@@ -645,6 +645,32 @@ body {
 .alert-time  { font-size: 8px; color: var(--dim); font-family: var(--mono); margin-left: auto; white-space: nowrap; }
 .no-alerts   { font-size: 10px; color: var(--dim); font-family: var(--mono); text-align: center; padding: 12px 0; }
 
+/* ── ZONE GROUPS ───────────────────────────── */
+.zone-group { margin-bottom: 4px; }
+.zone-group__hdr {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 6px;
+  background: var(--s2); border: 1px solid var(--line);
+  cursor: pointer; user-select: none;
+  transition: background .15s;
+}
+.zone-group__hdr:hover { background: var(--s3); }
+.zone-group__chevron {
+  font-size: 9px; color: var(--lo);
+  transition: transform .2s; flex-shrink:0;
+}
+.zone-group__hdr.open .zone-group__chevron { transform: rotate(90deg); }
+.zone-group__name { font-size: 11px; font-weight: 600; color: var(--md); flex: 1; }
+.zone-group__pts  { font-size: 9px; font-family: var(--mono); color: var(--lo); }
+.zone-group__status {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink:0;
+  background: var(--ok);
+}
+.zone-group__status.warn { background: var(--warn); }
+.zone-group__status.crit { background: var(--crit); animation: pulse 1s infinite; }
+.zone-group__body { display: none; padding-top: 6px; }
+.zone-group__body.open { display: block; }
+
 /* ── EMPTY FLOOR ─────────────────────────────── */
 .floor-empty {
   color: var(--dim); font-size: 11px; font-family: var(--mono);
@@ -724,6 +750,45 @@ body {
   .sgrid { grid-template-columns: 1fr 1fr; gap: 6px; }
   .sc { padding: 10px; }
   .sc__val { font-size: 20px; }
+}
+
+/* ── PWA INSTALL BANNER ─────────────────────── */
+.install-banner {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  background: var(--s2); border: 1px solid rgba(75,142,255,.35);
+  border-radius: 12px; padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.55);
+  max-width: 340px; width: calc(100vw - 40px);
+  animation: slideUp .3s ease;
+}
+@keyframes slideUp {
+  from { transform:translateX(-50%) translateY(20px); opacity:0; }
+  to   { transform:translateX(-50%) translateY(0);    opacity:1; }
+}
+.install-banner.hidden { display: none; }
+.install-banner__icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: var(--s3); border: 1px solid rgba(75,142,255,.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.install-banner__text { flex: 1; min-width: 0; }
+.install-banner__title { font-size: 12px; font-weight: 600; color: var(--hi); margin-bottom: 2px; }
+.install-banner__sub   { font-size: 10px; color: var(--lo); font-family: var(--mono); }
+.install-banner__btns  { display: flex; gap: 6px; flex-shrink: 0; }
+.install-btn {
+  padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: none; font-family: var(--sans); transition: opacity .15s;
+}
+.install-btn--primary { background: var(--blue); color: #fff; }
+.install-btn--primary:hover { opacity: .85; }
+.install-btn--dismiss { background: var(--s4); color: var(--lo); }
+.install-btn--dismiss:hover { color: var(--md); }
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .install-banner { bottom: calc(20px + env(safe-area-inset-bottom)); }
 }
 </style>
 </head>
@@ -838,6 +903,19 @@ body {
 <!-- Mobile nav toggle button -->
 <button class="nav-toggle" id="navToggle" onclick="toggleNav()">☰</button>
 
+<!-- PWA Install Banner -->
+<div class="install-banner hidden" id="installBanner">
+  <div class="install-banner__icon">🏢</div>
+  <div class="install-banner__text">
+    <div class="install-banner__title">앱으로 설치</div>
+    <div class="install-banner__sub">Grimes BIM-IoT · 홈 화면에 추가</div>
+  </div>
+  <div class="install-banner__btns">
+    <button class="install-btn install-btn--primary" id="installBtn">설치</button>
+    <button class="install-btn install-btn--dismiss" id="dismissBtn">나중에</button>
+  </div>
+</div>
+
 <script>
 /* ════════════════════════════════════════════════
    MOBILE NAV
@@ -866,73 +944,53 @@ const EQUIPMENT = [
     system:'hvac', floor:'B1', zone:'Mechanical Room',
     sensors:['pipe_pressure','pipe_temp','flow_gpm'] },
 
-  // ── B1 · Basement ── Chilled Water System ──────────────────────
-  { id:'CHW-PUMP-A', bimId:'CSI-23-CHWP-A', name:'Chilled Water Pump A (Primary)',
+  // ── B1 · Chiller Plant ───────────────────────────────────────
+  // CHW overview: supply/return + BTU meter derived (standard BACnet AI/derived)
+  { id:'CHW-PLANT', bimId:'CSI-23-CHWPLANT', name:'Chilled Water Plant',
     family:'Victaulic Grooved 90 Elbow + Sch.40 Pipe', category:'Fire Sprinkler System', source:'dwg',
     system:'water', floor:'B1', zone:'Chiller Plant',
-    sensors:['chw_supply_temp','chw_return_temp','pump_flow_gpm','pump_speed_rpm','pump_kw','status'] },
-  { id:'CHW-PUMP-B', bimId:'CSI-23-CHWP-B', name:'Chilled Water Pump B (Standby)',
+    sensors:['chw_supply_temp','chw_return_temp','chw_delta_t','chw_flow_gpm','cooling_tons'] },
+  // Pump A: run/fault DI + differential pressure AI (VFD integrated to pump, not separate)
+  { id:'CHW-PUMP-A', bimId:'CSI-23-CHWP-A', name:'CHW Pump A (Primary)',
     family:'Victaulic Style 009N + Sch.40', category:'Fire Sprinkler System', source:'dwg',
     system:'water', floor:'B1', zone:'Chiller Plant',
-    sensors:['pump_flow_gpm','pump_speed_rpm','pump_kw','status'] },
-  { id:'CHW-VFD-A', bimId:'CSI-23-VFD-A', name:'VFD – Chiller Pump A',
-    family:'Anvil Fig.3201R Reducing Elbow + Tee', category:'Fire Sprinkler System', source:'dwg',
+    sensors:['run_status','fault_alarm','chw_diff_press_ft'] },
+  // Pump B standby: status only — operators verify standby is ready
+  { id:'CHW-PUMP-B', bimId:'CSI-23-CHWP-B', name:'CHW Pump B (Standby)',
+    family:'Victaulic Style 004N + Sch.40', category:'Fire Sprinkler System', source:'dwg',
     system:'water', floor:'B1', zone:'Chiller Plant',
-    sensors:['vfd_hz','vfd_current','vfd_kw','status'] },
-  { id:'CHW-EXP-TK', bimId:'CSI-23-EXP', name:'Expansion Tank – Hydronic',
-    family:'Generic Fitting Rigid Coupling', category:'Pipe Fittings', source:'dwg',
-    system:'water', floor:'B1', zone:'Chiller Plant',
-    sensors:['tank_level_pct','tank_pressure'] },
-  { id:'CHW-DELTA-T', bimId:'CSI-23-DT', name:'Chilled Water Δ-T Monitor',
-    family:'Anvil Fig.3205R Reducing Tee', category:'Pipe Fittings', source:'dwg',
-    system:'water', floor:'B1', zone:'Chiller Plant',
-    sensors:['chw_supply_temp','chw_return_temp','delta_t_f','cooling_tons'] },
+    sensors:['run_status','fault_alarm'] },
 
-  // ── B1 · Basement ── Hot Water System ─────────────────────────
-  { id:'HW-PUMP-1', bimId:'CSI-23-HWP-1', name:'Hot Water Circulator Pump',
+  // ── B1 · Boiler Room ─────────────────────────────────────────
+  { id:'HW-SYSTEM', bimId:'CSI-23-HWS', name:'Hot Water System',
+    family:'Anvil Fig.3201R 90 Elbow + Sch.40', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Boiler Room',
+    sensors:['hw_supply_temp','hw_return_temp'] },
+  { id:'HW-PUMP-1', bimId:'CSI-23-HWP-1', name:'HW Circulator Pump',
     family:'Victaulic No.001 FireLock 90 Elbow', category:'Fire Sprinkler System', source:'dwg',
     system:'water', floor:'B1', zone:'Boiler Room',
-    sensors:['hw_supply_temp','hw_return_temp','pump_flow_gpm','pump_kw','status'] },
-  { id:'HW-VALVE-1', bimId:'CSI-23-HWV-1', name:'Hot Water Control Valve',
-    family:'Generic Fitting Threaded Reducing Tee CI', category:'Pipe Fittings', source:'dwg',
-    system:'water', floor:'B1', zone:'Boiler Room',
-    sensors:['valve_pos_pct','hw_supply_temp','flow_gpm'] },
+    sensors:['run_status','fault_alarm','hw_flow_gpm'] },
 
-  // ── B1 · Basement ── Domestic Water ───────────────────────────
-  { id:'DW-MAIN-METER', bimId:'CSI-22-DWM', name:'Domestic Water Main Meter',
+  // ── B1 · Utility Vault ───────────────────────────────────────
+  // Main flow meter + pressure transducer (water quality = separate treatment system)
+  { id:'DW-MAIN', bimId:'CSI-22-DWM', name:'Domestic Water Main Meter',
     family:'Victaulic Style 004N Flexible Coupling', category:'Fire Sprinkler System', source:'dwg',
     system:'water', floor:'B1', zone:'Utility Vault',
-    sensors:['dw_flow_gpm','dw_pressure','dw_temp','conductivity_us'] },
-  { id:'DW-PRV-1', bimId:'CSI-22-PRV', name:'Pressure Reducing Valve (PRV)',
-    family:'Generic Fitting Threaded 90 Elbow CI', category:'Pipe Fittings', source:'dwg',
-    system:'water', floor:'B1', zone:'Utility Vault',
-    sensors:['dw_pressure','valve_pos_pct','status'] },
-  { id:'DW-HW-METER', bimId:'CSI-22-HWM', name:'Domestic Hot Water Meter',
-    family:'Anvil Fig.3351R Threaded 90 Elbow CI', category:'Pipe Fittings', source:'dwg',
-    system:'water', floor:'B1', zone:'Utility Vault',
-    sensors:['dw_flow_gpm','dw_temp','status'] },
-  { id:'DW-BACKFLOW', bimId:'CSI-22-BFP', name:'Backflow Preventer',
-    family:'Victaulic No.12 Grooved 22 Elbow', category:'Fire Sprinkler System', source:'dwg',
-    system:'water', floor:'B1', zone:'Utility Vault',
-    sensors:['dw_pressure','status'] },
+    sensors:['dw_flow_gpm','dw_pressure'] },
 
-  // ── B1 · Basement ── Water Quality & Drain ────────────────────
-  { id:'WQ-001', bimId:'CSI-22-WQ', name:'Water Quality Monitor',
-    family:'Generic Fitting Concentric Reducer CI', category:'Pipe Fittings', source:'dwg',
-    system:'water', floor:'B1', zone:'Utility Vault',
-    sensors:['conductivity_us','turbidity_ntu','dw_temp','ph_level'] },
+  // ── B1 · Sump Pit ─────────────────────────────────────────────
+  // Run status + high-water float alarm — standard BACnet DI from MCC panel
   { id:'SUMP-PUMP-1', bimId:'CSI-22-SP1', name:'Sump Pump #1',
     family:'Generic Fitting Cap Threaded CI', category:'Pipe Fittings', source:'dwg',
     system:'water', floor:'B1', zone:'Sump Pit',
-    sensors:['sump_level_in','pump_kw','status','leak_detect'] },
-  { id:'SUMP-PUMP-2', bimId:'CSI-22-SP2', name:'Sump Pump #2 (Backup)',
-    family:'Victaulic No.006 FireLock Cap DI', category:'Fire Sprinkler System', source:'dwg',
-    system:'water', floor:'B1', zone:'Sump Pit',
-    sensors:['sump_level_in','status'] },
-  { id:'LEAK-SENSOR-B1', bimId:null, name:'Leak Detection Strip – B1',
+    sensors:['run_status','float_alarm'] },
+
+  // ── B1 · Mechanical Room ─────────────────────────────────────
+  // Leak detection dry-contact → BACnet DI
+  { id:'LEAK-B1', bimId:null, name:'Leak Detection – Mech. Room',
     family:'Wheatland Tube Sch.10', category:'Fire Sprinkler System', source:'dwg',
     system:'water', floor:'B1', zone:'Mechanical Room',
-    sensors:['leak_detect','status'] },
+    sensors:['leak_status'] },
 
   // ── L1 · Level 1 ───────────────────────────────────────────────
   { id:'SPRK-Z1', bimId:'CSI-21-ZA', name:'Sprinkler Zone A (Sch.40)',
@@ -1023,49 +1081,59 @@ const EQUIPMENT = [
    SENSOR DEFINITIONS
 ════════════════════════════════════════════════ */
 const SD = {
-  supply_temp:    { label:'Supply Air Temp',  unit:'°F',  color:'#f87171', badge:'TEMP',  bbc:'rgba(248,113,113,.12)', range:[55,95],   warn:[73,80],   crit:[80,90]   },
-  return_temp:    { label:'Return Air Temp',  unit:'°F',  color:'#fb923c', badge:'TEMP',  bbc:'rgba(251,146,60,.12)',  range:[60,90],   warn:[75,80],   crit:[80,88]   },
-  airflow_cfm:    { label:'Airflow',          unit:'CFM', color:'#4b8eff', badge:'AIR',   bbc:'rgba(75,142,255,.12)',  range:[0,2000],  warn:null,      crit:null      },
-  co2_ppm:        { label:'CO₂',             unit:'ppm', color:'#f472b6', badge:'CO2',   bbc:'rgba(244,114,182,.12)', range:[350,1500],warn:[800,1000],crit:[1000,1500]},
-  humidity:       { label:'Humidity',         unit:'%',   color:'#a78bfa', badge:'HUM',   bbc:'rgba(167,139,250,.12)', range:[20,90],   warn:[60,75],   crit:[75,90]   },
-  duct_pressure:  { label:'Duct Static Pres.', unit:'inWG',color:'#f59e0b',badge:'PRES',  bbc:'rgba(245,158,11,.12)', range:[0,3],     warn:[1.5,2],   crit:[2,3]     },
-  pipe_pressure:  { label:'Pipe Pressure',    unit:'PSI', color:'#f59e0b', badge:'PRES',  bbc:'rgba(245,158,11,.12)',  range:[0,200],   warn:[130,160], crit:[160,200] },
-  pipe_temp:      { label:'Pipe Temp',        unit:'°F',  color:'#f87171', badge:'TEMP',  bbc:'rgba(248,113,113,.12)', range:[40,200],  warn:null,      crit:null      },
-  flow_gpm:       { label:'Flow Rate',        unit:'GPM', color:'#2dd4bf', badge:'FLOW',  bbc:'rgba(45,212,191,.12)',  range:[0,100],   warn:null,      crit:null      },
-  supply_pressure:{ label:'Supply Pressure',  unit:'PSI', color:'#fb923c', badge:'PRES',  bbc:'rgba(251,146,60,.12)',  range:[100,200], warn:[145,155], crit:[155,200] },
-  zone_pressure:  { label:'Zone Pressure',    unit:'PSI', color:'#fb923c', badge:'PRES',  bbc:'rgba(251,146,60,.12)',  range:[100,200], warn:[110,120], crit:[100,110] },
-  alarm_status:   { label:'Alarm Status',     unit:'',    color:'#f87171', badge:'ALARM', bbc:'rgba(248,113,113,.15)', range:[0,1],     warn:null,      crit:null      },
-  battery_pct:    { label:'Battery',          unit:'%',   color:'#34d399', badge:'BATT',  bbc:'rgba(52,211,153,.12)',  range:[0,100],   warn:[20,40],   crit:[0,20]   },
-  voltage:        { label:'Voltage',          unit:'V',   color:'#fb923c', badge:'ELEC',  bbc:'rgba(251,146,60,.12)',  range:[100,130], warn:[122,127], crit:[127,130] },
-  current:        { label:'Current',          unit:'A',   color:'#fb923c', badge:'ELEC',  bbc:'rgba(251,146,60,.12)',  range:[0,100],   warn:[75,90],   crit:[90,100]  },
-  power_kw:       { label:'Active Power',     unit:'kW',  color:'#fb923c', badge:'PWR',   bbc:'rgba(251,146,60,.12)',  range:[0,50],    warn:[35,45],   crit:[45,50]   },
-  power_factor:   { label:'Power Factor',     unit:'',    color:'#fb923c', badge:'PF',    bbc:'rgba(251,146,60,.12)',  range:[0,1],     warn:[0,0.8],   crit:[0,0.7]   },
-  load_pct:       { label:'Load',             unit:'%',   color:'#fb923c', badge:'LOAD',  bbc:'rgba(251,146,60,.12)',  range:[0,100],   warn:[75,90],   crit:[90,100]  },
-  dimmer_pct:     { label:'Dimmer',           unit:'%',   color:'#34d399', badge:'LIGHT', bbc:'rgba(52,211,153,.12)',  range:[0,100],   warn:null,      crit:null      },
-  chw_supply_temp:{ label:'CHW Supply Temp',  unit:'°F',  color:'#38bdf8', badge:'CHW',   bbc:'rgba(56,189,248,.12)',  range:[38,60],   warn:[50,56],   crit:[56,60]   },
-  chw_return_temp:{ label:'CHW Return Temp',  unit:'°F',  color:'#7dd3fc', badge:'CHW',   bbc:'rgba(125,211,252,.12)', range:[44,70],   warn:[58,65],   crit:[65,70]   },
-  delta_t_f:      { label:'Δ-T (Supply↔Return)', unit:'°F', color:'#2dd4bf', badge:'ΔT', bbc:'rgba(45,212,191,.12)', range:[0,20],    warn:[3,5],     crit:[0,3]     },
-  cooling_tons:   { label:'Cooling Output',   unit:'tons',color:'#38bdf8', badge:'TONS',  bbc:'rgba(56,189,248,.12)',  range:[0,100],   warn:null,      crit:null      },
-  hw_supply_temp: { label:'HW Supply Temp',   unit:'°F',  color:'#fca5a5', badge:'HWS',   bbc:'rgba(252,165,165,.12)', range:[100,200], warn:[170,185], crit:[185,200] },
-  hw_return_temp: { label:'HW Return Temp',   unit:'°F',  color:'#fda4af', badge:'HWR',   bbc:'rgba(253,164,175,.12)', range:[80,160],  warn:null,      crit:null      },
-  pump_flow_gpm:  { label:'Pump Flow',        unit:'GPM', color:'#2dd4bf', badge:'FLOW',  bbc:'rgba(45,212,191,.12)',  range:[0,300],   warn:null,      crit:null      },
-  pump_speed_rpm: { label:'Pump Speed',       unit:'RPM', color:'#a78bfa', badge:'RPM',   bbc:'rgba(167,139,250,.12)', range:[0,1800],  warn:[1600,1750],crit:[1750,1800]},
-  pump_kw:        { label:'Pump Power',       unit:'kW',  color:'#fb923c', badge:'PWR',   bbc:'rgba(251,146,60,.12)',  range:[0,30],    warn:[20,25],   crit:[25,30]   },
-  valve_pos_pct:  { label:'Valve Position',   unit:'%',   color:'#a78bfa', badge:'VLV',   bbc:'rgba(167,139,250,.12)', range:[0,100],   warn:null,      crit:null      },
-  vfd_hz:         { label:'VFD Frequency',    unit:'Hz',  color:'#818cf8', badge:'VFD',   bbc:'rgba(129,140,248,.12)', range:[20,60],   warn:null,      crit:null      },
-  vfd_current:    { label:'VFD Current',      unit:'A',   color:'#818cf8', badge:'VFD',   bbc:'rgba(129,140,248,.12)', range:[0,60],    warn:[45,55],   crit:[55,60]   },
-  vfd_kw:         { label:'VFD Power',        unit:'kW',  color:'#818cf8', badge:'VFD',   bbc:'rgba(129,140,248,.12)', range:[0,25],    warn:[18,22],   crit:[22,25]   },
-  tank_level_pct: { label:'Tank Level',       unit:'%',   color:'#38bdf8', badge:'TANK',  bbc:'rgba(56,189,248,.12)',  range:[0,100],   warn:[15,25],   crit:[0,15]    },
-  tank_pressure:  { label:'Tank Pressure',    unit:'PSI', color:'#f59e0b', badge:'PRES',  bbc:'rgba(245,158,11,.12)',  range:[0,60],    warn:[45,55],   crit:[55,60]   },
-  dw_flow_gpm:    { label:'Domestic Flow',    unit:'GPM', color:'#34d399', badge:'DW',    bbc:'rgba(52,211,153,.12)',  range:[0,80],    warn:null,      crit:null      },
-  dw_pressure:    { label:'Water Pressure',   unit:'PSI', color:'#f59e0b', badge:'DW',    bbc:'rgba(245,158,11,.12)',  range:[30,120],  warn:[80,100],  crit:[100,120] },
-  dw_temp:        { label:'Water Temp',       unit:'°F',  color:'#7dd3fc', badge:'DW',    bbc:'rgba(125,211,252,.12)', range:[35,130],  warn:null,      crit:null      },
-  conductivity_us:{ label:'Conductivity',     unit:'μS/cm',color:'#34d399',badge:'WQ',   bbc:'rgba(52,211,153,.12)',  range:[50,600],  warn:[300,500], crit:[500,600] },
-  turbidity_ntu:  { label:'Turbidity',        unit:'NTU', color:'#34d399', badge:'WQ',    bbc:'rgba(52,211,153,.12)',  range:[0,5],     warn:[1,3],     crit:[3,5]     },
-  ph_level:       { label:'pH Level',         unit:'pH',  color:'#a78bfa', badge:'WQ',    bbc:'rgba(167,139,250,.12)', range:[5,9],     warn:null,      crit:null      },
-  sump_level_in:  { label:'Sump Level',       unit:'in',  color:'#38bdf8', badge:'SUMP',  bbc:'rgba(56,189,248,.12)',  range:[0,36],    warn:[18,28],   crit:[28,36]   },
-  leak_detect:    { label:'Leak Detection',   unit:'',    color:'#34d399', badge:'LEAK',  bbc:'rgba(52,211,153,.12)',  range:[0,1],     warn:null,      crit:null      },
-  status:         { label:'Status',           unit:'',    color:'#34d399', badge:'STATUS',bbc:'rgba(52,211,153,.12)',  range:[0,1],     warn:null,      crit:null      },
+  // ── HVAC / Air (BACnet AI from AHU/VAV DDC) ──────────────────
+  supply_temp:      { label:'Supply Air Temp',    unit:'°F',    color:'#f87171', badge:'SAT',  bbc:'rgba(248,113,113,.12)', range:[55,85],   warn:[72,78],   crit:[78,85]   },
+  return_temp:      { label:'Return Air Temp',    unit:'°F',    color:'#fb923c', badge:'RAT',  bbc:'rgba(251,146,60,.12)',  range:[60,90],   warn:[75,80],   crit:[80,88]   },
+  airflow_cfm:      { label:'Airflow',            unit:'CFM',   color:'#4b8eff', badge:'CFM',  bbc:'rgba(75,142,255,.12)',  range:[0,2000],  warn:null,      crit:null      },
+  co2_ppm:          { label:'CO₂',               unit:'ppm',   color:'#f472b6', badge:'CO2',  bbc:'rgba(244,114,182,.12)', range:[400,1500],warn:[800,1000],crit:[1000,1500]},
+  humidity:         { label:'Rel. Humidity',      unit:'%RH',   color:'#a78bfa', badge:'RH',   bbc:'rgba(167,139,250,.12)', range:[20,80],   warn:[60,70],   crit:[70,80]   },
+  duct_pressure:    { label:'Duct Static Press.',  unit:'in.WG', color:'#f59e0b', badge:'DSP',  bbc:'rgba(245,158,11,.12)',  range:[0,3],     warn:[1.5,2.2], crit:[2.2,3]   },
+  pipe_pressure:    { label:'Pipe Pressure',      unit:'PSI',   color:'#f59e0b', badge:'PRES', bbc:'rgba(245,158,11,.12)',  range:[0,150],   warn:[100,130], crit:[130,150] },
+  pipe_temp:        { label:'Pipe Temp',          unit:'°F',    color:'#f87171', badge:'TEMP', bbc:'rgba(248,113,113,.12)', range:[40,200],  warn:null,      crit:null      },
+  flow_gpm:         { label:'Flow Rate',          unit:'GPM',   color:'#2dd4bf', badge:'GPM',  bbc:'rgba(45,212,191,.12)',  range:[0,100],   warn:null,      crit:null      },
+  // ── Fire Protection ───────────────────────────────────────────
+  // NFPA 13: main supply must hold ≥150 PSI
+  supply_pressure:  { label:'Supply Pressure',    unit:'PSI',   color:'#fb923c', badge:'PRES', bbc:'rgba(251,146,60,.12)',  range:[100,200], warn:[140,150], crit:[100,140] },
+  zone_pressure:    { label:'Zone Pressure',      unit:'PSI',   color:'#fb923c', badge:'PRES', bbc:'rgba(251,146,60,.12)',  range:[100,200], warn:[110,125], crit:[100,110] },
+  alarm_status:     { label:'Alarm Status',       unit:'',      color:'#f87171', badge:'ALARM',bbc:'rgba(248,113,113,.15)', range:[0,1],     warn:null,      crit:null      },
+  battery_pct:      { label:'Battery',            unit:'%',     color:'#34d399', badge:'BATT', bbc:'rgba(52,211,153,.12)',  range:[0,100],   warn:[20,40],   crit:[0,20]    },
+  // ── Electrical (BACnet/Modbus from power meter) ───────────────
+  voltage:          { label:'Voltage',            unit:'V',     color:'#fb923c', badge:'V',    bbc:'rgba(251,146,60,.12)',  range:[100,130], warn:[122,127], crit:[127,130] },
+  current:          { label:'Current',            unit:'A',     color:'#fb923c', badge:'A',    bbc:'rgba(251,146,60,.12)',  range:[0,100],   warn:[75,90],   crit:[90,100]  },
+  power_kw:         { label:'Active Power',       unit:'kW',    color:'#fb923c', badge:'kW',   bbc:'rgba(251,146,60,.12)',  range:[0,50],    warn:[35,45],   crit:[45,50]   },
+  power_factor:     { label:'Power Factor',       unit:'',      color:'#fb923c', badge:'PF',   bbc:'rgba(251,146,60,.12)',  range:[0.6,1],   warn:[0.6,0.8], crit:null      },
+  load_pct:         { label:'Load',               unit:'%',     color:'#fb923c', badge:'LOAD', bbc:'rgba(251,146,60,.12)',  range:[0,100],   warn:[75,90],   crit:[90,100]  },
+  dimmer_pct:       { label:'Dimmer Level',       unit:'%',     color:'#34d399', badge:'DIM',  bbc:'rgba(52,211,153,.12)',  range:[0,100],   warn:null,      crit:null      },
+  // ── Chilled Water ─────────────────────────────────────────────
+  // CHW supply setpoint 44°F. ΔT design 12°F. Low ΔT (<4°F) = chiller efficiency problem.
+  chw_supply_temp:  { label:'CHW Supply Temp',    unit:'°F',    color:'#38bdf8', badge:'CHWS', bbc:'rgba(56,189,248,.12)',  range:[38,58],   warn:[48,54],   crit:[54,58]   },
+  chw_return_temp:  { label:'CHW Return Temp',    unit:'°F',    color:'#7dd3fc', badge:'CHWR', bbc:'rgba(125,211,252,.12)', range:[48,72],   warn:[64,68],   crit:[68,72]   },
+  chw_delta_t:      { label:'CHW ΔT',            unit:'°F',    color:'#2dd4bf', badge:'ΔT',   bbc:'rgba(45,212,191,.12)',  range:[0,18],    warn:[3,5],     crit:[0,3]     },
+  chw_flow_gpm:     { label:'CHW Flow Rate',      unit:'GPM',   color:'#38bdf8', badge:'GPM',  bbc:'rgba(56,189,248,.12)',  range:[0,400],   warn:null,      crit:null      },
+  cooling_tons:     { label:'Cooling Load',       unit:'TR',    color:'#0ea5e9', badge:'TR',   bbc:'rgba(14,165,233,.12)',  range:[0,100],   warn:null,      crit:null      },
+  // ft.WG = feet of water gauge — US HVAC standard for pump differential pressure
+  chw_diff_press_ft:{ label:'CHW Diff. Pressure', unit:'ft.WG', color:'#f59e0b', badge:'DP',   bbc:'rgba(245,158,11,.12)',  range:[0,100],   warn:[75,90],   crit:[90,100]  },
+  // AHU coil control valve: 0% closed → 100% fully open (BACnet AO)
+  chw_valve_pct:    { label:'CHW Valve Position', unit:'%',     color:'#a78bfa', badge:'VLV',  bbc:'rgba(167,139,250,.12)', range:[0,100],   warn:null,      crit:null      },
+  // ── Hot Water ─────────────────────────────────────────────────
+  hw_supply_temp:   { label:'HW Supply Temp',     unit:'°F',    color:'#fca5a5', badge:'HWS',  bbc:'rgba(252,165,165,.12)', range:[100,200], warn:[170,185], crit:[185,200] },
+  hw_return_temp:   { label:'HW Return Temp',     unit:'°F',    color:'#fda4af', badge:'HWR',  bbc:'rgba(253,164,175,.12)', range:[80,170],  warn:null,      crit:null      },
+  hw_flow_gpm:      { label:'HW Flow Rate',       unit:'GPM',   color:'#fca5a5', badge:'GPM',  bbc:'rgba(252,165,165,.12)', range:[0,80],    warn:null,      crit:null      },
+  // ── Domestic Water ────────────────────────────────────────────
+  // City water: pulsed flow meter + pressure transducer (BACnet AI/counter)
+  dw_flow_gpm:      { label:'Domestic Flow',      unit:'GPM',   color:'#34d399', badge:'DW',   bbc:'rgba(52,211,153,.12)',  range:[0,60],    warn:null,      crit:null      },
+  // US city supply 60–80 PSI at building entry
+  dw_pressure:      { label:'Water Pressure',     unit:'PSI',   color:'#f59e0b', badge:'DW',   bbc:'rgba(245,158,11,.12)',  range:[30,100],  warn:[75,90],   crit:[90,100]  },
+  // ── Binary / Digital Status (BACnet BI/DI from MCC panels) ───
+  // Most common BMS points — hardwired from motor control center
+  run_status:       { label:'Run Status',         unit:'',      color:'#34d399', badge:'RUN',  bbc:'rgba(52,211,153,.12)',  range:[0,1],     warn:null,      crit:null      },
+  fault_alarm:      { label:'Fault Alarm',        unit:'',      color:'#f87171', badge:'FLT',  bbc:'rgba(248,113,113,.15)', range:[0,1],     warn:null,      crit:null      },
+  float_alarm:      { label:'Float Alarm',        unit:'',      color:'#f59e0b', badge:'FLT',  bbc:'rgba(245,158,11,.15)',  range:[0,1],     warn:null,      crit:null      },
+  leak_status:      { label:'Leak Detection',     unit:'',      color:'#34d399', badge:'LEAK', bbc:'rgba(52,211,153,.12)',  range:[0,1],     warn:null,      crit:null      },
+  // ── Remaining legacy points (still used by non-water equipment) ──────────
+  dw_temp:          { label:'Water Temp',          unit:'°F',    color:'#7dd3fc', badge:'DW',   bbc:'rgba(125,211,252,.12)', range:[35,130],  warn:null,      crit:null      },
+  valve_pos_pct:    { label:'Valve Position',      unit:'%',     color:'#a78bfa', badge:'VLV',  bbc:'rgba(167,139,250,.12)', range:[0,100],   warn:null,      crit:null      },
+  status:           { label:'Status',              unit:'',      color:'#34d399', badge:'STS',  bbc:'rgba(52,211,153,.12)',  range:[0,1],     warn:null,      crit:null      },
 };
 
 const FLOORS = [
@@ -1124,111 +1192,93 @@ const DataAdapter = {
 
   simulate(equipId, sensorType) {
     const now = new Date();
-    const occ = this.occupancy(now);
+    const occ  = this.occupancy(now);
     const outT = this.outdoorTemp(now);
-    const d = this.drift(equipId, sensorType);
-    const h = now.getHours() + now.getMinutes()/60;
-    const dwUsage = occ * (
-      (h >= 7.5 && h <= 9)   ? 1.4 :
-      (h >= 11.5 && h <= 13) ? 1.2 :
-      (h >= 17 && h <= 18.5) ? 1.1 :
-      1.0
-    );
+    const d    = this.drift(equipId, sensorType);
+    const h    = now.getHours() + now.getMinutes()/60;
+    const dwUsage = occ * ((h>=7.5&&h<=9)?1.4:(h>=11.5&&h<=13)?1.2:(h>=17&&h<=18.5)?1.1:1.0);
 
     switch(sensorType) {
-      case 'supply_temp':      return +(63 - occ*5 + d*1.5).toFixed(1);
-      case 'return_temp':      return +(68 + occ*6 + (outT-70)*0.15 + d*1.2).toFixed(1);
-      case 'airflow_cfm':      return +(Math.max(200, 200 + occ*1600 + d*80)).toFixed(0);
-      case 'co2_ppm':          return +(Math.max(400, 420 + occ*780 + d*40)).toFixed(0);
-      case 'humidity':         return +(Math.min(80,Math.max(20, 35 + occ*20 + (outT>75?8:0) + d*3))).toFixed(1);
-      case 'duct_pressure':    return +(0.5 + occ*1.2 + d*0.08).toFixed(2);
-      case 'pipe_pressure':    return +(100 + d*2).toFixed(1);
-      case 'pipe_temp':        return +(55 + occ*8 + d*1.5).toFixed(1);
-      case 'flow_gpm':         return +(20 + occ*40 + d*2).toFixed(1);
-      case 'supply_pressure':  return +(150 + d*1.2).toFixed(1);
-      case 'zone_pressure':    return +(135 + d*1.0).toFixed(1);
-      case 'voltage':          return +(120 - occ*3 + d*0.8).toFixed(1);
-      case 'current':          return +(Math.max(0, 5 + occ*55 + d*4)).toFixed(1);
+      // ── HVAC / Air ───────────────────────────────────────────────────────
+      case 'supply_temp':    return +(63 - occ*5 + d*1.5).toFixed(1);
+      case 'return_temp':    return +(68 + occ*6 + (outT-70)*0.15 + d*1.2).toFixed(1);
+      case 'airflow_cfm':    return +(Math.max(200, 200 + occ*1600 + d*80)).toFixed(0);
+      case 'co2_ppm':        return +(Math.max(400, 420 + occ*780 + d*40)).toFixed(0);
+      case 'humidity':       return +(Math.min(75,Math.max(20, 35+occ*20+(outT>75?5:0)+d*3))).toFixed(1);
+      case 'duct_pressure':  return +(0.5 + occ*1.2 + d*0.08).toFixed(2);
+      case 'pipe_pressure':  return +(100 + d*2).toFixed(1);
+      case 'pipe_temp':      return +(55 + occ*8 + d*1.5).toFixed(1);
+      case 'flow_gpm':       return +(20 + occ*40 + d*2).toFixed(1);
+      // ── Fire ─────────────────────────────────────────────────────────────
+      case 'supply_pressure':return +(152 + d*1.2).toFixed(1);
+      case 'zone_pressure':  return +(138 + d*1.0).toFixed(1);
+      case 'alarm_status':   return 'NORMAL';
+      case 'battery_pct':    return 88;
+      // ── Electrical ───────────────────────────────────────────────────────
+      case 'voltage':        return +(120 - occ*3 + d*0.8).toFixed(1);
+      case 'current':        return +(Math.max(0, 5 + occ*55 + d*4)).toFixed(1);
       case 'power_kw': {
-        const s = equipId.startsWith('LIGHT') ? 0.4 : equipId === 'ELEC-AVDPS' ? 1.0 : 0.2;
+        const s = equipId.startsWith('LIGHT')||equipId.startsWith('FIX') ? 0.4
+                : equipId === 'ELEC-AVDPS' ? 1.0 : 0.2;
         return +(Math.max(0, (2+occ*18)*s + d*0.5)).toFixed(2);
       }
-      case 'power_factor':     return +(Math.min(1, 0.87 + occ*0.07 + d*0.01)).toFixed(2);
-      case 'load_pct':         return +(Math.min(98,Math.max(2, occ*75 + d*5))).toFixed(1);
-      case 'dimmer_pct':       return occ > 0.3 ? +(85 + d*5).toFixed(0) : +(20+d*5).toFixed(0);
-      case 'battery_pct':      return 88;
-      case 'alarm_status':     return 'NORMAL';
+      case 'power_factor':   return +(Math.min(1, 0.87 + occ*0.07 + d*0.01)).toFixed(2);
+      case 'load_pct':       return +(Math.min(98,Math.max(2, occ*75 + d*5))).toFixed(1);
+      case 'dimmer_pct':     return occ > 0.3 ? +(85 + d*5).toFixed(0) : +(20+d*5).toFixed(0);
+      // ── Chilled Water ────────────────────────────────────────────────────
+      // CHW setpoint 44°F. Low ΔT syndrome (<4°F) = efficiency problem.
       case 'chw_supply_temp': {
-        const load = occ * 0.6 + (outT - 62) * 0.03;
-        return +(44 + Math.max(0, load - 0.5) * 2 + d * 0.4).toFixed(1);
+        const load = occ*0.6 + (outT-62)*0.03;
+        return +(44 + Math.max(0, load-0.5)*2 + d*0.4).toFixed(1);
       }
       case 'chw_return_temp': {
-        const supplyT = 44 + d*0.3;
-        const deltaT = 4 + occ * 10 + (outT-62)*0.1;
-        return +(supplyT + deltaT + d*0.5).toFixed(1);
+        const dt = 4 + occ*10 + (outT-62)*0.1;
+        return +(44 + dt + d*0.5).toFixed(1);
       }
-      case 'delta_t_f':        return +(4 + occ*10 + d*0.8).toFixed(1);
-      case 'cooling_tons':     return +(occ * 75 + (outT-62)*0.3 + d*2).toFixed(1);
-      case 'hw_supply_temp':   return +(150 - occ*8 + d*1.0).toFixed(1);
-      case 'hw_return_temp':   return +(120 + occ*4 + d*1.2).toFixed(1);
-      case 'pump_speed_rpm': {
-        if (equipId === 'CHW-PUMP-B') return occ > 0 ? +(200 + d*20).toFixed(0) : 0;
-        const rpm = 900 + occ * 850;
-        return +(Math.min(1750, Math.max(900, rpm + d*40))).toFixed(0);
-      }
-      case 'pump_flow_gpm': {
-        if (equipId === 'CHW-PUMP-B') return +(d > 0 ? 5 : 0).toFixed(1);
-        if (equipId === 'HW-PUMP-1') return +(15 + occ*60 + d*3).toFixed(1);
-        return +(30 + occ*200 + d*8).toFixed(1);
-      }
-      case 'pump_kw': {
-        if (equipId === 'CHW-PUMP-B') return +(0.5 + d*0.1).toFixed(2);
-        if (equipId.startsWith('SUMP')) return occ > 0 ? +(1.5 + d*0.2).toFixed(2) : +(0).toFixed(2);
-        if (equipId === 'HW-PUMP-1') return +(1 + occ*4 + d*0.3).toFixed(2);
-        const frac = 0.5 + occ*0.5;
-        return +(Math.max(1, 18 * frac*frac*frac + d*0.5)).toFixed(2);
-      }
-      case 'vfd_hz':           return +(30 + occ*30 + d*1.5).toFixed(1);
-      case 'vfd_current':      return +(8 + occ*35 + d*2).toFixed(1);
-      case 'vfd_kw': {
-        const frac = 0.5 + occ*0.5;
-        return +(Math.max(0.5, 15 * frac*frac*frac + d*0.4)).toFixed(2);
-      }
-      case 'valve_pos_pct': {
-        if (equipId === 'DW-PRV-1') return +(55 + d*3).toFixed(1);
-        if (equipId === 'HW-VALVE-1') return +(20 + occ*65 + d*4).toFixed(1);
-        return +(15 + occ*75 + d*5).toFixed(1);
-      }
-      case 'tank_level_pct':   return +(55 + occ*18 + d*2).toFixed(1);
-      case 'tank_pressure':    return +(30 + occ*12 + d*1).toFixed(1);
-      case 'dw_flow_gpm':      return +(Math.max(0, dwUsage*18 + d*2)).toFixed(1);
-      case 'dw_pressure':      return +(72 - dwUsage*8 + d*1.5).toFixed(1);
-      case 'dw_temp': {
-        if (equipId === 'DW-HW-METER') return +(115 - dwUsage*3 + d*1.5).toFixed(1);
-        return +(54 + (outT-62)*0.05 + d*0.8).toFixed(1);
-      }
-      case 'conductivity_us': {
-        const t = Math.floor(Date.now()/3600000) % 24;
-        const cyclePhase = (t % 8) / 8;
-        return +(200 + cyclePhase*60 + d*8).toFixed(1);
-      }
-      case 'turbidity_ntu':    return +(0.15 + dwUsage*0.1 + Math.max(0, d*0.08)).toFixed(2);
-      case 'ph_level':         return +(7.4 + d*0.08).toFixed(2);
-      case 'sump_level_in':    return +(4 + Math.max(0, d*1.5)).toFixed(1);
-      case 'leak_detect':      return 'CLEAR';
-      case 'status': {
-        if (equipId.startsWith('SPRK'))  return 'STANDBY';
-        if (equipId === 'ORBIT-BMCS')    return 'ONLINE';
-        if (equipId === 'DW-PRV-1')      return 'ACTIVE';
-        if (equipId === 'DW-BACKFLOW')   return 'CLOSED';
-        if (equipId === 'CHW-PUMP-B')    return occ > 0.95 ? 'ACTIVE' : 'STANDBY';
-        if (equipId === 'SUMP-PUMP-2')   return 'STANDBY';
-        if (equipId.startsWith('SUMP'))  return occ > 0.1 ? 'ON' : 'IDLE';
+      case 'chw_delta_t':     return +(4 + occ*10 + d*0.8).toFixed(1);
+      case 'chw_flow_gpm':    return +(50 + occ*200 + d*8).toFixed(0);
+      // Cooling tons = GPM × ΔT × 500 / 12000 (US formula)
+      case 'cooling_tons':    return +(occ*65 + (outT-62)*0.3 + d*2).toFixed(1);
+      // CHW diff pressure ft.WG — VFD maintains ~60 ft.WG setpoint
+      case 'chw_diff_press_ft': return +(55 + occ*12 + d*2).toFixed(1);
+      // AHU coil valve 0–100%
+      case 'chw_valve_pct':   return +(Math.min(98,Math.max(2, occ*80+(outT-62)*0.5+d*4))).toFixed(1);
+      // ── Hot Water ────────────────────────────────────────────────────────
+      // Outdoor reset: supply drops slightly as load rises
+      case 'hw_supply_temp':  return +(150 - occ*8 + (62-outT)*0.1 + d*1.0).toFixed(1);
+      case 'hw_return_temp':  return +(120 + occ*4 + d*1.2).toFixed(1);
+      case 'hw_flow_gpm':     return +(15 + occ*45 + d*2).toFixed(1);
+      // ── Domestic Water ───────────────────────────────────────────────────
+      case 'dw_flow_gpm':     return +(Math.max(0, dwUsage*16 + d*2)).toFixed(1);
+      case 'dw_pressure':     return +(72 - dwUsage*6 + d*1.5).toFixed(1);
+      // ── Binary status (BACnet DI from MCC) ───────────────────────────────
+      case 'run_status': {
+        if (equipId === 'CHW-PUMP-B')  return occ > 0.93 ? 'RUN' : 'STANDBY';
+        if (equipId === 'SUMP-PUMP-1') return 'STOP';
+        if (equipId === 'ORBIT-BMCS')  return 'RUN';
+        if (equipId.startsWith('SPRK')) return 'OPEN';
         if (equipId.startsWith('CONDUIT')) return occ > 0.1 ? 'ACTIVE' : 'IDLE';
-        if (equipId.startsWith('CHW') || equipId.startsWith('HW') || equipId.startsWith('DW'))
-          return occ > 0.05 ? 'ACTIVE' : 'IDLE';
-        if (equipId.startsWith('WQ') || equipId.startsWith('LEAK')) return 'MONITORING';
-        return occ > 0.1 ? 'ON' : 'STANDBY';
+        if (equipId.startsWith('CHW')||equipId.startsWith('HW')) return occ>0.05?'RUN':'STOP';
+        return occ > 0.1 ? 'RUN' : 'STOP';
+      }
+      case 'fault_alarm':     return 'NO FAULT';
+      case 'float_alarm':     return 'CLEAR';
+      case 'leak_status':     return 'CLEAR';
+      // ── Life Safety ──────────────────────────────────────────────────────
+      case 'alarm_status':    return 'NORMAL';
+      case 'dw_temp': {
+        if (equipId === 'DW-RISER-L1'||equipId === 'DW-RISER-L2'||equipId === 'DW-RISER-L3')
+          return +(54 + (this.outdoorTemp()-62)*0.05 + d*0.8).toFixed(1);
+        return +(54 + d*0.8).toFixed(1);
+      }
+      case 'valve_pos_pct': return +(15 + this.occupancy()*75 + d*5).toFixed(1);
+      case 'status': {
+        const occ = this.occupancy();
+        if (equipId.startsWith('SPRK'))      return 'OPEN';
+        if (equipId === 'ORBIT-BMCS')        return 'RUN';
+        if (equipId.startsWith('CONDUIT'))   return occ > 0.1 ? 'ACTIVE' : 'IDLE';
+        if (equipId.startsWith('CHW')||equipId.startsWith('HW')) return occ>0.05?'RUN':'STOP';
+        return occ > 0.1 ? 'RUN' : 'STOP';
       }
       default: return 0;
     }
@@ -1267,7 +1317,14 @@ const S = {
   selectedEquipId: null,
   selectedSensorKey: null,
   chart: null,
+  zoneOpen: {},  // tracks zone collapse state: 'sys::zone' -> bool (default true)
 };
+
+function toggleZone(sys, zone) {
+  const k = `${sys}::${zone}`;
+  S.zoneOpen[k] = !(S.zoneOpen[k] !== false);  // default true
+  renderContent();
+}
 
 /* ════════════════════════════════════════════════
    HELPERS
@@ -1406,11 +1463,59 @@ function renderContent() {
     life:  { icon:'🚨', name:'Life Safety',       csi:'CSI 28' },
   };
 
+  // ── Helper: build one sensor card HTML ──────────────────────────────────
+  function buildCard(equip, sType, color) {
+    const key = `${equip.id}:${sType}`;
+    const val = S.readings[key];
+    const def = SD[sType];
+    if (!def || val === undefined) return '';
+    const status = sensorStatus(def, val);
+    const isStr  = typeof val === 'string';
+    const valColor = status === 'crit' ? 'var(--crit)' : status === 'warn' ? 'var(--warn)' : def.color;
+    const pct    = barPct(def, val);
+    const [ti, tc] = trendOf(key);
+    const isSelected = S.selectedSensorKey === key;
+    const cardCls = `sc${status==='crit'?' sc-crit':status==='warn'?' sc-warn':''}${isSelected?' selected':''}`;
+    let valHtml = '';
+    if (isStr) {
+      const OK  = ['RUN','ONLINE','ACTIVE','OPEN','CLEAR','NO FAULT','NORMAL','MONITORING'];
+      const OFF = ['STOP','IDLE','STANDBY'];
+      const cls = OK.includes(val) ? 'status-val' : OFF.includes(val) ? 'status-off' : 'status-alarm';
+      valHtml = `<span class="sc__val ${cls}">${val}</span>`;
+    } else {
+      valHtml = `<span class="sc__val" style="color:${valColor}">${fmtVal(sType, val)}</span>
+                 <span class="sc__unit">${def.unit}</span>
+                 <span class="sc__trend ${tc}">${ti}</span>`;
+    }
+    return `<div class="${cardCls}" style="--sys-color:${color};--val-color:${valColor};--badge-bg:${def.bbc};--badge-c:${def.color}"
+         onclick="selectCard('${equip.id}','${sType}')">
+      <div class="sc__top"><span class="sc__equip-id">${equip.id}</span><span class="sc__badge">${def.badge}</span></div>
+      <div class="sc__label">${def.label}</div>
+      <div class="sc__value-area">${valHtml}</div>
+      ${!isStr?`<div class="sc__bar"><div class="sc__bar-fill" style="width:${pct}%"></div></div>`:'<div style="height:10px"></div>'}
+      <div class="sc__bottom">
+        <span class="sc__status-chip chip-${status}">${status}</span>
+        <span class="sc__equip-name">${equip.name}</span>
+      </div>
+    </div>`;
+  }
+
+  // ── Worst status across a list of equipment ──────────────────────────────
+  function worstOf(equips_) {
+    let w = 'ok';
+    for (const e of equips_) for (const s of e.sensors) {
+      const st = sensorStatus(SD[s], S.readings[`${e.id}:${s}`]);
+      if (st === 'crit') return 'crit';
+      if (st === 'warn') w = 'warn';
+    }
+    return w;
+  }
+
   let html = '';
   for (const [sys, equips_] of Object.entries(groups)) {
-    const meta = sysMeta[sys] || { icon:'◈', name:sys, csi:'' };
+    const meta     = sysMeta[sys] || { icon:'◈', name:sys, csi:'' };
     const totalPts = equips_.reduce((a, e) => a + e.sensors.length, 0);
-    const color = sysColor(sys);
+    const color    = sysColor(sys);
 
     html += `<div class="sys-group">
       <div class="sys-group__hdr">
@@ -1418,54 +1523,42 @@ function renderContent() {
         <span class="sys-group__name" style="color:${color}">${meta.name}</span>
         <span class="sys-group__count">${totalPts} pts · ${equips_.length} equip</span>
         <span class="sys-group__csi">${meta.csi}</span>
-      </div>
-      <div class="sgrid">`;
+      </div>`;
 
-    for (const equip of equips_) {
-      for (const sType of equip.sensors) {
-        const key = `${equip.id}:${sType}`;
-        const val = S.readings[key];
-        const def = SD[sType];
-        if (!def || val === undefined) continue;
+    // Zone grouping: apply when ≥2 zones AND ≥10 sensor points in this system
+    const zones    = [...new Set(equips_.map(e => e.zone))];
+    const useZones = zones.length >= 2 && totalPts >= 10;
 
-        const status = sensorStatus(def, val);
-        const isStr = typeof val === 'string';
-        const valColor = status === 'crit' ? 'var(--crit)' : status === 'warn' ? 'var(--warn)' : def.color;
-        const pct = barPct(def, val);
-        const [ti, tc] = trendOf(key);
-        const isSelected = S.selectedSensorKey === key;
-        const cardCls = `sc${status === 'crit' ? ' sc-crit' : status === 'warn' ? ' sc-warn' : ''}${isSelected ? ' selected' : ''}`;
-
-        let valHtml = '';
-        if (isStr) {
-          const cls = val === 'NORMAL' || val === 'ON' || val === 'ONLINE' || val === 'STANDBY' || val === 'ACTIVE' || val === 'CLEAR' || val === 'MONITORING' || val === 'CLOSED'
-            ? 'status-val'
-            : val === 'IDLE' ? 'status-off' : 'status-alarm';
-          valHtml = `<span class="sc__val ${cls}">${val}</span>`;
-        } else {
-          valHtml = `<span class="sc__val" style="color:${valColor}">${fmtVal(sType, val)}</span>
-                     <span class="sc__unit">${def.unit}</span>
-                     <span class="sc__trend ${tc}">${ti}</span>`;
-        }
-
-        html += `
-          <div class="${cardCls}" style="--sys-color:${color}; --val-color:${valColor}; --badge-bg:${def.bbc}; --badge-c:${def.color}"
-               onclick="selectCard('${equip.id}','${sType}')">
-            <div class="sc__top">
-              <span class="sc__equip-id">${equip.id}</span>
-              <span class="sc__badge">${def.badge}</span>
-            </div>
-            <div class="sc__label">${def.label}</div>
-            <div class="sc__value-area">${valHtml}</div>
-            ${!isStr ? `<div class="sc__bar"><div class="sc__bar-fill" style="width:${pct}%"></div></div>` : '<div style="height:10px"></div>'}
-            <div class="sc__bottom">
-              <span class="sc__status-chip chip-${status}">${status}</span>
-              <span class="sc__equip-name">${equip.name}</span>
-            </div>
-          </div>`;
+    if (useZones) {
+      for (const zone of zones) {
+        const zEquips  = equips_.filter(e => e.zone === zone);
+        const zonePts  = zEquips.reduce((a,e) => a + e.sensors.length, 0);
+        const zWorst   = worstOf(zEquips);
+        const zKey     = `${sys}::${zone}`;
+        const isOpen   = S.zoneOpen[zKey] !== false; // default open
+        html += `<div class="zone-group">
+          <div class="zone-group__hdr${isOpen?' open':''}" onclick="toggleZone('${sys}','${zone}')">
+            <span class="zone-group__chevron">▶</span>
+            <span class="zone-group__name">${zone}</span>
+            <span class="zone-group__pts">${zonePts} pts · ${zEquips.length} equip</span>
+            <div class="zone-group__status ${zWorst}"></div>
+          </div>
+          <div class="zone-group__body${isOpen?' open':''}">
+            <div class="sgrid">`;
+        for (const equip of zEquips)
+          for (const sType of equip.sensors)
+            html += buildCard(equip, sType, color);
+        html += `</div></div></div>`;
       }
+    } else {
+      html += `<div class="sgrid">`;
+      for (const equip of equips_)
+        for (const sType of equip.sensors)
+          html += buildCard(equip, sType, color);
+      html += `</div>`;
     }
-    html += `</div></div>`;
+
+    html += `</div>`; // end sys-group
   }
 
   ca.innerHTML = html;
@@ -1716,24 +1809,21 @@ function toggleMode() {
    MAIN LOOP
 ════════════════════════════════════════════════ */
 async function tick() {
-  for (const e of EQUIPMENT) {
-    for (const s of e.sensors) {
-      const key = `${e.id}:${s}`;
-      const val = await DataAdapter.fetch(e.id, s);
-      S.readings[key] = val;
-      if (typeof val !== 'string') {
-        if (!S.history[key]) S.history[key] = [];
-        S.history[key].push(+val);
-        if (S.history[key].length > 60) S.history[key].shift();
-      }
+  // Fetch all sensor values in parallel (not sequential) for live mode performance
+  const pairs = EQUIPMENT.flatMap(e => e.sensors.map(s => ({ e, s, key:`${e.id}:${s}` })));
+  const results = await Promise.all(pairs.map(p => DataAdapter.fetch(p.e.id, p.s)));
+  results.forEach((val, i) => {
+    const { key } = pairs[i];
+    S.readings[key] = val;
+    if (typeof val !== 'string') {
+      if (!S.history[key]) S.history[key] = [];
+      S.history[key].push(+val);
+      if (S.history[key].length > 60) S.history[key].shift();
     }
-  }
+  });
+  // Only KPI header needs update every tick — structural renders happen on state changes
   renderKPIs();
-  renderFloorNav();
-  renderFloorTabs();
-  renderSysFilters();
-  renderContent();
-  renderOccStrip();
+  renderContent();  // sensor values update in place
   if (S.selectedEquipId) renderDetailPanel(S.selectedEquipId, S.selectedSensorKey);
 }
 
@@ -1743,27 +1833,64 @@ function updateClock() {
 }
 
 /* ════════════════════════════════════════════════
-   SERVICE WORKER (inline registration for PWA)
+   PWA — Service Worker + Install Banner
 ════════════════════════════════════════════════ */
 if ('serviceWorker' in navigator) {
-  // Create a minimal service worker via blob URL for offline caching
-  const swCode = `
-    const CACHE = 'grimes-bim-v1';
-    const ASSETS = ['/'];
-    self.addEventListener('install', e => {
-      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-      self.skipWaiting();
-    });
-    self.addEventListener('fetch', e => {
-      e.respondWith(
-        caches.match(e.request).then(r => r || fetch(e.request))
-      );
-    });
-  `;
-  const swBlob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swUrl).catch(() => {});
+  try {
+    const swCode = `
+      const CACHE = 'grimes-bim-v2';
+      const ASSETS = [self.location.pathname || './'];
+      self.addEventListener('install', e => {
+        e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(()=>{})));
+        self.skipWaiting();
+      });
+      self.addEventListener('activate', e => {
+        e.waitUntil(caches.keys().then(ks =>
+          Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))
+        ));
+        self.clients.claim();
+      });
+      self.addEventListener('fetch', e => {
+        e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+      });
+    `;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+  } catch(e) { /* SW not available in this environment */ }
 }
+
+// Install prompt (Android/Chrome)
+let _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredPrompt = e;
+  setTimeout(() => document.getElementById('installBanner')?.classList.remove('hidden'), 3000);
+});
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('installBtn')?.addEventListener('click', async () => {
+    if (!_deferredPrompt) return;
+    _deferredPrompt.prompt();
+    await _deferredPrompt.userChoice;
+    _deferredPrompt = null;
+    document.getElementById('installBanner').classList.add('hidden');
+  });
+  document.getElementById('dismissBtn')?.addEventListener('click', () => {
+    document.getElementById('installBanner').classList.add('hidden');
+  });
+  // iOS Safari hint
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode:standalone)').matches;
+  if (isIOS && !isStandalone) {
+    const b = document.getElementById('installBanner');
+    if (b) {
+      b.querySelector('.install-banner__title').textContent = 'iOS 앱으로 설치';
+      b.querySelector('.install-banner__sub').textContent = '공유 버튼 → "홈 화면에 추가"';
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.style.display = 'none';
+      setTimeout(() => b.classList.remove('hidden'), 3000);
+    }
+  }
+});
 
 /* ════════════════════════════════════════════════
    INIT
@@ -1782,4 +1909,3 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
-
