@@ -1,1 +1,1785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grimes BIM-IoT">
+<meta name="theme-color" content="#0c0e14">
+<meta name="description" content="Grimes Building BIM-IoT Digital Twin Dashboard — UC Berkeley">
+<title>Grimes Building · BIM-IoT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+<!-- PWA Manifest (inline via data URI) -->
+<link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22Grimes%20BIM-IoT%20Dashboard%22%2C%22short_name%22%3A%22Grimes%20BIM%22%2C%22description%22%3A%22Digital%20Twin%20Dashboard%20for%20Grimes%20Building%20%E2%80%93%20UC%20Berkeley%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230c0e14%22%2C%22theme_color%22%3A%22%230c0e14%22%2C%22orientation%22%3A%22any%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%2527http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%2527%2520viewBox%3D%25270%25200%2520512%2520512%2527%253E%253Crect%2520fill%3D%2527%25234b8eff%2527%2520rx%3D%252796%2527%2520width%3D%2527512%2527%2520height%3D%2527512%2527%2F%253E%253Ctext%2520x%3D%252750%2525%2527%2520y%3D%252754%2525%2527%2520font-size%3D%2527200%2527%2520fill%3D%2527white%2527%2520text-anchor%3D%2527middle%2527%2520font-family%3D%2527monospace%2527%2520font-weight%3D%2527bold%2527%253EGB%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+
+<style>
+:root {
+  --bg:      #0c0e14;
+  --s1:      #111420;
+  --s2:      #161a26;
+  --s3:      #1c2133;
+  --s4:      #222840;
+  --line:    rgba(255,255,255,.06);
+  --line2:   rgba(255,255,255,.1);
+
+  --hi:      #f0f4ff;
+  --md:      #8892b0;
+  --lo:      #4a5470;
+  --dim:     #2d3450;
+
+  --blue:    #4b8eff;
+  --cyan:    #2dd4bf;
+  --green:   #34d399;
+  --amber:   #f59e0b;
+  --red:     #f87171;
+  --purple:  #a78bfa;
+  --orange:  #fb923c;
+
+  --ok:    #34d399;
+  --warn:  #f59e0b;
+  --crit:  #f87171;
+
+  --mono: 'DM Mono', monospace;
+  --sans: 'Syne', system-ui, sans-serif;
+
+  --nav-w: 220px;
+  --detail-w: 320px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--hi);
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* scrollbars */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--s4); border-radius: 2px; }
+
+/* ── HEADER ──────────────────────────────────── */
+.hdr {
+  height: 52px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 0;
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+.hdr-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 32px;
+}
+.hdr-brand__mark {
+  width: 28px; height: 28px;
+  background: var(--blue);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; color: #fff; font-family: var(--mono);
+  flex-shrink: 0;
+}
+.hdr-brand__text h1 {
+  font-size: 13px; font-weight: 600; color: var(--hi); letter-spacing: -.1px;
+}
+.hdr-brand__text p {
+  font-size: 10px; color: var(--lo); font-family: var(--mono);
+}
+
+/* kpi strip */
+.hdr-kpis {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  overflow-x: auto;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px;
+  border-right: 1px solid var(--line);
+  cursor: default;
+  white-space: nowrap;
+}
+.kpi:first-child { border-left: 1px solid var(--line); }
+.kpi__label {
+  font-size: 9px; font-family: var(--mono); color: var(--lo);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 2px;
+}
+.kpi__val {
+  font-size: 15px; font-weight: 600; font-family: var(--mono);
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.kpi__val small { font-size: 9px; font-weight: 400; color: var(--lo); }
+.c-green { color: var(--green); }
+.c-cyan  { color: var(--cyan);  }
+.c-amber { color: var(--amber); }
+.c-red   { color: var(--red);   }
+.c-blue  { color: var(--blue);  }
+.c-md    { color: var(--md);    }
+
+.hdr-right {
+  display: flex; align-items: center; gap: 10px; margin-left: 20px;
+}
+.live-pill {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 10px; font-weight: 500; font-family: var(--mono);
+  letter-spacing: .5px;
+  background: rgba(52,211,153,.1);
+  border: 1px solid rgba(52,211,153,.2);
+  color: var(--green);
+  cursor: pointer;
+  transition: all .2s;
+}
+.live-pill.live-mode {
+  background: rgba(248,113,113,.1);
+  border-color: rgba(248,113,113,.2);
+  color: var(--red);
+}
+.live-pill__dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.hdr-clock {
+  font-family: var(--mono); font-size: 12px; color: var(--md);
+  min-width: 66px; text-align: right;
+}
+
+/* ── BODY LAYOUT ─────────────────────────────── */
+.body-wrap {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── LEFT NAV ────────────────────────────────── */
+.nav {
+  width: var(--nav-w);
+  background: var(--s1);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.nav-section { border-bottom: 1px solid var(--line); }
+.nav-section:last-child { border-bottom: none; }
+
+.nav-label {
+  padding: 14px 16px 6px;
+  font-size: 9px; font-family: var(--mono); color: var(--lo);
+  text-transform: uppercase; letter-spacing: 1.2px;
+}
+
+/* Building diagram */
+.bldg {
+  padding: 8px 16px 12px;
+}
+.bldg-floor {
+  display: flex; align-items: center;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all .15s;
+  margin-bottom: 2px;
+  position: relative;
+  gap: 8px;
+}
+.bldg-floor:hover { background: var(--s3); }
+.bldg-floor.active {
+  background: rgba(75,142,255,.12);
+  border: 1px solid rgba(75,142,255,.2);
+}
+.bldg-floor:not(.active) { border: 1px solid transparent; }
+.bldg-floor__num {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  min-width: 24px;
+  color: var(--md);
+}
+.bldg-floor.active .bldg-floor__num { color: var(--blue); }
+.bldg-floor__name {
+  font-size: 11px; color: var(--md); flex: 1;
+}
+.bldg-floor.active .bldg-floor__name { color: var(--hi); font-weight: 500; }
+.bldg-floor__badges {
+  display: flex; gap: 3px;
+}
+.bldg-floor__badge {
+  width: 6px; height: 6px; border-radius: 2px;
+  background: var(--s4);
+}
+.bldg-floor__badge.ok   { background: rgba(52,211,153,.5);  }
+.bldg-floor__badge.warn { background: rgba(245,158,11,.6);  }
+.bldg-floor__badge.crit { background: rgba(248,113,113,.7); animation: pulse 1.5s ease-in-out infinite; }
+
+/* System filter */
+.sys-filters {
+  padding: 8px 16px 12px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.sys-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all .15s;
+  border: 1px solid transparent;
+  font-size: 11px; color: var(--lo);
+}
+.sys-btn:hover { background: var(--s3); color: var(--md); }
+.sys-btn.active {
+  background: var(--s3);
+  color: var(--hi);
+  border-color: var(--line2);
+}
+.sys-btn__dot {
+  width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
+}
+.sys-btn__count {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 10px; color: var(--lo);
+}
+
+/* BIM info */
+.bim-info {
+  padding: 10px 16px 12px;
+}
+.bim-row {
+  display: flex; gap: 6px; padding: 2px 0;
+  font-size: 10px;
+}
+.bim-k { color: var(--lo); font-family: var(--mono); min-width: 44px; }
+.bim-v { color: var(--md); font-family: var(--mono); font-size: 9px; word-break: break-all; }
+
+/* Occupancy strip */
+.occ-strip {
+  padding: 10px 16px 14px;
+}
+.occ-strip__label {
+  font-size: 9px; font-family: var(--mono); color: var(--lo);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px;
+  display: flex; justify-content: space-between;
+}
+.occ-strip__label span { color: var(--cyan); }
+.occ-bars {
+  display: flex; gap: 1px; height: 36px; align-items: flex-end;
+}
+.occ-bar-h {
+  flex: 1; border-radius: 1px 1px 0 0; transition: height .4s ease, background .4s ease;
+  min-height: 2px;
+}
+.occ-times {
+  display: flex; justify-content: space-between; margin-top: 3px;
+  font-size: 8px; font-family: var(--mono); color: var(--dim);
+}
+
+/* ── MAIN ────────────────────────────────────── */
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Floor nav bar */
+.floor-bar {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+  background: var(--s1);
+  flex-shrink: 0;
+  padding: 0 20px;
+  gap: 2px;
+  overflow-x: auto;
+}
+.floor-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 42px;
+  cursor: pointer;
+  font-size: 11px; font-weight: 500;
+  color: var(--lo);
+  border-bottom: 2px solid transparent;
+  transition: all .15s;
+  position: relative;
+  white-space: nowrap;
+}
+.floor-tab:hover { color: var(--md); }
+.floor-tab.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+.floor-tab__num {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+}
+.floor-tab__name { font-size: 10px; }
+.floor-tab__alert {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--red);
+  position: absolute; top: 8px; right: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.floor-tab__warn-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--amber);
+  position: absolute; top: 8px; right: 8px;
+}
+
+/* Content scroll area */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Floor section */
+.floor-section {
+  display: none;
+}
+.floor-section.visible { display: block; }
+
+/* System group within floor */
+.sys-group {
+  margin-bottom: 24px;
+}
+.sys-group__hdr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.sys-group__icon { font-size: 14px; }
+.sys-group__name {
+  font-size: 11px; font-weight: 600; color: var(--md);
+  text-transform: uppercase; letter-spacing: .6px;
+}
+.sys-group__count {
+  font-size: 9px; font-family: var(--mono); color: var(--lo);
+  background: var(--s2); padding: 1px 6px; border-radius: 3px;
+}
+.sys-group__csi {
+  font-size: 9px; font-family: var(--mono); color: var(--dim); margin-left: auto;
+}
+
+/* Sensor grid */
+.sgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+/* ── SENSOR CARD ─────────────────────────────── */
+.sc {
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  cursor: pointer;
+  transition: border-color .15s, transform .15s, background .15s;
+  position: relative;
+  overflow: hidden;
+}
+.sc::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--sys-color, var(--blue));
+  opacity: .5;
+}
+.sc:hover {
+  border-color: var(--line2);
+  transform: translateY(-1px);
+  background: var(--s3);
+}
+.sc.selected {
+  border-color: rgba(75,142,255,.4);
+  background: rgba(75,142,255,.05);
+}
+.sc.sc-warn { border-color: rgba(245,158,11,.25); }
+.sc.sc-crit {
+  border-color: rgba(248,113,113,.3);
+  animation: crit-pulse 2.5s ease-in-out infinite;
+}
+@keyframes crit-pulse {
+  0%,100%{border-color:rgba(248,113,113,.3)}
+  50%{border-color:rgba(248,113,113,.55)}
+}
+
+.sc__top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 10px;
+}
+.sc__equip-id {
+  font-size: 9px; font-family: var(--mono); color: var(--lo);
+}
+.sc__badge {
+  font-size: 7px; font-family: var(--mono); font-weight: 500;
+  padding: 2px 6px; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: .5px;
+  background: var(--badge-bg, rgba(75,142,255,.12));
+  color: var(--badge-c, var(--blue));
+}
+
+.sc__label {
+  font-size: 10px; font-weight: 600; color: var(--md);
+  margin-bottom: 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.sc__value-area {
+  display: flex; align-items: baseline; gap: 3px; margin-bottom: 8px;
+}
+.sc__val {
+  font-size: 26px; font-weight: 600; font-family: var(--mono);
+  font-variant-numeric: tabular-nums; line-height: 1;
+  color: var(--val-color, var(--hi));
+}
+.sc__val.status-val {
+  font-size: 13px;
+  padding: 3px 8px; border-radius: 4px;
+  background: rgba(52,211,153,.1);
+  color: var(--green);
+}
+.sc__val.status-off {
+  background: rgba(74,84,112,.15);
+  color: var(--lo);
+}
+.sc__val.status-alarm {
+  background: rgba(248,113,113,.1);
+  color: var(--red);
+}
+.sc__unit { font-size: 10px; color: var(--lo); font-family: var(--mono); }
+.sc__trend { font-size: 11px; margin-left: 2px; }
+
+/* mini bar */
+.sc__bar {
+  height: 2px;
+  background: var(--s4);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-bottom: 7px;
+}
+.sc__bar-fill {
+  height: 100%; border-radius: 1px;
+  background: var(--val-color, var(--blue));
+  transition: width .5s ease;
+  opacity: .8;
+}
+
+.sc__bottom {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.sc__status-chip {
+  font-size: 8px; font-family: var(--mono);
+  padding: 2px 5px; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.chip-ok   { background:rgba(52,211,153,.08); color:var(--green); }
+.chip-warn { background:rgba(245,158,11,.1);  color:var(--amber); }
+.chip-crit { background:rgba(248,113,113,.1); color:var(--red);   }
+.sc__equip-name {
+  font-size: 9px; color: var(--dim); font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;
+}
+
+/* ── DETAIL PANEL (right) ────────────────────── */
+.detail {
+  width: var(--detail-w);
+  background: var(--s1);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width .25s ease;
+}
+.detail.collapsed { width: 0; border-left: none; }
+
+.detail-hdr {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.detail-hdr__top {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;
+}
+.detail-hdr__id {
+  font-size: 11px; font-weight: 600; color: var(--blue); font-family: var(--mono);
+}
+.detail-hdr__close {
+  width: 22px; height: 22px;
+  background: var(--s3); border: 1px solid var(--line);
+  border-radius: 4px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--lo);
+  transition: all .15s;
+}
+.detail-hdr__close:hover { color: var(--hi); border-color: var(--line2); }
+.detail-hdr__name {
+  font-size: 12px; font-weight: 600; color: var(--hi); margin-bottom: 4px;
+}
+.detail-hdr__sub {
+  font-size: 9px; color: var(--lo); font-family: var(--mono);
+}
+
+.detail-body {
+  flex: 1; overflow-y: auto; padding: 14px 18px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+.detail-group {}
+.detail-group__title {
+  font-size: 9px; font-family: var(--mono); color: var(--lo);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 6px; padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+}
+.detail-row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 4px 0; font-size: 10px;
+}
+.detail-row__k { color: var(--lo); font-family: var(--mono); }
+.detail-row__v {
+  color: var(--md); font-family: var(--mono);
+  text-align: right; max-width: 170px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Live readings in detail */
+.reading-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0; border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.reading-row:last-child { border-bottom: none; }
+.reading-row__label { font-size: 10px; color: var(--lo); flex: 1; font-family: var(--mono); }
+.reading-row__val {
+  font-size: 13px; font-weight: 600; font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.reading-row__unit { font-size: 9px; color: var(--lo); font-family: var(--mono); }
+.reading-row__status {
+  width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+}
+.reading-row__status.ok { background: var(--green); }
+.reading-row__status.warn { background: var(--amber); }
+.reading-row__status.crit { background: var(--red); }
+
+/* trend chart in detail */
+.detail-chart-wrap { height: 120px; position: relative; }
+.detail-chart-empty {
+  height: 120px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-family: var(--mono); color: var(--dim);
+  border: 1px dashed var(--line); border-radius: 6px;
+}
+
+/* Adapter block */
+.adapter-block {
+  background: var(--s2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 10px 12px;
+}
+.adapter-block__label {
+  font-size: 9px; font-family: var(--mono); color: var(--lo);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+}
+.adapter-block pre {
+  font-family: var(--mono); font-size: 9px; color: var(--lo); line-height: 1.7;
+  white-space: pre-wrap;
+}
+.adapter-block__mode-btn {
+  margin-top: 8px;
+  font-size: 9px; font-family: var(--mono);
+  padding: 4px 10px; border-radius: 4px; cursor: pointer;
+  background: var(--s3); border: 1px solid var(--line); color: var(--md);
+  transition: all .15s; width: 100%;
+}
+.adapter-block__mode-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+/* Alerts in detail */
+.alert-item {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 8px; border-radius: 5px; margin-bottom: 4px;
+}
+.alert-item--crit { background:rgba(248,113,113,.06); border:1px solid rgba(248,113,113,.12); }
+.alert-item--warn { background:rgba(245,158,11,.06);  border:1px solid rgba(245,158,11,.12);  }
+.alert-item--info { background:rgba(75,142,255,.06);  border:1px solid rgba(75,142,255,.12);  }
+.alert-icon {
+  width: 16px; height: 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+}
+.alert-item--crit .alert-icon { background:rgba(248,113,113,.15); color:var(--red);   }
+.alert-item--warn .alert-icon { background:rgba(245,158,11,.15);  color:var(--amber); }
+.alert-item--info .alert-icon { background:rgba(75,142,255,.15);  color:var(--blue);  }
+.alert-title { font-size: 10px; font-weight: 600; color: var(--md); margin-bottom: 1px; }
+.alert-sub   { font-size: 9px; color: var(--lo); font-family: var(--mono); }
+.alert-time  { font-size: 8px; color: var(--dim); font-family: var(--mono); margin-left: auto; white-space: nowrap; }
+.no-alerts   { font-size: 10px; color: var(--dim); font-family: var(--mono); text-align: center; padding: 12px 0; }
+
+/* ── EMPTY FLOOR ─────────────────────────────── */
+.floor-empty {
+  color: var(--dim); font-size: 11px; font-family: var(--mono);
+  padding: 40px 0; text-align: center;
+}
+
+/* ── MOBILE NAV TOGGLE ───────────────────────── */
+.nav-toggle {
+  display: none;
+  position: fixed;
+  bottom: 16px; left: 16px;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: var(--blue);
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  z-index: 200;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(75,142,255,.4);
+  align-items: center; justify-content: center;
+}
+
+/* ── RESPONSIVE ──────────────────────────────── */
+@media (max-width: 1024px) {
+  :root { --detail-w: 280px; }
+  .sgrid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .hdr { padding: 0 12px; height: 48px; }
+  .hdr-brand { margin-right: 12px; }
+  .hdr-brand__text p { display: none; }
+  .hdr-kpis { gap: 0; }
+  .kpi { padding: 0 10px; }
+  .kpi__label { font-size: 8px; }
+  .kpi__val { font-size: 13px; }
+
+  .nav {
+    position: fixed;
+    top: 48px; left: 0; bottom: 0;
+    z-index: 150;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    width: 240px;
+  }
+  .nav.open { transform: translateX(0); }
+  .nav-toggle { display: flex; }
+
+  .nav-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 140;
+  }
+  .nav-overlay.show { display: block; }
+
+  .detail {
+    position: fixed;
+    top: 48px; right: 0; bottom: 0;
+    z-index: 150;
+    width: 300px;
+    transform: translateX(100%);
+    transition: transform .25s ease;
+  }
+  .detail:not(.collapsed) { transform: translateX(0); }
+  .detail.collapsed { transform: translateX(100%); width: 300px; border-left: 1px solid var(--line); }
+
+  .sgrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .content { padding: 12px; }
+  .floor-bar { padding: 0 12px; }
+}
+
+@media (max-width: 480px) {
+  .kpi:nth-child(n+4) { display: none; }
+  .hdr-brand__text h1 { font-size: 11px; }
+  .sgrid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .sc { padding: 10px; }
+  .sc__val { font-size: 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Mobile nav overlay -->
+<div class="nav-overlay" id="navOverlay" onclick="toggleNav()"></div>
+
+<!-- ── HEADER ── -->
+<div class="hdr">
+  <div class="hdr-brand">
+    <div class="hdr-brand__mark">GB</div>
+    <div class="hdr-brand__text">
+      <h1>Grimes Building</h1>
+      <p>UCBBE · BIM-IoT Digital Twin</p>
+    </div>
+  </div>
+
+  <div class="hdr-kpis">
+    <div class="kpi">
+      <div class="kpi__label">Occupancy</div>
+      <div class="kpi__val c-cyan" id="kpi-occ">—<small>%</small></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Avg Temp</div>
+      <div class="kpi__val c-md" id="kpi-temp">—<small>°F</small></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">CO₂ Max</div>
+      <div class="kpi__val" id="kpi-co2">—<small>ppm</small></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Total Load</div>
+      <div class="kpi__val c-blue" id="kpi-kw">—<small>kW</small></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Alerts</div>
+      <div class="kpi__val" id="kpi-alerts">—</div>
+    </div>
+  </div>
+
+  <div class="hdr-right">
+    <div class="live-pill" id="modePill" onclick="toggleMode()">
+      <div class="live-pill__dot"></div>
+      <span id="modeLabel">SIM</span>
+    </div>
+    <div class="hdr-clock" id="clock"></div>
+  </div>
+</div>
+
+<!-- ── BODY ── -->
+<div class="body-wrap">
+
+  <!-- LEFT NAV -->
+  <div class="nav" id="navPanel">
+    <div class="nav-section">
+      <div class="nav-label">Floors</div>
+      <div class="bldg" id="bldgFloors"></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">System</div>
+      <div class="sys-filters" id="sysFilters"></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Occupancy</div>
+      <div class="occ-strip">
+        <div class="occ-strip__label">Today's Schedule <span id="occPct">—%</span></div>
+        <div class="occ-bars" id="occBars"></div>
+        <div class="occ-times">
+          <span>0</span><span>6</span><span>12</span><span>18</span><span>24</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">BIM Source</div>
+      <div class="bim-info">
+        <div class="bim-row"><span class="bim-k">DWG</span><span class="bim-v">ucbbe-grimes-mep.dwg</span></div>
+        <div class="bim-row"><span class="bim-k">Revit</span><span class="bim-v">UCBBECH-A.rvt</span></div>
+        <div class="bim-row"><span class="bim-k">Items</span><span class="bim-v">4,243 elements</span></div>
+        <div class="bim-row"><span class="bim-k">Linked</span><span class="bim-v">UCBBECH-A.rvtx</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+    <!-- Floor tabs -->
+    <div class="floor-bar" id="floorBar"></div>
+
+    <!-- Scrollable content -->
+    <div class="content" id="contentArea"></div>
+  </div>
+
+  <!-- DETAIL PANEL -->
+  <div class="detail collapsed" id="detailPanel">
+    <div class="detail-hdr">
+      <div class="detail-hdr__top">
+        <div class="detail-hdr__id" id="dpId">—</div>
+        <div class="detail-hdr__close" onclick="closeDetail()">✕</div>
+      </div>
+      <div class="detail-hdr__name" id="dpName">—</div>
+      <div class="detail-hdr__sub" id="dpSub">—</div>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+
+</div>
+
+<!-- Mobile nav toggle button -->
+<button class="nav-toggle" id="navToggle" onclick="toggleNav()">☰</button>
+
+<script>
+/* ════════════════════════════════════════════════
+   MOBILE NAV
+════════════════════════════════════════════════ */
+function toggleNav() {
+  const nav = document.getElementById('navPanel');
+  const overlay = document.getElementById('navOverlay');
+  nav.classList.toggle('open');
+  overlay.classList.toggle('show');
+}
+
+/* ════════════════════════════════════════════════
+   BIM EQUIPMENT REGISTRY (real BIM IDs)
+════════════════════════════════════════════════ */
+const EQUIPMENT = [
+
+  // ── B1 · Basement ── Fire Protection ──────────────────────────
+  { id:'SPRK-MAIN', bimId:'CSI-21-MAIN', name:'Fire Sprinkler Main Supply',
+    family:'Victaulic Style 009N Push-On Coupling', category:'Fire Sprinkler System', source:'dwg',
+    system:'fire', floor:'B1', zone:'Fire Pump Room',
+    sensors:['supply_pressure','flow_gpm','status'] },
+
+  // ── B1 · Basement ── HVAC Hydronic ────────────────────────────
+  { id:'PF-001', bimId:null, name:'Pipe Fitting – Hydronic Supply',
+    family:'Standardj/Standardk Pipe Fitting', category:'Pipe Fittings', source:'revit',
+    system:'hvac', floor:'B1', zone:'Mechanical Room',
+    sensors:['pipe_pressure','pipe_temp','flow_gpm'] },
+
+  // ── B1 · Basement ── Chilled Water System ──────────────────────
+  { id:'CHW-PUMP-A', bimId:'CSI-23-CHWP-A', name:'Chilled Water Pump A (Primary)',
+    family:'Victaulic Grooved 90 Elbow + Sch.40 Pipe', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Chiller Plant',
+    sensors:['chw_supply_temp','chw_return_temp','pump_flow_gpm','pump_speed_rpm','pump_kw','status'] },
+  { id:'CHW-PUMP-B', bimId:'CSI-23-CHWP-B', name:'Chilled Water Pump B (Standby)',
+    family:'Victaulic Style 009N + Sch.40', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Chiller Plant',
+    sensors:['pump_flow_gpm','pump_speed_rpm','pump_kw','status'] },
+  { id:'CHW-VFD-A', bimId:'CSI-23-VFD-A', name:'VFD – Chiller Pump A',
+    family:'Anvil Fig.3201R Reducing Elbow + Tee', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Chiller Plant',
+    sensors:['vfd_hz','vfd_current','vfd_kw','status'] },
+  { id:'CHW-EXP-TK', bimId:'CSI-23-EXP', name:'Expansion Tank – Hydronic',
+    family:'Generic Fitting Rigid Coupling', category:'Pipe Fittings', source:'dwg',
+    system:'water', floor:'B1', zone:'Chiller Plant',
+    sensors:['tank_level_pct','tank_pressure'] },
+  { id:'CHW-DELTA-T', bimId:'CSI-23-DT', name:'Chilled Water Δ-T Monitor',
+    family:'Anvil Fig.3205R Reducing Tee', category:'Pipe Fittings', source:'dwg',
+    system:'water', floor:'B1', zone:'Chiller Plant',
+    sensors:['chw_supply_temp','chw_return_temp','delta_t_f','cooling_tons'] },
+
+  // ── B1 · Basement ── Hot Water System ─────────────────────────
+  { id:'HW-PUMP-1', bimId:'CSI-23-HWP-1', name:'Hot Water Circulator Pump',
+    family:'Victaulic No.001 FireLock 90 Elbow', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Boiler Room',
+    sensors:['hw_supply_temp','hw_return_temp','pump_flow_gpm','pump_kw','status'] },
+  { id:'HW-VALVE-1', bimId:'CSI-23-HWV-1', name:'Hot Water Control Valve',
+    family:'Generic Fitting Threaded Reducing Tee CI', category:'Pipe Fittings', source:'dwg',
+    system:'water', floor:'B1', zone:'Boiler Room',
+    sensors:['valve_pos_pct','hw_supply_temp','flow_gpm'] },
+
+  // ── B1 · Basement ── Domestic Water ───────────────────────────
+  { id:'DW-MAIN-METER', bimId:'CSI-22-DWM', name:'Domestic Water Main Meter',
+    family:'Victaulic Style 004N Flexible Coupling', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Utility Vault',
+    sensors:['dw_flow_gpm','dw_pressure','dw_temp','conductivity_us'] },
+  { id:'DW-PRV-1', bimId:'CSI-22-PRV', name:'Pressure Reducing Valve (PRV)',
+    family:'Generic Fitting Threaded 90 Elbow CI', category:'Pipe Fittings', source:'dwg',
+    system:'water', floor:'B1', zone:'Utility Vault',
+    sensors:['dw_pressure','valve_pos_pct','status'] },
+  { id:'DW-HW-METER', bimId:'CSI-22-HWM', name:'Domestic Hot Water Meter',
+    family:'Anvil Fig.3351R Threaded 90 Elbow CI', category:'Pipe Fittings', source:'dwg',
+    system:'water', floor:'B1', zone:'Utility Vault',
+    sensors:['dw_flow_gpm','dw_temp','status'] },
+  { id:'DW-BACKFLOW', bimId:'CSI-22-BFP', name:'Backflow Preventer',
+    family:'Victaulic No.12 Grooved 22 Elbow', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Utility Vault',
+    sensors:['dw_pressure','status'] },
+
+  // ── B1 · Basement ── Water Quality & Drain ────────────────────
+  { id:'WQ-001', bimId:'CSI-22-WQ', name:'Water Quality Monitor',
+    family:'Generic Fitting Concentric Reducer CI', category:'Pipe Fittings', source:'dwg',
+    system:'water', floor:'B1', zone:'Utility Vault',
+    sensors:['conductivity_us','turbidity_ntu','dw_temp','ph_level'] },
+  { id:'SUMP-PUMP-1', bimId:'CSI-22-SP1', name:'Sump Pump #1',
+    family:'Generic Fitting Cap Threaded CI', category:'Pipe Fittings', source:'dwg',
+    system:'water', floor:'B1', zone:'Sump Pit',
+    sensors:['sump_level_in','pump_kw','status','leak_detect'] },
+  { id:'SUMP-PUMP-2', bimId:'CSI-22-SP2', name:'Sump Pump #2 (Backup)',
+    family:'Victaulic No.006 FireLock Cap DI', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Sump Pit',
+    sensors:['sump_level_in','status'] },
+  { id:'LEAK-SENSOR-B1', bimId:null, name:'Leak Detection Strip – B1',
+    family:'Wheatland Tube Sch.10', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'B1', zone:'Mechanical Room',
+    sensors:['leak_detect','status'] },
+
+  // ── L1 · Level 1 ───────────────────────────────────────────────
+  { id:'SPRK-Z1', bimId:'CSI-21-ZA', name:'Sprinkler Zone A (Sch.40)',
+    family:'Wheatland Tube Pipe, Sch.40 2"', category:'Fire Sprinkler System', source:'dwg',
+    system:'fire', floor:'L1', zone:'Zone A',
+    sensors:['zone_pressure','status'] },
+  { id:'FA-HS1', bimId:'LcRevitHost', name:'Fire Alarm – HornStrobe',
+    family:'HornStrobe', category:'Fire Alarm Devices', source:'revit',
+    system:'life', floor:'L1', zone:'Lobby',
+    sensors:['alarm_status','battery_pct'] },
+  { id:'ELEC-JBOX', bimId:'LcRevitElement', name:'Junction Box – INV1',
+    family:'060604 - Standard JBox', category:'Electrical Equipment', source:'revit',
+    system:'elec', floor:'L1', zone:'Ceiling',
+    sensors:['status','power_kw'] },
+  { id:'CONDUIT-BRANCH', bimId:null, name:'EMT Branch Conduit',
+    family:'RT_EMT_BRANCH', category:'Conduits', source:'revit',
+    system:'elec', floor:'L1', zone:'Ceiling',
+    sensors:['status','load_pct'] },
+  { id:'DW-RISER-L1', bimId:'CSI-22-RS-L1', name:'Domestic Water Riser – L1 Tap',
+    family:'Wheatland Tube Sch.40 + Victaulic Coupling', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'L1', zone:'Plumbing Riser',
+    sensors:['dw_pressure','dw_flow_gpm','dw_temp'] },
+
+  // ── L2 · Level 2 ───────────────────────────────────────────────
+  { id:'AT-001', bimId:'LcRevitElement', name:'Air Terminal 24"×24"',
+    family:'24×24 Face 12×12 Connection', category:'Air Terminals', source:'revit',
+    system:'hvac', floor:'L2', zone:'Open Office',
+    sensors:['supply_temp','return_temp','airflow_cfm','co2_ppm','humidity'] },
+  { id:'DUCT-001', bimId:null, name:'MEP Fabrication Ductwork',
+    family:'Default MEP Fabrication Ductwork', category:'MEP Fabrication', source:'revit',
+    system:'hvac', floor:'L2', zone:'Mechanical',
+    sensors:['supply_temp','duct_pressure','airflow_cfm'] },
+  { id:'SPRK-Z2', bimId:'CSI-21-ZB', name:'Sprinkler Zone B (Sch.10)',
+    family:'Wheatland Tube Pipe, Sch.10', category:'Fire Sprinkler System', source:'dwg',
+    system:'fire', floor:'L2', zone:'Zone B',
+    sensors:['zone_pressure','status'] },
+  { id:'LIGHT-SF2A', bimId:'LcRevitHost', name:'Lighting Fixture SF2A',
+    family:'SF2Aj/SF2Ak', category:'Lighting Fixtures', source:'revit',
+    system:'elec', floor:'L2', zone:'Open Office',
+    sensors:['status','power_kw','dimmer_pct'] },
+  { id:'CONDUIT-LIGHT', bimId:null, name:'EMT Lighting Conduit',
+    family:'RT_EMT_LIGHTING', category:'Conduits', source:'revit',
+    system:'elec', floor:'L2', zone:'Ceiling',
+    sensors:['status','load_pct'] },
+  { id:'CONDUIT-TELECOM', bimId:null, name:'EMT Telecom Conduit',
+    family:'RT_EMT_TELECOM', category:'Conduits', source:'revit',
+    system:'life', floor:'L2', zone:'IDF Room',
+    sensors:['status','load_pct'] },
+  { id:'DW-RISER-L2', bimId:'CSI-22-RS-L2', name:'Domestic Water Riser – L2 Tap',
+    family:'Wheatland Tube Sch.40 + Victaulic Coupling', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'L2', zone:'Plumbing Riser',
+    sensors:['dw_pressure','dw_flow_gpm','dw_temp'] },
+  { id:'CHW-AHU-L2', bimId:'CSI-23-AHU-L2', name:'Chilled Water AHU Coil – L2',
+    family:'Victaulic Style 009N Rigid Coupling Galv', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'L2', zone:'AHU Room',
+    sensors:['chw_supply_temp','chw_return_temp','valve_pos_pct','flow_gpm'] },
+
+  // ── L3 · Level 3 ───────────────────────────────────────────────
+  { id:'ELEC-AVDPS', bimId:'PEER ADVISING 310-1', name:'Electrical Panel AVDPS',
+    family:'AVDPS', category:'Electrical Equipment', source:'revit',
+    system:'elec', floor:'L3', zone:'Electrical Room',
+    sensors:['voltage','current','power_kw','power_factor'] },
+  { id:'FIX-STD', bimId:'LcRevitHost', name:'Electrical Fixture Standard',
+    family:'Standardj/Standardk', category:'Electrical Fixtures', source:'revit',
+    system:'elec', floor:'L3', zone:'Corridor',
+    sensors:['status','power_kw'] },
+  { id:'FIX-PFS41', bimId:'LcRevitHost', name:'Electrical Fixture PF_S.41',
+    family:'PF_S.41_P1', category:'Electrical Fixtures', source:'revit',
+    system:'elec', floor:'L3', zone:'Office',
+    sensors:['status','power_kw'] },
+  { id:'SPRK-HEAD', bimId:'CSI-21-HEAD', name:'Sprinkler Heads Viking',
+    family:'Viking', category:'Fire Sprinkler System', source:'dwg',
+    system:'fire', floor:'L3', zone:'Open Area',
+    sensors:['status'] },
+  { id:'DW-RISER-L3', bimId:'CSI-22-RS-L3', name:'Domestic Water Riser – L3 Tap',
+    family:'Wheatland Tube Sch.10 + Anvil Coupling', category:'Fire Sprinkler System', source:'dwg',
+    system:'water', floor:'L3', zone:'Plumbing Riser',
+    sensors:['dw_pressure','dw_flow_gpm','dw_temp'] },
+
+  // ── SRV · Server/Control ───────────────────────────────────────
+  { id:'ORBIT-BMCS', bimId:'Linked:UCBBECH-A.rvtx', name:'BMCS Controller Orbit',
+    family:'Orbit_BMCS-CJ6', category:'Building Controls', source:'revit',
+    system:'life', floor:'SRV', zone:'Server Room',
+    sensors:['status','power_kw'] },
+];
+
+/* ════════════════════════════════════════════════
+   SENSOR DEFINITIONS
+════════════════════════════════════════════════ */
+const SD = {
+  supply_temp:    { label:'Supply Air Temp',  unit:'°F',  color:'#f87171', badge:'TEMP',  bbc:'rgba(248,113,113,.12)', range:[55,95],   warn:[73,80],   crit:[80,90]   },
+  return_temp:    { label:'Return Air Temp',  unit:'°F',  color:'#fb923c', badge:'TEMP',  bbc:'rgba(251,146,60,.12)',  range:[60,90],   warn:[75,80],   crit:[80,88]   },
+  airflow_cfm:    { label:'Airflow',          unit:'CFM', color:'#4b8eff', badge:'AIR',   bbc:'rgba(75,142,255,.12)',  range:[0,2000],  warn:null,      crit:null      },
+  co2_ppm:        { label:'CO₂',             unit:'ppm', color:'#f472b6', badge:'CO2',   bbc:'rgba(244,114,182,.12)', range:[350,1500],warn:[800,1000],crit:[1000,1500]},
+  humidity:       { label:'Humidity',         unit:'%',   color:'#a78bfa', badge:'HUM',   bbc:'rgba(167,139,250,.12)', range:[20,90],   warn:[60,75],   crit:[75,90]   },
+  duct_pressure:  { label:'Duct Static Pres.', unit:'inWG',color:'#f59e0b',badge:'PRES',  bbc:'rgba(245,158,11,.12)', range:[0,3],     warn:[1.5,2],   crit:[2,3]     },
+  pipe_pressure:  { label:'Pipe Pressure',    unit:'PSI', color:'#f59e0b', badge:'PRES',  bbc:'rgba(245,158,11,.12)',  range:[0,200],   warn:[130,160], crit:[160,200] },
+  pipe_temp:      { label:'Pipe Temp',        unit:'°F',  color:'#f87171', badge:'TEMP',  bbc:'rgba(248,113,113,.12)', range:[40,200],  warn:null,      crit:null      },
+  flow_gpm:       { label:'Flow Rate',        unit:'GPM', color:'#2dd4bf', badge:'FLOW',  bbc:'rgba(45,212,191,.12)',  range:[0,100],   warn:null,      crit:null      },
+  supply_pressure:{ label:'Supply Pressure',  unit:'PSI', color:'#fb923c', badge:'PRES',  bbc:'rgba(251,146,60,.12)',  range:[100,200], warn:[145,155], crit:[155,200] },
+  zone_pressure:  { label:'Zone Pressure',    unit:'PSI', color:'#fb923c', badge:'PRES',  bbc:'rgba(251,146,60,.12)',  range:[100,200], warn:[110,120], crit:[100,110] },
+  alarm_status:   { label:'Alarm Status',     unit:'',    color:'#f87171', badge:'ALARM', bbc:'rgba(248,113,113,.15)', range:[0,1],     warn:null,      crit:null      },
+  battery_pct:    { label:'Battery',          unit:'%',   color:'#34d399', badge:'BATT',  bbc:'rgba(52,211,153,.12)',  range:[0,100],   warn:[20,40],   crit:[0,20]   },
+  voltage:        { label:'Voltage',          unit:'V',   color:'#fb923c', badge:'ELEC',  bbc:'rgba(251,146,60,.12)',  range:[100,130], warn:[122,127], crit:[127,130] },
+  current:        { label:'Current',          unit:'A',   color:'#fb923c', badge:'ELEC',  bbc:'rgba(251,146,60,.12)',  range:[0,100],   warn:[75,90],   crit:[90,100]  },
+  power_kw:       { label:'Active Power',     unit:'kW',  color:'#fb923c', badge:'PWR',   bbc:'rgba(251,146,60,.12)',  range:[0,50],    warn:[35,45],   crit:[45,50]   },
+  power_factor:   { label:'Power Factor',     unit:'',    color:'#fb923c', badge:'PF',    bbc:'rgba(251,146,60,.12)',  range:[0,1],     warn:[0,0.8],   crit:[0,0.7]   },
+  load_pct:       { label:'Load',             unit:'%',   color:'#fb923c', badge:'LOAD',  bbc:'rgba(251,146,60,.12)',  range:[0,100],   warn:[75,90],   crit:[90,100]  },
+  dimmer_pct:     { label:'Dimmer',           unit:'%',   color:'#34d399', badge:'LIGHT', bbc:'rgba(52,211,153,.12)',  range:[0,100],   warn:null,      crit:null      },
+  chw_supply_temp:{ label:'CHW Supply Temp',  unit:'°F',  color:'#38bdf8', badge:'CHW',   bbc:'rgba(56,189,248,.12)',  range:[38,60],   warn:[50,56],   crit:[56,60]   },
+  chw_return_temp:{ label:'CHW Return Temp',  unit:'°F',  color:'#7dd3fc', badge:'CHW',   bbc:'rgba(125,211,252,.12)', range:[44,70],   warn:[58,65],   crit:[65,70]   },
+  delta_t_f:      { label:'Δ-T (Supply↔Return)', unit:'°F', color:'#2dd4bf', badge:'ΔT', bbc:'rgba(45,212,191,.12)', range:[0,20],    warn:[3,5],     crit:[0,3]     },
+  cooling_tons:   { label:'Cooling Output',   unit:'tons',color:'#38bdf8', badge:'TONS',  bbc:'rgba(56,189,248,.12)',  range:[0,100],   warn:null,      crit:null      },
+  hw_supply_temp: { label:'HW Supply Temp',   unit:'°F',  color:'#fca5a5', badge:'HWS',   bbc:'rgba(252,165,165,.12)', range:[100,200], warn:[170,185], crit:[185,200] },
+  hw_return_temp: { label:'HW Return Temp',   unit:'°F',  color:'#fda4af', badge:'HWR',   bbc:'rgba(253,164,175,.12)', range:[80,160],  warn:null,      crit:null      },
+  pump_flow_gpm:  { label:'Pump Flow',        unit:'GPM', color:'#2dd4bf', badge:'FLOW',  bbc:'rgba(45,212,191,.12)',  range:[0,300],   warn:null,      crit:null      },
+  pump_speed_rpm: { label:'Pump Speed',       unit:'RPM', color:'#a78bfa', badge:'RPM',   bbc:'rgba(167,139,250,.12)', range:[0,1800],  warn:[1600,1750],crit:[1750,1800]},
+  pump_kw:        { label:'Pump Power',       unit:'kW',  color:'#fb923c', badge:'PWR',   bbc:'rgba(251,146,60,.12)',  range:[0,30],    warn:[20,25],   crit:[25,30]   },
+  valve_pos_pct:  { label:'Valve Position',   unit:'%',   color:'#a78bfa', badge:'VLV',   bbc:'rgba(167,139,250,.12)', range:[0,100],   warn:null,      crit:null      },
+  vfd_hz:         { label:'VFD Frequency',    unit:'Hz',  color:'#818cf8', badge:'VFD',   bbc:'rgba(129,140,248,.12)', range:[20,60],   warn:null,      crit:null      },
+  vfd_current:    { label:'VFD Current',      unit:'A',   color:'#818cf8', badge:'VFD',   bbc:'rgba(129,140,248,.12)', range:[0,60],    warn:[45,55],   crit:[55,60]   },
+  vfd_kw:         { label:'VFD Power',        unit:'kW',  color:'#818cf8', badge:'VFD',   bbc:'rgba(129,140,248,.12)', range:[0,25],    warn:[18,22],   crit:[22,25]   },
+  tank_level_pct: { label:'Tank Level',       unit:'%',   color:'#38bdf8', badge:'TANK',  bbc:'rgba(56,189,248,.12)',  range:[0,100],   warn:[15,25],   crit:[0,15]    },
+  tank_pressure:  { label:'Tank Pressure',    unit:'PSI', color:'#f59e0b', badge:'PRES',  bbc:'rgba(245,158,11,.12)',  range:[0,60],    warn:[45,55],   crit:[55,60]   },
+  dw_flow_gpm:    { label:'Domestic Flow',    unit:'GPM', color:'#34d399', badge:'DW',    bbc:'rgba(52,211,153,.12)',  range:[0,80],    warn:null,      crit:null      },
+  dw_pressure:    { label:'Water Pressure',   unit:'PSI', color:'#f59e0b', badge:'DW',    bbc:'rgba(245,158,11,.12)',  range:[30,120],  warn:[80,100],  crit:[100,120] },
+  dw_temp:        { label:'Water Temp',       unit:'°F',  color:'#7dd3fc', badge:'DW',    bbc:'rgba(125,211,252,.12)', range:[35,130],  warn:null,      crit:null      },
+  conductivity_us:{ label:'Conductivity',     unit:'μS/cm',color:'#34d399',badge:'WQ',   bbc:'rgba(52,211,153,.12)',  range:[50,600],  warn:[300,500], crit:[500,600] },
+  turbidity_ntu:  { label:'Turbidity',        unit:'NTU', color:'#34d399', badge:'WQ',    bbc:'rgba(52,211,153,.12)',  range:[0,5],     warn:[1,3],     crit:[3,5]     },
+  ph_level:       { label:'pH Level',         unit:'pH',  color:'#a78bfa', badge:'WQ',    bbc:'rgba(167,139,250,.12)', range:[5,9],     warn:null,      crit:null      },
+  sump_level_in:  { label:'Sump Level',       unit:'in',  color:'#38bdf8', badge:'SUMP',  bbc:'rgba(56,189,248,.12)',  range:[0,36],    warn:[18,28],   crit:[28,36]   },
+  leak_detect:    { label:'Leak Detection',   unit:'',    color:'#34d399', badge:'LEAK',  bbc:'rgba(52,211,153,.12)',  range:[0,1],     warn:null,      crit:null      },
+  status:         { label:'Status',           unit:'',    color:'#34d399', badge:'STATUS',bbc:'rgba(52,211,153,.12)',  range:[0,1],     warn:null,      crit:null      },
+};
+
+const FLOORS = [
+  { id:'B1', label:'B1', name:'Basement', icon:'⬇' },
+  { id:'L1', label:'L1', name:'Level 1',  icon:'1' },
+  { id:'L2', label:'L2', name:'Level 2',  icon:'2' },
+  { id:'L3', label:'L3', name:'Level 3',  icon:'3' },
+  { id:'SRV', label:'SRV', name:'Server', icon:'⚙' },
+];
+
+const SYSTEMS = [
+  { id:'all',   label:'All Systems',      icon:'◈', color:'#4b8eff' },
+  { id:'hvac',  label:'HVAC / MEP',       icon:'🌡', color:'#2dd4bf' },
+  { id:'water', label:'Plumbing / Water', icon:'💧', color:'#38bdf8' },
+  { id:'fire',  label:'Fire Protection',  icon:'🔥', color:'#fb923c' },
+  { id:'elec',  label:'Electrical',       icon:'⚡', color:'#f59e0b' },
+  { id:'life',  label:'Life Safety',      icon:'🚨', color:'#f87171' },
+];
+
+/* ════════════════════════════════════════════════
+   DATA ADAPTER — simulation + live-ready
+════════════════════════════════════════════════ */
+const DataAdapter = {
+  mode: 'simulation',
+  endpoint: null,
+  apiKey: null,
+
+  occupancy(date = new Date()) {
+    const day = date.getDay();
+    const h = date.getHours() + date.getMinutes() / 60;
+    if (day === 0 || day === 6) return 0.05;
+    if (h < 6)  return 0.02;
+    if (h < 7)  return 0.05 + (h-6)*0.1;
+    if (h < 8)  return 0.15 + (h-7)*0.35;
+    if (h < 9)  return 0.50 + (h-8)*0.3;
+    if (h < 12) return 0.80 + Math.sin((h-9)/3*Math.PI)*0.15;
+    if (h < 13) return 0.65;
+    if (h < 14) return 0.72 + (h-13)*0.15;
+    if (h < 16) return 0.85 + Math.sin((h-14)/2*Math.PI)*0.1;
+    if (h < 18) return 0.85 - (h-16)*0.35;
+    if (h < 20) return 0.15 - (h-18)*0.06;
+    return 0.02;
+  },
+
+  outdoorTemp(date = new Date()) {
+    const h = date.getHours() + date.getMinutes()/60;
+    return 62 + 14*Math.sin((h-5)/24*2*Math.PI);
+  },
+
+  drift(equipId, sensorType) {
+    const t = Math.floor(Date.now()/1000);
+    const seed = (equipId.split('').reduce((a,c)=>a+c.charCodeAt(0),0)*31 +
+                  sensorType.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) & 0xfffff;
+    return Math.sin((t+seed)/300*Math.PI)*0.7 + Math.sin((t+seed*7)/30*Math.PI)*0.3;
+  },
+
+  simulate(equipId, sensorType) {
+    const now = new Date();
+    const occ = this.occupancy(now);
+    const outT = this.outdoorTemp(now);
+    const d = this.drift(equipId, sensorType);
+    const h = now.getHours() + now.getMinutes()/60;
+    const dwUsage = occ * (
+      (h >= 7.5 && h <= 9)   ? 1.4 :
+      (h >= 11.5 && h <= 13) ? 1.2 :
+      (h >= 17 && h <= 18.5) ? 1.1 :
+      1.0
+    );
+
+    switch(sensorType) {
+      case 'supply_temp':      return +(63 - occ*5 + d*1.5).toFixed(1);
+      case 'return_temp':      return +(68 + occ*6 + (outT-70)*0.15 + d*1.2).toFixed(1);
+      case 'airflow_cfm':      return +(Math.max(200, 200 + occ*1600 + d*80)).toFixed(0);
+      case 'co2_ppm':          return +(Math.max(400, 420 + occ*780 + d*40)).toFixed(0);
+      case 'humidity':         return +(Math.min(80,Math.max(20, 35 + occ*20 + (outT>75?8:0) + d*3))).toFixed(1);
+      case 'duct_pressure':    return +(0.5 + occ*1.2 + d*0.08).toFixed(2);
+      case 'pipe_pressure':    return +(100 + d*2).toFixed(1);
+      case 'pipe_temp':        return +(55 + occ*8 + d*1.5).toFixed(1);
+      case 'flow_gpm':         return +(20 + occ*40 + d*2).toFixed(1);
+      case 'supply_pressure':  return +(150 + d*1.2).toFixed(1);
+      case 'zone_pressure':    return +(135 + d*1.0).toFixed(1);
+      case 'voltage':          return +(120 - occ*3 + d*0.8).toFixed(1);
+      case 'current':          return +(Math.max(0, 5 + occ*55 + d*4)).toFixed(1);
+      case 'power_kw': {
+        const s = equipId.startsWith('LIGHT') ? 0.4 : equipId === 'ELEC-AVDPS' ? 1.0 : 0.2;
+        return +(Math.max(0, (2+occ*18)*s + d*0.5)).toFixed(2);
+      }
+      case 'power_factor':     return +(Math.min(1, 0.87 + occ*0.07 + d*0.01)).toFixed(2);
+      case 'load_pct':         return +(Math.min(98,Math.max(2, occ*75 + d*5))).toFixed(1);
+      case 'dimmer_pct':       return occ > 0.3 ? +(85 + d*5).toFixed(0) : +(20+d*5).toFixed(0);
+      case 'battery_pct':      return 88;
+      case 'alarm_status':     return 'NORMAL';
+      case 'chw_supply_temp': {
+        const load = occ * 0.6 + (outT - 62) * 0.03;
+        return +(44 + Math.max(0, load - 0.5) * 2 + d * 0.4).toFixed(1);
+      }
+      case 'chw_return_temp': {
+        const supplyT = 44 + d*0.3;
+        const deltaT = 4 + occ * 10 + (outT-62)*0.1;
+        return +(supplyT + deltaT + d*0.5).toFixed(1);
+      }
+      case 'delta_t_f':        return +(4 + occ*10 + d*0.8).toFixed(1);
+      case 'cooling_tons':     return +(occ * 75 + (outT-62)*0.3 + d*2).toFixed(1);
+      case 'hw_supply_temp':   return +(150 - occ*8 + d*1.0).toFixed(1);
+      case 'hw_return_temp':   return +(120 + occ*4 + d*1.2).toFixed(1);
+      case 'pump_speed_rpm': {
+        if (equipId === 'CHW-PUMP-B') return occ > 0 ? +(200 + d*20).toFixed(0) : 0;
+        const rpm = 900 + occ * 850;
+        return +(Math.min(1750, Math.max(900, rpm + d*40))).toFixed(0);
+      }
+      case 'pump_flow_gpm': {
+        if (equipId === 'CHW-PUMP-B') return +(d > 0 ? 5 : 0).toFixed(1);
+        if (equipId === 'HW-PUMP-1') return +(15 + occ*60 + d*3).toFixed(1);
+        return +(30 + occ*200 + d*8).toFixed(1);
+      }
+      case 'pump_kw': {
+        if (equipId === 'CHW-PUMP-B') return +(0.5 + d*0.1).toFixed(2);
+        if (equipId.startsWith('SUMP')) return occ > 0 ? +(1.5 + d*0.2).toFixed(2) : +(0).toFixed(2);
+        if (equipId === 'HW-PUMP-1') return +(1 + occ*4 + d*0.3).toFixed(2);
+        const frac = 0.5 + occ*0.5;
+        return +(Math.max(1, 18 * frac*frac*frac + d*0.5)).toFixed(2);
+      }
+      case 'vfd_hz':           return +(30 + occ*30 + d*1.5).toFixed(1);
+      case 'vfd_current':      return +(8 + occ*35 + d*2).toFixed(1);
+      case 'vfd_kw': {
+        const frac = 0.5 + occ*0.5;
+        return +(Math.max(0.5, 15 * frac*frac*frac + d*0.4)).toFixed(2);
+      }
+      case 'valve_pos_pct': {
+        if (equipId === 'DW-PRV-1') return +(55 + d*3).toFixed(1);
+        if (equipId === 'HW-VALVE-1') return +(20 + occ*65 + d*4).toFixed(1);
+        return +(15 + occ*75 + d*5).toFixed(1);
+      }
+      case 'tank_level_pct':   return +(55 + occ*18 + d*2).toFixed(1);
+      case 'tank_pressure':    return +(30 + occ*12 + d*1).toFixed(1);
+      case 'dw_flow_gpm':      return +(Math.max(0, dwUsage*18 + d*2)).toFixed(1);
+      case 'dw_pressure':      return +(72 - dwUsage*8 + d*1.5).toFixed(1);
+      case 'dw_temp': {
+        if (equipId === 'DW-HW-METER') return +(115 - dwUsage*3 + d*1.5).toFixed(1);
+        return +(54 + (outT-62)*0.05 + d*0.8).toFixed(1);
+      }
+      case 'conductivity_us': {
+        const t = Math.floor(Date.now()/3600000) % 24;
+        const cyclePhase = (t % 8) / 8;
+        return +(200 + cyclePhase*60 + d*8).toFixed(1);
+      }
+      case 'turbidity_ntu':    return +(0.15 + dwUsage*0.1 + Math.max(0, d*0.08)).toFixed(2);
+      case 'ph_level':         return +(7.4 + d*0.08).toFixed(2);
+      case 'sump_level_in':    return +(4 + Math.max(0, d*1.5)).toFixed(1);
+      case 'leak_detect':      return 'CLEAR';
+      case 'status': {
+        if (equipId.startsWith('SPRK'))  return 'STANDBY';
+        if (equipId === 'ORBIT-BMCS')    return 'ONLINE';
+        if (equipId === 'DW-PRV-1')      return 'ACTIVE';
+        if (equipId === 'DW-BACKFLOW')   return 'CLOSED';
+        if (equipId === 'CHW-PUMP-B')    return occ > 0.95 ? 'ACTIVE' : 'STANDBY';
+        if (equipId === 'SUMP-PUMP-2')   return 'STANDBY';
+        if (equipId.startsWith('SUMP'))  return occ > 0.1 ? 'ON' : 'IDLE';
+        if (equipId.startsWith('CONDUIT')) return occ > 0.1 ? 'ACTIVE' : 'IDLE';
+        if (equipId.startsWith('CHW') || equipId.startsWith('HW') || equipId.startsWith('DW'))
+          return occ > 0.05 ? 'ACTIVE' : 'IDLE';
+        if (equipId.startsWith('WQ') || equipId.startsWith('LEAK')) return 'MONITORING';
+        return occ > 0.1 ? 'ON' : 'STANDBY';
+      }
+      default: return 0;
+    }
+  },
+
+  async fetchLive(equipId, sensorType) {
+    /* ──────────────────────────────────────────────────────
+       LIVE MODE — Connect your real API here
+       ──────────────────────────────────────────────────────
+       Example for MQTT / REST:
+       const res = await fetch(`${this.endpoint}/api/v1/sensor/${equipId}/${sensorType}`,
+         { headers: { Authorization: `Bearer ${this.apiKey}` } });
+       const data = await res.json();
+       return data.value;
+    ────────────────────────────────────────────────────── */
+    console.warn('[DataAdapter] Live endpoint not configured — falling back to simulation');
+    return this.simulate(equipId, sensorType);
+  },
+
+  async fetch(equipId, sensorType) {
+    return this.mode === 'live'
+      ? this.fetchLive(equipId, sensorType)
+      : this.simulate(equipId, sensorType);
+  }
+};
+
+/* ════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════ */
+const S = {
+  floor: 'B1',
+  system: 'all',
+  readings: {},
+  history: {},
+  alerts: [],
+  selectedEquipId: null,
+  selectedSensorKey: null,
+  chart: null,
+};
+
+/* ════════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════════ */
+function sensorStatus(def, value) {
+  if (!def || typeof value === 'string') return 'ok';
+  if (def.crit && value >= def.crit[0] && value <= def.crit[1]) return 'crit';
+  if (def.warn && value >= def.warn[0] && value <= def.warn[1]) return 'warn';
+  return 'ok';
+}
+function fmtVal(type, val) {
+  if (typeof val === 'string') return val;
+  if (type === 'power_factor') return val.toFixed(2);
+  if (['co2_ppm','airflow_cfm'].includes(type)) return Math.round(val);
+  return val.toFixed(1);
+}
+function barPct(def, val) {
+  if (!def || typeof val === 'string') return 0;
+  return Math.min(100, Math.max(0, ((val - def.range[0]) / (def.range[1] - def.range[0])) * 100));
+}
+function trendOf(key) {
+  const h = S.history[key];
+  if (!h || h.length < 3) return ['—',''];
+  const last = h[h.length-1], prev = h[h.length-3];
+  const d = last - prev;
+  if (Math.abs(d) < 0.05) return ['→', 'c-md'];
+  return d > 0 ? ['↑','c-red'] : ['↓','c-cyan'];
+}
+function worstForFloor(floorId) {
+  let w = 'ok';
+  for (const e of EQUIPMENT.filter(e => e.floor === floorId)) {
+    for (const s of e.sensors) {
+      const v = S.readings[`${e.id}:${s}`]; const def = SD[s];
+      if (v !== undefined && def) {
+        const st = sensorStatus(def, v);
+        if (st === 'crit') return 'crit';
+        if (st === 'warn') w = 'warn';
+      }
+    }
+  }
+  return w;
+}
+function sysColor(sys) {
+  return SYSTEMS.find(s => s.id === sys)?.color || '#4b8eff';
+}
+
+/* ════════════════════════════════════════════════
+   RENDER: LEFT NAV
+════════════════════════════════════════════════ */
+function renderFloorNav() {
+  const el = document.getElementById('bldgFloors');
+  el.innerHTML = [...FLOORS].reverse().map(f => {
+    const w = worstForFloor(f.id);
+    return `<div class="bldg-floor${S.floor === f.id ? ' active' : ''}" onclick="setFloor('${f.id}')">
+      <span class="bldg-floor__num">${f.label}</span>
+      <span class="bldg-floor__name">${f.name}</span>
+      <div class="bldg-floor__badges">
+        <div class="bldg-floor__badge ${w}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSysFilters() {
+  const el = document.getElementById('sysFilters');
+  el.innerHTML = SYSTEMS.map(sys => {
+    const cnt = EQUIPMENT.filter(e =>
+      (sys.id === 'all' || e.system === sys.id) &&
+      e.floor === S.floor
+    ).reduce((a, e) => a + e.sensors.length, 0);
+    return `<div class="sys-btn${S.system === sys.id ? ' active' : ''}" onclick="setSystem('${sys.id}')">
+      <div class="sys-btn__dot" style="background:${sys.color}20;outline:1px solid ${sys.color}60; outline-offset:-1px;"></div>
+      <span>${sys.label}</span>
+      <span class="sys-btn__count">${cnt}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderOccStrip() {
+  const now = new Date();
+  const occ = DataAdapter.occupancy(now);
+  document.getElementById('occPct').textContent = Math.round(occ * 100) + '%';
+  const bars = document.getElementById('occBars');
+  const nowH = now.getHours();
+  bars.innerHTML = Array.from({length: 24}, (_, h) => {
+    const t = new Date(now); t.setHours(h, 0, 0, 0);
+    const o = DataAdapter.occupancy(t);
+    const pct = Math.max(4, o * 100);
+    const isNow = nowH === h;
+    const color = isNow ? 'var(--cyan)' : o > 0.5 ? 'rgba(52,211,153,.45)' : 'rgba(52,211,153,.18)';
+    return `<div class="occ-bar-h" style="height:${pct}%;background:${color}"></div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════
+   RENDER: FLOOR TABS + CONTENT
+════════════════════════════════════════════════ */
+function renderFloorTabs() {
+  const bar = document.getElementById('floorBar');
+  bar.innerHTML = FLOORS.map(f => {
+    const w = worstForFloor(f.id);
+    const active = S.floor === f.id;
+    return `<div class="floor-tab${active ? ' active' : ''}" onclick="setFloor('${f.id}')">
+      <span class="floor-tab__num">${f.label}</span>
+      <span class="floor-tab__name">${f.name}</span>
+      ${w === 'crit' ? '<div class="floor-tab__alert"></div>' : ''}
+      ${w === 'warn' ? '<div class="floor-tab__warn-dot"></div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderContent() {
+  const ca = document.getElementById('contentArea');
+  const floor = FLOORS.find(f => f.id === S.floor);
+  if (!floor) return;
+
+  let equips = EQUIPMENT.filter(e => e.floor === S.floor);
+  if (S.system !== 'all') equips = equips.filter(e => e.system === S.system);
+
+  if (!equips.length) {
+    ca.innerHTML = `<div class="floor-empty">No equipment found for this selection.</div>`;
+    return;
+  }
+
+  const groups = {};
+  for (const e of equips) {
+    if (!groups[e.system]) groups[e.system] = [];
+    groups[e.system].push(e);
+  }
+
+  const sysMeta = {
+    hvac:  { icon:'🌡', name:'HVAC / MEP',       csi:'CSI 23' },
+    water: { icon:'💧', name:'Plumbing / Water',  csi:'CSI 22/23' },
+    fire:  { icon:'🔥', name:'Fire Protection',   csi:'CSI 21' },
+    elec:  { icon:'⚡', name:'Electrical',        csi:'CSI 26' },
+    life:  { icon:'🚨', name:'Life Safety',       csi:'CSI 28' },
+  };
+
+  let html = '';
+  for (const [sys, equips_] of Object.entries(groups)) {
+    const meta = sysMeta[sys] || { icon:'◈', name:sys, csi:'' };
+    const totalPts = equips_.reduce((a, e) => a + e.sensors.length, 0);
+    const color = sysColor(sys);
+
+    html += `<div class="sys-group">
+      <div class="sys-group__hdr">
+        <span class="sys-group__icon">${meta.icon}</span>
+        <span class="sys-group__name" style="color:${color}">${meta.name}</span>
+        <span class="sys-group__count">${totalPts} pts · ${equips_.length} equip</span>
+        <span class="sys-group__csi">${meta.csi}</span>
+      </div>
+      <div class="sgrid">`;
+
+    for (const equip of equips_) {
+      for (const sType of equip.sensors) {
+        const key = `${equip.id}:${sType}`;
+        const val = S.readings[key];
+        const def = SD[sType];
+        if (!def || val === undefined) continue;
+
+        const status = sensorStatus(def, val);
+        const isStr = typeof val === 'string';
+        const valColor = status === 'crit' ? 'var(--crit)' : status === 'warn' ? 'var(--warn)' : def.color;
+        const pct = barPct(def, val);
+        const [ti, tc] = trendOf(key);
+        const isSelected = S.selectedSensorKey === key;
+        const cardCls = `sc${status === 'crit' ? ' sc-crit' : status === 'warn' ? ' sc-warn' : ''}${isSelected ? ' selected' : ''}`;
+
+        let valHtml = '';
+        if (isStr) {
+          const cls = val === 'NORMAL' || val === 'ON' || val === 'ONLINE' || val === 'STANDBY' || val === 'ACTIVE' || val === 'CLEAR' || val === 'MONITORING' || val === 'CLOSED'
+            ? 'status-val'
+            : val === 'IDLE' ? 'status-off' : 'status-alarm';
+          valHtml = `<span class="sc__val ${cls}">${val}</span>`;
+        } else {
+          valHtml = `<span class="sc__val" style="color:${valColor}">${fmtVal(sType, val)}</span>
+                     <span class="sc__unit">${def.unit}</span>
+                     <span class="sc__trend ${tc}">${ti}</span>`;
+        }
+
+        html += `
+          <div class="${cardCls}" style="--sys-color:${color}; --val-color:${valColor}; --badge-bg:${def.bbc}; --badge-c:${def.color}"
+               onclick="selectCard('${equip.id}','${sType}')">
+            <div class="sc__top">
+              <span class="sc__equip-id">${equip.id}</span>
+              <span class="sc__badge">${def.badge}</span>
+            </div>
+            <div class="sc__label">${def.label}</div>
+            <div class="sc__value-area">${valHtml}</div>
+            ${!isStr ? `<div class="sc__bar"><div class="sc__bar-fill" style="width:${pct}%"></div></div>` : '<div style="height:10px"></div>'}
+            <div class="sc__bottom">
+              <span class="sc__status-chip chip-${status}">${status}</span>
+              <span class="sc__equip-name">${equip.name}</span>
+            </div>
+          </div>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+
+  ca.innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════
+   RENDER: DETAIL PANEL
+════════════════════════════════════════════════ */
+let chartInst = null;
+function renderDetailPanel(equipId, sensorKey) {
+  const equip = EQUIPMENT.find(e => e.id === equipId);
+  if (!equip) return;
+
+  document.getElementById('dpId').textContent = `${equip.id} · ${equip.system.toUpperCase()}`;
+  document.getElementById('dpName').textContent = equip.name;
+  document.getElementById('dpSub').textContent = `${equip.floor} · ${equip.zone}`;
+
+  const body = document.getElementById('detailBody');
+  const sType = sensorKey?.split(':')?.[1];
+
+  const readingsHtml = equip.sensors.map(s => {
+    const key = `${equip.id}:${s}`;
+    const val = S.readings[key];
+    const def = SD[s];
+    if (!def || val === undefined) return '';
+    const st = sensorStatus(def, val);
+    const color = st === 'crit' ? 'var(--crit)' : st === 'warn' ? 'var(--warn)' : def.color;
+    const isSelected = sensorKey === key;
+    return `<div class="reading-row" style="${isSelected ? `background:${def.bbc};border-radius:4px;padding:5px 6px;` : ''}"
+                 onclick="selectCard('${equip.id}','${s}')">
+      <span class="reading-row__label">${def.label}</span>
+      <span class="reading-row__val" style="color:${color}">${fmtVal(s, val)}</span>
+      <span class="reading-row__unit">${def.unit}</span>
+      <div class="reading-row__status ${st}"></div>
+    </div>`;
+  }).join('');
+
+  let chartHtml = '';
+  if (sType && SD[sType] && typeof S.readings[sensorKey] !== 'string') {
+    chartHtml = `<div class="detail-group">
+      <div class="detail-group__title">${SD[sType]?.label} — Trend (30 pts)</div>
+      <div class="detail-chart-wrap"><canvas id="detailChart"></canvas></div>
+    </div>`;
+  } else {
+    chartHtml = `<div class="detail-chart-empty">Select a numeric sensor to view trend.</div>`;
+  }
+
+  body.innerHTML = `
+    <div class="detail-group">
+      <div class="detail-group__title">BIM Properties</div>
+      <div class="detail-row"><span class="detail-row__k">BIM ID</span><span class="detail-row__v">${equip.bimId || 'N/A'}</span></div>
+      <div class="detail-row"><span class="detail-row__k">Family</span><span class="detail-row__v">${equip.family}</span></div>
+      <div class="detail-row"><span class="detail-row__k">Category</span><span class="detail-row__v">${equip.category}</span></div>
+      <div class="detail-row"><span class="detail-row__k">Source</span><span class="detail-row__v">${equip.source.toUpperCase()}</span></div>
+    </div>
+    <div class="detail-group">
+      <div class="detail-group__title">Live Readings</div>
+      ${readingsHtml}
+    </div>
+    ${chartHtml}
+    <div class="detail-group">
+      <div class="detail-group__title">Data Adapter</div>
+      <div class="adapter-block">
+        <pre id="adapterPre"></pre>
+        <button class="adapter-block__mode-btn" onclick="toggleMode()">
+          Switch to ${DataAdapter.mode === 'simulation' ? 'Live' : 'Simulation'} Mode
+        </button>
+      </div>
+    </div>
+  `;
+
+  updateAdapterPre();
+
+  if (sType && SD[sType] && typeof S.readings[sensorKey] !== 'string') {
+    const hist = S.history[sensorKey] || [];
+    if (hist.length > 1) {
+      setTimeout(() => drawDetailChart(sensorKey, sType, hist), 0);
+    }
+  }
+}
+
+function drawDetailChart(sensorKey, sType, hist) {
+  const canvas = document.getElementById('detailChart');
+  if (!canvas) return;
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  const def = SD[sType];
+  const color = def.color;
+  chartInst = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: hist.map((_, i) => i),
+      datasets: [{
+        data: hist,
+        borderColor: color,
+        backgroundColor: color + '18',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.35,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 200 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(12,14,20,.95)',
+          borderColor: color + '40',
+          borderWidth: 1,
+          titleColor: '#8892b0',
+          bodyColor: color,
+          titleFont: { family:'DM Mono', size:9 },
+          bodyFont: { family:'DM Mono', size:11 },
+          callbacks: { label: ctx => `${fmtVal(sType, ctx.raw)} ${def.unit}` }
+        }
+      },
+      scales: {
+        x: { display: false },
+        y: {
+          grid: { color: 'rgba(255,255,255,.04)' },
+          ticks: {
+            color: '#4a5470',
+            font: { family:'DM Mono', size:9 },
+            maxTicksLimit: 4,
+            callback: v => `${v}${def.unit}`
+          }
+        }
+      }
+    }
+  });
+}
+
+function updateAdapterPre() {
+  const pre = document.getElementById('adapterPre');
+  if (!pre) return;
+  const occ = (DataAdapter.occupancy()*100).toFixed(0);
+  const now = new Date().toLocaleTimeString();
+  pre.textContent = DataAdapter.mode === 'live'
+    ? `mode = "live"\nendpoint = ${DataAdapter.endpoint || '<not set>'}\nlastSync = ${now}`
+    : `mode = "simulation"\noccupancy() = ${occ}%\noutdoorTemp() = ${DataAdapter.outdoorTemp().toFixed(1)}°F\nlastSync = ${now}`;
+}
+
+/* ════════════════════════════════════════════════
+   RENDER: KPIs + ALERTS
+════════════════════════════════════════════════ */
+function renderKPIs() {
+  const occ = Math.round(DataAdapter.occupancy() * 100);
+  let totalKW = 0, maxCO2 = 0, temps = [], alerts = 0, crits = 0;
+
+  for (const e of EQUIPMENT) {
+    for (const s of e.sensors) {
+      const key = `${e.id}:${s}`;
+      const val = S.readings[key];
+      const def = SD[s];
+      if (val === undefined) continue;
+      if ((s === 'power_kw' || s === 'pump_kw' || s === 'vfd_kw') && typeof val === 'number') totalKW += val;
+      if (s === 'co2_ppm') maxCO2 = Math.max(maxCO2, val);
+      if (s === 'supply_temp' || s === 'return_temp') temps.push(val);
+      if (def && typeof val !== 'string') {
+        const st = sensorStatus(def, val);
+        if (st === 'crit') crits++;
+        else if (st === 'warn') alerts++;
+      }
+    }
+  }
+
+  const avgT = temps.length ? (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1) : '—';
+  const totalAlerts = crits + alerts;
+
+  const co2El = document.getElementById('kpi-co2');
+  const co2Class = maxCO2 > 1000 ? 'c-red' : maxCO2 > 800 ? 'c-amber' : 'c-green';
+  co2El.innerHTML = `<span class="${co2Class}">${maxCO2 || '—'}</span><small>ppm</small>`;
+
+  const alertEl = document.getElementById('kpi-alerts');
+  alertEl.innerHTML = totalAlerts === 0
+    ? `<span class="c-green">Clear</span>`
+    : `<span class="${crits > 0 ? 'c-red' : 'c-amber'}">${totalAlerts}</span>`;
+
+  document.getElementById('kpi-occ').innerHTML = `<span>${occ}</span><small>%</small>`;
+  document.getElementById('kpi-temp').innerHTML = `<span>${avgT}</span><small>°F</small>`;
+  document.getElementById('kpi-kw').innerHTML = `<span>${totalKW.toFixed(1)}</span><small>kW</small>`;
+
+  S.alerts = [];
+  for (const e of EQUIPMENT) {
+    for (const s of e.sensors) {
+      const val = S.readings[`${e.id}:${s}`];
+      const def = SD[s];
+      if (val === undefined || !def || typeof val === 'string') continue;
+      const st = sensorStatus(def, val);
+      if (st !== 'ok') S.alerts.push({ level:st, equip:e, sType:s, val, def });
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════
+   INTERACTIONS
+════════════════════════════════════════════════ */
+function setFloor(id) {
+  S.floor = id;
+  // Close mobile nav if open
+  document.getElementById('navPanel').classList.remove('open');
+  document.getElementById('navOverlay').classList.remove('show');
+  renderFloorNav();
+  renderFloorTabs();
+  renderSysFilters();
+  renderContent();
+}
+
+function setSystem(id) {
+  S.system = id;
+  renderSysFilters();
+  renderContent();
+}
+
+function selectCard(equipId, sType) {
+  const key = `${equipId}:${sType}`;
+  S.selectedEquipId = equipId;
+  S.selectedSensorKey = key;
+  document.getElementById('detailPanel').classList.remove('collapsed');
+  renderDetailPanel(equipId, key);
+  renderContent();
+}
+
+function closeDetail() {
+  S.selectedSensorKey = null;
+  S.selectedEquipId = null;
+  document.getElementById('detailPanel').classList.add('collapsed');
+  renderContent();
+}
+
+function toggleMode() {
+  DataAdapter.mode = DataAdapter.mode === 'simulation' ? 'live' : 'simulation';
+  const pill = document.getElementById('modePill');
+  const label = document.getElementById('modeLabel');
+  if (DataAdapter.mode === 'live') {
+    pill.classList.add('live-mode');
+    label.textContent = 'LIVE';
+  } else {
+    pill.classList.remove('live-mode');
+    label.textContent = 'SIM';
+  }
+  updateAdapterPre();
+  if (S.selectedEquipId) renderDetailPanel(S.selectedEquipId, S.selectedSensorKey);
+}
+
+/* ════════════════════════════════════════════════
+   MAIN LOOP
+════════════════════════════════════════════════ */
+async function tick() {
+  for (const e of EQUIPMENT) {
+    for (const s of e.sensors) {
+      const key = `${e.id}:${s}`;
+      const val = await DataAdapter.fetch(e.id, s);
+      S.readings[key] = val;
+      if (typeof val !== 'string') {
+        if (!S.history[key]) S.history[key] = [];
+        S.history[key].push(+val);
+        if (S.history[key].length > 60) S.history[key].shift();
+      }
+    }
+  }
+  renderKPIs();
+  renderFloorNav();
+  renderFloorTabs();
+  renderSysFilters();
+  renderContent();
+  renderOccStrip();
+  if (S.selectedEquipId) renderDetailPanel(S.selectedEquipId, S.selectedSensorKey);
+}
+
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+}
+
+/* ════════════════════════════════════════════════
+   SERVICE WORKER (inline registration for PWA)
+════════════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  // Create a minimal service worker via blob URL for offline caching
+  const swCode = `
+    const CACHE = 'grimes-bim-v1';
+    const ASSETS = ['/'];
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+      self.skipWaiting();
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(
+        caches.match(e.request).then(r => r || fetch(e.request))
+      );
+    });
+  `;
+  const swBlob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+
+/* ════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════ */
+(async function init() {
+  updateClock();
+  setInterval(updateClock, 1000);
+  renderOccStrip();
+  renderSysFilters();
+  renderFloorNav();
+  renderFloorTabs();
+  await tick();
+  setInterval(tick, 5000);
+  setInterval(renderOccStrip, 60000);
+})();
+</script>
+</body>
+</html>
 
