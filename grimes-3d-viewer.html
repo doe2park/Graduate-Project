@@ -130,6 +130,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 /* ════════════════════════════════════════════════
    DATA LAYER — copied from Protoys.html
@@ -337,6 +338,9 @@ function makeLabel(text) {
 
 // ── GLB Loader ──
 const gltfLoader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/libs/draco/');
+gltfLoader.setDRACOLoader(dracoLoader);
 const loadingEl = document.createElement('div');
 loadingEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;font-family:var(--mono);font-size:14px;color:var(--cyan);background:rgba(10,12,18,.9);padding:20px 32px;border-radius:10px;border:1px solid rgba(45,212,191,.2)';
 loadingEl.textContent = 'Loading Grimes MEP model...';
