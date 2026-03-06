@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Grimes Building · 3D MEP Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c12; --s1:#0f1219; --s2:#151a24; --s3:#1b2130;
+  --border:rgba(255,255,255,.07); --hi:#eef1fa; --md:#8892b0; --lo:#4a5470;
+  --blue:#4b8eff; --cyan:#2dd4bf; --green:#34d399; --amber:#f59e0b; --red:#f87171; --purple:#a78bfa;
+  --mono:'JetBrains Mono',monospace; --sans:'Outfit',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px}
+
+/* ── Canvas ── */
+#canvas3d{position:absolute;inset:0;z-index:0}
+
+/* ── Top Bar ── */
+.topbar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(15,18,25,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;z-index:100;gap:12px}
+.topbar .brand{display:flex;align-items:center;gap:8px}
+.topbar .mark{width:26px;height:26px;background:var(--cyan);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;font-family:var(--mono)}
+.topbar h1{font-size:13px;font-weight:600}
+.topbar h1 span{color:var(--cyan);font-weight:700}
+.mode-pills{display:flex;gap:4px;margin-left:auto;background:var(--s2);border-radius:8px;padding:3px}
+.mode-pills button{border:none;background:transparent;color:var(--lo);font-family:var(--sans);font-size:11px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .2s}
+.mode-pills button.active{background:var(--cyan);color:#000}
+.mode-pills button:hover:not(.active){color:var(--md)}
+.sim-badge{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:5px;background:rgba(45,212,191,.12);color:var(--cyan);letter-spacing:.3px}
+
+/* ── Floor Selector ── */
+.floor-nav{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:90;display:flex;flex-direction:column;gap:4px;background:rgba(15,18,25,.85);backdrop-filter:blur(8px);border-radius:10px;padding:6px;border:1px solid var(--border)}
+.floor-btn{width:36px;height:36px;border:none;background:transparent;color:var(--lo);font-family:var(--mono);font-size:12px;font-weight:600;border-radius:7px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.floor-btn:hover{color:var(--md);background:var(--s3)}
+.floor-btn.active{background:rgba(45,212,191,.15);color:var(--cyan)}
+
+/* ── Info Panel (right side) ── */
+.info-panel{position:fixed;right:0;top:48px;bottom:0;width:320px;background:rgba(15,18,25,.94);backdrop-filter:blur(12px);border-left:1px solid var(--border);z-index:80;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column}
+.info-panel.open{transform:translateX(0)}
+.panel-head{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px}
+.panel-head .equip-icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.panel-head .equip-info h2{font-size:14px;font-weight:700;line-height:1.3}
+.panel-head .equip-info p{font-size:11px;color:var(--lo);font-family:var(--mono);margin-top:2px}
+.panel-close{position:absolute;top:12px;right:12px;width:28px;height:28px;border:none;background:var(--s3);color:var(--md);border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.panel-close:hover{background:var(--red);color:#fff}
+
+.panel-meta{padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.meta-chip{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:5px;background:var(--s2);color:var(--md);border:1px solid var(--border)}
+
+.sensor-list{padding:8px 12px;flex:1}
+.sensor-card{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;transition:border-color .3s}
+.sensor-card.warn{border-color:rgba(245,158,11,.3)}
+.sensor-card.crit{border-color:rgba(248,113,113,.4);animation:pulse-crit 2s infinite}
+@keyframes pulse-crit{0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,0)}50%{box-shadow:0 0 8px 2px rgba(248,113,113,.15)}}
+.sensor-badge{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;flex-shrink:0;min-width:38px;text-align:center}
+.sensor-info{flex:1;min-width:0}
+.sensor-info .label{font-size:11px;color:var(--md)}
+.sensor-info .value{font-size:16px;font-weight:700;font-family:var(--mono)}
+.sensor-info .unit{font-size:11px;color:var(--lo);font-weight:400;margin-left:2px}
+.sensor-status{font-size:9px;font-family:var(--mono);padding:2px 6px;border-radius:4px;font-weight:600}
+.st-ok{background:rgba(52,211,153,.12);color:var(--green)}
+.st-warn{background:rgba(245,158,11,.12);color:var(--amber)}
+.st-crit{background:rgba(248,113,113,.15);color:var(--red)}
+
+/* ── Hint overlay ── */
+.hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(15,18,25,.85);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-size:12px;color:var(--md);z-index:90;transition:opacity .5s;pointer-events:none}
+.hint.hidden{opacity:0}
+
+/* ── Stats ── */
+.stats{position:fixed;bottom:16px;left:16px;font-family:var(--mono);font-size:10px;color:var(--lo);z-index:90;background:rgba(15,18,25,.7);padding:6px 10px;border-radius:6px}
+
+@media(max-width:768px){
+  .info-panel{width:100%;border-left:none;border-top:1px solid var(--border);top:auto;bottom:0;height:55vh;transform:translateY(100%)}
+  .info-panel.open{transform:translateY(0)}
+  .floor-nav{left:8px}
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="brand">
+    <div class="mark">GB</div>
+    <h1>Grimes Building · <span>3D MEP</span></h1>
+  </div>
+  <div class="mode-pills">
+    <button class="active" data-view="3d">3D</button>
+    <button data-view="ar">AR</button>
+  </div>
+  <div class="sim-badge" id="modeBadge">SIM</div>
+</div>
+
+<!-- Floor Navigation -->
+<div class="floor-nav" id="floorNav"></div>
+
+<!-- 3D Canvas -->
+<canvas id="canvas3d"></canvas>
+
+<!-- Sensor Info Panel -->
+<div class="info-panel" id="infoPanel">
+  <button class="panel-close" id="panelClose">✕</button>
+  <div class="panel-head" id="panelHead"></div>
+  <div class="panel-meta" id="panelMeta"></div>
+  <div class="sensor-list" id="sensorList"></div>
+</div>
+
+<!-- Hint -->
+<div class="hint" id="hint">Click on a MEP asset to view sensor data</div>
+
+<!-- Stats -->
+<div class="stats" id="stats"></div>
+
+<!-- ═══════════════════════════════════════════════════
+     SCRIPTS
+═══════════════════════════════════════════════════ -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+/* ════════════════════════════════════════════════
+   DATA LAYER — copied from Protoys.html
+════════════════════════════════════════════════ */
+const EQUIPMENT = [
+  { id:'SPRK-MAIN', bimId:'CSI-21-MAIN', name:'Fire Sprinkler Main Supply', system:'fire', floor:'B1', zone:'Fire Pump Room', sensors:['supply_pressure','flow_gpm','status'] },
+  { id:'PF-001', bimId:null, name:'Pipe Fitting – Hydronic Supply', system:'hvac', floor:'B1', zone:'Mechanical Room', sensors:['pipe_pressure','pipe_temp','flow_gpm'] },
+  { id:'CHW-PUMP-A', bimId:'CSI-23-CHWP-A', name:'Chilled Water Pump A', system:'water', floor:'B1', zone:'Chiller Plant', sensors:['chw_supply_temp','chw_return_temp','pump_flow_gpm','pump_speed_rpm','pump_kw','status'] },
+  { id:'CHW-PUMP-B', bimId:'CSI-23-CHWP-B', name:'Chilled Water Pump B (Standby)', system:'water', floor:'B1', zone:'Chiller Plant', sensors:['pump_flow_gpm','pump_speed_rpm','pump_kw','status'] },
+  { id:'CHW-VFD-A', bimId:'CSI-23-VFD-A', name:'VFD – Chiller Pump A', system:'water', floor:'B1', zone:'Chiller Plant', sensors:['vfd_hz','vfd_current','vfd_kw','status'] },
+  { id:'HW-PUMP-1', bimId:'CSI-23-HWP-1', name:'Hot Water Circulator Pump', system:'water', floor:'B1', zone:'Boiler Room', sensors:['hw_supply_temp','hw_return_temp','pump_flow_gpm','pump_kw','status'] },
+  { id:'DW-MAIN-METER', bimId:'CSI-22-DWM', name:'Domestic Water Main Meter', system:'water', floor:'B1', zone:'Utility Vault', sensors:['dw_flow_gpm','dw_pressure','dw_temp'] },
+  { id:'AT-001', bimId:'LcRevitElement', name:'Air Terminal 24×24', system:'hvac', floor:'L2', zone:'Open Office', sensors:['supply_temp','return_temp','airflow_cfm','co2_ppm','humidity'] },
+  { id:'ELEC-AVDPS', bimId:'PEER ADVISING 310-1', name:'Electrical Panel AVDPS', system:'elec', floor:'L3', zone:'Electrical Room', sensors:['voltage','current','power_kw','power_factor'] },
+  { id:'ORBIT-BMCS', bimId:'Linked:UCBBECH-A.rvtx', name:'BMCS Controller Orbit', system:'life', floor:'SRV', zone:'Server Room', sensors:['status','power_kw'] },
+];
+
+const SD = {
+  supply_temp:{label:'Supply Air Temp',unit:'°F',color:'#f87171',badge:'TEMP',warn:[73,80],crit:[80,90]},
+  return_temp:{label:'Return Air Temp',unit:'°F',color:'#fb923c',badge:'TEMP',warn:[75,80],crit:[80,88]},
+  airflow_cfm:{label:'Airflow',unit:'CFM',color:'#4b8eff',badge:'AIR',warn:null,crit:null},
+  co2_ppm:{label:'CO₂',unit:'ppm',color:'#f472b6',badge:'CO2',warn:[800,1000],crit:[1000,1500]},
+  humidity:{label:'Humidity',unit:'%',color:'#a78bfa',badge:'HUM',warn:[60,75],crit:[75,90]},
+  pipe_pressure:{label:'Pipe Pressure',unit:'PSI',color:'#f59e0b',badge:'PRES',warn:[130,160],crit:[160,200]},
+  pipe_temp:{label:'Pipe Temp',unit:'°F',color:'#f87171',badge:'TEMP',warn:null,crit:null},
+  flow_gpm:{label:'Flow Rate',unit:'GPM',color:'#2dd4bf',badge:'FLOW',warn:null,crit:null},
+  supply_pressure:{label:'Supply Pressure',unit:'PSI',color:'#fb923c',badge:'PRES',warn:[145,155],crit:[155,200]},
+  chw_supply_temp:{label:'CHW Supply',unit:'°F',color:'#38bdf8',badge:'CHW',warn:[50,56],crit:[56,60]},
+  chw_return_temp:{label:'CHW Return',unit:'°F',color:'#7dd3fc',badge:'CHW',warn:[58,65],crit:[65,70]},
+  pump_flow_gpm:{label:'Pump Flow',unit:'GPM',color:'#2dd4bf',badge:'FLOW',warn:null,crit:null},
+  pump_speed_rpm:{label:'Pump Speed',unit:'RPM',color:'#a78bfa',badge:'RPM',warn:[1600,1750],crit:[1750,1800]},
+  pump_kw:{label:'Pump Power',unit:'kW',color:'#fb923c',badge:'PWR',warn:[20,25],crit:[25,30]},
+  hw_supply_temp:{label:'HW Supply',unit:'°F',color:'#fca5a5',badge:'HWS',warn:[170,185],crit:[185,200]},
+  hw_return_temp:{label:'HW Return',unit:'°F',color:'#fda4af',badge:'HWR',warn:null,crit:null},
+  vfd_hz:{label:'VFD Freq',unit:'Hz',color:'#818cf8',badge:'VFD',warn:null,crit:null},
+  vfd_current:{label:'VFD Current',unit:'A',color:'#818cf8',badge:'VFD',warn:[45,55],crit:[55,60]},
+  vfd_kw:{label:'VFD Power',unit:'kW',color:'#818cf8',badge:'VFD',warn:[18,22],crit:[22,25]},
+  voltage:{label:'Voltage',unit:'V',color:'#fb923c',badge:'ELEC',warn:[122,127],crit:[127,130]},
+  current:{label:'Current',unit:'A',color:'#fb923c',badge:'ELEC',warn:[75,90],crit:[90,100]},
+  power_kw:{label:'Active Power',unit:'kW',color:'#fb923c',badge:'PWR',warn:[35,45],crit:[45,50]},
+  power_factor:{label:'Power Factor',unit:'',color:'#fb923c',badge:'PF',warn:null,crit:null},
+  dw_flow_gpm:{label:'Domestic Flow',unit:'GPM',color:'#34d399',badge:'DW',warn:null,crit:null},
+  dw_pressure:{label:'Water Pressure',unit:'PSI',color:'#f59e0b',badge:'DW',warn:[80,100],crit:[100,120]},
+  dw_temp:{label:'Water Temp',unit:'°F',color:'#7dd3fc',badge:'DW',warn:null,crit:null},
+  status:{label:'Status',unit:'',color:'#34d399',badge:'STS',warn:null,crit:null},
+};
+
+const FLOORS = [
+  { id:'B1', label:'B1', name:'Basement', y:-3 },
+  { id:'L1', label:'L1', name:'Level 1', y:0 },
+  { id:'L2', label:'L2', name:'Level 2', y:4 },
+  { id:'L3', label:'L3', name:'Level 3', y:8 },
+  { id:'SRV', label:'SRV', name:'Server', y:12 },
+];
+
+const SYS_COLORS = { hvac:'#2dd4bf', water:'#38bdf8', fire:'#fb923c', elec:'#f59e0b', life:'#f87171' };
+
+/* ── DataAdapter (from Protoys.html) ── */
+const DataAdapter = {
+  mode:'simulation', endpoint:null,
+  occupancy(d=new Date()){const day=d.getDay(),h=d.getHours()+d.getMinutes()/60;if(day===0||day===6)return .05;if(h<6)return .02;if(h<8)return .05+(h-6)*.2;if(h<9)return .45+(h-8)*.35;if(h<12)return .8+Math.sin((h-9)/3*Math.PI)*.15;if(h<13)return .65;if(h<16)return .75+Math.sin((h-13)/3*Math.PI)*.1;if(h<18)return .85-(h-16)*.35;if(h<20)return .15-(h-18)*.06;return .02},
+  outdoorTemp(d=new Date()){const h=d.getHours()+d.getMinutes()/60;return 62+14*Math.sin((h-5)/24*2*Math.PI)},
+  drift(eId,sT){const t=Math.floor(Date.now()/1000),seed=(eId.split('').reduce((a,c)=>a+c.charCodeAt(0),0)*31+sT.split('').reduce((a,c)=>a+c.charCodeAt(0),0))&0xfffff;return Math.sin((t+seed)/300*Math.PI)*.7+Math.sin((t+seed*7)/30*Math.PI)*.3},
+  simulate(eId,sT){
+    const occ=this.occupancy(),outT=this.outdoorTemp(),d=this.drift(eId,sT);
+    const map={
+      supply_temp:()=>+(63-occ*5+d*1.5).toFixed(1),
+      return_temp:()=>+(68+occ*6+(outT-70)*.15+d*1.2).toFixed(1),
+      airflow_cfm:()=>+(Math.max(200,200+occ*1600+d*80)).toFixed(0),
+      co2_ppm:()=>+(Math.max(400,420+occ*780+d*40)).toFixed(0),
+      humidity:()=>+(Math.min(80,Math.max(20,35+occ*20+d*3))).toFixed(1),
+      pipe_pressure:()=>+(100+d*2).toFixed(1),
+      pipe_temp:()=>+(55+occ*8+d*1.5).toFixed(1),
+      flow_gpm:()=>+(20+occ*40+d*2).toFixed(1),
+      supply_pressure:()=>+(150+d*1.2).toFixed(1),
+      chw_supply_temp:()=>+(44+Math.max(0,occ*.6-0.5)*2+d*.4).toFixed(1),
+      chw_return_temp:()=>+(44+d*.3+4+occ*10+d*.5).toFixed(1),
+      pump_flow_gpm:()=>+(30+occ*200+d*8).toFixed(1),
+      pump_speed_rpm:()=>+(Math.min(1750,Math.max(900,900+occ*850+d*40))).toFixed(0),
+      pump_kw:()=>{const f=.5+occ*.5;return+(Math.max(1,18*f*f*f+d*.5)).toFixed(2)},
+      hw_supply_temp:()=>+(150-occ*8+d).toFixed(1),
+      hw_return_temp:()=>+(120+occ*4+d*1.2).toFixed(1),
+      vfd_hz:()=>+(30+occ*30+d*1.5).toFixed(1),
+      vfd_current:()=>+(8+occ*35+d*2).toFixed(1),
+      vfd_kw:()=>{const f=.5+occ*.5;return+(Math.max(.5,15*f*f*f+d*.4)).toFixed(2)},
+      voltage:()=>+(120-occ*3+d*.8).toFixed(1),
+      current:()=>+(Math.max(0,5+occ*55+d*4)).toFixed(1),
+      power_kw:()=>+(Math.max(0,(2+occ*18)*.5+d*.5)).toFixed(2),
+      power_factor:()=>+(Math.min(1,.87+occ*.07+d*.01)).toFixed(2),
+      dw_flow_gpm:()=>+(Math.max(0,occ*18+d*2)).toFixed(1),
+      dw_pressure:()=>+(72-occ*8+d*1.5).toFixed(1),
+      dw_temp:()=>+(54+(outT-62)*.05+d*.8).toFixed(1),
+      status:()=>occ>.1?'ON':'STANDBY',
+    };
+    return map[sT]?map[sT]():0;
+  },
+  fetch(eId,sT){return this.simulate(eId,sT)}
+};
+
+/* ════════════════════════════════════════════════
+   THREE.JS SCENE
+════════════════════════════════════════════════ */
+const canvas = document.getElementById('canvas3d');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x0a0c12);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0c12, 0.012);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 500);
+camera.position.set(15, 12, 20);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, 3, 0);
+controls.minDistance = 3;
+controls.maxDistance = 80;
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x334466, 0.6);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+dirLight.position.set(10, 20, 15);
+scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0x4488ff, 0.3);
+fillLight.position.set(-10, 5, -10);
+scene.add(fillLight);
+
+// Ground grid
+const gridHelper = new THREE.GridHelper(40, 40, 0x1a1f30, 0x111520);
+scene.add(gridHelper);
+
+/* ════════════════════════════════════════════════
+   PLACEHOLDER MEP ASSETS (dummy cubes until GLB)
+   → Replace with GLB loader when file is ready
+════════════════════════════════════════════════ */
+const equipMeshes = new Map(); // equipId → THREE.Mesh
+const meshToEquip = new Map(); // mesh.uuid → equipId
+
+function createPlaceholderAssets() {
+  // Spread equipment across floors with pseudo-positions
+  const floorY = { B1:-2, L1:0, L2:4, L3:8, SRV:12 };
+  let idx = 0;
+  for (const eq of EQUIPMENT) {
+    const y = floorY[eq.floor] ?? 0;
+    const angle = (idx / EQUIPMENT.length) * Math.PI * 2;
+    const radius = 3 + (idx % 3) * 2.5;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+
+    const sysColor = SYS_COLORS[eq.system] || '#4b8eff';
+    const size = eq.sensors.length > 4 ? 1.0 : eq.sensors.length > 2 ? 0.7 : 0.5;
+
+    const geo = new THREE.BoxGeometry(size, size * 1.2, size);
+    const mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(sysColor),
+      metalness: 0.3,
+      roughness: 0.6,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y + size * 0.6, z);
+    mesh.userData = { equipId: eq.id };
+    scene.add(mesh);
+
+    // Wireframe outline
+    const wire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: sysColor, transparent:true, opacity:0.4 })
+    );
+    mesh.add(wire);
+
+    // Label sprite
+    const label = makeLabel(eq.name.length > 20 ? eq.id : eq.name);
+    label.position.set(0, size * 0.9, 0);
+    mesh.add(label);
+
+    equipMeshes.set(eq.id, mesh);
+    meshToEquip.set(mesh.uuid, eq.id);
+    idx++;
+  }
+}
+
+function makeLabel(text) {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 48;
+  const ctx = c.getContext('2d');
+  ctx.font = '600 20px Outfit, sans-serif';
+  ctx.fillStyle = '#eef1fa';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 128, 30);
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(3, 0.6, 1);
+  return sprite;
+}
+
+// ── GLB Loader (uncomment when file is ready) ──
+/*
+const gltfLoader = new GLTFLoader();
+gltfLoader.load('grimes-mep.glb', (gltf) => {
+  const model = gltf.scene;
+  scene.add(model);
+
+  // Traverse meshes and try to match names to EQUIPMENT
+  model.traverse((child) => {
+    if (child.isMesh) {
+      // Try matching mesh name to known equipment
+      for (const eq of EQUIPMENT) {
+        if (child.name.includes(eq.bimId) || child.name.includes(eq.id)) {
+          child.userData = { equipId: eq.id };
+          equipMeshes.set(eq.id, child);
+          meshToEquip.set(child.uuid, eq.id);
+          break;
+        }
+      }
+    }
+  });
+
+  console.log(`Loaded GLB: ${equipMeshes.size} equipment matched`);
+}, (progress) => {
+  console.log(`Loading: ${(progress.loaded/progress.total*100).toFixed(0)}%`);
+}, (err) => {
+  console.error('GLB load error:', err);
+});
+*/
+
+createPlaceholderAssets();
+
+/* ════════════════════════════════════════════════
+   FLOOR NAVIGATION
+════════════════════════════════════════════════ */
+let activeFloor = null;
+const floorNav = document.getElementById('floorNav');
+
+const allBtn = document.createElement('button');
+allBtn.className = 'floor-btn active';
+allBtn.textContent = '⊕';
+allBtn.title = 'All Floors';
+allBtn.onclick = () => setFloor(null);
+floorNav.appendChild(allBtn);
+
+for (const f of FLOORS) {
+  const btn = document.createElement('button');
+  btn.className = 'floor-btn';
+  btn.textContent = f.label;
+  btn.onclick = () => setFloor(f.id);
+  btn.dataset.floor = f.id;
+  floorNav.appendChild(btn);
+}
+
+function setFloor(floorId) {
+  activeFloor = floorId;
+  floorNav.querySelectorAll('.floor-btn').forEach(b => {
+    b.classList.toggle('active', floorId ? b.dataset.floor === floorId : b.textContent === '⊕');
+  });
+  for (const [eqId, mesh] of equipMeshes) {
+    const eq = EQUIPMENT.find(e => e.id === eqId);
+    if (!eq) continue;
+    const show = !floorId || eq.floor === floorId;
+    mesh.visible = show;
+  }
+}
+
+/* ════════════════════════════════════════════════
+   RAYCASTER — CLICK TO SELECT
+════════════════════════════════════════════════ */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let selectedMesh = null;
+let hoverMesh = null;
+
+canvas.addEventListener('pointermove', (e) => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects([...equipMeshes.values()], false);
+
+  if (hoverMesh && hoverMesh !== selectedMesh) {
+    hoverMesh.scale.setScalar(1);
+  }
+  if (hits.length > 0 && hits[0].object !== selectedMesh) {
+    hoverMesh = hits[0].object;
+    hoverMesh.scale.setScalar(1.08);
+    canvas.style.cursor = 'pointer';
+  } else {
+    hoverMesh = null;
+    canvas.style.cursor = 'grab';
+  }
+});
+
+canvas.addEventListener('pointerdown', (e) => {
+  // Only process clicks, not drags
+  const startX = e.clientX, startY = e.clientY;
+  const up = (e2) => {
+    canvas.removeEventListener('pointerup', up);
+    if (Math.abs(e2.clientX - startX) > 5 || Math.abs(e2.clientY - startY) > 5) return;
+
+    mouse.x = (e2.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e2.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects([...equipMeshes.values()], false);
+
+    if (hits.length > 0) {
+      const mesh = hits[0].object;
+      const equipId = meshToEquip.get(mesh.uuid) || mesh.userData?.equipId;
+      if (equipId) selectEquipment(equipId, mesh);
+    } else {
+      deselectEquipment();
+    }
+  };
+  canvas.addEventListener('pointerup', up);
+});
+
+/* ════════════════════════════════════════════════
+   SELECTION & SENSOR PANEL
+════════════════════════════════════════════════ */
+const infoPanel = document.getElementById('infoPanel');
+const panelHead = document.getElementById('panelHead');
+const panelMeta = document.getElementById('panelMeta');
+const sensorList = document.getElementById('sensorList');
+const hint = document.getElementById('hint');
+let sensorInterval = null;
+
+function selectEquipment(equipId, mesh) {
+  deselectEquipment();
+  const eq = EQUIPMENT.find(e => e.id === equipId);
+  if (!eq) return;
+
+  selectedMesh = mesh;
+  mesh.scale.setScalar(1.15);
+  hint.classList.add('hidden');
+
+  // Header
+  const sysIcon = { hvac:'🌡️', water:'💧', fire:'🔥', elec:'⚡', life:'🚨' };
+  const sysCol = SYS_COLORS[eq.system] || '#4b8eff';
+  panelHead.innerHTML = `
+    <div class="equip-icon" style="background:${sysCol}22;border:1px solid ${sysCol}44">
+      ${sysIcon[eq.system] || '📦'}
+    </div>
+    <div class="equip-info">
+      <h2>${eq.name}</h2>
+      <p>${eq.id}${eq.bimId ? ' · NWD: ' + eq.bimId : ''}</p>
+    </div>
+  `;
+
+  // Meta chips
+  panelMeta.innerHTML = `
+    <span class="meta-chip">${eq.floor}</span>
+    <span class="meta-chip">${eq.zone}</span>
+    <span class="meta-chip" style="color:${sysCol}">${eq.system.toUpperCase()}</span>
+    <span class="meta-chip">${eq.sensors.length} sensors</span>
+  `;
+
+  // Initial sensor render
+  updateSensors(eq);
+
+  // Live update every 3s
+  sensorInterval = setInterval(() => updateSensors(eq), 3000);
+
+  infoPanel.classList.add('open');
+}
+
+function updateSensors(eq) {
+  let html = '';
+  for (const sType of eq.sensors) {
+    const def = SD[sType];
+    if (!def) continue;
+    const val = DataAdapter.fetch(eq.id, sType);
+    const status = getStatus(val, def);
+    const statusClass = status === 'CRIT' ? 'crit' : status === 'WARN' ? 'warn' : '';
+    const stClass = status === 'CRIT' ? 'st-crit' : status === 'WARN' ? 'st-warn' : 'st-ok';
+
+    html += `
+      <div class="sensor-card ${statusClass}">
+        <div class="sensor-badge" style="background:${def.color}18;color:${def.color}">${def.badge}</div>
+        <div class="sensor-info">
+          <div class="label">${def.label}</div>
+          <div class="value">${val}<span class="unit">${def.unit}</span></div>
+        </div>
+        <div class="sensor-status ${stClass}">${status}</div>
+      </div>
+    `;
+  }
+  sensorList.innerHTML = html;
+
+  // Update mesh color based on worst status
+  if (selectedMesh) {
+    const worstStatus = getWorstStatus(eq);
+    const col = worstStatus === 'CRIT' ? '#f87171' : worstStatus === 'WARN' ? '#f59e0b' : SYS_COLORS[eq.system] || '#4b8eff';
+    selectedMesh.material.emissive = new THREE.Color(col);
+    selectedMesh.material.emissiveIntensity = 0.3;
+  }
+}
+
+function getStatus(val, def) {
+  if (typeof val === 'string') return 'OK';
+  if (def.crit && val >= def.crit[0] && val <= def.crit[1]) return 'CRIT';
+  if (def.warn && val >= def.warn[0] && val <= def.warn[1]) return 'WARN';
+  return 'OK';
+}
+
+function getWorstStatus(eq) {
+  let worst = 'OK';
+  for (const sType of eq.sensors) {
+    const def = SD[sType]; if (!def) continue;
+    const val = DataAdapter.fetch(eq.id, sType);
+    const st = getStatus(val, def);
+    if (st === 'CRIT') return 'CRIT';
+    if (st === 'WARN') worst = 'WARN';
+  }
+  return worst;
+}
+
+function deselectEquipment() {
+  if (selectedMesh) {
+    selectedMesh.scale.setScalar(1);
+    selectedMesh.material.emissive = new THREE.Color(0x000000);
+    selectedMesh.material.emissiveIntensity = 0;
+    selectedMesh = null;
+  }
+  if (sensorInterval) { clearInterval(sensorInterval); sensorInterval = null; }
+  infoPanel.classList.remove('open');
+}
+
+document.getElementById('panelClose').onclick = deselectEquipment;
+
+/* ════════════════════════════════════════════════
+   AMBIENT GLOW — equipment status colors
+════════════════════════════════════════════════ */
+function updateAmbientGlow() {
+  for (const [eqId, mesh] of equipMeshes) {
+    if (mesh === selectedMesh) continue;
+    const eq = EQUIPMENT.find(e => e.id === eqId);
+    if (!eq || !mesh.visible) continue;
+    const worst = getWorstStatus(eq);
+    if (worst === 'CRIT') {
+      mesh.material.emissive = new THREE.Color('#f87171');
+      mesh.material.emissiveIntensity = 0.15 + Math.sin(Date.now()/500) * 0.1;
+    } else if (worst === 'WARN') {
+      mesh.material.emissive = new THREE.Color('#f59e0b');
+      mesh.material.emissiveIntensity = 0.08;
+    } else {
+      mesh.material.emissive = new THREE.Color(0x000000);
+      mesh.material.emissiveIntensity = 0;
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════
+   ANIMATION LOOP
+════════════════════════════════════════════════ */
+const statsEl = document.getElementById('stats');
+let frameCount = 0, lastTime = performance.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  // Glow update every 30 frames
+  frameCount++;
+  if (frameCount % 30 === 0) updateAmbientGlow();
+
+  // FPS counter
+  if (frameCount % 60 === 0) {
+    const now = performance.now();
+    const fps = Math.round(60000 / (now - lastTime));
+    lastTime = now;
+    statsEl.textContent = `${fps} FPS · ${EQUIPMENT.length} assets · ${DataAdapter.mode.toUpperCase()}`;
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ── Resize ── */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ── Hide hint after 5s ── */
+setTimeout(() => hint.classList.add('hidden'), 5000);
+
+</script>
+</body>
+</html>
