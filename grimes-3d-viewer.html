@@ -300,8 +300,20 @@ const FLOORS = [
 
 const SYS_COLORS = { hvac:'#2dd4bf', water:'#38bdf8', fire:'#fb923c', elec:'#f59e0b', life:'#f87171' };
 
-/* ── MEP keyword regex for identifying MEP meshes ── */
-const MEP_REGEX = /pipe|duct|iron|fitting|valve|pump|coil|sprink|fire|elec|panel|conduit|Metal_-_Ductile|exhaust|meter|tank|cool|conden|boiler|chiller|hvac|mech|ahu|fan|galvan|M-DFT|DFT|SP-A|LOD200|LOD300|ADSK|EQ-|Cooling.?Unit|Condenser|AHU|Exhauster|Cabinet|Round.?Connection|Coil.?Kit|nwc|EQPM|Ductile|Supply|Return|Tap|Fab/i;
+/* ── MEP classification: positive match + exclusion ── */
+// Positive: specific MEP patterns (tight, not generic words)
+const MEP_POSITIVE = /pipe|piping|duct(?!ile)|ductwork|valve|damper|pump|chiller|boiler|ahu|compressor|condenser|exhauster|cooling.?unit|coil.?kit|sprink|conduit|busway|transformer|switchgear|diffuser|grille|register|vav|fcu|Metal_-_Ductile|M-DFT|EQPM|M-EQPM|SP-A|ADSK_US_M|Galvanized.?Steel|elec.?panel|control.?panel|fire.?sprink|fire.?alarm|fire.?pump|fire.?protect|exhaust.?fan|supply.?air|return.?air|supply.?duct|return.?duct|chw|hwp|chwp|vfd|air.?terminal|air.?handling|Ductile.?Iron/i;
+
+// Negative: architectural elements that false-positive on broad patterns
+const MEP_EXCLUDE = /wall|gypsum|partition|drywall|sheathing|stair|railing|handrail|baluster|tread|riser|landing|chair|desk|table|furniture|steelcase|herman|sofa|shelf|storage|column|beam|slab|footing|foundation|door|window|glass|curtain.?wall|ceiling.?tile|roof|fascia|grid|level.?line|section|floor.?finish|carpet|laminate|wood|plywood|counter|signage|toilet|sink(?!.*(pump|valve))|urinal|lavatory|mirror|locker|whiteboard|marker/i;
+
+function classifyMEP(meshName) {
+  if (!meshName) return false;
+  // Exclude first: if it's clearly architectural, skip it
+  if (MEP_EXCLUDE.test(meshName)) return false;
+  // Then check positive MEP patterns
+  return MEP_POSITIVE.test(meshName);
+}
 
 /* ── DataAdapter ── */
 const DataAdapter = {
@@ -459,7 +471,7 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
 
       // Classify as MEP or not
       const nameUpper = (child.name || '').toUpperCase();
-      const isMEP = MEP_REGEX.test(child.name || '');
+      const isMEP = classifyMEP(child.name || '');
       meshMEPFlags.set(child.uuid, isMEP);
       if (isMEP) mepCount++;
 
@@ -493,6 +505,42 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   console.log(`GLB loaded: ${allModelMeshes.length} meshes, ${mepCount} MEP, ${equipMeshes.size} equipment matched`);
   loadingEl.textContent = `Loaded · ${allModelMeshes.length} meshes · ${mepCount} MEP · ${equipMeshes.size} matched`;
   setTimeout(() => loadingEl.remove(), 3000);
+
+  // ── Diagnostic: dump MEP classification to console ──
+  // Open DevTools → Console to inspect
+  const mepNames = [];
+  const nonMepSample = [];
+  for (const mesh of allModelMeshes) {
+    if (meshMEPFlags.get(mesh.uuid)) {
+      mepNames.push(mesh.name);
+    } else if (nonMepSample.length < 50) {
+      nonMepSample.push(mesh.name);
+    }
+  }
+  console.groupCollapsed(`🔧 MEP Classification: ${mepNames.length} MEP meshes`);
+  // Sort and deduplicate for readability
+  const uniqueMEP = [...new Set(mepNames)].sort();
+  console.log('MEP meshes:', uniqueMEP);
+  console.groupEnd();
+  console.groupCollapsed(`🏗️ Non-MEP sample (first 50)`);
+  console.log('Non-MEP:', [...new Set(nonMepSample)].sort());
+  console.groupEnd();
+  console.log('%c💡 Run window.__debugMEP() for full classification table', 'color: #2dd4bf; font-weight: bold');
+  
+  // Debug helper: call window.__debugMEP() in console
+  window.__debugMEP = () => {
+    const table = allModelMeshes.map(m => ({
+      name: m.name,
+      isMEP: meshMEPFlags.get(m.uuid) ? '✅ MEP' : '❌ No',
+      system: meshMEPFlags.get(m.uuid) ? guessMEPSystem(m.name) : '-',
+    }));
+    console.table(table);
+    // Also count by classification
+    const mepTotal = table.filter(r => r.isMEP === '✅ MEP').length;
+    const nonTotal = table.filter(r => r.isMEP === '❌ No').length;
+    console.log(`Total: ${mepTotal} MEP, ${nonTotal} non-MEP out of ${table.length}`);
+    return table;
+  };
 
   // ── Apply default X-Ray mode + color MEP meshes ──
   applyHighlightMode();
@@ -568,10 +616,10 @@ document.getElementById('mepPills').addEventListener('click', (e) => {
    MEP MESH COLORING — make MEP visible with system colors
 ════════════════════════════════════════════════ */
 const MEP_SYS_PATTERNS = {
-  fire:  /sprink|fire|SP-A/i,
-  water: /pump|chw|hw|water|galvan|Ductile/i,
-  hvac:  /duct|ahu|coil|fan|exhaust|cool|conden|DFT|M-DFT|Supply|Return|Tap|Fab|Cabinet|ADSK/i,
-  elec:  /elec|panel|conduit|EQ-/i,
+  fire:  /sprink|fire.?sprink|fire.?alarm|fire.?pump|fire.?protect|SP-A/i,
+  water: /pump|chw|hwp|chwp|water.?main|Ductile.?Iron|Galvanized/i,
+  hvac:  /duct|ahu|coil|exhaust|condenser|compressor|diffuser|grille|register|vav|fcu|M-DFT|air.?terminal|air.?handling|damper|cooling/i,
+  elec:  /elec.?panel|control.?panel|conduit|busway|transformer|switchgear|vfd/i,
 };
 
 function guessMEPSystem(meshName) {
@@ -756,8 +804,8 @@ function getFloorFromY(y, modelBox) {
 function findNearestEquipment(hitPoint, meshName, meshUuid) {
   const modelBox = window.__modelBox;
   const floor = getFloorFromY(hitPoint.y, modelBox);
-  // Check both the name regex AND the pre-classified MEP flag
-  const isMEP = MEP_REGEX.test(meshName || '') || (meshUuid && meshMEPFlags.get(meshUuid));
+  // Check both the name classifier AND the pre-classified MEP flag
+  const isMEP = classifyMEP(meshName || '') || (meshUuid && meshMEPFlags.get(meshUuid));
   if (!isMEP) return null;
 
   let candidates = EQUIPMENT.filter(e => e.floor === floor);
