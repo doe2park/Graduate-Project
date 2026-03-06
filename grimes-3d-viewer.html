@@ -335,37 +335,74 @@ function makeLabel(text) {
   return sprite;
 }
 
-// ── GLB Loader (uncomment when file is ready) ──
-/*
+// ── GLB Loader ──
 const gltfLoader = new GLTFLoader();
-gltfLoader.load('grimes-mep.glb', (gltf) => {
+const loadingEl = document.createElement('div');
+loadingEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;font-family:var(--mono);font-size:14px;color:var(--cyan);background:rgba(10,12,18,.9);padding:20px 32px;border-radius:10px;border:1px solid rgba(45,212,191,.2)';
+loadingEl.textContent = 'Loading Grimes MEP model...';
+document.body.appendChild(loadingEl);
+
+gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   const model = gltf.scene;
   scene.add(model);
 
-  // Traverse meshes and try to match names to EQUIPMENT
+  // Auto-fit camera to model
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  camera.position.set(center.x + maxDim, center.y + maxDim * 0.6, center.z + maxDim);
+  controls.target.copy(center);
+  controls.update();
+
+  // Collect all meshes for raycasting
+  const allMeshes = [];
   model.traverse((child) => {
     if (child.isMesh) {
+      child.userData.originalColor = child.material.color ? child.material.color.clone() : null;
+      allMeshes.push(child);
+
       // Try matching mesh name to known equipment
       for (const eq of EQUIPMENT) {
-        if (child.name.includes(eq.bimId) || child.name.includes(eq.id)) {
-          child.userData = { equipId: eq.id };
+        const nameUpper = (child.name || '').toUpperCase();
+        const matchId = eq.bimId ? nameUpper.includes(eq.bimId.toUpperCase()) : false;
+        const matchName = nameUpper.includes(eq.id.toUpperCase());
+        if (matchId || matchName) {
+          child.userData.equipId = eq.id;
           equipMeshes.set(eq.id, child);
           meshToEquip.set(child.uuid, eq.id);
           break;
         }
       }
+
+      // If no match, make it clickable anyway with mesh name as ID
+      if (!child.userData.equipId && child.name) {
+        child.userData.equipId = '__mesh__' + child.name;
+        meshToEquip.set(child.uuid, child.userData.equipId);
+      }
     }
   });
 
-  console.log(`Loaded GLB: ${equipMeshes.size} equipment matched`);
+  // Store all meshes for raycasting (not just matched equipment)
+  window.__allMeshes = allMeshes;
+
+  console.log(`GLB loaded: ${allMeshes.length} meshes, ${equipMeshes.size} equipment matched`);
+  loadingEl.textContent = `Loaded · ${allMeshes.length} meshes · ${equipMeshes.size} matched`;
+  setTimeout(() => loadingEl.remove(), 3000);
+
 }, (progress) => {
-  console.log(`Loading: ${(progress.loaded/progress.total*100).toFixed(0)}%`);
+  if (progress.total > 0) {
+    const pct = (progress.loaded / progress.total * 100).toFixed(0);
+    loadingEl.textContent = `Loading MEP model... ${pct}%`;
+  }
 }, (err) => {
   console.error('GLB load error:', err);
+  loadingEl.textContent = 'Error loading model. Check console.';
+  loadingEl.style.color = '#f87171';
 });
-*/
 
-createPlaceholderAssets();
+// Also create placeholders as fallback (will coexist with GLB)
+// createPlaceholderAssets();
 
 /* ════════════════════════════════════════════════
    FLOOR NAVIGATION
@@ -414,14 +451,15 @@ canvas.addEventListener('pointermove', (e) => {
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects([...equipMeshes.values()], false);
+  const targets = window.__allMeshes || [...equipMeshes.values()];
+  const hits = raycaster.intersectObjects(targets, false);
 
   if (hoverMesh && hoverMesh !== selectedMesh) {
     hoverMesh.scale.setScalar(1);
   }
   if (hits.length > 0 && hits[0].object !== selectedMesh) {
     hoverMesh = hits[0].object;
-    hoverMesh.scale.setScalar(1.08);
+    hoverMesh.scale.setScalar(1.05);
     canvas.style.cursor = 'pointer';
   } else {
     hoverMesh = null;
@@ -439,12 +477,18 @@ canvas.addEventListener('pointerdown', (e) => {
     mouse.x = (e2.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(e2.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
-    const hits = raycaster.intersectObjects([...equipMeshes.values()], false);
+    const targets = window.__allMeshes || [...equipMeshes.values()];
+    const hits = raycaster.intersectObjects(targets, false);
 
     if (hits.length > 0) {
       const mesh = hits[0].object;
       const equipId = meshToEquip.get(mesh.uuid) || mesh.userData?.equipId;
-      if (equipId) selectEquipment(equipId, mesh);
+      if (equipId && !equipId.startsWith('__mesh__')) {
+        selectEquipment(equipId, mesh);
+      } else {
+        // Show basic info for unmatched meshes
+        showMeshInfo(mesh);
+      }
     } else {
       deselectEquipment();
     }
@@ -564,6 +608,34 @@ function deselectEquipment() {
 }
 
 document.getElementById('panelClose').onclick = deselectEquipment;
+
+/* ── Show info for unmatched meshes ── */
+function showMeshInfo(mesh) {
+  deselectEquipment();
+  selectedMesh = mesh;
+  mesh.scale.setScalar(1.05);
+  hint.classList.add('hidden');
+
+  panelHead.innerHTML = `
+    <div class="equip-icon" style="background:rgba(75,142,255,.12);border:1px solid rgba(75,142,255,.3)">🧊</div>
+    <div class="equip-info">
+      <h2>${mesh.name || 'Unnamed Mesh'}</h2>
+      <p>BIM Object · Not yet linked to sensor data</p>
+    </div>
+  `;
+  panelMeta.innerHTML = `
+    <span class="meta-chip">Vertices: ${mesh.geometry?.attributes?.position?.count || '?'}</span>
+    <span class="meta-chip">Type: ${mesh.geometry?.type || 'BufferGeometry'}</span>
+  `;
+  sensorList.innerHTML = `
+    <div style="padding:20px;text-align:center;color:var(--lo);font-size:12px">
+      <p style="font-size:24px;margin-bottom:8px">📡</p>
+      <p>This mesh can be linked to sensor data<br>by mapping its name to an EQUIPMENT entry.</p>
+      <p style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--md)">mesh.name: "${mesh.name}"</p>
+    </div>
+  `;
+  infoPanel.classList.add('open');
+}
 
 /* ════════════════════════════════════════════════
    AMBIENT GLOW — equipment status colors
