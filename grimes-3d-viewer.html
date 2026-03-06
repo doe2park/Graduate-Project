@@ -300,19 +300,25 @@ const FLOORS = [
 
 const SYS_COLORS = { hvac:'#2dd4bf', water:'#38bdf8', fire:'#fb923c', elec:'#f59e0b', life:'#f87171' };
 
-/* ── MEP classification: positive match + exclusion ── */
-// Positive: specific MEP patterns (tight, not generic words)
-const MEP_POSITIVE = /pipe|piping|duct(?!ile)|ductwork|valve|damper|pump|chiller|boiler|ahu|compressor|condenser|exhauster|cooling.?unit|coil.?kit|sprink|conduit|busway|transformer|switchgear|diffuser|grille|register|vav|fcu|Metal_-_Ductile|M-DFT|EQPM|M-EQPM|SP-A|ADSK_US_M|Galvanized.?Steel|elec.?panel|control.?panel|fire.?sprink|fire.?alarm|fire.?pump|fire.?protect|exhaust.?fan|supply.?air|return.?air|supply.?duct|return.?duct|chw|hwp|chwp|vfd|air.?terminal|air.?handling|Ductile.?Iron/i;
-
-// Negative: architectural elements that false-positive on broad patterns
-const MEP_EXCLUDE = /wall|gypsum|partition|drywall|sheathing|stair|railing|handrail|baluster|tread|riser|landing|chair|desk|table|furniture|steelcase|herman|sofa|shelf|storage|column|beam|slab|footing|foundation|door|window|glass|curtain.?wall|ceiling.?tile|roof|fascia|grid|level.?line|section|floor.?finish|carpet|laminate|wood|plywood|counter|signage|toilet|sink(?!.*(pump|valve))|urinal|lavatory|mirror|locker|whiteboard|marker/i;
+/* ── MEP classification: exact material name matching ──
+   GLB mesh names are MATERIAL names, not element names.
+   These are the confirmed MEP materials from the actual model. */
+const MEP_EXACT_PREFIXES = [
+  'Metal_-_Ductile_Iron',        // 14 meshes — cast iron pipes (plumbing)
+  'Metal_-_Steel_Galvanized',    // 21 meshes — galvanized duct/pipe
+  'Insulation_-_Rigid_Insulation',// 12 meshes — pipe/duct insulation
+  'UCBBECH_-_VENTILATOR',        // 26 meshes — ventilation grilles
+  '*FWP',                        // fire water pump
+  '*PT-',                        // pressure transmitter
+  'Specialty_-_Black_Sensor',    // 2 meshes — sensors
+];
 
 function classifyMEP(meshName) {
   if (!meshName) return false;
-  // Exclude first: if it's clearly architectural, skip it
-  if (MEP_EXCLUDE.test(meshName)) return false;
-  // Then check positive MEP patterns
-  return MEP_POSITIVE.test(meshName);
+  for (const prefix of MEP_EXACT_PREFIXES) {
+    if (meshName.startsWith(prefix)) return true;
+  }
+  return false;
 }
 
 /* ── DataAdapter ── */
@@ -616,10 +622,10 @@ document.getElementById('mepPills').addEventListener('click', (e) => {
    MEP MESH COLORING — make MEP visible with system colors
 ════════════════════════════════════════════════ */
 const MEP_SYS_PATTERNS = {
-  fire:  /sprink|fire.?sprink|fire.?alarm|fire.?pump|fire.?protect|SP-A/i,
-  water: /pump|chw|hwp|chwp|water.?main|Ductile.?Iron|Galvanized/i,
-  hvac:  /duct|ahu|coil|exhaust|condenser|compressor|diffuser|grille|register|vav|fcu|M-DFT|air.?terminal|air.?handling|damper|cooling/i,
-  elec:  /elec.?panel|control.?panel|conduit|busway|transformer|switchgear|vfd/i,
+  water: /Ductile_Iron/i,
+  hvac:  /Galvanized|Insulation|VENTILATOR/i,
+  fire:  /FWP/i,
+  elec:  /Sensor|PT-/i,
 };
 
 function guessMEPSystem(meshName) {
