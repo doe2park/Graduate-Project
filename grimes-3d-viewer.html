@@ -126,9 +126,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
   </div>
   <!-- MEP Highlight Mode -->
   <div class="mep-pills" id="mepPills">
-    <button class="active" data-mode="full">Full Building</button>
+    <button data-mode="full">Full Building</button>
     <button data-mode="mep">MEP Only</button>
-    <button data-mode="xray">X-Ray</button>
+    <button class="active" data-mode="xray">X-Ray</button>
   </div>
   <div class="mode-pills">
     <button class="active" data-view="3d">3D</button>
@@ -152,7 +152,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 </div>
 
 <!-- Hint -->
-<div class="hint" id="hint">Click on a MEP asset to view sensor data · WASD to move · Scroll to zoom</div>
+<div class="hint" id="hint">X-Ray mode ON — MEP elements glow · Click any pipe/duct to view sensors · WASD to move</div>
 
 <!-- ViewCube -->
 <div class="viewcube" id="viewCube">
@@ -273,7 +273,7 @@ const FLOORS = [
 const SYS_COLORS = { hvac:'#2dd4bf', water:'#38bdf8', fire:'#fb923c', elec:'#f59e0b', life:'#f87171' };
 
 /* ── MEP keyword regex for identifying MEP meshes ── */
-const MEP_REGEX = /pipe|duct|iron|fitting|valve|pump|coil|sprink|fire|elec|panel|conduit|Metal_-_Ductile|exhaust|meter|tank|cool|conden|boiler|chiller|hvac|mech|ahu|fan/i;
+const MEP_REGEX = /pipe|duct|iron|fitting|valve|pump|coil|sprink|fire|elec|panel|conduit|Metal_-_Ductile|exhaust|meter|tank|cool|conden|boiler|chiller|hvac|mech|ahu|fan|galvan|M-DFT|DFT|SP-A|LOD200|LOD300|ADSK|EQ-|Cooling.?Unit|Condenser|AHU|Exhauster|Cabinet|Round.?Connection|Coil.?Kit|nwc|EQPM|Ductile|Supply|Return|Tap|Fab/i;
 
 /* ── DataAdapter ── */
 const DataAdapter = {
@@ -374,7 +374,7 @@ let allModelMeshes = [];       // every mesh from GLB
 const meshMEPFlags = new Map(); // mesh.uuid → boolean (is MEP?)
 
 // Current highlight mode: 'full' | 'mep' | 'xray'
-let highlightMode = 'full';
+let highlightMode = 'xray';
 
 // Floor filter
 let activeFloor = null;
@@ -466,6 +466,10 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   loadingEl.textContent = `Loaded · ${allModelMeshes.length} meshes · ${mepCount} MEP · ${equipMeshes.size} matched`;
   setTimeout(() => loadingEl.remove(), 3000);
 
+  // ── Apply default X-Ray mode + color MEP meshes ──
+  applyHighlightMode();
+  colorMEPMeshes();
+
 }, (progress) => {
   if (progress.total > 0) {
     const pct = (progress.loaded / progress.total * 100).toFixed(0);
@@ -529,7 +533,48 @@ document.getElementById('mepPills').addEventListener('click', (e) => {
   highlightMode = btn.dataset.mode;
   document.querySelectorAll('#mepPills button').forEach(b => b.classList.toggle('active', b === btn));
   applyHighlightMode();
+  colorMEPMeshes();
 });
+
+/* ════════════════════════════════════════════════
+   MEP MESH COLORING — make MEP visible with system colors
+════════════════════════════════════════════════ */
+const MEP_SYS_PATTERNS = {
+  fire:  /sprink|fire|SP-A/i,
+  water: /pump|chw|hw|water|galvan|Ductile/i,
+  hvac:  /duct|ahu|coil|fan|exhaust|cool|conden|DFT|M-DFT|Supply|Return|Tap|Fab|Cabinet|ADSK/i,
+  elec:  /elec|panel|conduit|EQ-/i,
+};
+
+function guessMEPSystem(meshName) {
+  for (const [sys, pat] of Object.entries(MEP_SYS_PATTERNS)) {
+    if (pat.test(meshName || '')) return sys;
+  }
+  return 'hvac'; // default
+}
+
+function colorMEPMeshes() {
+  const SYS_HEX = { hvac:0x2dd4bf, water:0x38bdf8, fire:0xfb923c, elec:0xf59e0b, life:0xf87171 };
+  for (const mesh of allModelMeshes) {
+    const isMEP = meshMEPFlags.get(mesh.uuid) || false;
+    if (!isMEP || mesh === selectedMesh) continue;
+
+    const sys = guessMEPSystem(mesh.name);
+    const col = SYS_HEX[sys] || 0x2dd4bf;
+
+    // Clone material if not already cloned
+    if (!mesh.material._mepColored) {
+      mesh.material = mesh.material.clone();
+      mesh.material._mepColored = true;
+    }
+    mesh.material.emissive = new THREE.Color(col);
+    mesh.material.emissiveIntensity = 0.25;
+    // Make MEP meshes slightly brighter and fully opaque
+    mesh.material.opacity = 1.0;
+    mesh.material.transparent = false;
+    mesh.material.depthWrite = true;
+  }
+}
 
 /* ════════════════════════════════════════════════
    FLOOR NAVIGATION — Y-based filtering
@@ -610,13 +655,16 @@ canvas.addEventListener('pointermove', (e) => {
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const targets = window.__allMeshes || [...equipMeshes.values()];
-  const hits = raycaster.intersectObjects(targets, false);
+  const hits = raycaster.intersectObjects(targets, false).filter(h => h.object.visible);
 
   if (hoverMesh && hoverMesh !== selectedMesh) {
     hoverMesh.scale.setScalar(1);
   }
-  if (hits.length > 0 && hits[0].object.visible && hits[0].object !== selectedMesh) {
-    hoverMesh = hits[0].object;
+  // Prefer MEP mesh in hover
+  const mepHit = hits.find(h => meshMEPFlags.get(h.object.uuid));
+  const bestHit = mepHit || hits[0];
+  if (bestHit && bestHit.object !== selectedMesh) {
+    hoverMesh = bestHit.object;
     hoverMesh.scale.setScalar(1.05);
     canvas.style.cursor = 'pointer';
   } else {
@@ -638,9 +686,12 @@ canvas.addEventListener('pointerdown', (e) => {
     const hits = raycaster.intersectObjects(targets, false).filter(h => h.object.visible);
 
     if (hits.length > 0) {
-      const mesh = hits[0].object;
-      const hitPoint = hits[0].point;
-      const nearest = findNearestEquipment(hitPoint, mesh.name);
+      // ── Prioritize MEP meshes: pick first MEP hit, fall back to first hit ──
+      const mepHit = hits.find(h => meshMEPFlags.get(h.object.uuid));
+      const bestHit = mepHit || hits[0];
+      const mesh = bestHit.object;
+      const hitPoint = bestHit.point;
+      const nearest = findNearestEquipment(hitPoint, mesh.name, mesh.uuid);
       if (nearest) {
         selectEquipment(nearest.id, mesh, hitPoint);
       } else {
@@ -674,10 +725,11 @@ function getFloorFromY(y, modelBox) {
   return 'SRV';
 }
 
-function findNearestEquipment(hitPoint, meshName) {
+function findNearestEquipment(hitPoint, meshName, meshUuid) {
   const modelBox = window.__modelBox;
   const floor = getFloorFromY(hitPoint.y, modelBox);
-  const isMEP = MEP_REGEX.test(meshName || '');
+  // Check both the name regex AND the pre-classified MEP flag
+  const isMEP = MEP_REGEX.test(meshName || '') || (meshUuid && meshMEPFlags.get(meshUuid));
   if (!isMEP) return null;
 
   let candidates = EQUIPMENT.filter(e => e.floor === floor);
