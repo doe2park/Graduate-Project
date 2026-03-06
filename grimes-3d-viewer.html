@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#0a0c12; --s1:#0f1219; --s2:#151a24; --s3:#1b2130;
+  --bg:#131826; --s1:#0f1219; --s2:#151a24; --s3:#1b2130;
   --border:rgba(255,255,255,.07); --hi:#eef1fa; --md:#8892b0; --lo:#4a5470;
   --blue:#4b8eff; --cyan:#2dd4bf; --green:#34d399; --amber:#f59e0b; --red:#f87171; --purple:#a78bfa;
   --mono:'JetBrains Mono',monospace; --sans:'Outfit',sans-serif;
@@ -268,12 +268,12 @@ const canvas = document.getElementById('canvas3d');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setClearColor(0x0a0c12);
+renderer.setClearColor(0x1a1f2e);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.8;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0c12, 0.012);
+scene.fog = new THREE.FogExp2(0x1a1f2e, 0.004);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 500);
 camera.position.set(15, 12, 20);
@@ -289,15 +289,21 @@ controls.rotateSpeed = 0.8;
 controls.panSpeed = 0.8;
 controls.maxPolarAngle = Math.PI * 0.95;
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0x334466, 0.6);
+// Lighting — brighter for building visualization
+const ambientLight = new THREE.AmbientLight(0x8899bb, 1.2);
 scene.add(ambientLight);
-const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
-dirLight.position.set(10, 20, 15);
+const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+dirLight.position.set(20, 40, 30);
 scene.add(dirLight);
-const fillLight = new THREE.DirectionalLight(0x4488ff, 0.3);
-fillLight.position.set(-10, 5, -10);
+const fillLight = new THREE.DirectionalLight(0x88aaff, 0.8);
+fillLight.position.set(-20, 10, -20);
 scene.add(fillLight);
+const backLight = new THREE.DirectionalLight(0xffeedd, 0.5);
+backLight.position.set(0, -10, -30);
+scene.add(backLight);
+// Hemisphere light for natural outdoor feel
+const hemiLight = new THREE.HemisphereLight(0xb0c4de, 0x444466, 0.6);
+scene.add(hemiLight);
 
 // Ground grid
 const gridHelper = new THREE.GridHelper(40, 40, 0x1a1f30, 0x111520);
@@ -383,6 +389,8 @@ document.body.appendChild(loadingEl);
 
 gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   const model = gltf.scene;
+  // Fix orientation: NWD uses Z-up, Three.js uses Y-up
+  model.rotation.x = -Math.PI / 2;
   scene.add(model);
 
   // Auto-fit camera to model
@@ -524,7 +532,7 @@ canvas.addEventListener('pointerdown', (e) => {
       const mesh = hits[0].object;
       const hitPoint = hits[0].point;
       // Find nearest EQUIPMENT based on click position (Y = floor)
-      const nearest = findNearestEquipment(hitPoint);
+      const nearest = findNearestEquipment(hitPoint, mesh.name);
       if (nearest) {
         selectEquipment(nearest.id, mesh, hitPoint);
       } else {
@@ -554,17 +562,21 @@ function getFloorFromY(y, modelBox) {
   return 'SRV';
 }
 
-function findNearestEquipment(hitPoint) {
+function findNearestEquipment(hitPoint, meshName) {
   const modelBox = window.__modelBox;
   const floor = getFloorFromY(hitPoint.y, modelBox);
   
+  // Check if clicked mesh is likely MEP-related (pipes, ducts, equipment)
+  const mepKeywords = /duct|pipe|pump|valve|coil|fan|ahu|sprink|fire|elec|panel|conduit|meter|tank|exhaust|cool|conden|boiler|chiller|hvac|mech|iron|fitting/i;
+  const isMEP = mepKeywords.test(meshName || '');
+  
+  // Non-MEP items (walls, furniture, etc) — show basic info, no sensor data
+  if (!isMEP) return null;
+  
   // Get equipment on this floor
   let candidates = EQUIPMENT.filter(e => e.floor === floor);
-  // If none on this floor, use all equipment
   if (candidates.length === 0) candidates = EQUIPMENT;
   
-  // Pick based on a hash of the click position to get consistent results
-  // This gives different equipment for different areas of the building
   const hash = Math.abs(Math.floor(hitPoint.x * 7 + hitPoint.z * 13)) % candidates.length;
   return candidates[hash];
 }
@@ -697,29 +709,55 @@ function deselectEquipment() {
 
 document.getElementById('panelClose').onclick = deselectEquipment;
 
-/* ── Show info for unmatched meshes ── */
+/* ── Show info for non-MEP meshes (walls, furniture etc) ── */
 function showMeshInfo(mesh) {
   deselectEquipment();
   selectedMesh = mesh;
-  mesh.scale.setScalar(1.05);
   hint.classList.add('hidden');
 
+  if (mesh.material && mesh.material.clone) {
+    mesh.userData._origMat = mesh.material;
+    mesh.material = mesh.material.clone();
+    mesh.material.emissive = new THREE.Color('#4b8eff');
+    mesh.material.emissiveIntensity = 0.15;
+  }
+
+  // Categorize by name
+  const name = mesh.name || 'Unnamed';
+  const categories = {
+    'Wall|Gypsum|Sheathing': { icon:'🧱', type:'Wall / Partition' },
+    'Furniture|Chair|Desk|Table|Steelcase|Herman': { icon:'🪑', type:'Furniture' },
+    'Glass|Window': { icon:'🪟', type:'Glass / Window' },
+    'Ceiling|Tile': { icon:'⬜', type:'Ceiling' },
+    'Floor|Concrete|Slab': { icon:'⬛', type:'Floor / Structure' },
+    'Metal|Steel|Aluminum': { icon:'🔩', type:'Metal Component' },
+    'Wood|Laminate': { icon:'🪵', type:'Wood Element' },
+    'Grid': { icon:'📐', type:'Grid / Reference' },
+  };
+  
+  let icon = '📦', type = 'Building Element';
+  for (const [pattern, info] of Object.entries(categories)) {
+    if (new RegExp(pattern, 'i').test(name)) {
+      icon = info.icon; type = info.type; break;
+    }
+  }
+
   panelHead.innerHTML = `
-    <div class="equip-icon" style="background:rgba(75,142,255,.12);border:1px solid rgba(75,142,255,.3)">🧊</div>
+    <div class="equip-icon" style="background:rgba(75,142,255,.08);border:1px solid rgba(75,142,255,.2)">${icon}</div>
     <div class="equip-info">
-      <h2>${mesh.name || 'Unnamed Mesh'}</h2>
-      <p>BIM Object · Not yet linked to sensor data</p>
+      <h2>${type}</h2>
+      <p style="font-size:10px;word-break:break-all">${name}</p>
     </div>
   `;
   panelMeta.innerHTML = `
-    <span class="meta-chip">Vertices: ${mesh.geometry?.attributes?.position?.count || '?'}</span>
-    <span class="meta-chip">Type: ${mesh.geometry?.type || 'BufferGeometry'}</span>
+    <span class="meta-chip">Non-MEP Element</span>
+    <span class="meta-chip">Vertices: ${(mesh.geometry?.attributes?.position?.count || 0).toLocaleString()}</span>
   `;
   sensorList.innerHTML = `
-    <div style="padding:20px;text-align:center;color:var(--lo);font-size:12px">
-      <p style="font-size:24px;margin-bottom:8px">📡</p>
-      <p>This mesh can be linked to sensor data<br>by mapping its name to an EQUIPMENT entry.</p>
-      <p style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--md)">mesh.name: "${mesh.name}"</p>
+    <div style="padding:24px 16px;text-align:center;color:var(--lo);font-size:12px;line-height:1.8">
+      <p style="font-size:28px;margin-bottom:8px;opacity:.5">${icon}</p>
+      <p>This is a <strong style="color:var(--md)">${type.toLowerCase()}</strong></p>
+      <p style="margin-top:4px">Click on <span style="color:var(--cyan)">pipes, ducts, or equipment</span><br>to view sensor data</p>
     </div>
   `;
   infoPanel.classList.add('open');
