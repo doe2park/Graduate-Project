@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Grimes Building · 3D MEP Viewer</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- model-viewer for AR -->
+<script type="module" src="https://unpkg.com/@google/model-viewer@3.4.0/dist/model-viewer.min.js"></script>
 <style>
 :root {
   --bg:#131826; --s1:#0f1219; --s2:#151a24; --s3:#1b2130;
@@ -25,10 +27,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 .topbar .mark{width:26px;height:26px;background:var(--cyan);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;font-family:var(--mono)}
 .topbar h1{font-size:13px;font-weight:600}
 .topbar h1 span{color:var(--cyan);font-weight:700}
+
+/* ── Mode Pills (3D / AR) ── */
 .mode-pills{display:flex;gap:4px;margin-left:auto;background:var(--s2);border-radius:8px;padding:3px}
 .mode-pills button{border:none;background:transparent;color:var(--lo);font-family:var(--sans);font-size:11px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .2s}
 .mode-pills button.active{background:var(--cyan);color:#000}
 .mode-pills button:hover:not(.active){color:var(--md)}
+
+/* ── MEP Highlight Pills ── */
+.mep-pills{display:flex;gap:4px;background:var(--s2);border-radius:8px;padding:3px;margin-left:8px}
+.mep-pills button{border:none;background:transparent;color:var(--lo);font-family:var(--sans);font-size:10px;font-weight:600;padding:5px 10px;border-radius:6px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.mep-pills button.active{background:var(--blue);color:#fff}
+.mep-pills button:hover:not(.active){color:var(--md)}
+
 .sim-badge{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:5px;background:rgba(45,212,191,.12);color:var(--cyan);letter-spacing:.3px}
 
 /* ── Floor Selector ── */
@@ -73,19 +84,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 .stats{position:fixed;bottom:16px;left:16px;font-family:var(--mono);font-size:10px;color:var(--lo);z-index:90;background:rgba(15,18,25,.7);padding:6px 10px;border-radius:6px}
 
 /* ── ViewCube ── */
-.viewcube{position:fixed;top:60px;right:16px;width:90px;height:90px;perspective:200px;z-index:95;cursor:pointer}
+.viewcube{position:fixed;top:60px;right:16px;z-index:95;cursor:pointer;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:2px;width:96px;height:96px}
 .viewcube:hover{transform:scale(1.05)}
-.vc-face{position:absolute;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.5px;color:var(--md);border:1px solid var(--border);transition:all .2s;user-select:none}
+.vc-face{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:7px;font-weight:600;letter-spacing:.5px;color:var(--md);border:1px solid var(--border);transition:all .2s;user-select:none;border-radius:4px;background:rgba(15,18,25,.85)}
 .vc-face:hover{background:rgba(45,212,191,.2);color:var(--cyan);border-color:rgba(45,212,191,.4)}
-.vc-front{width:90px;height:30px;bottom:0;left:0;background:rgba(15,18,25,.85);border-radius:0 0 6px 6px}
-.vc-top{width:90px;height:30px;top:0;left:0;background:rgba(15,18,25,.75);border-radius:6px 6px 0 0}
-.vc-left{width:30px;height:30px;bottom:0;left:0;background:rgba(15,18,25,.8);border-radius:0 0 0 6px;font-size:7px}
-.vc-right{width:30px;height:30px;bottom:0;right:0;background:rgba(15,18,25,.8);border-radius:0 0 6px 0;font-size:7px}
-.vc-back{width:90px;height:30px;top:0;left:0;background:rgba(15,18,25,.7);border-radius:6px 6px 0 0;font-size:7px;display:none}
-.vc-bottom{width:30px;height:30px;top:0;right:0;background:rgba(15,18,25,.7);border-radius:0 6px 0 0;font-size:7px}
-/* Reorganize as simple grid */
-.viewcube{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:2px;width:96px;height:96px;perspective:none}
-.vc-face{position:relative;width:auto;height:auto;border-radius:4px;background:rgba(15,18,25,.85);top:auto;left:auto;right:auto;bottom:auto;display:flex;font-size:7px}
 .vc-top{grid-column:2;grid-row:1}
 .vc-left{grid-column:1;grid-row:2}
 .vc-front{grid-column:2;grid-row:2;background:rgba(45,212,191,.1);color:var(--cyan);font-size:8px}
@@ -93,10 +95,24 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 .vc-bottom{grid-column:2;grid-row:3}
 .vc-back{grid-column:1;grid-row:1;display:flex}
 
+/* ── AR Overlay ── */
+.ar-overlay{position:fixed;inset:0;z-index:500;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center}
+.ar-overlay.visible{display:flex}
+.ar-overlay model-viewer{width:100%;height:calc(100% - 56px);background:var(--bg)}
+.ar-topbar{width:100%;height:56px;background:rgba(15,18,25,.95);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+.ar-topbar h2{font-size:14px;font-weight:600;color:var(--hi)}
+.ar-topbar h2 span{color:var(--cyan)}
+.ar-back-btn{border:none;background:var(--s3);color:var(--md);font-family:var(--sans);font-size:12px;font-weight:600;padding:6px 14px;border-radius:6px;cursor:pointer;margin-left:auto;transition:all .2s}
+.ar-back-btn:hover{background:var(--cyan);color:#000}
+.ar-hint{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--lo);font-family:var(--mono);background:rgba(15,18,25,.8);padding:8px 16px;border-radius:8px;border:1px solid var(--border);pointer-events:none}
+
 @media(max-width:768px){
   .info-panel{width:100%;border-left:none;border-top:1px solid var(--border);top:auto;bottom:0;height:55vh;transform:translateY(100%)}
   .info-panel.open{transform:translateY(0)}
   .floor-nav{left:8px}
+  .mep-pills{display:none}
+  .topbar{gap:6px;padding:0 10px}
+  .topbar h1{font-size:11px}
 }
 </style>
 </head>
@@ -107,6 +123,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
   <div class="brand">
     <div class="mark">GB</div>
     <h1>Grimes Building · <span>3D MEP</span></h1>
+  </div>
+  <!-- MEP Highlight Mode -->
+  <div class="mep-pills" id="mepPills">
+    <button class="active" data-mode="full">Full Building</button>
+    <button data-mode="mep">MEP Only</button>
+    <button data-mode="xray">X-Ray</button>
   </div>
   <div class="mode-pills">
     <button class="active" data-view="3d">3D</button>
@@ -145,9 +167,40 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 <!-- Stats -->
 <div class="stats" id="stats"></div>
 
-<!-- ═══════════════════════════════════════════════════
+<!-- AR Overlay -->
+<div class="ar-overlay" id="arOverlay">
+  <div class="ar-topbar">
+    <div class="mark" style="width:26px;height:26px;background:var(--cyan);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;font-family:var(--mono)">GB</div>
+    <h2>Grimes Building · <span>AR Mode</span></h2>
+    <button class="ar-back-btn" id="arBackBtn">← Back to 3D</button>
+  </div>
+  <model-viewer
+    id="arModelViewer"
+    alt="Grimes Building MEP Model"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    camera-controls
+    touch-action="pan-y"
+    auto-rotate
+    shadow-intensity="1"
+    environment-image="neutral"
+    style="--poster-color:var(--bg)"
+  >
+    <button slot="ar-button" style="
+      position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
+      background:var(--cyan);color:#000;font-family:var(--sans);font-weight:700;
+      font-size:14px;padding:12px 28px;border:none;border-radius:10px;cursor:pointer;
+      box-shadow:0 4px 20px rgba(45,212,191,.3);z-index:10;
+    ">
+      👁 View in AR
+    </button>
+  </model-viewer>
+  <div class="ar-hint">On mobile, tap "View in AR" to place the model in your space</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
      SCRIPTS
-═══════════════════════════════════════════════════ -->
+═══════════════════════════════════════════════ -->
 <script type="importmap">
 {
   "imports": {
@@ -164,7 +217,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 /* ════════════════════════════════════════════════
-   DATA LAYER — copied from Protoys.html
+   DATA LAYER
 ════════════════════════════════════════════════ */
 const EQUIPMENT = [
   { id:'SPRK-MAIN', bimId:'CSI-21-MAIN', name:'Fire Sprinkler Main Supply', system:'fire', floor:'B1', zone:'Fire Pump Room', sensors:['supply_pressure','flow_gpm','status'] },
@@ -219,7 +272,10 @@ const FLOORS = [
 
 const SYS_COLORS = { hvac:'#2dd4bf', water:'#38bdf8', fire:'#fb923c', elec:'#f59e0b', life:'#f87171' };
 
-/* ── DataAdapter (from Protoys.html) ── */
+/* ── MEP keyword regex for identifying MEP meshes ── */
+const MEP_REGEX = /pipe|duct|iron|fitting|valve|pump|coil|sprink|fire|elec|panel|conduit|Metal_-_Ductile|exhaust|meter|tank|cool|conden|boiler|chiller|hvac|mech|ahu|fan/i;
+
+/* ── DataAdapter ── */
 const DataAdapter = {
   mode:'simulation', endpoint:null,
   occupancy(d=new Date()){const day=d.getDay(),h=d.getHours()+d.getMinutes()/60;if(day===0||day===6)return .05;if(h<6)return .02;if(h<8)return .05+(h-6)*.2;if(h<9)return .45+(h-8)*.35;if(h<12)return .8+Math.sin((h-9)/3*Math.PI)*.15;if(h<13)return .65;if(h<16)return .75+Math.sin((h-13)/3*Math.PI)*.1;if(h<18)return .85-(h-16)*.35;if(h<20)return .15-(h-18)*.06;return .02},
@@ -289,7 +345,7 @@ controls.rotateSpeed = 0.8;
 controls.panSpeed = 0.8;
 controls.maxPolarAngle = Math.PI * 0.95;
 
-// Lighting — brighter for building visualization
+// Lighting
 const ambientLight = new THREE.AmbientLight(0x8899bb, 1.2);
 scene.add(ambientLight);
 const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
@@ -301,87 +357,39 @@ scene.add(fillLight);
 const backLight = new THREE.DirectionalLight(0xffeedd, 0.5);
 backLight.position.set(0, -10, -30);
 scene.add(backLight);
-// Hemisphere light for natural outdoor feel
 const hemiLight = new THREE.HemisphereLight(0xb0c4de, 0x444466, 0.6);
 scene.add(hemiLight);
 
-// Ground grid
 const gridHelper = new THREE.GridHelper(40, 40, 0x1a1f30, 0x111520);
 scene.add(gridHelper);
 
 /* ════════════════════════════════════════════════
-   PLACEHOLDER MEP ASSETS (dummy cubes until GLB)
-   → Replace with GLB loader when file is ready
+   GLOBAL STATE
 ════════════════════════════════════════════════ */
-const equipMeshes = new Map(); // equipId → THREE.Mesh
-const meshToEquip = new Map(); // mesh.uuid → equipId
+const equipMeshes = new Map();
+const meshToEquip = new Map();
 
-function createPlaceholderAssets() {
-  // Spread equipment across floors with pseudo-positions
-  const floorY = { B1:-2, L1:0, L2:4, L3:8, SRV:12 };
-  let idx = 0;
-  for (const eq of EQUIPMENT) {
-    const y = floorY[eq.floor] ?? 0;
-    const angle = (idx / EQUIPMENT.length) * Math.PI * 2;
-    const radius = 3 + (idx % 3) * 2.5;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
+// Track all meshes and their MEP classification
+let allModelMeshes = [];       // every mesh from GLB
+const meshMEPFlags = new Map(); // mesh.uuid → boolean (is MEP?)
 
-    const sysColor = SYS_COLORS[eq.system] || '#4b8eff';
-    const size = eq.sensors.length > 4 ? 1.0 : eq.sensors.length > 2 ? 0.7 : 0.5;
+// Current highlight mode: 'full' | 'mep' | 'xray'
+let highlightMode = 'full';
 
-    const geo = new THREE.BoxGeometry(size, size * 1.2, size);
-    const mat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(sysColor),
-      metalness: 0.3,
-      roughness: 0.6,
-      transparent: true,
-      opacity: 0.85,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, y + size * 0.6, z);
-    mesh.userData = { equipId: eq.id };
-    scene.add(mesh);
+// Floor filter
+let activeFloor = null;
 
-    // Wireframe outline
-    const wire = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geo),
-      new THREE.LineBasicMaterial({ color: sysColor, transparent:true, opacity:0.4 })
-    );
-    mesh.add(wire);
+// Floor Y-range zones (computed after model loads)
+let floorZones = null; // { B1:[minY,maxY], L1:..., etc }
 
-    // Label sprite
-    const label = makeLabel(eq.name.length > 20 ? eq.id : eq.name);
-    label.position.set(0, size * 0.9, 0);
-    mesh.add(label);
-
-    equipMeshes.set(eq.id, mesh);
-    meshToEquip.set(mesh.uuid, eq.id);
-    idx++;
-  }
-}
-
-function makeLabel(text) {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 48;
-  const ctx = c.getContext('2d');
-  ctx.font = '600 20px Outfit, sans-serif';
-  ctx.fillStyle = '#eef1fa';
-  ctx.textAlign = 'center';
-  ctx.fillText(text, 128, 30);
-  const tex = new THREE.CanvasTexture(c);
-  tex.minFilter = THREE.LinearFilter;
-  const mat = new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false });
-  const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(3, 0.6, 1);
-  return sprite;
-}
-
-// ── GLB Loader ──
+/* ════════════════════════════════════════════════
+   GLB LOADER
+════════════════════════════════════════════════ */
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/libs/draco/');
 gltfLoader.setDRACOLoader(dracoLoader);
+
 const loadingEl = document.createElement('div');
 loadingEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;font-family:var(--mono);font-size:14px;color:var(--cyan);background:rgba(10,12,18,.9);padding:20px 32px;border-radius:10px;border:1px solid rgba(45,212,191,.2)';
 loadingEl.textContent = 'Loading Grimes MEP model...';
@@ -389,11 +397,10 @@ document.body.appendChild(loadingEl);
 
 gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   const model = gltf.scene;
-  // Fix orientation: NWD uses Z-up, Three.js uses Y-up
   model.rotation.x = -Math.PI / 2;
   scene.add(model);
 
-  // Auto-fit camera to model
+  // Compute bounding box
   const box = new THREE.Box3().setFromObject(model);
   window.__modelBox = box;
   const center = box.getCenter(new THREE.Vector3());
@@ -403,27 +410,49 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   controls.target.copy(center);
   controls.update();
 
-  // Collect all meshes for raycasting
-  const allMeshes = [];
+  // ── Compute floor zones by splitting Y into 5 equal bands ──
+  const minY = box.min.y;
+  const maxY = box.max.y;
+  const bandHeight = (maxY - minY) / 5;
+  floorZones = {
+    'B1':  [minY, minY + bandHeight],
+    'L1':  [minY + bandHeight, minY + bandHeight * 2],
+    'L2':  [minY + bandHeight * 2, minY + bandHeight * 3],
+    'L3':  [minY + bandHeight * 3, minY + bandHeight * 4],
+    'SRV': [minY + bandHeight * 4, maxY],
+  };
+  console.log('Floor zones (Y ranges):', floorZones);
+
+  // Collect meshes
+  let mepCount = 0;
   model.traverse((child) => {
     if (child.isMesh) {
-      child.userData.originalColor = child.material.color ? child.material.color.clone() : null;
-      allMeshes.push(child);
+      allModelMeshes.push(child);
 
-      // Try matching mesh name to known equipment
+      // Classify as MEP or not
+      const nameUpper = (child.name || '').toUpperCase();
+      const isMEP = MEP_REGEX.test(child.name || '');
+      meshMEPFlags.set(child.uuid, isMEP);
+      if (isMEP) mepCount++;
+
+      // Store original material data for X-ray mode
+      child.userData.originalColor = child.material.color ? child.material.color.clone() : null;
+      child.userData.originalOpacity = child.material.opacity !== undefined ? child.material.opacity : 1;
+      child.userData.originalTransparent = child.material.transparent || false;
+
+      // Try matching to known equipment
       for (const eq of EQUIPMENT) {
-        const nameUpper = (child.name || '').toUpperCase();
         const matchId = eq.bimId ? nameUpper.includes(eq.bimId.toUpperCase()) : false;
         const matchName = nameUpper.includes(eq.id.toUpperCase());
         if (matchId || matchName) {
           child.userData.equipId = eq.id;
           equipMeshes.set(eq.id, child);
           meshToEquip.set(child.uuid, eq.id);
+          meshMEPFlags.set(child.uuid, true); // force MEP
           break;
         }
       }
 
-      // If no match, make it clickable anyway with mesh name as ID
       if (!child.userData.equipId && child.name) {
         child.userData.equipId = '__mesh__' + child.name;
         meshToEquip.set(child.uuid, child.userData.equipId);
@@ -431,11 +460,10 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
     }
   });
 
-  // Store all meshes for raycasting (not just matched equipment)
-  window.__allMeshes = allMeshes;
+  window.__allMeshes = allModelMeshes;
 
-  console.log(`GLB loaded: ${allMeshes.length} meshes, ${equipMeshes.size} equipment matched`);
-  loadingEl.textContent = `Loaded · ${allMeshes.length} meshes · ${equipMeshes.size} matched`;
+  console.log(`GLB loaded: ${allModelMeshes.length} meshes, ${mepCount} MEP, ${equipMeshes.size} equipment matched`);
+  loadingEl.textContent = `Loaded · ${allModelMeshes.length} meshes · ${mepCount} MEP · ${equipMeshes.size} matched`;
   setTimeout(() => loadingEl.remove(), 3000);
 
 }, (progress) => {
@@ -449,13 +477,63 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   loadingEl.style.color = '#f87171';
 });
 
-// Also create placeholders as fallback (will coexist with GLB)
-// createPlaceholderAssets();
+/* ════════════════════════════════════════════════
+   MEP HIGHLIGHT MODE
+════════════════════════════════════════════════ */
+function applyHighlightMode() {
+  for (const mesh of allModelMeshes) {
+    const isMEP = meshMEPFlags.get(mesh.uuid) || false;
+
+    // Reset material to original state first
+    if (mesh.userData._xrayApplied) {
+      mesh.material.opacity = mesh.userData.originalOpacity;
+      mesh.material.transparent = mesh.userData.originalTransparent;
+      if (mesh.material.depthWrite !== undefined) mesh.material.depthWrite = true;
+      mesh.userData._xrayApplied = false;
+    }
+
+    switch (highlightMode) {
+      case 'full':
+        mesh.visible = true;
+        break;
+
+      case 'mep':
+        mesh.visible = isMEP;
+        break;
+
+      case 'xray':
+        mesh.visible = true;
+        if (!isMEP) {
+          // Make non-MEP ghostly transparent
+          if (!mesh.material._isClonedForXray) {
+            mesh.material = mesh.material.clone();
+            mesh.material._isClonedForXray = true;
+          }
+          mesh.material.transparent = true;
+          mesh.material.opacity = 0.06;
+          mesh.material.depthWrite = false;
+          mesh.userData._xrayApplied = true;
+        }
+        break;
+    }
+  }
+
+  // Reapply floor filter on top of highlight mode
+  applyFloorFilter();
+}
+
+// MEP pills click handler
+document.getElementById('mepPills').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn || !btn.dataset.mode) return;
+  highlightMode = btn.dataset.mode;
+  document.querySelectorAll('#mepPills button').forEach(b => b.classList.toggle('active', b === btn));
+  applyHighlightMode();
+});
 
 /* ════════════════════════════════════════════════
-   FLOOR NAVIGATION
+   FLOOR NAVIGATION — Y-based filtering
 ════════════════════════════════════════════════ */
-let activeFloor = null;
 const floorNav = document.getElementById('floorNav');
 
 const allBtn = document.createElement('button');
@@ -479,11 +557,43 @@ function setFloor(floorId) {
   floorNav.querySelectorAll('.floor-btn').forEach(b => {
     b.classList.toggle('active', floorId ? b.dataset.floor === floorId : b.textContent === '⊕');
   });
-  for (const [eqId, mesh] of equipMeshes) {
-    const eq = EQUIPMENT.find(e => e.id === eqId);
-    if (!eq) continue;
-    const show = !floorId || eq.floor === floorId;
-    mesh.visible = show;
+  applyFloorFilter();
+}
+
+function getMeshFloor(mesh) {
+  if (!floorZones) return null;
+  // Get world-space bounding box center Y for this mesh
+  const worldPos = new THREE.Vector3();
+  mesh.getWorldPosition(worldPos);
+
+  for (const [floorId, [minY, maxY]] of Object.entries(floorZones)) {
+    if (worldPos.y >= minY && worldPos.y < maxY) return floorId;
+  }
+  // Edge case: if exactly at maxY of last zone
+  return 'SRV';
+}
+
+function applyFloorFilter() {
+  if (!floorZones) return; // model not loaded yet
+
+  for (const mesh of allModelMeshes) {
+    const isMEP = meshMEPFlags.get(mesh.uuid) || false;
+
+    // First determine visibility from highlight mode
+    let shouldBeVisible;
+    switch (highlightMode) {
+      case 'mep':  shouldBeVisible = isMEP; break;
+      case 'xray': shouldBeVisible = true; break;
+      default:     shouldBeVisible = true; break;
+    }
+
+    // Then apply floor filter
+    if (activeFloor && shouldBeVisible) {
+      const meshFloor = getMeshFloor(mesh);
+      shouldBeVisible = (meshFloor === activeFloor);
+    }
+
+    mesh.visible = shouldBeVisible;
   }
 }
 
@@ -505,7 +615,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (hoverMesh && hoverMesh !== selectedMesh) {
     hoverMesh.scale.setScalar(1);
   }
-  if (hits.length > 0 && hits[0].object !== selectedMesh) {
+  if (hits.length > 0 && hits[0].object.visible && hits[0].object !== selectedMesh) {
     hoverMesh = hits[0].object;
     hoverMesh.scale.setScalar(1.05);
     canvas.style.cursor = 'pointer';
@@ -516,7 +626,6 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 canvas.addEventListener('pointerdown', (e) => {
-  // Only process clicks, not drags
   const startX = e.clientX, startY = e.clientY;
   const up = (e2) => {
     canvas.removeEventListener('pointerup', up);
@@ -526,12 +635,11 @@ canvas.addEventListener('pointerdown', (e) => {
     mouse.y = -(e2.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const targets = window.__allMeshes || [...equipMeshes.values()];
-    const hits = raycaster.intersectObjects(targets, false);
+    const hits = raycaster.intersectObjects(targets, false).filter(h => h.object.visible);
 
     if (hits.length > 0) {
       const mesh = hits[0].object;
       const hitPoint = hits[0].point;
-      // Find nearest EQUIPMENT based on click position (Y = floor)
       const nearest = findNearestEquipment(hitPoint, mesh.name);
       if (nearest) {
         selectEquipment(nearest.id, mesh, hitPoint);
@@ -547,14 +655,18 @@ canvas.addEventListener('pointerdown', (e) => {
 
 /* ════════════════════════════════════════════════
    PROXIMITY-BASED EQUIPMENT MATCHING
-   Maps click Y-position to floor, then picks nearest equipment on that floor
 ════════════════════════════════════════════════ */
 function getFloorFromY(y, modelBox) {
-  // Normalize Y position to 0-1 range based on model bounds
+  if (floorZones) {
+    for (const [floorId, [minY, maxY]] of Object.entries(floorZones)) {
+      if (y >= minY && y < maxY) return floorId;
+    }
+    return 'SRV';
+  }
+  // Fallback if zones not computed
   const minY = modelBox ? modelBox.min.y : 0;
   const maxY = modelBox ? modelBox.max.y : 20;
   const normalY = (y - minY) / (maxY - minY);
-  
   if (normalY < 0.2) return 'B1';
   if (normalY < 0.4) return 'L1';
   if (normalY < 0.6) return 'L2';
@@ -565,18 +677,12 @@ function getFloorFromY(y, modelBox) {
 function findNearestEquipment(hitPoint, meshName) {
   const modelBox = window.__modelBox;
   const floor = getFloorFromY(hitPoint.y, modelBox);
-  
-  // Check if clicked mesh is likely MEP-related (pipes, ducts, equipment)
-  const mepKeywords = /duct|pipe|pump|valve|coil|fan|ahu|sprink|fire|elec|panel|conduit|meter|tank|exhaust|cool|conden|boiler|chiller|hvac|mech|iron|fitting/i;
-  const isMEP = mepKeywords.test(meshName || '');
-  
-  // Non-MEP items (walls, furniture, etc) — show basic info, no sensor data
+  const isMEP = MEP_REGEX.test(meshName || '');
   if (!isMEP) return null;
-  
-  // Get equipment on this floor
+
   let candidates = EQUIPMENT.filter(e => e.floor === floor);
   if (candidates.length === 0) candidates = EQUIPMENT;
-  
+
   const hash = Math.abs(Math.floor(hitPoint.x * 7 + hitPoint.z * 13)) % candidates.length;
   return candidates[hash];
 }
@@ -599,7 +705,6 @@ function selectEquipment(equipId, mesh, hitPoint) {
   selectedMesh = mesh;
   hint.classList.add('hidden');
 
-  // Highlight mesh
   if (mesh.material) {
     if (mesh.material.clone) {
       mesh.userData._origMat = mesh.material;
@@ -609,11 +714,9 @@ function selectEquipment(equipId, mesh, hitPoint) {
     }
   }
 
-  // Determine floor from click
   const modelBox = window.__modelBox;
   const detectedFloor = hitPoint ? getFloorFromY(hitPoint.y, modelBox) : eq.floor;
 
-  // Header
   const sysIcon = { hvac:'🌡️', water:'💧', fire:'🔥', elec:'⚡', life:'🚨' };
   const sysCol = SYS_COLORS[eq.system] || '#4b8eff';
   panelHead.innerHTML = `
@@ -626,7 +729,6 @@ function selectEquipment(equipId, mesh, hitPoint) {
     </div>
   `;
 
-  // Meta chips
   panelMeta.innerHTML = `
     <span class="meta-chip">📍 ${detectedFloor}</span>
     <span class="meta-chip">${eq.zone}</span>
@@ -635,12 +737,8 @@ function selectEquipment(equipId, mesh, hitPoint) {
     <span class="meta-chip" style="color:var(--cyan)">⚡ LIVE SIM</span>
   `;
 
-  // Initial sensor render
   updateSensors(eq);
-
-  // Live update every 3s
   sensorInterval = setInterval(() => updateSensors(eq), 3000);
-
   infoPanel.classList.add('open');
 }
 
@@ -667,8 +765,7 @@ function updateSensors(eq) {
   }
   sensorList.innerHTML = html;
 
-  // Update mesh color based on worst status
-  if (selectedMesh) {
+  if (selectedMesh && selectedMesh.material) {
     const worstStatus = getWorstStatus(eq);
     const col = worstStatus === 'CRIT' ? '#f87171' : worstStatus === 'WARN' ? '#f59e0b' : SYS_COLORS[eq.system] || '#4b8eff';
     selectedMesh.material.emissive = new THREE.Color(col);
@@ -709,7 +806,7 @@ function deselectEquipment() {
 
 document.getElementById('panelClose').onclick = deselectEquipment;
 
-/* ── Show info for non-MEP meshes (walls, furniture etc) ── */
+/* ── Show info for non-MEP meshes ── */
 function showMeshInfo(mesh) {
   deselectEquipment();
   selectedMesh = mesh;
@@ -722,7 +819,6 @@ function showMeshInfo(mesh) {
     mesh.material.emissiveIntensity = 0.15;
   }
 
-  // Categorize by name
   const name = mesh.name || 'Unnamed';
   const categories = {
     'Wall|Gypsum|Sheathing': { icon:'🧱', type:'Wall / Partition' },
@@ -734,13 +830,15 @@ function showMeshInfo(mesh) {
     'Wood|Laminate': { icon:'🪵', type:'Wood Element' },
     'Grid': { icon:'📐', type:'Grid / Reference' },
   };
-  
+
   let icon = '📦', type = 'Building Element';
   for (const [pattern, info] of Object.entries(categories)) {
     if (new RegExp(pattern, 'i').test(name)) {
       icon = info.icon; type = info.type; break;
     }
   }
+
+  const meshFloor = getMeshFloor(mesh);
 
   panelHead.innerHTML = `
     <div class="equip-icon" style="background:rgba(75,142,255,.08);border:1px solid rgba(75,142,255,.2)">${icon}</div>
@@ -751,6 +849,7 @@ function showMeshInfo(mesh) {
   `;
   panelMeta.innerHTML = `
     <span class="meta-chip">Non-MEP Element</span>
+    <span class="meta-chip">📍 ${meshFloor || '—'}</span>
     <span class="meta-chip">Vertices: ${(mesh.geometry?.attributes?.position?.count || 0).toLocaleString()}</span>
   `;
   sensorList.innerHTML = `
@@ -764,7 +863,7 @@ function showMeshInfo(mesh) {
 }
 
 /* ════════════════════════════════════════════════
-   AMBIENT GLOW — equipment status colors
+   AMBIENT GLOW
 ════════════════════════════════════════════════ */
 function updateAmbientGlow() {
   for (const [eqId, mesh] of equipMeshes) {
@@ -786,21 +885,19 @@ function updateAmbientGlow() {
 }
 
 /* ════════════════════════════════════════════════
-   VIEWCUBE — click to change camera angle
+   VIEWCUBE
 ════════════════════════════════════════════════ */
 function animateCamera(newPos, newTarget, duration = 800) {
   const startPos = camera.position.clone();
   const startTarget = controls.target.clone();
   const startTime = performance.now();
-  
+
   function step(now) {
     const t = Math.min((now - startTime) / duration, 1);
-    const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2; // easeInOutCubic
-    
+    const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
     camera.position.lerpVectors(startPos, newPos, ease);
     controls.target.lerpVectors(startTarget, newTarget, ease);
     controls.update();
-    
     if (t < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -809,11 +906,9 @@ function animateCamera(newPos, newTarget, duration = 800) {
 document.getElementById('viewCube').addEventListener('click', (e) => {
   const view = e.target.dataset.view;
   if (!view) return;
-  
   const target = controls.target.clone();
   const dist = camera.position.distanceTo(target);
   const d = Math.max(dist, 30);
-  
   const views = {
     front:  new THREE.Vector3(target.x, target.y, target.z + d),
     back:   new THREE.Vector3(target.x, target.y, target.z - d),
@@ -822,7 +917,6 @@ document.getElementById('viewCube').addEventListener('click', (e) => {
     top:    new THREE.Vector3(target.x, target.y + d, target.z + 0.01),
     bottom: new THREE.Vector3(target.x, target.y - d, target.z + 0.01),
   };
-  
   if (views[view]) animateCamera(views[view], target);
 });
 
@@ -840,7 +934,6 @@ function updateKeyboardMovement() {
   forward.y = 0;
   forward.normalize();
   const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
-  
   if (keys['w']) { camera.position.addScaledVector(forward, speed); controls.target.addScaledVector(forward, speed); }
   if (keys['s']) { camera.position.addScaledVector(forward, -speed); controls.target.addScaledVector(forward, -speed); }
   if (keys['a']) { camera.position.addScaledVector(right, -speed); controls.target.addScaledVector(right, -speed); }
@@ -860,8 +953,8 @@ canvas.addEventListener('dblclick', (e) => {
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const targets = window.__allMeshes || [...equipMeshes.values()];
-  const hits = raycaster.intersectObjects(targets, false);
-  
+  const hits = raycaster.intersectObjects(targets, false).filter(h => h.object.visible);
+
   if (hits.length > 0) {
     const point = hits[0].point;
     const dir = new THREE.Vector3().subVectors(camera.position, point).normalize();
@@ -869,6 +962,39 @@ canvas.addEventListener('dblclick', (e) => {
     newPos.y = Math.max(newPos.y, point.y + 2);
     animateCamera(newPos, point);
   }
+});
+
+/* ════════════════════════════════════════════════
+   AR MODE TOGGLE
+════════════════════════════════════════════════ */
+const arOverlay = document.getElementById('arOverlay');
+const arModelViewer = document.getElementById('arModelViewer');
+const arBackBtn = document.getElementById('arBackBtn');
+
+document.querySelector('.mode-pills').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn || !btn.dataset.view) return;
+
+  document.querySelectorAll('.mode-pills button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  if (btn.dataset.view === 'ar') {
+    // Set the GLB source for model-viewer
+    arModelViewer.setAttribute('src', 'grimes-mep-compressed.glb');
+    arOverlay.classList.add('visible');
+  } else {
+    arOverlay.classList.remove('visible');
+    // Remove src to free memory when leaving AR
+    arModelViewer.removeAttribute('src');
+  }
+});
+
+arBackBtn.addEventListener('click', () => {
+  arOverlay.classList.remove('visible');
+  arModelViewer.removeAttribute('src');
+  document.querySelectorAll('.mode-pills button').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === '3d');
+  });
 });
 
 /* ════════════════════════════════════════════════
@@ -882,16 +1008,16 @@ function animate() {
   updateKeyboardMovement();
   controls.update();
 
-  // Glow update every 30 frames
-  frameCount++;
   if (frameCount % 30 === 0) updateAmbientGlow();
+  frameCount++;
 
-  // FPS counter
   if (frameCount % 60 === 0) {
     const now = performance.now();
     const fps = Math.round(60000 / (now - lastTime));
     lastTime = now;
-    statsEl.textContent = `${fps} FPS · ${EQUIPMENT.length} assets · ${DataAdapter.mode.toUpperCase()}`;
+    const mepCount = [...meshMEPFlags.values()].filter(Boolean).length;
+    const modeLabel = highlightMode === 'full' ? 'FULL' : highlightMode === 'mep' ? 'MEP ONLY' : 'X-RAY';
+    statsEl.textContent = `${fps} FPS · ${allModelMeshes.length} meshes · ${mepCount} MEP · ${modeLabel} · ${DataAdapter.mode.toUpperCase()}`;
   }
 
   renderer.render(scene, camera);
