@@ -553,9 +553,13 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   colorMEPMeshes();
 
 }, (progress) => {
-  if (progress.total > 0) {
-    const pct = (progress.loaded / progress.total * 100).toFixed(0);
+  if (progress.total > 0 && progress.loaded <= progress.total) {
+    const pct = Math.min(100, (progress.loaded / progress.total * 100)).toFixed(0);
     loadingEl.textContent = `Loading MEP model... ${pct}%`;
+  } else {
+    // GitHub Pages may not send accurate Content-Length — show MB instead
+    const mb = (progress.loaded / 1024 / 1024).toFixed(1);
+    loadingEl.textContent = `Loading MEP model... ${mb} MB`;
   }
 }, (err) => {
   console.error('GLB load error:', err);
