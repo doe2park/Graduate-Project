@@ -33,6 +33,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 .mode-pills button{border:none;background:transparent;color:var(--lo);font-family:var(--sans);font-size:11px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .2s}
 .mode-pills button.active{background:var(--cyan);color:#000}
 .mode-pills button:hover:not(.active){color:var(--md)}
+.mode-pills button[data-view="vr"].active{background:var(--purple);color:#fff}
 
 /* ── MEP Highlight Pills ── */
 .mep-pills{display:flex;gap:4px;background:var(--s2);border-radius:8px;padding:3px;margin-left:8px}
@@ -155,6 +156,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
   <div class="mode-pills">
     <button class="active" data-view="3d">3D</button>
     <button data-view="ar">AR</button>
+    <button data-view="vr" id="vrBtn">VR</button>
   </div>
   <div class="sim-badge" id="modeBadge">SIM</div>
 </div>
@@ -180,7 +182,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 </div>
 
 <!-- Hint -->
-<div class="hint" id="hint">Tap ⚡ button to browse MEP equipment · Or click directly in 3D view</div>
+<div class="hint" id="hint">Tap ⚡ for MEP list · VR/XR button for Quest · WASD to move</div>
 
 <!-- ViewCube -->
 <div class="viewcube" id="viewCube">
@@ -243,6 +245,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 /* ════════════════════════════════════════════════
    DATA LAYER
@@ -367,12 +370,13 @@ const DataAdapter = {
    THREE.JS SCENE
 ════════════════════════════════════════════════ */
 const canvas = document.getElementById('canvas3d');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setClearColor(0x1a1f2e);
+renderer.setClearColor(0x1a1f2e, 1);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.8;
+renderer.xr.enabled = true;
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x1a1f2e, 0.004);
@@ -1102,7 +1106,7 @@ canvas.addEventListener('dblclick', (e) => {
 });
 
 /* ════════════════════════════════════════════════
-   AR MODE TOGGLE
+   AR MODE TOGGLE (model-viewer fallback for mobile)
 ════════════════════════════════════════════════ */
 const arOverlay = document.getElementById('arOverlay');
 const arModelViewer = document.getElementById('arModelViewer');
@@ -1111,17 +1115,16 @@ const arBackBtn = document.getElementById('arBackBtn');
 document.querySelector('.mode-pills').addEventListener('click', (e) => {
   const btn = e.target.closest('button');
   if (!btn || !btn.dataset.view) return;
+  if (btn.dataset.view === 'vr') return; // handled separately
 
   document.querySelectorAll('.mode-pills button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 
   if (btn.dataset.view === 'ar') {
-    // Set the GLB source for model-viewer
     arModelViewer.setAttribute('src', 'grimes-mep-compressed.glb');
     arOverlay.classList.add('visible');
   } else {
     arOverlay.classList.remove('visible');
-    // Remove src to free memory when leaving AR
     arModelViewer.removeAttribute('src');
   }
 });
@@ -1135,15 +1138,157 @@ arBackBtn.addEventListener('click', () => {
 });
 
 /* ════════════════════════════════════════════════
-   ANIMATION LOOP
+   WEBXR — Quest 2 (VR) / Quest 3 (AR passthrough)
+════════════════════════════════════════════════ */
+let xrSession = null;
+let xrMode = null; // 'immersive-vr' or 'immersive-ar'
+const xrRay = new THREE.Raycaster();
+const xrTempMatrix = new THREE.Matrix4();
+
+// Controller setup
+const controller0 = renderer.xr.getController(0);
+controller0.addEventListener('selectstart', onXRSelect);
+scene.add(controller0);
+
+const controller1 = renderer.xr.getController(1);
+controller1.addEventListener('selectstart', onXRSelect);
+scene.add(controller1);
+
+// Visible ray line from controllers
+function makeControllerRay() {
+  const geo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -5)
+  ]);
+  const mat = new THREE.LineBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.6 });
+  return new THREE.Line(geo, mat);
+}
+const ray0 = makeControllerRay();
+controller0.add(ray0);
+const ray1 = makeControllerRay();
+controller1.add(ray1);
+
+// Controller models (Quest hand/controller visualization)
+const controllerModelFactory = new XRControllerModelFactory();
+const grip0 = renderer.xr.getControllerGrip(0);
+grip0.add(controllerModelFactory.createControllerModel(grip0));
+scene.add(grip0);
+const grip1 = renderer.xr.getControllerGrip(1);
+grip1.add(controllerModelFactory.createControllerModel(grip1));
+scene.add(grip1);
+
+// XR select (trigger press) — interact with MEP
+function onXRSelect(event) {
+  const controller = event.target;
+  xrTempMatrix.identity().extractRotation(controller.matrixWorld);
+  xrRay.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  xrRay.ray.direction.set(0, 0, -1).applyMatrix4(xrTempMatrix);
+
+  const targets = window.__allMeshes || [];
+  const hits = xrRay.intersectObjects(targets, false).filter(h => h.object.visible);
+
+  if (hits.length > 0) {
+    const mepHit = hits.find(h => meshMEPFlags.get(h.object.uuid));
+    const bestHit = mepHit || hits[0];
+    const mesh = bestHit.object;
+    const hitPoint = bestHit.point;
+    const nearest = findNearestEquipment(hitPoint, mesh.name, mesh.uuid);
+    if (nearest) {
+      selectEquipment(nearest.id, mesh, hitPoint);
+    }
+  }
+}
+
+// Check XR support and setup VR button
+async function setupXR() {
+  const vrBtn = document.getElementById('vrBtn');
+
+  // Check immersive-ar first (Quest 3), then immersive-vr (Quest 2)
+  let arSupported = false;
+  let vrSupported = false;
+
+  if (navigator.xr) {
+    arSupported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
+    vrSupported = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
+  }
+
+  if (!arSupported && !vrSupported) {
+    vrBtn.style.opacity = '0.3';
+    vrBtn.title = 'WebXR not supported on this device';
+    return;
+  }
+
+  xrMode = arSupported ? 'immersive-ar' : 'immersive-vr';
+  vrBtn.textContent = arSupported ? 'XR' : 'VR';
+  vrBtn.title = arSupported ? 'Enter AR (Quest 3)' : 'Enter VR (Quest 2)';
+
+  vrBtn.addEventListener('click', async () => {
+    if (xrSession) {
+      xrSession.end();
+      return;
+    }
+
+    try {
+      const sessionInit = xrMode === 'immersive-ar' ? {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['plane-detection', 'mesh-detection', 'hand-tracking']
+      } : {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['hand-tracking']
+      };
+
+      const session = await navigator.xr.requestSession(xrMode, sessionInit);
+      renderer.xr.setSession(session);
+      xrSession = session;
+
+      // In AR mode: transparent background, In VR: keep dark
+      if (xrMode === 'immersive-ar') {
+        renderer.setClearColor(0x000000, 0);
+        scene.fog = null;
+        gridHelper.visible = false;
+      }
+
+      // Auto-switch to X-Ray mode in XR
+      highlightMode = 'xray';
+      document.querySelectorAll('#mepPills button').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === 'xray')
+      );
+      applyHighlightMode();
+      colorMEPMeshes();
+
+      vrBtn.textContent = 'EXIT';
+      vrBtn.classList.add('active');
+
+      session.addEventListener('end', () => {
+        xrSession = null;
+        vrBtn.textContent = xrMode === 'immersive-ar' ? 'XR' : 'VR';
+        vrBtn.classList.remove('active');
+        renderer.setClearColor(0x1a1f2e, 1);
+        scene.fog = new THREE.FogExp2(0x1a1f2e, 0.004);
+        gridHelper.visible = true;
+      });
+
+    } catch (err) {
+      console.error('XR session error:', err);
+      alert('Could not start XR session: ' + err.message);
+    }
+  });
+}
+
+setupXR();
+
+/* ════════════════════════════════════════════════
+   ANIMATION LOOP (XR-compatible)
 ════════════════════════════════════════════════ */
 const statsEl = document.getElementById('stats');
 let frameCount = 0, lastTime = performance.now();
 
-function animate() {
-  requestAnimationFrame(animate);
-  updateKeyboardMovement();
-  controls.update();
+renderer.setAnimationLoop(function animate() {
+  // Only use OrbitControls and keyboard when NOT in XR
+  if (!renderer.xr.isPresenting) {
+    updateKeyboardMovement();
+    controls.update();
+  }
 
   if (frameCount % 30 === 0) updateAmbientGlow();
   frameCount++;
@@ -1154,12 +1299,12 @@ function animate() {
     lastTime = now;
     const mepCount = [...meshMEPFlags.values()].filter(Boolean).length;
     const modeLabel = highlightMode === 'full' ? 'FULL' : highlightMode === 'mep' ? 'MEP ONLY' : 'X-RAY';
-    statsEl.textContent = `${fps} FPS · ${allModelMeshes.length} meshes · ${mepCount} MEP · ${modeLabel} · ${DataAdapter.mode.toUpperCase()}`;
+    const xrLabel = renderer.xr.isPresenting ? (xrMode === 'immersive-ar' ? ' · AR' : ' · VR') : '';
+    statsEl.textContent = `${fps} FPS · ${allModelMeshes.length} meshes · ${mepCount} MEP · ${modeLabel}${xrLabel}`;
   }
 
   renderer.render(scene, camera);
-}
-animate();
+});
 
 /* ── Resize ── */
 window.addEventListener('resize', () => {
