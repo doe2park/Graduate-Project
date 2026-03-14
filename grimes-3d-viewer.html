@@ -177,6 +177,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--hi);font-size:13px
 
 <!-- Equipment List Panel -->
 <button class="equip-list-toggle" id="equipToggle" title="MEP Equipment List">⚡</button>
+<button class="equip-list-toggle" id="exportMepBtn" title="Export MEP-only GLB for Quest" style="bottom:90px;background:#f59e0b;font-size:16px">📦</button>
 <div class="equip-list" id="equipList">
   <div class="equip-list-title">MEP EQUIPMENT — TAP TO INSPECT</div>
 </div>
@@ -245,6 +246,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 /* ════════════════════════════════════════════════
@@ -555,6 +557,69 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   // ── Apply default X-Ray mode + color MEP meshes ──
   applyHighlightMode();
   colorMEPMeshes();
+
+  // ── MEP GLB Export ──
+  document.getElementById('exportMepBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('exportMepBtn');
+    btn.textContent = '⏳';
+    btn.style.pointerEvents = 'none';
+
+    try {
+      // Collect MEP meshes into a temporary scene
+      const exportScene = new THREE.Scene();
+
+      // Compute bounding box center of MEP meshes to re-center
+      const mepBox = new THREE.Box3();
+      const mepMeshes = allModelMeshes.filter(m => meshMEPFlags.get(m.uuid));
+
+      mepMeshes.forEach(m => {
+        m.updateWorldMatrix(true, false);
+        const geo = m.geometry;
+        if (geo) {
+          geo.computeBoundingBox();
+          const box = geo.boundingBox.clone();
+          box.applyMatrix4(m.matrixWorld);
+          mepBox.union(box);
+        }
+      });
+
+      const center = mepBox.getCenter(new THREE.Vector3());
+
+      // Clone each MEP mesh with its world transform
+      mepMeshes.forEach(m => {
+        const cloned = m.clone();
+        // Bake world position
+        m.updateWorldMatrix(true, false);
+        cloned.applyMatrix4(m.matrixWorld);
+        // Re-center around origin
+        cloned.position.sub(center);
+        // Reset any parent transforms
+        cloned.updateMatrix();
+        exportScene.add(cloned);
+      });
+
+      const exporter = new GLTFExporter();
+      const glb = await exporter.parseAsync(exportScene, { binary: true });
+
+      // Download
+      const blob = new Blob([glb], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'grimes-mep-only.glb';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
+      console.log(`✅ Exported ${mepMeshes.length} MEP meshes → grimes-mep-only.glb (${sizeMB} MB)`);
+      btn.textContent = '✅';
+      setTimeout(() => { btn.textContent = '📦'; btn.style.pointerEvents = 'auto'; }, 2000);
+    } catch (err) {
+      console.error('Export failed:', err);
+      btn.textContent = '❌';
+      setTimeout(() => { btn.textContent = '📦'; btn.style.pointerEvents = 'auto'; }, 2000);
+    }
+  });
 
 }, (progress) => {
   if (progress.total > 0 && progress.loaded <= progress.total) {

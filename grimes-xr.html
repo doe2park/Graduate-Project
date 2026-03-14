@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grimes MEP · XR</title>
+<style>
+  :root { --cyan: #2dd4bf; --bg: #0a0e1a; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background: var(--bg); color: #e2e8f0; font-family: system-ui, sans-serif; overflow: hidden; }
+
+  #loading {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; background: var(--bg); z-index: 100;
+    font-size: 18px; gap: 16px;
+  }
+  #loading .spinner {
+    width: 48px; height: 48px; border: 3px solid #334155;
+    border-top-color: var(--cyan); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #enterXR {
+    position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+    background: var(--cyan); color: #000; font-weight: 700; font-size: 18px;
+    padding: 16px 40px; border: none; border-radius: 12px; cursor: pointer;
+    box-shadow: 0 4px 24px rgba(45,212,191,0.4); z-index: 50;
+    display: none;
+  }
+  #enterXR:hover { filter: brightness(1.1); }
+  #enterXR:disabled { opacity: 0.4; cursor: default; }
+
+  #info {
+    position: fixed; top: 16px; left: 16px; z-index: 50;
+    background: rgba(15,23,42,0.85); padding: 12px 16px; border-radius: 10px;
+    font-size: 13px; backdrop-filter: blur(8px); border: 1px solid rgba(45,212,191,0.15);
+  }
+  #info h2 { font-size: 15px; color: var(--cyan); margin-bottom: 4px; }
+
+  canvas { display: block; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div id="loadText">Loading MEP model...</div>
+</div>
+
+<div id="info">
+  <h2>Grimes Building · XR</h2>
+  <div id="status">MEP-only lightweight model</div>
+</div>
+
+<button id="enterXR">Enter VR / AR</button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+/* ── Renderer ── */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x0a0e1a, 1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.6;
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+/* ── Scene ── */
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 200);
+camera.position.set(5, 4, 8);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 1, 0);
+
+/* ── Lights ── */
+scene.add(new THREE.AmbientLight(0x8899bb, 1.5));
+const dir = new THREE.DirectionalLight(0xffffff, 2.0);
+dir.position.set(10, 20, 15);
+scene.add(dir);
+scene.add(new THREE.HemisphereLight(0xb0c4de, 0x444466, 0.8));
+
+/* ── Grid (hidden in XR) ── */
+const grid = new THREE.GridHelper(20, 20, 0x1a2535, 0x111825);
+scene.add(grid);
+
+/* ── System colors ── */
+const SYS_COLORS = {
+  hvac: 0x2dd4bf, water: 0x38bdf8, fire: 0xfb923c, elec: 0xf59e0b, default: 0xa78bfa
+};
+
+function guessSystem(name) {
+  if (!name) return 'default';
+  if (/Ductile_Iron/i.test(name)) return 'water';
+  if (/Galvanized|Insulation|VENTILATOR/i.test(name)) return 'hvac';
+  if (/FWP/i.test(name)) return 'fire';
+  if (/Sensor|PT-/i.test(name)) return 'elec';
+  return 'default';
+}
+
+/* ── Load MEP GLB ── */
+const loadingEl = document.getElementById('loadText');
+const statusEl = document.getElementById('status');
+const allMeshes = [];
+
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+
+const loader = new GLTFLoader();
+loader.setDRACOLoader(dracoLoader);
+
+// Try MEP-only first, fall back to full model
+const glbUrl = 'grimes-mep-only.glb';
+
+loader.load(glbUrl, (gltf) => {
+  const model = gltf.scene;
+  scene.add(model);
+
+  let meshCount = 0;
+  model.traverse(child => {
+    if (child.isMesh) {
+      meshCount++;
+      allMeshes.push(child);
+
+      const sys = guessSystem(child.name);
+      const color = SYS_COLORS[sys] || SYS_COLORS.default;
+
+      child.material = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.3,
+        metalness: 0.4,
+        roughness: 0.5,
+        transparent: false,
+      });
+    }
+  });
+
+  // Auto-fit camera
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  camera.position.set(center.x + maxDim, center.y + maxDim * 0.7, center.z + maxDim);
+  controls.target.copy(center);
+  controls.update();
+
+  document.getElementById('loading').style.display = 'none';
+  statusEl.textContent = `${meshCount} MEP meshes loaded`;
+
+  // Show XR button
+  setupXR();
+
+}, (progress) => {
+  if (progress.total > 0) {
+    const pct = Math.min(100, (progress.loaded / progress.total * 100)).toFixed(0);
+    loadingEl.textContent = `Loading MEP... ${pct}%`;
+  } else {
+    const kb = (progress.loaded / 1024).toFixed(0);
+    loadingEl.textContent = `Loading MEP... ${kb} KB`;
+  }
+}, (err) => {
+  console.error('GLB load error:', err);
+  loadingEl.textContent = 'grimes-mep-only.glb not found. Export it from the main viewer (📦 button).';
+  loadingEl.style.color = '#f87171';
+});
+
+/* ── XR Controllers ── */
+const xrRay = new THREE.Raycaster();
+const xrMat = new THREE.Matrix4();
+
+const controller0 = renderer.xr.getController(0);
+controller0.addEventListener('selectstart', onXRSelect);
+scene.add(controller0);
+const controller1 = renderer.xr.getController(1);
+controller1.addEventListener('selectstart', onXRSelect);
+scene.add(controller1);
+
+function makeLine() {
+  const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-4)]);
+  return new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x2dd4bf, opacity: 0.6, transparent: true }));
+}
+controller0.add(makeLine());
+controller1.add(makeLine());
+
+const factory = new XRControllerModelFactory();
+const grip0 = renderer.xr.getControllerGrip(0);
+grip0.add(factory.createControllerModel(grip0));
+scene.add(grip0);
+const grip1 = renderer.xr.getControllerGrip(1);
+grip1.add(factory.createControllerModel(grip1));
+scene.add(grip1);
+
+// Highlight on select
+let highlighted = null;
+const highlightMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 });
+
+function onXRSelect(event) {
+  const c = event.target;
+  xrMat.identity().extractRotation(c.matrixWorld);
+  xrRay.ray.origin.setFromMatrixPosition(c.matrixWorld);
+  xrRay.ray.direction.set(0, 0, -1).applyMatrix4(xrMat);
+
+  const hits = xrRay.intersectObjects(allMeshes, false);
+  if (hits.length > 0) {
+    // Restore previous
+    if (highlighted) {
+      highlighted.mesh.material = highlighted.originalMat;
+    }
+    const mesh = hits[0].object;
+    highlighted = { mesh, originalMat: mesh.material };
+    mesh.material = highlightMat.clone();
+
+    const sys = guessSystem(mesh.name);
+    statusEl.textContent = `${mesh.name} · ${sys.toUpperCase()}`;
+  }
+}
+
+/* ── XR Session ── */
+let xrSession = null;
+
+async function setupXR() {
+  const btn = document.getElementById('enterXR');
+
+  if (!navigator.xr) {
+    btn.textContent = 'WebXR not supported';
+    btn.disabled = true;
+    btn.style.display = 'block';
+    return;
+  }
+
+  const arOK = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
+  const vrOK = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
+
+  if (!arOK && !vrOK) {
+    btn.textContent = 'XR not available';
+    btn.disabled = true;
+    btn.style.display = 'block';
+    return;
+  }
+
+  const mode = arOK ? 'immersive-ar' : 'immersive-vr';
+  btn.textContent = arOK ? '🥽 Enter AR' : '🥽 Enter VR';
+  btn.style.display = 'block';
+
+  btn.addEventListener('click', async () => {
+    if (xrSession) { xrSession.end(); return; }
+
+    try {
+      const opts = mode === 'immersive-ar' ? {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['plane-detection', 'hand-tracking']
+      } : {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['hand-tracking']
+      };
+
+      const session = await navigator.xr.requestSession(mode, opts);
+
+      // AR: transparent bg
+      if (mode === 'immersive-ar') {
+        renderer.setClearColor(0x000000, 0);
+        grid.visible = false;
+      } else {
+        renderer.setClearColor(0x060a14, 1);
+        grid.visible = false;
+      }
+
+      renderer.xr.setSession(session);
+      xrSession = session;
+      btn.textContent = '✕ Exit XR';
+
+      session.addEventListener('end', () => {
+        xrSession = null;
+        btn.textContent = mode === 'immersive-ar' ? '🥽 Enter AR' : '🥽 Enter VR';
+        renderer.setClearColor(0x0a0e1a, 1);
+        grid.visible = true;
+      });
+
+    } catch (e) {
+      console.error('XR error:', e);
+      statusEl.textContent = 'XR failed: ' + e.message;
+    }
+  });
+}
+
+/* ── Render Loop ── */
+renderer.setAnimationLoop(() => {
+  if (!renderer.xr.isPresenting) {
+    controls.update();
+  }
+  renderer.render(scene, camera);
+});
+
+/* ── Resize ── */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
