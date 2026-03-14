@@ -1184,8 +1184,9 @@ function onXRSelect(event) {
   xrRay.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   xrRay.ray.direction.set(0, 0, -1).applyMatrix4(xrTempMatrix);
 
-  const targets = window.__allMeshes || [];
-  const hits = xrRay.intersectObjects(targets, false).filter(h => h.object.visible);
+  // In XR only test visible meshes (78 MEP, not 31K all)
+  const targets = (window.__allMeshes || []).filter(m => m.visible);
+  const hits = xrRay.intersectObjects(targets, false);
 
   if (hits.length > 0) {
     const mepHit = hits.find(h => meshMEPFlags.get(h.object.uuid));
@@ -1238,22 +1239,38 @@ async function setupXR() {
       };
 
       const session = await navigator.xr.requestSession(xrMode, sessionInit);
+
+      // ── CRITICAL: Quest lightweight mode ──
+      // Hide ALL non-MEP meshes before starting XR session
+      // This reduces draw calls from 31K to ~78
+      const xrHiddenMeshes = [];
+      allModelMeshes.forEach(m => {
+        if (!meshMEPFlags.get(m.uuid)) {
+          if (m.visible) {
+            m.visible = false;
+            xrHiddenMeshes.push(m);
+          }
+        }
+      });
+      // Also hide grid, reduce lights for perf
+      gridHelper.visible = false;
+      scene.fog = null;
+
+      // In AR mode: transparent background
+      if (xrMode === 'immersive-ar') {
+        renderer.setClearColor(0x000000, 0);
+      } else {
+        renderer.setClearColor(0x0a0e1a, 1);
+      }
+
       renderer.xr.setSession(session);
       xrSession = session;
 
-      // In AR mode: transparent background, In VR: keep dark
-      if (xrMode === 'immersive-ar') {
-        renderer.setClearColor(0x000000, 0);
-        scene.fog = null;
-        gridHelper.visible = false;
-      }
-
-      // Auto-switch to X-Ray mode in XR
-      highlightMode = 'xray';
+      // Force MEP-only highlight
+      highlightMode = 'mep';
       document.querySelectorAll('#mepPills button').forEach(b =>
-        b.classList.toggle('active', b.dataset.mode === 'xray')
+        b.classList.toggle('active', b.dataset.mode === 'mep')
       );
-      applyHighlightMode();
       colorMEPMeshes();
 
       vrBtn.textContent = 'EXIT';
@@ -1263,9 +1280,18 @@ async function setupXR() {
         xrSession = null;
         vrBtn.textContent = xrMode === 'immersive-ar' ? 'XR' : 'VR';
         vrBtn.classList.remove('active');
+        // Restore hidden meshes
+        xrHiddenMeshes.forEach(m => m.visible = true);
         renderer.setClearColor(0x1a1f2e, 1);
         scene.fog = new THREE.FogExp2(0x1a1f2e, 0.004);
         gridHelper.visible = true;
+        // Restore X-Ray mode
+        highlightMode = 'xray';
+        document.querySelectorAll('#mepPills button').forEach(b =>
+          b.classList.toggle('active', b.dataset.mode === 'xray')
+        );
+        applyHighlightMode();
+        colorMEPMeshes();
       });
 
     } catch (err) {
