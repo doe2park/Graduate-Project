@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UC Berkeley · Campus Digital Twin</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;600;700;800&display=swap');
+
+  :root {
+    --bg: #070b14;
+    --surface: #0d1220;
+    --border: rgba(45,212,191,0.12);
+    --cyan: #2dd4bf;
+    --cyan-dim: rgba(45,212,191,0.15);
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font: 'Outfit', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font); overflow:hidden; height:100vh; }
+
+  /* ── Map container ── */
+  #map { position:absolute; inset:0; z-index:1; }
+
+  /* ── Leaflet overrides ── */
+  .leaflet-control-zoom { border:none !important; }
+  .leaflet-control-zoom a { background:var(--surface) !important; color:var(--cyan) !important; border:1px solid var(--border) !important; border-radius:8px !important; width:36px !important; height:36px !important; line-height:36px !important; font-size:18px !important; }
+  .leaflet-control-zoom a:hover { background:var(--cyan-dim) !important; }
+  .leaflet-control-attribution { background:rgba(7,11,20,0.8) !important; color:var(--muted) !important; font-size:9px !important; }
+  .leaflet-control-attribution a { color:var(--cyan) !important; }
+
+  /* ── Top bar ── */
+  #topbar {
+    position:fixed; top:0; left:0; right:0; z-index:1000;
+    display:flex; align-items:center; gap:16px;
+    padding:14px 24px;
+    background:rgba(7,11,20,0.88);
+    backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--border);
+  }
+  .logo { display:flex; align-items:center; gap:10px; }
+  .logo-mark {
+    width:36px; height:36px; border-radius:10px;
+    background:linear-gradient(135deg, var(--cyan), #38bdf8);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; font-size:13px; color:#000;
+  }
+  .logo h1 { font-size:18px; font-weight:700; letter-spacing:-0.5px; }
+  .logo h1 span { color:var(--cyan); }
+
+  .topbar-stats {
+    margin-left:auto; display:flex; gap:20px; font-size:12px; color:var(--muted);
+  }
+  .topbar-stats .val { color:var(--cyan); font-weight:600; font-family:var(--mono); }
+
+  /* ── Building card popup ── */
+  .building-popup {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px 20px;
+    min-width:260px;
+    box-shadow:0 12px 48px rgba(0,0,0,0.6);
+    font-family:var(--font);
+  }
+  .building-popup h3 {
+    font-size:16px; font-weight:700; margin-bottom:4px;
+    color:var(--text); letter-spacing:-0.3px;
+  }
+  .building-popup .bp-type {
+    font-size:11px; color:var(--muted); margin-bottom:12px;
+    text-transform:uppercase; letter-spacing:0.5px;
+  }
+  .bp-stats {
+    display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:14px;
+  }
+  .bp-stat {
+    background:rgba(45,212,191,0.05);
+    border:1px solid rgba(45,212,191,0.08);
+    border-radius:8px; padding:8px 10px;
+  }
+  .bp-stat-label { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+  .bp-stat-val { font-size:15px; font-weight:700; font-family:var(--mono); color:var(--text); margin-top:2px; }
+  .bp-stat-val.ok { color:var(--cyan); }
+  .bp-stat-val.warn { color:#fb923c; }
+
+  .bp-enter {
+    display:block; width:100%; padding:10px 0; border:none; border-radius:10px;
+    background:var(--cyan); color:#000; font-weight:700; font-size:14px;
+    font-family:var(--font); cursor:pointer;
+    transition:all 0.2s;
+  }
+  .bp-enter:hover { filter:brightness(1.1); transform:translateY(-1px); }
+  .bp-enter:disabled { opacity:0.3; cursor:default; transform:none; }
+  .bp-no-bim { text-align:center; color:var(--muted); font-size:11px; padding:8px 0; }
+
+  /* ── Custom marker ── */
+  .bldg-marker {
+    width:40px; height:40px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; font-weight:700;
+    box-shadow:0 4px 20px rgba(0,0,0,0.4);
+    border:2px solid rgba(255,255,255,0.15);
+    transition:all 0.2s;
+    cursor:pointer;
+  }
+  .bldg-marker:hover { transform:scale(1.15); }
+  .bldg-marker.has-bim {
+    background:linear-gradient(135deg, var(--cyan), #38bdf8);
+    color:#000;
+  }
+  .bldg-marker.no-bim {
+    background:rgba(100,116,139,0.3);
+    color:#94a3b8;
+    border-color:rgba(100,116,139,0.3);
+  }
+
+  .bldg-marker .pulse {
+    position:absolute; inset:-6px; border-radius:16px;
+    border:2px solid var(--cyan);
+    animation:pulse 2s ease-out infinite;
+  }
+  @keyframes pulse {
+    0% { opacity:0.6; transform:scale(1); }
+    100% { opacity:0; transform:scale(1.5); }
+  }
+
+  /* ── Side panel ── */
+  #sidePanel {
+    position:fixed; top:64px; left:16px; bottom:16px; z-index:1000;
+    width:240px; background:rgba(13,18,32,0.92);
+    backdrop-filter:blur(16px); border-radius:14px;
+    border:1px solid var(--border); padding:16px;
+    overflow-y:auto;
+  }
+  #sidePanel h2 { font-size:13px; color:var(--cyan); margin-bottom:12px; letter-spacing:0.5px; text-transform:uppercase; }
+  .sp-item {
+    display:flex; align-items:center; gap:10px; padding:10px;
+    border-radius:10px; cursor:pointer; transition:background 0.2s;
+    margin-bottom:4px;
+  }
+  .sp-item:hover { background:var(--cyan-dim); }
+  .sp-icon {
+    width:32px; height:32px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700; flex-shrink:0;
+  }
+  .sp-icon.active { background:linear-gradient(135deg, var(--cyan), #38bdf8); color:#000; }
+  .sp-icon.inactive { background:rgba(100,116,139,0.2); color:#64748b; }
+  .sp-name { font-size:12px; font-weight:600; }
+  .sp-sub { font-size:10px; color:var(--muted); }
+  .sp-badge {
+    margin-left:auto; font-size:9px; padding:2px 6px; border-radius:4px;
+    font-weight:600; font-family:var(--mono);
+  }
+  .sp-badge.live { background:rgba(45,212,191,0.15); color:var(--cyan); }
+  .sp-badge.offline { background:rgba(100,116,139,0.15); color:#64748b; }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-mark">DT</div>
+    <h1>UC Berkeley · <span>Campus Digital Twin</span></h1>
+  </div>
+  <div class="topbar-stats">
+    <div>Buildings <span class="val" id="tsBuildings">12</span></div>
+    <div>BIM Models <span class="val" id="tsBim">1</span></div>
+    <div>Sensors <span class="val" id="tsSensors">10</span></div>
+  </div>
+</div>
+
+<!-- Side Panel -->
+<div id="sidePanel">
+  <h2>Campus Buildings</h2>
+  <div id="buildingList"></div>
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ═══════════════════════════════════════════
+   BUILDING DATA
+═══════════════════════════════════════════ */
+const BUILDINGS = [
+  {
+    id: 'grimes',
+    name: 'Bechtel Engineering Center',
+    alias: 'Grimes Building',
+    lat: 37.87465,
+    lng: -122.25866,
+    type: 'Engineering / Research',
+    floors: 4,
+    sqft: '62,000',
+    year: 1980,
+    hasBIM: true,
+    glbUrl: 'grimes-mep-only.glb',
+    viewerUrl: 'grimes-xr.html',
+    mepSystems: 8,
+    sensors: 10,
+    energy: '87 kW',
+    status: 'live'
+  },
+  {
+    id: 'davis',
+    name: 'Davis Hall',
+    lat: 37.87515,
+    lng: -122.25775,
+    type: 'Civil & Environmental Eng.',
+    floors: 4,
+    sqft: '83,000',
+    year: 1930,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'etcheverry',
+    name: 'Etcheverry Hall',
+    lat: 37.87584,
+    lng: -122.25920,
+    type: 'Mechanical Engineering',
+    floors: 3,
+    sqft: '55,000',
+    year: 1964,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'soda',
+    name: 'Soda Hall',
+    lat: 37.87564,
+    lng: -122.25868,
+    type: 'Computer Science',
+    floors: 5,
+    sqft: '110,000',
+    year: 1994,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'cory',
+    name: 'Cory Hall',
+    lat: 37.87515,
+    lng: -122.25698,
+    type: 'EECS',
+    floors: 5,
+    sqft: '82,000',
+    year: 1950,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'hearst_mining',
+    name: 'Hearst Memorial Mining',
+    lat: 37.87488,
+    lng: -122.25720,
+    type: 'Materials Science',
+    floors: 3,
+    sqft: '112,000',
+    year: 1907,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'mclaughlin',
+    name: "O'Brien Hall",
+    lat: 37.87530,
+    lng: -122.25838,
+    type: 'Civil Engineering Lab',
+    floors: 2,
+    sqft: '22,000',
+    year: 1960,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'stanley',
+    name: 'Stanley Hall',
+    lat: 37.87395,
+    lng: -122.25559,
+    type: 'Bioengineering',
+    floors: 6,
+    sqft: '285,000',
+    year: 2007,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'sutardja',
+    name: 'Sutardja Dai Hall',
+    lat: 37.87547,
+    lng: -122.25828,
+    type: 'CITRIS',
+    floors: 4,
+    sqft: '141,000',
+    year: 2009,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'hesse',
+    name: 'Hesse Hall',
+    lat: 37.87449,
+    lng: -122.25782,
+    type: 'Mechanical Engineering Lab',
+    floors: 2,
+    sqft: '23,000',
+    year: 1924,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'tan',
+    name: 'Tan Hall',
+    lat: 37.87349,
+    lng: -122.25686,
+    type: 'Chemistry / ChemE',
+    floors: 4,
+    sqft: '60,000',
+    year: 1997,
+    hasBIM: false,
+    status: 'offline'
+  },
+  {
+    id: 'gilman',
+    name: 'Gilman Hall',
+    lat: 37.87326,
+    lng: -122.25613,
+    type: 'Chemistry',
+    floors: 3,
+    sqft: '92,000',
+    year: 1917,
+    hasBIM: false,
+    status: 'offline'
+  },
+];
+
+/* ═══════════════════════════════════════════
+   MAP SETUP
+═══════════════════════════════════════════ */
+const map = L.map('map', {
+  center: [37.87470, -122.25780],
+  zoom: 17,
+  zoomControl: false,
+  attributionControl: true,
+});
+
+// Dark map tiles
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 20,
+  subdomains: 'abcd',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+}).addTo(map);
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+/* ═══════════════════════════════════════════
+   MARKERS
+═══════════════════════════════════════════ */
+const markers = {};
+
+BUILDINGS.forEach(bldg => {
+  const iconHtml = bldg.hasBIM
+    ? `<div class="bldg-marker has-bim"><div class="pulse"></div>🏢</div>`
+    : `<div class="bldg-marker no-bim">🏢</div>`;
+
+  const icon = L.divIcon({
+    html: iconHtml,
+    className: '',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -24],
+  });
+
+  const marker = L.marker([bldg.lat, bldg.lng], { icon }).addTo(map);
+
+  // Popup content
+  let popupHtml = `<div class="building-popup"><h3>${bldg.name}</h3>`;
+  if (bldg.alias) popupHtml += `<div style="font-size:11px;color:#94a3b8;margin-bottom:2px">${bldg.alias}</div>`;
+  popupHtml += `<div class="bp-type">${bldg.type}</div>`;
+  popupHtml += `<div class="bp-stats">`;
+  popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Floors</div><div class="bp-stat-val">${bldg.floors}</div></div>`;
+  popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Area</div><div class="bp-stat-val">${bldg.sqft} ft²</div></div>`;
+
+  if (bldg.hasBIM) {
+    popupHtml += `<div class="bp-stat"><div class="bp-stat-label">MEP Systems</div><div class="bp-stat-val ok">${bldg.mepSystems}</div></div>`;
+    popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Energy</div><div class="bp-stat-val warn">${bldg.energy}</div></div>`;
+    popupHtml += `</div>`;
+    popupHtml += `<button class="bp-enter" onclick="window.location.href='${bldg.viewerUrl}'">Enter 3D Digital Twin →</button>`;
+  } else {
+    popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Built</div><div class="bp-stat-val">${bldg.year}</div></div>`;
+    popupHtml += `<div class="bp-stat"><div class="bp-stat-label">BIM</div><div class="bp-stat-val" style="color:#64748b">—</div></div>`;
+    popupHtml += `</div>`;
+    popupHtml += `<div class="bp-no-bim">BIM model not yet available</div>`;
+    popupHtml += `<button class="bp-enter" disabled>No BIM Data</button>`;
+  }
+  popupHtml += `</div>`;
+
+  marker.bindPopup(popupHtml, {
+    className: 'leaflet-popup-custom',
+    maxWidth: 300,
+    closeButton: true,
+  });
+
+  markers[bldg.id] = marker;
+});
+
+/* Override Leaflet popup styles */
+const style = document.createElement('style');
+style.textContent = `
+  .leaflet-popup-custom .leaflet-popup-content-wrapper { background:transparent; box-shadow:none; border-radius:0; padding:0; }
+  .leaflet-popup-custom .leaflet-popup-content { margin:0; }
+  .leaflet-popup-custom .leaflet-popup-tip { background:var(--surface); border:1px solid var(--border); }
+  .leaflet-popup-close-button { color:var(--muted) !important; font-size:18px !important; top:8px !important; right:10px !important; }
+`;
+document.head.appendChild(style);
+
+/* ═══════════════════════════════════════════
+   SIDE PANEL
+═══════════════════════════════════════════ */
+const listEl = document.getElementById('buildingList');
+
+BUILDINGS.forEach(bldg => {
+  const item = document.createElement('div');
+  item.className = 'sp-item';
+  item.innerHTML = `
+    <div class="sp-icon ${bldg.hasBIM ? 'active' : 'inactive'}">🏢</div>
+    <div>
+      <div class="sp-name">${bldg.alias || bldg.name}</div>
+      <div class="sp-sub">${bldg.type}</div>
+    </div>
+    <span class="sp-badge ${bldg.hasBIM ? 'live' : 'offline'}">${bldg.hasBIM ? 'LIVE' : '—'}</span>
+  `;
+  item.addEventListener('click', () => {
+    map.flyTo([bldg.lat, bldg.lng], 18, { duration: 0.8 });
+    setTimeout(() => markers[bldg.id].openPopup(), 400);
+  });
+  listEl.appendChild(item);
+});
+
+/* ═══════════════════════════════════════════
+   GPS LOCATION (if available)
+═══════════════════════════════════════════ */
+let userMarker = null;
+
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(pos => {
+    const { latitude: lat, longitude: lng } = pos.coords;
+
+    if (!userMarker) {
+      const icon = L.divIcon({
+        html: '<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 12px rgba(59,130,246,0.6)"></div>',
+        className: '',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+      userMarker = L.marker([lat, lng], { icon }).addTo(map);
+    } else {
+      userMarker.setLatLng([lat, lng]);
+    }
+
+    // Check proximity to buildings
+    BUILDINGS.forEach(bldg => {
+      const dist = map.distance([lat, lng], [bldg.lat, bldg.lng]);
+      if (dist < 50 && bldg.hasBIM) {
+        // User is near a BIM building — could auto-open popup
+        // For now just log
+        console.log(`📍 Near ${bldg.name} (${Math.round(dist)}m)`);
+      }
+    });
+  }, err => {
+    console.log('GPS not available:', err.message);
+  }, {
+    enableHighAccuracy: true,
+    maximumAge: 5000,
+  });
+}
+
+/* ═══════════════════════════════════════════
+   STATS
+═══════════════════════════════════════════ */
+document.getElementById('tsBuildings').textContent = BUILDINGS.length;
+document.getElementById('tsBim').textContent = BUILDINGS.filter(b => b.hasBIM).length;
+document.getElementById('tsSensors').textContent = BUILDINGS.reduce((s, b) => s + (b.sensors || 0), 0);
+</script>
+</body>
+</html>
