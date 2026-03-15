@@ -394,7 +394,7 @@ BUILDINGS.forEach(bldg => {
     popupHtml += `<div class="bp-stat"><div class="bp-stat-label">MEP Systems</div><div class="bp-stat-val ok">${bldg.mepSystems}</div></div>`;
     popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Energy</div><div class="bp-stat-val warn">${bldg.energy}</div></div>`;
     popupHtml += `</div>`;
-    popupHtml += `<button class="bp-enter" onclick="window.location.href='${bldg.viewerUrl}'">Enter 3D Digital Twin →</button>`;
+    popupHtml += `<button class="bp-enter" data-url="${bldg.viewerUrl}">Enter 3D Digital Twin →</button>`;
   } else {
     popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Built</div><div class="bp-stat-val">${bldg.year}</div></div>`;
     popupHtml += `<div class="bp-stat"><div class="bp-stat-label">BIM</div><div class="bp-stat-val" style="color:#64748b">—</div></div>`;
@@ -483,6 +483,16 @@ if (navigator.geolocation) {
     maximumAge: 5000,
   });
 }
+
+/* ═══════════════════════════════════════════
+   POPUP BUTTON HANDLER (event delegation)
+═══════════════════════════════════════════ */
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.bp-enter');
+  if (btn && btn.dataset.url) {
+    window.location.href = btn.dataset.url;
+  }
+});
 
 /* ═══════════════════════════════════════════
    STATS
