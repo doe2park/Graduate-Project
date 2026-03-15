@@ -3,136 +3,122 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimes MEP · Digital Twin</title>
+<title>Grimes MEP · XR Walkthrough</title>
 <style>
-  :root { --cyan:#2dd4bf; --bg:#0a0e1a; --panel:rgba(10,14,26,0.92); --border:rgba(45,212,191,0.15); }
+  :root { --cyan: #2dd4bf; --bg: #0a0e1a; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:#e2e8f0; font-family:system-ui,sans-serif; overflow:hidden; }
+  body { background: var(--bg); color: #e2e8f0; font-family: system-ui, sans-serif; overflow: hidden; }
 
-  #loading { position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);z-index:100;font-size:18px;gap:16px; }
-  .spinner { width:48px;height:48px;border:3px solid #334155;border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite; }
-  @keyframes spin { to{transform:rotate(360deg)} }
+  #loading {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; background: var(--bg); z-index: 100;
+    font-size: 18px; gap: 16px;
+  }
+  .spinner { width: 48px; height: 48px; border: 3px solid #334155;
+    border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  #enterXR { position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--cyan);color:#000;font-weight:800;font-size:20px;padding:18px 48px;border:none;border-radius:16px;cursor:pointer;box-shadow:0 6px 32px rgba(45,212,191,.5);z-index:50;display:none; }
+  /* VR Button - huge and obvious */
+  #enterXR {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: var(--cyan); color: #000; font-weight: 800; font-size: 22px;
+    padding: 20px 56px; border: none; border-radius: 16px; cursor: pointer;
+    box-shadow: 0 6px 32px rgba(45,212,191,0.5); z-index: 50; display: none;
+    letter-spacing: 0.5px;
+  }
+  #enterXR:hover { filter: brightness(1.1); transform: translateX(-50%) scale(1.03); }
 
-  /* ── Top Bar ── */
-  #topbar { position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);backdrop-filter:blur(12px);border-bottom:1px solid var(--border); }
-  #topbar h1 { font-size:15px;color:var(--cyan);flex:1;white-space:nowrap; }
-  .view-btn { background:rgba(45,212,191,.08);border:1px solid var(--border);color:#94a3b8;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:600; }
-  .view-btn.active { background:var(--cyan);color:#000;border-color:var(--cyan); }
+  /* Info panel */
+  #info {
+    position: fixed; top: 12px; left: 12px; z-index: 50;
+    background: rgba(10,14,26,0.88); padding: 14px 18px; border-radius: 12px;
+    font-size: 13px; backdrop-filter: blur(10px); border: 1px solid rgba(45,212,191,0.2);
+    max-width: 360px;
+  }
+  #info h2 { font-size: 16px; color: var(--cyan); margin-bottom: 4px; }
+  #status { margin-bottom: 6px; }
+  .ctrl-hint { font-size: 11px; color: #64748b; line-height: 1.5; }
+  .ctrl-hint b { color: #94a3b8; }
 
-  /* ── Legend ── */
-  #legend { position:fixed;top:52px;left:12px;z-index:50;background:var(--panel);padding:12px 14px;border-radius:10px;backdrop-filter:blur(10px);border:1px solid var(--border);max-width:200px;font-size:11px; }
-  #legend h3 { font-size:12px;color:var(--cyan);margin-bottom:8px; }
-  .sys-row { display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;user-select:none;transition:opacity .2s; }
-  .sys-row:hover { opacity:.8; } .sys-row.off { opacity:.25;text-decoration:line-through; }
-  .sys-dot { width:12px;height:12px;border-radius:3px;flex-shrink:0;border:1px solid rgba(255,255,255,.15); }
-  .sys-name { flex:1;font-size:11px; } .sys-count { color:#475569;font-size:10px; }
+  /* On-screen joystick for mobile/Quest browser */
+  .joystick-zone {
+    position: fixed; bottom: 20px; z-index: 40; width: 120px; height: 120px;
+    border-radius: 50%; background: rgba(45,212,191,0.08);
+    border: 2px solid rgba(45,212,191,0.2);
+    touch-action: none;
+  }
+  #joystickMove { left: 30px; }
+  #joystickLook { right: 30px; }
+  .joystick-knob {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(45,212,191,0.5); border: 2px solid var(--cyan);
+    pointer-events: none;
+  }
+  .joystick-label {
+    position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;
+    white-space: nowrap;
+  }
 
-  /* ── Dashboard ── */
-  #dashboard { position:fixed;top:52px;right:14px;z-index:50;background:var(--panel);padding:12px 14px;border-radius:10px;backdrop-filter:blur(10px);border:1px solid var(--border);width:200px; }
-  #dashboard h3 { font-size:12px;color:var(--cyan);margin-bottom:8px; }
-  .stat-row { display:flex;justify-content:space-between;padding:3px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.04); }
-  .stat-label { color:#64748b; } .stat-val { font-weight:600;font-variant-numeric:tabular-nums; }
-  .stat-val.warn { color:#fb923c; } .stat-val.ok { color:var(--cyan); } .stat-val.crit { color:#f87171; }
-
-  /* ── Click Detail Panel ── */
-  #detailPanel { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--panel);padding:16px 24px;border-radius:14px;backdrop-filter:blur(12px);border:1px solid var(--border);z-index:55;display:none;min-width:320px;max-width:420px; }
-  .dp-header { display:flex;align-items:center;gap:10px;margin-bottom:10px; }
-  .dp-tag { padding:4px 12px;border-radius:6px;font-weight:700;font-size:12px;color:#000; }
-  .dp-title { font-size:14px;font-weight:600; }
-  .dp-floor { font-size:11px;color:#64748b; }
-  .dp-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px; }
-  .dp-sensor { background:rgba(255,255,255,.03);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.05); }
-  .dp-sensor-label { font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.5px; }
-  .dp-sensor-val { font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px; }
-  .dp-sensor-unit { font-size:10px;color:#64748b;font-weight:400; }
-  .dp-close { position:absolute;top:8px;right:12px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px; }
-
-  /* ── Heatmap Legend ── */
-  #heatLegend { position:fixed;bottom:90px;right:14px;z-index:50;background:var(--panel);padding:10px 12px;border-radius:10px;border:1px solid var(--border);display:none;font-size:10px; }
-  .heat-bar { width:120px;height:12px;border-radius:4px;margin:4px 0; }
-  .heat-labels { display:flex;justify-content:space-between;font-size:9px;color:#64748b; }
-
-  /* ── Joysticks / Floor Nav (same as before) ── */
-  .joystick-zone { position:fixed;bottom:20px;z-index:40;width:100px;height:100px;border-radius:50%;background:rgba(45,212,191,.06);border:2px solid rgba(45,212,191,.12);touch-action:none; }
-  #joystickMove { left:24px; } #joystickLook { right:24px; }
-  .joystick-knob { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:rgba(45,212,191,.35);border:2px solid var(--cyan);pointer-events:none; }
-  .joystick-label { position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:1px; }
-
-  #floorNav { position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:40;display:flex;flex-direction:column;gap:4px; }
-  .fl-btn { background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.15);color:#64748b;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;text-align:center; }
-  .fl-btn.active { background:var(--cyan);color:#000;border-color:var(--cyan); }
-
-  #ctrlHint { position:fixed;bottom:8px;left:12px;z-index:40;font-size:9px;color:#334155;line-height:1.4; }
+  /* Floor indicator */
+  #floorIndicator {
+    position: fixed; right: 16px; top: 50%; transform: translateY(-50%); z-index: 40;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .floor-btn {
+    background: rgba(45,212,191,0.1); border: 1px solid rgba(45,212,191,0.2);
+    color: #94a3b8; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    font-size: 12px; font-weight: 600; text-align: center; min-width: 50px;
+  }
+  .floor-btn.active { background: var(--cyan); color: #000; border-color: var(--cyan); }
 </style>
 </head>
 <body>
-<div id="loading"><div class="spinner"></div><div id="loadText">Loading MEP...</div></div>
 
-<!-- Top Bar -->
-<div id="topbar">
-  <h1>🏢 Grimes Building · Digital Twin</h1>
-  <button class="view-btn active" data-mode="system">System</button>
-  <button class="view-btn" data-mode="temp">🌡️ Temp</button>
-  <button class="view-btn" data-mode="flow">💧 Flow</button>
-  <button class="view-btn" data-mode="energy">⚡ Energy</button>
+<div id="loading">
+  <div class="spinner"></div>
+  <div id="loadText">Loading MEP model...</div>
 </div>
 
-<!-- Legend -->
-<div id="legend"><h3>MEP Systems</h3><div id="systemList"></div></div>
-
-<!-- Dashboard -->
-<div id="dashboard">
-  <h3>Building Status</h3>
-  <div class="stat-row"><span class="stat-label">Outdoor Temp</span><span class="stat-val" id="dOutTemp">72°F</span></div>
-  <div class="stat-row"><span class="stat-label">CHW Supply</span><span class="stat-val ok" id="dCHW">42°F</span></div>
-  <div class="stat-row"><span class="stat-label">CHW Return</span><span class="stat-val" id="dCHWR">54°F</span></div>
-  <div class="stat-row"><span class="stat-label">HW Supply</span><span class="stat-val warn" id="dHW">145°F</span></div>
-  <div class="stat-row"><span class="stat-label">Total Flow</span><span class="stat-val ok" id="dFlow">1,240 GPM</span></div>
-  <div class="stat-row"><span class="stat-label">Energy Now</span><span class="stat-val" id="dEnergy">87 kW</span></div>
-  <div class="stat-row"><span class="stat-label">Alerts</span><span class="stat-val crit" id="dAlerts">2 active</span></div>
-  <div style="margin-top:8px;font-size:9px;color:#334155">SIM — simulated data</div>
-</div>
-
-<!-- Detail Panel -->
-<div id="detailPanel">
-  <button class="dp-close" id="dpClose">✕</button>
-  <div class="dp-header">
-    <div class="dp-tag" id="dpTag">—</div>
-    <div><div class="dp-title" id="dpTitle">—</div><div class="dp-floor" id="dpFloor">—</div></div>
+<div id="info">
+  <h2>Grimes Building · MEP Walkthrough</h2>
+  <div id="status">Loading...</div>
+  <div class="ctrl-hint" id="ctrlHint">
+    <b>Mouse:</b> Drag rotate · Scroll zoom · Right-drag pan<br>
+    <b>Keys:</b> WASD move · QE up/down · Arrows look<br>
+    <b>Touch:</b> Use on-screen joysticks
   </div>
-  <div class="dp-grid" id="dpSensors"></div>
 </div>
 
-<!-- Heatmap Legend -->
-<div id="heatLegend">
-  <div id="heatTitle">Temperature</div>
-  <div class="heat-bar" id="heatBar"></div>
-  <div class="heat-labels"><span id="heatMin">40°F</span><span id="heatMax">160°F</span></div>
-</div>
-
-<!-- Floor Nav -->
-<div id="floorNav">
-  <button class="fl-btn" data-y="17">SRV</button>
-  <button class="fl-btn" data-y="13">L3</button>
-  <button class="fl-btn" data-y="9">L2</button>
-  <button class="fl-btn" data-y="5">L1</button>
-  <button class="fl-btn active" data-y="1.6">B1</button>
-</div>
-
-<!-- Joysticks -->
-<div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
-<div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
-
-<div id="ctrlHint">WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
+<!-- On-screen joysticks for Quest browser / mobile -->
+<div class="joystick-zone" id="joystickMove">
+  <div class="joystick-label">Move</div>
+  <div class="joystick-knob" id="moveKnob"></div>
+</div>
+<div class="joystick-zone" id="joystickLook">
+  <div class="joystick-label">Look</div>
+  <div class="joystick-knob" id="lookKnob"></div>
+</div>
+
+<!-- Floor quick-nav -->
+<div id="floorIndicator">
+  <button class="floor-btn" data-y="16">SRV</button>
+  <button class="floor-btn" data-y="12">L3</button>
+  <button class="floor-btn" data-y="8">L2</button>
+  <button class="floor-btn" data-y="4" >L1</button>
+  <button class="floor-btn active" data-y="1.6">B1</button>
+</div>
+
 <script type="importmap">
-{ "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-}}
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
 </script>
 
 <script type="module">
@@ -142,43 +128,10 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-/* ══════════════════════════════════════════
-   SYSTEM + SENSOR DATA
-══════════════════════════════════════════ */
-const SYSTEM_INFO = [
-  { id:'hvac_duct',  label:'HVAC Ductwork',    color:'#2dd4bf', hex:0x2dd4bf },
-  { id:'hvac_equip', label:'HVAC Equipment',    color:'#1ab3a6', hex:0x1ab3a6 },
-  { id:'pipe',       label:'Plumbing / Piping', color:'#38bdf8', hex:0x38bdf8 },
-  { id:'sprinkler',  label:'Fire Protection',   color:'#fb923c', hex:0xfb923c },
-  { id:'conduit',    label:'Electrical',        color:'#f59e0b', hex:0xf59e0b },
-  { id:'diffuser',   label:'Diffusers / Grilles', color:'#80f2cc', hex:0x80f2cc },
-  { id:'pump',       label:'Pumps / Valves',    color:'#67d9f2', hex:0x67d9f2 },
-  { id:'spiral',     label:'Spiral Ductwork',   color:'#4de6cc', hex:0x4de6cc },
-];
-
-// Simulated sensor data per system — will be replaced with real BMS data
-const SIM_DATA = {
-  hvac_duct:  { temp:{ val:55, unit:'°F', label:'Supply Air' },    flow:{ val:2400, unit:'CFM', label:'Airflow' },   energy:{ val:12.4, unit:'kW', label:'Fan Power' },   pressure:{ val:1.2, unit:'inWC', label:'Static P' } },
-  hvac_equip: { temp:{ val:42, unit:'°F', label:'CHW Supply' },    flow:{ val:320, unit:'GPM', label:'CHW Flow' },   energy:{ val:45.0, unit:'kW', label:'Chiller' },     status:{ val:'Running', unit:'', label:'Status' } },
-  pipe:       { temp:{ val:48, unit:'°F', label:'Water Temp' },    flow:{ val:150, unit:'GPM', label:'Flow Rate' },  energy:{ val:8.2, unit:'kW', label:'Pump Power' },   pressure:{ val:65, unit:'PSI', label:'Pressure' } },
-  sprinkler:  { temp:{ val:70, unit:'°F', label:'Ambient' },       flow:{ val:0, unit:'GPM', label:'Flow (idle)' },  energy:{ val:0, unit:'kW', label:'Standby' },        pressure:{ val:120, unit:'PSI', label:'Line P' } },
-  conduit:    { temp:{ val:78, unit:'°F', label:'Cable Temp' },    flow:{ val:0, unit:'', label:'—' },               energy:{ val:87, unit:'kW', label:'Total Load' },     current:{ val:240, unit:'A', label:'Current' } },
-  diffuser:   { temp:{ val:55, unit:'°F', label:'Discharge' },     flow:{ val:350, unit:'CFM', label:'Airflow' },    energy:{ val:0, unit:'', label:'—' },                 co2:{ val:620, unit:'ppm', label:'CO₂ Level' } },
-  pump:       { temp:{ val:52, unit:'°F', label:'Fluid Temp' },    flow:{ val:280, unit:'GPM', label:'Flow' },       energy:{ val:15.5, unit:'kW', label:'Motor kW' },     speed:{ val:1760, unit:'RPM', label:'Speed' } },
-  spiral:     { temp:{ val:55, unit:'°F', label:'Supply Air' },    flow:{ val:1800, unit:'CFM', label:'Airflow' },   energy:{ val:5.2, unit:'kW', label:'Fan Power' },     pressure:{ val:0.8, unit:'inWC', label:'Static P' } },
-};
-
-// Heatmap ranges
-const HEAT_RANGES = {
-  temp:   { min:40, max:160, unit:'°F', label:'Temperature',  gradient:'linear-gradient(90deg, #38bdf8, #2dd4bf, #f59e0b, #fb923c, #f87171)' },
-  flow:   { min:0,  max:2500, unit:'',   label:'Flow Rate',    gradient:'linear-gradient(90deg, #1e293b, #38bdf8, #2dd4bf, #22d3ee)' },
-  energy: { min:0,  max:100,  unit:'kW', label:'Energy Load',  gradient:'linear-gradient(90deg, #22c55e, #f59e0b, #f87171)' },
-};
-
-let viewMode = 'system'; // 'system' | 'temp' | 'flow' | 'energy'
-
-/* ══════════════════════════════════════════ RENDERER ══════════════════════════════════════════ */
-const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+/* ═══════════════════════════════════════════
+   RENDERER
+═══════════════════════════════════════════ */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setClearColor(0x0a0e1a, 1);
@@ -187,363 +140,470 @@ renderer.toneMappingExposure = 2.2;
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-/* ══════════════════════════════════════════ SCENE ══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   SCENE
+═══════════════════════════════════════════ */
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0e1a, 0.006);
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 300);
-camera.position.set(0, 6, 0);
-const orbitControls = new OrbitControls(camera, renderer.domElement);
-orbitControls.enableDamping = true; orbitControls.dampingFactor = 0.1;
-orbitControls.target.set(0, 6, -5);
+scene.fog = new THREE.FogExp2(0x0a0e1a, 0.008);
 
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 300);
+camera.position.set(0, 6, 0); // start inside building, L1 eye level
+
+// Orbit controls for mouse/touch (initial exploration)
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+orbitControls.enableDamping = true;
+orbitControls.dampingFactor = 0.1;
+orbitControls.target.set(0, 6, -5);
+orbitControls.maxDistance = 100;
+orbitControls.minDistance = 0.5;
+
+/* ── Lights ── */
 scene.add(new THREE.AmbientLight(0xffffff, 2.0));
-const sun = new THREE.DirectionalLight(0xffffff, 3.0); sun.position.set(30,50,20); scene.add(sun);
+const sun = new THREE.DirectionalLight(0xffffff, 3.0);
+sun.position.set(30, 50, 20); scene.add(sun);
 scene.add(new THREE.DirectionalLight(0xaaccff, 2.0).translateX(-30).translateY(20));
 scene.add(new THREE.DirectionalLight(0xffeedd, 1.5).translateZ(30).translateY(-10));
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.5));
 
-const grid = new THREE.GridHelper(80,40,0x2dd4bf,0x1a2535);
-grid.material.opacity=0.12; grid.material.transparent=true; scene.add(grid);
-const floorMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,opacity:0.03,side:THREE.DoubleSide});
-[0,4,8,12,16].forEach(y=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(70,55),floorMat);p.rotation.x=-Math.PI/2;p.position.y=y;scene.add(p);});
+/* ── Reference grid + floor planes ── */
+const grid = new THREE.GridHelper(80, 40, 0x2dd4bf, 0x1a2535);
+grid.material.opacity = 0.15; grid.material.transparent = true;
+scene.add(grid);
 
-/* ══════════════════════════════════════════ LOAD MODEL ══════════════════════════════════════════ */
+const floorMat = new THREE.MeshBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.04, side: THREE.DoubleSide });
+[0, 4, 8, 12, 16].forEach(y => {
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(70, 55), floorMat);
+  p.rotation.x = -Math.PI / 2; p.position.y = y; scene.add(p);
+});
+
+/* ═══════════════════════════════════════════
+   LOAD MEP MODEL
+═══════════════════════════════════════════ */
 const loadingEl = document.getElementById('loadText');
+const statusEl = document.getElementById('status');
 const allMeshes = [];
-const systemMeshes = [];
-const systemVisible = new Array(8).fill(true);
-const originalMaterials = new Map();
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
-const gltfLoader = new GLTFLoader(); gltfLoader.setDRACOLoader(dracoLoader);
+const loader = new GLTFLoader();
+loader.setDRACOLoader(dracoLoader);
 
-gltfLoader.load('grimes-mep-only.glb', (gltf) => {
-  scene.add(gltf.scene);
-  let meshIdx = 0;
-  gltf.scene.traverse(child => {
-    if (!child.isMesh) return;
-    allMeshes.push(child);
-    const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length-1);
-    const sys = SYSTEM_INFO[sysIdx];
-    const mat = new THREE.MeshStandardMaterial({ color:sys.hex, emissive:sys.hex, emissiveIntensity:0.35, metalness:0.3, roughness:0.4, side:THREE.DoubleSide });
-    child.material = mat;
-    child.userData.sysIndex = sysIdx;
-    child.userData.sysId = sys.id;
-    child.userData.sysLabel = sys.label;
-    originalMaterials.set(child.uuid, mat);
-    systemMeshes.push({ mesh:child, sysIndex:sysIdx });
-    meshIdx++;
-  });
-  document.getElementById('loading').style.display = 'none';
-  buildLegend();
-  startSimulation();
-  setupXR();
-}, p => { loadingEl.textContent = `Loading MEP... ${(p.loaded/1024/1024).toFixed(1)} MB`; },
-() => { loadingEl.textContent = 'Error'; loadingEl.style.color = '#f87171'; });
+loader.load('grimes-mep-only.glb', (gltf) => {
+  const model = gltf.scene;
+  scene.add(model);
 
-/* ══════════════════════════════════════════ HEATMAP COLORING ══════════════════════════════════════════ */
-function tempToColor(t) {
-  // 40°F=blue → 70°F=cyan → 100°F=yellow → 130°F=orange → 160°F=red
-  const n = Math.max(0, Math.min(1, (t - 40) / 120));
-  const r = n < 0.5 ? n * 2 : 1;
-  const g = n < 0.25 ? 0.5 + n * 2 : n < 0.75 ? 1 : 1 - (n - 0.75) * 4;
-  const b = n < 0.25 ? 1 : Math.max(0, 1 - (n - 0.25) * 2);
-  return new THREE.Color(r, Math.max(0, g), Math.max(0, b));
-}
-
-function flowToColor(f) {
-  const n = Math.max(0, Math.min(1, f / 2500));
-  return new THREE.Color(n * 0.2, 0.3 + n * 0.5, 0.5 + n * 0.5);
-}
-
-function energyToColor(e) {
-  const n = Math.max(0, Math.min(1, e / 100));
-  if (n < 0.5) return new THREE.Color(0.13 + n, 0.77 - n * 0.3, 0.22);
-  return new THREE.Color(0.97, 0.62 - (n - 0.5) * 1.2, 0.04 + (n - 0.5) * 0.6);
-}
-
-function applyViewMode() {
-  const hl = document.getElementById('heatLegend');
-
-  if (viewMode === 'system') {
-    hl.style.display = 'none';
-    systemMeshes.forEach(sm => {
-      sm.mesh.material = originalMaterials.get(sm.mesh.uuid);
-    });
-    return;
-  }
-
-  const range = HEAT_RANGES[viewMode];
-  document.getElementById('heatTitle').textContent = range.label;
-  document.getElementById('heatBar').style.background = range.gradient;
-  document.getElementById('heatMin').textContent = range.min + range.unit;
-  document.getElementById('heatMax').textContent = range.max + range.unit;
-  hl.style.display = 'block';
-
-  systemMeshes.forEach(sm => {
-    const sysId = SYSTEM_INFO[sm.sysIndex].id;
-    const data = SIM_DATA[sysId];
-    let color;
-
-    if (viewMode === 'temp' && data.temp) {
-      color = tempToColor(data.temp.val);
-    } else if (viewMode === 'flow' && data.flow) {
-      color = flowToColor(data.flow.val);
-    } else if (viewMode === 'energy' && data.energy) {
-      color = energyToColor(data.energy.val);
-    } else {
-      color = new THREE.Color(0x333333);
-    }
-
-    sm.mesh.material = new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 0.4,
-      metalness: 0.2, roughness: 0.4, side: THREE.DoubleSide
-    });
-  });
-}
-
-// View mode buttons
-document.getElementById('topbar').addEventListener('click', e => {
-  const btn = e.target.closest('.view-btn');
-  if (!btn) return;
-  viewMode = btn.dataset.mode;
-  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b === btn));
-  applyViewMode();
-});
-
-/* ══════════════════════════════════════════ SIMULATION ══════════════════════════════════════════ */
-function startSimulation() {
-  setInterval(() => {
-    // Fluctuate sensor values
-    for (const [sysId, data] of Object.entries(SIM_DATA)) {
-      for (const [key, sensor] of Object.entries(data)) {
-        if (typeof sensor.val === 'number' && sensor.val > 0) {
-          sensor.val += (Math.random() - 0.5) * sensor.val * 0.02;
-          sensor.val = Math.round(sensor.val * 10) / 10;
-        }
+  let meshCount = 0;
+  model.traverse(child => {
+    if (child.isMesh) {
+      meshCount++;
+      allMeshes.push(child);
+      // Ensure emissive for VR visibility
+      if (child.material) {
+        child.material.emissive = child.material.color.clone();
+        child.material.emissiveIntensity = 0.3;
+        child.material.side = THREE.DoubleSide;
       }
     }
-
-    // Update dashboard
-    document.getElementById('dOutTemp').textContent = Math.round(68 + Math.random() * 8) + '°F';
-    document.getElementById('dCHW').textContent = SIM_DATA.hvac_equip.temp.val.toFixed(0) + '°F';
-    document.getElementById('dCHWR').textContent = (SIM_DATA.hvac_equip.temp.val + 12).toFixed(0) + '°F';
-    document.getElementById('dHW').textContent = Math.round(140 + Math.random() * 10) + '°F';
-    document.getElementById('dFlow').textContent = Math.round(SIM_DATA.pipe.flow.val + SIM_DATA.pump.flow.val + SIM_DATA.hvac_equip.flow.val).toLocaleString() + ' GPM';
-    document.getElementById('dEnergy').textContent = SIM_DATA.conduit.energy.val.toFixed(0) + ' kW';
-
-    // Re-apply heatmap if active
-    if (viewMode !== 'system') applyViewMode();
-  }, 2000);
-}
-
-/* ══════════════════════════════════════════ LEGEND ══════════════════════════════════════════ */
-function buildLegend() {
-  const list = document.getElementById('systemList');
-  const counts = {};
-  systemMeshes.forEach(sm => {
-    const fc = sm.mesh.geometry.index ? sm.mesh.geometry.index.count / 3 : 0;
-    counts[sm.sysIndex] = (counts[sm.sysIndex] || 0) + fc;
   });
-  SYSTEM_INFO.forEach((sys, i) => {
-    if (!counts[i]) return;
-    const row = document.createElement('div'); row.className = 'sys-row'; row.dataset.idx = i;
-    row.innerHTML = `<div class="sys-dot" style="background:${sys.color}"></div><span class="sys-name">${sys.label}</span><span class="sys-count">${Math.round(counts[i]/1000)}K</span>`;
-    row.addEventListener('click', () => { systemVisible[i] = !systemVisible[i]; row.classList.toggle('off', !systemVisible[i]);
-      systemMeshes.forEach(sm => { if (sm.sysIndex === i) sm.mesh.visible = systemVisible[i]; }); });
-    list.appendChild(row);
-  });
-}
 
-/* ══════════════════════════════════════════ CLICK DETAIL ══════════════════════════════════════════ */
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const detailPanel = document.getElementById('detailPanel');
-let highlightedMesh = null;
+  document.getElementById('loading').style.display = 'none';
+  statusEl.textContent = `${meshCount} MEP meshes · Use joysticks or WASD to explore`;
+  setupXR();
 
-document.getElementById('dpClose').addEventListener('click', () => {
-  detailPanel.style.display = 'none';
-  if (highlightedMesh) { highlightedMesh.material = originalMaterials.get(highlightedMesh.uuid) || highlightedMesh.material; highlightedMesh = null; }
+}, (progress) => {
+  const mb = (progress.loaded / 1024 / 1024).toFixed(1);
+  loadingEl.textContent = `Loading MEP... ${mb} MB`;
+}, () => {
+  loadingEl.textContent = 'Error loading model';
+  loadingEl.style.color = '#f87171';
 });
 
-renderer.domElement.addEventListener('click', e => {
-  if (e.target !== renderer.domElement) return;
+/* ═══════════════════════════════════════════
+   FIRST-PERSON KEYBOARD CONTROLS (WASD)
+═══════════════════════════════════════════ */
+const keys = {};
+const moveDir = new THREE.Vector3();
+const FP_SPEED = 0.15;
+let firstPersonMode = false;
+
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  // Switch to first-person on WASD press
+  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE'].includes(e.code)) {
+    if (!firstPersonMode) {
+      firstPersonMode = true;
+      orbitControls.enabled = false;
+      renderer.domElement.requestPointerLock?.();
+    }
+  }
+  if (e.code === 'Escape') {
+    firstPersonMode = false;
+    orbitControls.enabled = true;
+    document.exitPointerLock?.();
+  }
+});
+window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+// Mouse look in first-person mode
+document.addEventListener('mousemove', (e) => {
+  if (!firstPersonMode || !document.pointerLockElement) return;
+  camera.rotation.y -= e.movementX * 0.002;
+  camera.rotation.x -= e.movementY * 0.002;
+  camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+});
+
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement) {
+    firstPersonMode = false;
+    orbitControls.enabled = true;
+  }
+});
+
+function updateFirstPerson() {
+  if (!firstPersonMode) return;
+  
+  moveDir.set(0, 0, 0);
+  if (keys['KeyW']) moveDir.z -= 1;
+  if (keys['KeyS']) moveDir.z += 1;
+  if (keys['KeyA']) moveDir.x -= 1;
+  if (keys['KeyD']) moveDir.x += 1;
+  if (keys['KeyQ']) moveDir.y -= 1;
+  if (keys['KeyE']) moveDir.y += 1;
+
+  if (moveDir.length() > 0) {
+    moveDir.normalize().multiplyScalar(FP_SPEED);
+    // Rotate movement by camera yaw only
+    const yaw = camera.rotation.y;
+    const sin = Math.sin(yaw), cos = Math.cos(yaw);
+    const mx = moveDir.x * cos - moveDir.z * sin;
+    const mz = moveDir.x * sin + moveDir.z * cos;
+    camera.position.x += mx;
+    camera.position.y += moveDir.y * FP_SPEED;
+    camera.position.z += mz;
+  }
+
+  // Arrow keys for looking
+  if (keys['ArrowLeft']) camera.rotation.y += 0.02;
+  if (keys['ArrowRight']) camera.rotation.y -= 0.02;
+  if (keys['ArrowUp']) camera.rotation.x += 0.02;
+  if (keys['ArrowDown']) camera.rotation.x -= 0.02;
+}
+
+/* ═══════════════════════════════════════════
+   ON-SCREEN JOYSTICKS (Quest browser / mobile)
+═══════════════════════════════════════════ */
+const joystickState = { move: {x:0, y:0}, look: {x:0, y:0} };
+
+function setupJoystick(zoneId, knobId, stateKey) {
+  const zone = document.getElementById(zoneId);
+  const knob = document.getElementById(knobId);
+  let active = false;
+  const rect = { cx: 0, cy: 0, r: 50 };
+
+  function start(e) {
+    e.preventDefault();
+    active = true;
+    const touch = e.touches ? e.touches[0] : e;
+    const box = zone.getBoundingClientRect();
+    rect.cx = box.left + box.width / 2;
+    rect.cy = box.top + box.height / 2;
+    update(touch);
+  }
+
+  function update(e) {
+    if (!active) return;
+    const touch = e.touches ? e.touches[0] : e;
+    let dx = (touch.clientX - rect.cx) / rect.r;
+    let dy = (touch.clientY - rect.cy) / rect.r;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len > 1) { dx /= len; dy /= len; }
+    joystickState[stateKey].x = dx;
+    joystickState[stateKey].y = dy;
+    knob.style.transform = `translate(calc(-50% + ${dx*30}px), calc(-50% + ${dy*30}px))`;
+  }
+
+  function end() {
+    active = false;
+    joystickState[stateKey].x = 0;
+    joystickState[stateKey].y = 0;
+    knob.style.transform = 'translate(-50%, -50%)';
+  }
+
+  zone.addEventListener('touchstart', start, { passive: false });
+  zone.addEventListener('touchmove', (e) => { e.preventDefault(); update(e); }, { passive: false });
+  zone.addEventListener('touchend', end);
+  zone.addEventListener('touchcancel', end);
+  // Mouse fallback
+  zone.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', (e) => { if (active) update(e); });
+  window.addEventListener('mouseup', () => { if (active) end(); });
+}
+
+setupJoystick('joystickMove', 'moveKnob', 'move');
+setupJoystick('joystickLook', 'lookKnob', 'look');
+
+function updateJoystickMovement() {
+  const { move, look } = joystickState;
+  if (Math.abs(move.x) > 0.1 || Math.abs(move.y) > 0.1) {
+    if (!firstPersonMode) {
+      firstPersonMode = true;
+      orbitControls.enabled = false;
+    }
+    const yaw = camera.rotation.y;
+    const sin = Math.sin(yaw), cos = Math.cos(yaw);
+    const speed = FP_SPEED * 0.7;
+    camera.position.x += (move.x * cos - (-move.y) * sin) * speed;
+    camera.position.z += (move.x * sin + (-move.y) * cos) * speed;
+  }
+  if (Math.abs(look.x) > 0.1 || Math.abs(look.y) > 0.1) {
+    if (!firstPersonMode) {
+      firstPersonMode = true;
+      orbitControls.enabled = false;
+    }
+    camera.rotation.y -= look.x * 0.03;
+    camera.rotation.x -= look.y * 0.02;
+    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+  }
+}
+
+/* ═══════════════════════════════════════════
+   FLOOR QUICK-NAV
+═══════════════════════════════════════════ */
+document.getElementById('floorIndicator').addEventListener('click', (e) => {
+  const btn = e.target.closest('.floor-btn');
+  if (!btn) return;
+  const y = parseFloat(btn.dataset.y);
+  camera.position.y = y;
+  document.querySelectorAll('.floor-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (!firstPersonMode) {
+    firstPersonMode = true;
+    orbitControls.enabled = false;
+  }
+});
+
+/* ═══════════════════════════════════════════
+   RAYCASTER — click/touch to inspect MEP
+═══════════════════════════════════════════ */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let highlightedMesh = null;
+const defaultMats = new Map();
+
+renderer.domElement.addEventListener('click', (e) => {
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
+  
   const hits = raycaster.intersectObjects(allMeshes, false);
-
-  if (highlightedMesh) {
-    highlightedMesh.material = originalMaterials.get(highlightedMesh.uuid) || highlightedMesh.material;
-    if (viewMode !== 'system') applyViewMode();
+  
+  // Restore previous
+  if (highlightedMesh && defaultMats.has(highlightedMesh.uuid)) {
+    highlightedMesh.material = defaultMats.get(highlightedMesh.uuid);
   }
-
+  
   if (hits.length > 0) {
     const mesh = hits[0].object;
-    const point = hits[0].point;
-    const sysIdx = mesh.userData.sysIndex ?? 0;
-    const sys = SYSTEM_INFO[sysIdx];
-    const sysId = sys.id;
-    const data = SIM_DATA[sysId];
-
+    defaultMats.set(mesh.uuid, mesh.material);
     highlightedMesh = mesh;
-    mesh.material = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xffffff, emissiveIntensity:0.7, metalness:0.1, roughness:0.2, side:THREE.DoubleSide });
+    
+    mesh.material = new THREE.MeshStandardMaterial({
+      color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8,
+      metalness: 0.1, roughness: 0.3, side: THREE.DoubleSide
+    });
 
+    const p = hits[0].point;
     let floor = 'B1';
-    if (point.y > 3) floor = 'L1'; if (point.y > 7) floor = 'L2';
-    if (point.y > 11) floor = 'L3'; if (point.y > 15) floor = 'SRV';
+    if (p.y > 3) floor = 'L1';
+    if (p.y > 7) floor = 'L2';
+    if (p.y > 11) floor = 'L3';
+    if (p.y > 15) floor = 'SRV';
+    
+    const name = mesh.name || mesh.parent?.name || 'MEP Element';
+    statusEl.textContent = `${name} · Floor ${floor} · Y=${p.y.toFixed(1)}m`;
+  }
+});
 
-    document.getElementById('dpTag').textContent = sys.label;
-    document.getElementById('dpTag').style.background = sys.color;
-    document.getElementById('dpTitle').textContent = sys.label;
-    document.getElementById('dpFloor').textContent = `Floor ${floor} · Height ${point.y.toFixed(1)}m · (${point.x.toFixed(1)}, ${point.z.toFixed(1)})`;
+/* ═══════════════════════════════════════════
+   XR CONTROLLERS + SESSION
+═══════════════════════════════════════════ */
+const xrRay = new THREE.Raycaster();
+const tmpMat = new THREE.Matrix4();
 
-    const sensorsEl = document.getElementById('dpSensors');
-    sensorsEl.innerHTML = '';
-    for (const [key, sensor] of Object.entries(data)) {
-      if (key === 'status') {
-        sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">${sensor.label}</div><div class="dp-sensor-val" style="color:var(--cyan)">${sensor.val}</div></div>`;
-      } else if (sensor.val > 0) {
-        const valColor = key === 'temp' ? (sensor.val > 100 ? '#fb923c' : sensor.val < 50 ? '#38bdf8' : '#2dd4bf') :
-                         key === 'energy' ? (sensor.val > 50 ? '#fb923c' : '#2dd4bf') : '#e2e8f0';
-        sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">${sensor.label}</div><div class="dp-sensor-val" style="color:${valColor}">${typeof sensor.val === 'number' ? sensor.val.toFixed(1) : sensor.val} <span class="dp-sensor-unit">${sensor.unit}</span></div></div>`;
+const c0 = renderer.xr.getController(0);
+c0.addEventListener('selectstart', onXRSelect);
+scene.add(c0);
+const c1 = renderer.xr.getController(1);
+c1.addEventListener('selectstart', onXRSelect);
+scene.add(c1);
+
+function makeRay() {
+  const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-20)]);
+  return new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x00ffff }));
+}
+c0.add(makeRay());
+c1.add(makeRay());
+
+const factory = new XRControllerModelFactory();
+const g0 = renderer.xr.getControllerGrip(0);
+g0.add(factory.createControllerModel(g0));
+scene.add(g0);
+const g1 = renderer.xr.getControllerGrip(1);
+g1.add(factory.createControllerModel(g1));
+scene.add(g1);
+
+const hitDot = new THREE.Mesh(
+  new THREE.SphereGeometry(0.12, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xff3333 })
+);
+hitDot.visible = false;
+scene.add(hitDot);
+
+function onXRSelect(event) {
+  const ctrl = event.target;
+  tmpMat.identity().extractRotation(ctrl.matrixWorld);
+  xrRay.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+  xrRay.ray.direction.set(0, 0, -1).applyMatrix4(tmpMat);
+  const hits = xrRay.intersectObjects(allMeshes, false);
+  if (hits.length > 0) {
+    hitDot.position.copy(hits[0].point);
+    hitDot.visible = true;
+  }
+}
+
+/* ── XR Session ── */
+let xrSession = null;
+
+async function setupXR() {
+  const btn = document.getElementById('enterXR');
+  if (!navigator.xr) return;
+
+  const arOK = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
+  const vrOK = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
+  if (!arOK && !vrOK) return;
+
+  const mode = arOK ? 'immersive-ar' : 'immersive-vr';
+  btn.textContent = arOK ? '🥽 ENTER AR' : '🥽 ENTER VR';
+  btn.style.display = 'block';
+
+  btn.addEventListener('click', async () => {
+    if (xrSession) { xrSession.end(); return; }
+    try {
+      const session = await navigator.xr.requestSession(mode, {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: mode === 'immersive-ar' ? ['plane-detection','hand-tracking'] : ['hand-tracking']
+      });
+
+      renderer.setClearColor(mode === 'immersive-ar' ? 0x000000 : 0x0d1117, mode === 'immersive-ar' ? 0 : 1);
+      grid.visible = false;
+      scene.fog = null;
+
+      // Hide 2D UI elements
+      document.getElementById('joystickMove').style.display = 'none';
+      document.getElementById('joystickLook').style.display = 'none';
+      document.getElementById('floorIndicator').style.display = 'none';
+      document.getElementById('info').style.display = 'none';
+
+      renderer.xr.setReferenceSpaceType('local-floor');
+      renderer.xr.setSession(session);
+      xrSession = session;
+      btn.textContent = '✕ EXIT';
+
+      session.addEventListener('end', () => {
+        xrSession = null;
+        btn.textContent = mode === 'immersive-ar' ? '🥽 ENTER AR' : '🥽 ENTER VR';
+        renderer.setClearColor(0x0a0e1a, 1);
+        grid.visible = true;
+        scene.fog = new THREE.FogExp2(0x0a0e1a, 0.008);
+        document.getElementById('joystickMove').style.display = '';
+        document.getElementById('joystickLook').style.display = '';
+        document.getElementById('floorIndicator').style.display = '';
+        document.getElementById('info').style.display = '';
+      });
+    } catch (e) {
+      console.error('XR error:', e);
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════
+   VR LOCOMOTION (thumbstick)
+═══════════════════════════════════════════ */
+const VR_MOVE = 0.12;
+const VR_ROT = 0.025;
+
+function processVRInput() {
+  const session = renderer.xr.getSession();
+  if (!session) return;
+  const cam = renderer.xr.getCamera();
+
+  for (const src of session.inputSources) {
+    if (!src.gamepad) continue;
+    const ax = src.gamepad.axes;
+    if (ax.length < 4) continue;
+
+    if (src.handedness === 'left') {
+      const dx = ax[2], dz = ax[3];
+      if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) {
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+        fwd.y = 0; fwd.normalize();
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
+        right.y = 0; right.normalize();
+
+        const offset = new THREE.Vector3();
+        offset.addScaledVector(right, dx * VR_MOVE);
+        offset.addScaledVector(fwd, -dz * VR_MOVE);
+
+        try {
+          const ref = renderer.xr.getReferenceSpace();
+          const xform = new XRRigidTransform({ x: -offset.x, y: 0, z: -offset.z, w: 1 });
+          renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(xform));
+        } catch(e) {}
       }
     }
-    detailPanel.style.display = 'block';
-  } else {
-    detailPanel.style.display = 'none';
-    highlightedMesh = null;
-  }
-});
 
-/* ══════════════════════════════════════════ FLOOR NAV ══════════════════════════════════════════ */
-document.getElementById('floorNav').addEventListener('click', e => {
-  const btn = e.target.closest('.fl-btn'); if (!btn) return;
-  camera.position.y = parseFloat(btn.dataset.y);
-  document.querySelectorAll('.fl-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  if (!fpMode) { fpMode = true; orbitControls.enabled = false; }
-});
-
-/* ══════════════════════════════════════════ FIRST PERSON ══════════════════════════════════════════ */
-const keys = {}; let fpMode = false; const FP_SPEED = 0.15;
-window.addEventListener('keydown', e => { keys[e.code]=true;
-  if(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE'].includes(e.code)&&!fpMode){fpMode=true;orbitControls.enabled=false;renderer.domElement.requestPointerLock?.();}
-  if(e.code==='Escape'){fpMode=false;orbitControls.enabled=true;document.exitPointerLock?.();}});
-window.addEventListener('keyup', e => keys[e.code]=false);
-document.addEventListener('mousemove', e => { if(!fpMode||!document.pointerLockElement)return; camera.rotation.y-=e.movementX*.002; camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-e.movementY*.002)); });
-document.addEventListener('pointerlockchange', () => { if(!document.pointerLockElement){fpMode=false;orbitControls.enabled=true;} });
-
-function updateFP() { if(!fpMode)return; let mx=0,my=0,mz=0;
-  if(keys['KeyW'])mz=-1;if(keys['KeyS'])mz=1;if(keys['KeyA'])mx=-1;if(keys['KeyD'])mx=1;if(keys['KeyQ'])my=-1;if(keys['KeyE'])my=1;
-  if(keys['ArrowLeft'])camera.rotation.y+=.02;if(keys['ArrowRight'])camera.rotation.y-=.02;
-  if(mx||mz){const y=camera.rotation.y,s=Math.sin(y),c=Math.cos(y);camera.position.x+=(mx*c-mz*s)*FP_SPEED;camera.position.z+=(mx*s+mz*c)*FP_SPEED;}
-  camera.position.y+=my*FP_SPEED*.7; }
-
-/* ══════════════════════════════════════════ JOYSTICKS ══════════════════════════════════════════ */
-const joy={move:{x:0,y:0},look:{x:0,y:0}};
-function initJoy(zid,kid,k){const z=document.getElementById(zid),kn=document.getElementById(kid);let a=false,cx=0,cy=0;
-  function s(e){e.preventDefault();a=true;const r=z.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;m(e);}
-  function m(e){if(!a)return;const t=e.touches?e.touches[0]:e;let dx=(t.clientX-cx)/50,dy=(t.clientY-cy)/50;const l=Math.sqrt(dx*dx+dy*dy);if(l>1){dx/=l;dy/=l;}joy[k].x=dx;joy[k].y=dy;kn.style.transform=`translate(calc(-50% + ${dx*22}px),calc(-50% + ${dy*22}px))`;}
-  function e2(){a=false;joy[k]={x:0,y:0};kn.style.transform='translate(-50%,-50%)';}
-  z.addEventListener('touchstart',s,{passive:false});z.addEventListener('touchmove',ev=>{ev.preventDefault();m(ev);},{passive:false});
-  z.addEventListener('touchend',e2);z.addEventListener('touchcancel',e2);z.addEventListener('mousedown',s);
-  window.addEventListener('mousemove',ev=>{if(a)m(ev);});window.addEventListener('mouseup',()=>{if(a)e2();});}
-initJoy('joystickMove','moveKnob','move');initJoy('joystickLook','lookKnob','look');
-function updateJoy(){const{move,look}=joy;
-  if(Math.abs(move.x)>.1||Math.abs(move.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}const y=camera.rotation.y,s=Math.sin(y),c=Math.cos(y),sp=FP_SPEED*.6;camera.position.x+=(move.x*c-(-move.y)*s)*sp;camera.position.z+=(move.x*s+(-move.y)*c)*sp;}
-  if(Math.abs(look.x)>.1||Math.abs(look.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}camera.rotation.y-=look.x*.03;camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-look.y*.02));}}
-
-/* ══════════════════════════════════════════ XR ══════════════════════════════════════════ */
-const xrRay=new THREE.Raycaster(),tmpMat=new THREE.Matrix4();
-const c0=renderer.xr.getController(0);c0.addEventListener('selectstart',onXR);scene.add(c0);
-const c1=renderer.xr.getController(1);c1.addEventListener('selectstart',onXR);scene.add(c1);
-function mkR(){return new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-20)]),new THREE.LineBasicMaterial({color:0x00ffff}));}
-c0.add(mkR());c1.add(mkR());
-const fac=new XRControllerModelFactory();
-const g0=renderer.xr.getControllerGrip(0);g0.add(fac.createControllerModel(g0));scene.add(g0);
-const g1=renderer.xr.getControllerGrip(1);g1.add(fac.createControllerModel(g1));scene.add(g1);
-const hitDot=new THREE.Mesh(new THREE.SphereGeometry(.1,16,16),new THREE.MeshBasicMaterial({color:0xff3333}));hitDot.visible=false;scene.add(hitDot);
-
-let vrLabel=null;
-function makeVRLabel(lines, bgColor) {
-  const cv=document.createElement('canvas');cv.width=512;cv.height=192;
-  const ctx=cv.getContext('2d');
-  ctx.fillStyle='rgba(0,0,0,0.85)';ctx.fillRect(0,0,512,192);
-  ctx.fillStyle=bgColor;ctx.fillRect(0,0,512,6);
-  ctx.fillStyle=bgColor;ctx.font='bold 28px system-ui';ctx.textAlign='center';
-  ctx.fillText(lines[0]||'',256,40);
-  ctx.fillStyle='#e2e8f0';ctx.font='22px system-ui';
-  if(lines[1])ctx.fillText(lines[1],256,80);
-  if(lines[2])ctx.fillText(lines[2],256,115);
-  if(lines[3])ctx.fillText(lines[3],256,150);
-  if(lines[4])ctx.fillText(lines[4],256,180);
-  const tex=new THREE.CanvasTexture(cv);
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));
-  sp.scale.set(3,1.2,1);return sp;
-}
-
-function onXR(event) {
-  const ctrl=event.target;tmpMat.identity().extractRotation(ctrl.matrixWorld);
-  xrRay.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
-  xrRay.ray.direction.set(0,0,-1).applyMatrix4(tmpMat);
-  const hits=xrRay.intersectObjects(allMeshes,false);
-  if(hits.length>0){
-    const pt=hits[0].point;hitDot.position.copy(pt);hitDot.visible=true;
-    const sysIdx=hits[0].object.userData.sysIndex??0;
-    const sys=SYSTEM_INFO[sysIdx];
-    const data=SIM_DATA[sys.id];
-    if(vrLabel)scene.remove(vrLabel);
-    const lines=[sys.label];
-    for(const[k,s]of Object.entries(data)){
-      if(typeof s.val==='number'&&s.val>0) lines.push(`${s.label}: ${s.val.toFixed(1)} ${s.unit}`);
-      else if(typeof s.val==='string') lines.push(`${s.label}: ${s.val}`);
+    if (src.handedness === 'right') {
+      const rotX = ax[2];
+      if (Math.abs(rotX) > 0.1) {
+        try {
+          const angle = -rotX * VR_ROT;
+          const ref = renderer.xr.getReferenceSpace();
+          const q = { x: 0, y: Math.sin(angle/2), z: 0, w: Math.cos(angle/2) };
+          const xform = new XRRigidTransform({ x:0, y:0, z:0, w:1 }, q);
+          renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(xform));
+        } catch(e) {}
+      }
+      const moveY = ax[3];
+      if (Math.abs(moveY) > 0.15) {
+        try {
+          const ref = renderer.xr.getReferenceSpace();
+          const xform = new XRRigidTransform({ x:0, y: moveY * VR_MOVE * 0.5, z:0, w:1 });
+          renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(xform));
+        } catch(e) {}
+      }
     }
-    vrLabel=makeVRLabel(lines.slice(0,5), sys.color);
-    vrLabel.position.copy(pt);vrLabel.position.y+=0.8;scene.add(vrLabel);
   }
 }
 
-let xrSession=null;
-async function setupXR(){
-  const btn=document.getElementById('enterXR');if(!navigator.xr)return;
-  const arOK=await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
-  const vrOK=await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);
-  if(!arOK&&!vrOK)return;
-  const mode=arOK?'immersive-ar':'immersive-vr';
-  btn.textContent=arOK?'🥽 ENTER AR':'🥽 ENTER VR';btn.style.display='block';
-  btn.addEventListener('click',async()=>{if(xrSession){xrSession.end();return;}
-    try{const session=await navigator.xr.requestSession(mode,{requiredFeatures:['local-floor'],optionalFeatures:mode==='immersive-ar'?['plane-detection','hand-tracking']:['hand-tracking']});
-      renderer.setClearColor(mode==='immersive-ar'?0x000000:0x0d1117,mode==='immersive-ar'?0:1);
-      grid.visible=false;scene.fog=null;
-      ['legend','clickInfo','floorNav','joystickMove','joystickLook','ctrlHint','topbar','dashboard','heatLegend','detailPanel'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
-      renderer.xr.setReferenceSpaceType('local-floor');renderer.xr.setSession(session);xrSession=session;btn.textContent='✕ EXIT';
-      session.addEventListener('end',()=>{xrSession=null;btn.textContent=mode==='immersive-ar'?'🥽 ENTER AR':'🥽 ENTER VR';
-        renderer.setClearColor(0x0a0e1a,1);grid.visible=true;scene.fog=new THREE.FogExp2(0x0a0e1a,.006);
-        ['legend','floorNav','joystickMove','joystickLook','ctrlHint','topbar','dashboard'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});});
-    }catch(e){console.error('XR:',e);}});
-}
-
-const VM=.12,VRT=.025;
-function vrInput(){const session=renderer.xr.getSession();if(!session)return;const cam=renderer.xr.getCamera();
-  for(const src of session.inputSources){if(!src.gamepad)continue;const ax=src.gamepad.axes;if(ax.length<4)continue;
-    if(src.handedness==='left'){const dx=ax[2],dz=ax[3];if(Math.abs(dx)>.1||Math.abs(dz)>.1){
-      const f=new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);f.y=0;f.normalize();
-      const r=new THREE.Vector3(1,0,0).applyQuaternion(cam.quaternion);r.y=0;r.normalize();
-      const o=new THREE.Vector3();o.addScaledVector(r,dx*VM);o.addScaledVector(f,-dz*VM);
-      try{const ref=renderer.xr.getReferenceSpace();renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(new XRRigidTransform({x:-o.x,y:0,z:-o.z,w:1})));}catch(e){}}}
-    if(src.handedness==='right'){if(Math.abs(ax[2])>.1){try{const a=-ax[2]*VRT;const ref=renderer.xr.getReferenceSpace();
-      renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(new XRRigidTransform({x:0,y:0,z:0,w:1},{x:0,y:Math.sin(a/2),z:0,w:Math.cos(a/2)})));}catch(e){}}
-      if(Math.abs(ax[3])>.15){try{const ref=renderer.xr.getReferenceSpace();renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(new XRRigidTransform({x:0,y:ax[3]*VM*.5,z:0,w:1})));}catch(e){}}}}}
-
-/* ══════════════════════════════════════════ RENDER ══════════════════════════════════════════ */
-renderer.setAnimationLoop(()=>{
-  if(renderer.xr.isPresenting)vrInput();
-  else{updateFP();updateJoy();if(!fpMode)orbitControls.update();}
-  renderer.render(scene,camera);
+/* ═══════════════════════════════════════════
+   RENDER LOOP
+═══════════════════════════════════════════ */
+renderer.setAnimationLoop(() => {
+  if (renderer.xr.isPresenting) {
+    processVRInput();
+  } else {
+    updateFirstPerson();
+    updateJoystickMovement();
+    if (!firstPersonMode) orbitControls.update();
+  }
+  renderer.render(scene, camera);
 });
-window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 </script>
 </body>
 </html>
