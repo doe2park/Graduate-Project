@@ -91,12 +91,18 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 1, 0);
 
-/* ── Lights ── */
-scene.add(new THREE.AmbientLight(0x8899bb, 1.5));
-const dir = new THREE.DirectionalLight(0xffffff, 2.0);
+/* ── Lights (boosted for VR) ── */
+scene.add(new THREE.AmbientLight(0xffffff, 3.0));
+const dir = new THREE.DirectionalLight(0xffffff, 3.0);
 dir.position.set(10, 20, 15);
 scene.add(dir);
-scene.add(new THREE.HemisphereLight(0xb0c4de, 0x444466, 0.8));
+const dir2 = new THREE.DirectionalLight(0xffffff, 2.0);
+dir2.position.set(-10, 15, -10);
+scene.add(dir2);
+const dir3 = new THREE.DirectionalLight(0xffffff, 1.5);
+dir3.position.set(0, -10, 20);
+scene.add(dir3);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x666688, 2.0));
 
 /* ── Grid (hidden in XR) ── */
 const grid = new THREE.GridHelper(20, 20, 0x1a2535, 0x111825);
@@ -132,7 +138,8 @@ const glbUrl = 'grimes-mep-only.glb';
 
 loader.load(glbUrl, (gltf) => {
   const model = gltf.scene;
-  scene.add(model);
+  mepGroup.add(model);
+  modelRef = model;
 
   let meshCount = 0;
   model.traverse(child => {
@@ -140,31 +147,39 @@ loader.load(glbUrl, (gltf) => {
       meshCount++;
       allMeshes.push(child);
 
-      const sys = guessSystem(child.name);
-      const color = SYS_COLORS[sys] || SYS_COLORS.default;
-
+      // Bright emissive material — visible in VR without relying on lighting
       child.material = new THREE.MeshStandardMaterial({
-        color: color,
-        emissive: color,
-        emissiveIntensity: 0.3,
-        metalness: 0.4,
-        roughness: 0.5,
-        transparent: false,
+        color: 0x2dd4bf,
+        emissive: 0x2dd4bf,
+        emissiveIntensity: 0.6,
+        metalness: 0.2,
+        roughness: 0.4,
+        side: THREE.DoubleSide,
       });
     }
   });
 
-  // Auto-fit camera
+  // Auto-fit camera and center model at origin
   const box = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
+  
+  // Move model so it's centered at origin
+  model.position.sub(center);
+  
+  // Scale down for VR — model should be ~2m across for comfortable viewing
   const maxDim = Math.max(size.x, size.y, size.z);
-  camera.position.set(center.x + maxDim, center.y + maxDim * 0.7, center.z + maxDim);
-  controls.target.copy(center);
+  const vrScale = 3.0 / maxDim;
+  mepGroup.scale.setScalar(vrScale);
+  mepGroup.position.set(0, 1.2, -2); // eye level, 2m in front
+
+  // Desktop camera
+  camera.position.set(3, 2, 4);
+  controls.target.set(0, 1.2, -2);
   controls.update();
 
   document.getElementById('loading').style.display = 'none';
-  statusEl.textContent = `${meshCount} MEP meshes loaded`;
+  statusEl.textContent = `${meshCount} MEP meshes · Thumbstick to move · Squeeze both to scale`;
 
   // Show XR button
   setupXR();
@@ -194,9 +209,10 @@ const controller1 = renderer.xr.getController(1);
 controller1.addEventListener('selectstart', onXRSelect);
 scene.add(controller1);
 
+// Brighter ray lines
 function makeLine() {
-  const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-4)]);
-  return new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x2dd4bf, opacity: 0.6, transparent: true }));
+  const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-8)]);
+  return new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 2 }));
 }
 controller0.add(makeLine());
 controller1.add(makeLine());
@@ -209,9 +225,37 @@ const grip1 = renderer.xr.getControllerGrip(1);
 grip1.add(factory.createControllerModel(grip1));
 scene.add(grip1);
 
-// Highlight on select
-let highlighted = null;
-const highlightMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 });
+// Hit point indicator — glowing sphere where ray hits
+const hitSphere = new THREE.Mesh(
+  new THREE.SphereGeometry(0.15, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.8 })
+);
+hitSphere.visible = false;
+scene.add(hitSphere);
+
+// 3D text label (using sprite)
+function makeLabel(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fillRect(0, 0, 512, 128);
+  ctx.fillStyle = '#2dd4bf';
+  ctx.font = 'bold 36px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 256, 50);
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = '26px system-ui';
+  ctx.fillText('MEP System', 256, 95);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(2, 0.5, 1);
+  return sprite;
+}
+
+let floatingLabel = null;
 
 function onXRSelect(event) {
   const c = event.target;
@@ -221,18 +265,43 @@ function onXRSelect(event) {
 
   const hits = xrRay.intersectObjects(allMeshes, false);
   if (hits.length > 0) {
-    // Restore previous
-    if (highlighted) {
-      highlighted.mesh.material = highlighted.originalMat;
-    }
-    const mesh = hits[0].object;
-    highlighted = { mesh, originalMat: mesh.material };
-    mesh.material = highlightMat.clone();
+    const point = hits[0].point;
 
-    const sys = guessSystem(mesh.name);
-    statusEl.textContent = `${mesh.name} · ${sys.toUpperCase()}`;
+    // Show hit sphere
+    hitSphere.position.copy(point);
+    hitSphere.visible = true;
+
+    // Remove old label
+    if (floatingLabel) scene.remove(floatingLabel);
+
+    // Create floating label above hit point
+    floatingLabel = makeLabel('Grimes MEP');
+    floatingLabel.position.copy(point);
+    floatingLabel.position.y += 0.8;
+    scene.add(floatingLabel);
+
+    statusEl.textContent = `Hit: (${point.x.toFixed(1)}, ${point.y.toFixed(1)}, ${point.z.toFixed(1)})`;
+  } else {
+    hitSphere.visible = false;
+    if (floatingLabel) { scene.remove(floatingLabel); floatingLabel = null; }
   }
 }
+
+// ── Thumbstick navigation (move through model) ──
+const mepGroup = new THREE.Group();
+scene.add(mepGroup);
+
+// Model reference for movement
+let modelRef = null;
+
+// Squeeze to grab & scale
+let squeezing = [false, false];
+let prevControllerDist = 0;
+
+controller0.addEventListener('squeezestart', () => { squeezing[0] = true; });
+controller0.addEventListener('squeezeend', () => { squeezing[0] = false; });
+controller1.addEventListener('squeezestart', () => { squeezing[1] = true; });
+controller1.addEventListener('squeezeend', () => { squeezing[1] = false; });
 
 /* ── XR Session ── */
 let xrSession = null;
@@ -280,7 +349,7 @@ async function setupXR() {
         renderer.setClearColor(0x000000, 0);
         grid.visible = false;
       } else {
-        renderer.setClearColor(0x060a14, 1);
+        renderer.setClearColor(0x1a2030, 1);  // slightly lighter for VR
         grid.visible = false;
       }
 
@@ -303,10 +372,71 @@ async function setupXR() {
 }
 
 /* ── Render Loop ── */
-renderer.setAnimationLoop(() => {
+renderer.setAnimationLoop(function animate() {
   if (!renderer.xr.isPresenting) {
     controls.update();
+  } else {
+    // Thumbstick movement in VR
+    const session = renderer.xr.getSession();
+    if (session) {
+      for (const source of session.inputSources) {
+        if (source.gamepad) {
+          const axes = source.gamepad.axes;
+          if (axes.length >= 4) {
+            // Left stick: move model
+            if (source.handedness === 'left') {
+              const moveX = axes[2] * 0.03;
+              const moveZ = axes[3] * 0.03;
+              if (Math.abs(moveX) > 0.01 || Math.abs(moveZ) > 0.01) {
+                const cam = renderer.xr.getCamera();
+                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+                forward.y = 0; forward.normalize();
+                const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
+                right.y = 0; right.normalize();
+                mepGroup.position.add(right.multiplyScalar(-moveX));
+                mepGroup.position.add(forward.multiplyScalar(moveZ));
+              }
+              // Up/down with Y axis
+              const moveY = axes[3] * 0.02;
+              if (Math.abs(moveY) > 0.01) {
+                // hold grip + thumbstick for Y movement
+              }
+            }
+            // Right stick: rotate model
+            if (source.handedness === 'right') {
+              const rotY = axes[2] * 0.025;
+              if (Math.abs(rotY) > 0.005) {
+                mepGroup.rotation.y += rotY;
+              }
+              // Right stick Y: scale up/down
+              const scaleY = axes[3] * 0.01;
+              if (Math.abs(scaleY) > 0.005) {
+                const s = 1 - scaleY;
+                mepGroup.scale.multiplyScalar(Math.max(0.1, Math.min(10, s)));
+              }
+            }
+          }
+        }
+      }
+
+      // Pinch to scale (both squeezes)
+      if (squeezing[0] && squeezing[1]) {
+        const pos0 = new THREE.Vector3();
+        const pos1 = new THREE.Vector3();
+        controller0.getWorldPosition(pos0);
+        controller1.getWorldPosition(pos1);
+        const dist = pos0.distanceTo(pos1);
+        if (prevControllerDist > 0) {
+          const scaleFactor = dist / prevControllerDist;
+          mepGroup.scale.multiplyScalar(scaleFactor);
+        }
+        prevControllerDist = dist;
+      } else {
+        prevControllerDist = 0;
+      }
+    }
   }
+
   renderer.render(scene, camera);
 });
 
