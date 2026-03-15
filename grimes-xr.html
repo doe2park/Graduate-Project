@@ -18,107 +18,125 @@
     border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* VR Button - huge and obvious */
+  /* VR Button */
   #enterXR {
     position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-    background: var(--cyan); color: #000; font-weight: 800; font-size: 22px;
-    padding: 20px 56px; border: none; border-radius: 16px; cursor: pointer;
+    background: var(--cyan); color: #000; font-weight: 800; font-size: 20px;
+    padding: 18px 48px; border: none; border-radius: 16px; cursor: pointer;
     box-shadow: 0 6px 32px rgba(45,212,191,0.5); z-index: 50; display: none;
-    letter-spacing: 0.5px;
   }
-  #enterXR:hover { filter: brightness(1.1); transform: translateX(-50%) scale(1.03); }
 
-  /* Info panel */
-  #info {
+  /* System Legend + Toggles */
+  #legend {
     position: fixed; top: 12px; left: 12px; z-index: 50;
-    background: rgba(10,14,26,0.88); padding: 14px 18px; border-radius: 12px;
-    font-size: 13px; backdrop-filter: blur(10px); border: 1px solid rgba(45,212,191,0.2);
-    max-width: 360px;
+    background: rgba(10,14,26,0.92); padding: 14px 16px; border-radius: 12px;
+    backdrop-filter: blur(10px); border: 1px solid rgba(45,212,191,0.15);
+    max-width: 220px; font-size: 12px;
   }
-  #info h2 { font-size: 16px; color: var(--cyan); margin-bottom: 4px; }
-  #status { margin-bottom: 6px; }
-  .ctrl-hint { font-size: 11px; color: #64748b; line-height: 1.5; }
-  .ctrl-hint b { color: #94a3b8; }
+  #legend h3 { font-size: 14px; color: var(--cyan); margin-bottom: 10px; }
+  .sys-row {
+    display: flex; align-items: center; gap: 8px; padding: 5px 0;
+    cursor: pointer; user-select: none; transition: opacity 0.2s;
+  }
+  .sys-row:hover { opacity: 0.8; }
+  .sys-row.off { opacity: 0.3; text-decoration: line-through; }
+  .sys-dot {
+    width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .sys-name { flex: 1; }
+  .sys-count { color: #64748b; font-size: 11px; }
 
-  /* On-screen joystick for mobile/Quest browser */
-  .joystick-zone {
-    position: fixed; bottom: 20px; z-index: 40; width: 120px; height: 120px;
-    border-radius: 50%; background: rgba(45,212,191,0.08);
-    border: 2px solid rgba(45,212,191,0.2);
-    touch-action: none;
+  /* Info panel on click */
+  #clickInfo {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: rgba(10,14,26,0.92); padding: 14px 24px; border-radius: 12px;
+    backdrop-filter: blur(10px); border: 1px solid rgba(45,212,191,0.3);
+    font-size: 14px; text-align: center; z-index: 50; display: none;
+    max-width: 400px;
   }
-  #joystickMove { left: 30px; }
-  #joystickLook { right: 30px; }
+  #clickInfo .sys-tag {
+    display: inline-block; padding: 3px 10px; border-radius: 6px;
+    font-weight: 700; font-size: 13px; margin-bottom: 6px;
+  }
+  #clickInfo .detail { color: #94a3b8; font-size: 12px; }
+
+  /* Controls hint */
+  #ctrlHint {
+    position: fixed; bottom: 12px; left: 12px; z-index: 40;
+    font-size: 10px; color: #475569; line-height: 1.5;
+  }
+
+  /* On-screen joysticks */
+  .joystick-zone {
+    position: fixed; bottom: 20px; z-index: 40; width: 110px; height: 110px;
+    border-radius: 50%; background: rgba(45,212,191,0.06);
+    border: 2px solid rgba(45,212,191,0.15); touch-action: none;
+  }
+  #joystickMove { left: 24px; }
+  #joystickLook { right: 24px; }
   .joystick-knob {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-    width: 44px; height: 44px; border-radius: 50%;
-    background: rgba(45,212,191,0.5); border: 2px solid var(--cyan);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(45,212,191,0.4); border: 2px solid var(--cyan);
     pointer-events: none;
   }
   .joystick-label {
-    position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
-    font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;
-    white-space: nowrap;
+    position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; color: #475569; text-transform: uppercase; letter-spacing: 1px;
   }
 
-  /* Floor indicator */
-  #floorIndicator {
-    position: fixed; right: 16px; top: 50%; transform: translateY(-50%); z-index: 40;
-    display: flex; flex-direction: column; gap: 6px;
+  /* Floor nav */
+  #floorNav {
+    position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 40;
+    display: flex; flex-direction: column; gap: 4px;
   }
-  .floor-btn {
-    background: rgba(45,212,191,0.1); border: 1px solid rgba(45,212,191,0.2);
-    color: #94a3b8; padding: 8px 14px; border-radius: 8px; cursor: pointer;
-    font-size: 12px; font-weight: 600; text-align: center; min-width: 50px;
+  .fl-btn {
+    background: rgba(45,212,191,0.08); border: 1px solid rgba(45,212,191,0.15);
+    color: #64748b; padding: 7px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 11px; font-weight: 600; text-align: center;
   }
-  .floor-btn.active { background: var(--cyan); color: #000; border-color: var(--cyan); }
+  .fl-btn.active { background: var(--cyan); color: #000; border-color: var(--cyan); }
 </style>
 </head>
 <body>
 
-<div id="loading">
-  <div class="spinner"></div>
-  <div id="loadText">Loading MEP model...</div>
+<div id="loading"><div class="spinner"></div><div id="loadText">Loading MEP...</div></div>
+
+<!-- System Legend -->
+<div id="legend">
+  <h3>MEP Systems</h3>
+  <div id="systemList"></div>
 </div>
 
-<div id="info">
-  <h2>Grimes Building · MEP Walkthrough</h2>
-  <div id="status">Loading...</div>
-  <div class="ctrl-hint" id="ctrlHint">
-    <b>Mouse:</b> Drag rotate · Scroll zoom · Right-drag pan<br>
-    <b>Keys:</b> WASD move · QE up/down · Arrows look<br>
-    <b>Touch:</b> Use on-screen joysticks
-  </div>
+<!-- Click Info -->
+<div id="clickInfo">
+  <div class="sys-tag" id="ciTag">—</div><br>
+  <div class="detail" id="ciDetail">Click on MEP to inspect</div>
 </div>
+
+<!-- Floor Nav -->
+<div id="floorNav">
+  <button class="fl-btn" data-y="17">SRV</button>
+  <button class="fl-btn" data-y="13">L3</button>
+  <button class="fl-btn" data-y="9">L2</button>
+  <button class="fl-btn" data-y="5">L1</button>
+  <button class="fl-btn active" data-y="1.6">B1</button>
+</div>
+
+<!-- Joysticks -->
+<div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
+<div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
+
+<div id="ctrlHint">WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 
 <button id="enterXR">🥽 ENTER VR</button>
 
-<!-- On-screen joysticks for Quest browser / mobile -->
-<div class="joystick-zone" id="joystickMove">
-  <div class="joystick-label">Move</div>
-  <div class="joystick-knob" id="moveKnob"></div>
-</div>
-<div class="joystick-zone" id="joystickLook">
-  <div class="joystick-label">Look</div>
-  <div class="joystick-knob" id="lookKnob"></div>
-</div>
-
-<!-- Floor quick-nav -->
-<div id="floorIndicator">
-  <button class="floor-btn" data-y="16">SRV</button>
-  <button class="floor-btn" data-y="12">L3</button>
-  <button class="floor-btn" data-y="8">L2</button>
-  <button class="floor-btn" data-y="4" >L1</button>
-  <button class="floor-btn active" data-y="1.6">B1</button>
-</div>
-
 <script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-  }
-}
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
 </script>
 
 <script type="module">
@@ -128,9 +146,19 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-/* ═══════════════════════════════════════════
-   RENDERER
-═══════════════════════════════════════════ */
+/* ── System metadata (matches GLB mesh order from v4 extraction) ── */
+const SYSTEM_INFO = [
+  { id:'hvac_duct',  label:'HVAC Ductwork',   color:'#2dd4bf', hex:0x2dd4bf },
+  { id:'hvac_equip', label:'HVAC Equipment',   color:'#1ab3a6', hex:0x1ab3a6 },
+  { id:'pipe',       label:'Plumbing / Piping', color:'#38bdf8', hex:0x38bdf8 },
+  { id:'sprinkler',  label:'Fire Protection',   color:'#fb923c', hex:0xfb923c },
+  { id:'conduit',    label:'Electrical',        color:'#f59e0b', hex:0xf59e0b },
+  { id:'diffuser',   label:'Diffusers / Grilles', color:'#80f2cc', hex:0x80f2cc },
+  { id:'pump',       label:'Pumps',             color:'#67d9f2', hex:0x67d9f2 },
+  { id:'spiral',     label:'Spiral Ductwork',   color:'#4de6cc', hex:0x4de6cc },
+];
+
+/* ══════════════════════════════════════════ RENDERER ══════════════════════════════════════════ */
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -140,48 +168,43 @@ renderer.toneMappingExposure = 2.2;
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-/* ═══════════════════════════════════════════
-   SCENE
-═══════════════════════════════════════════ */
+/* ══════════════════════════════════════════ SCENE ══════════════════════════════════════════ */
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0e1a, 0.008);
+scene.fog = new THREE.FogExp2(0x0a0e1a, 0.006);
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 300);
-camera.position.set(0, 6, 0); // start inside building, L1 eye level
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 300);
+camera.position.set(0, 6, 0);
 
-// Orbit controls for mouse/touch (initial exploration)
 const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping = true;
 orbitControls.dampingFactor = 0.1;
 orbitControls.target.set(0, 6, -5);
-orbitControls.maxDistance = 100;
-orbitControls.minDistance = 0.5;
 
 /* ── Lights ── */
 scene.add(new THREE.AmbientLight(0xffffff, 2.0));
 const sun = new THREE.DirectionalLight(0xffffff, 3.0);
 sun.position.set(30, 50, 20); scene.add(sun);
-scene.add(new THREE.DirectionalLight(0xaaccff, 2.0).translateX(-30).translateY(20));
-scene.add(new THREE.DirectionalLight(0xffeedd, 1.5).translateZ(30).translateY(-10));
+const fill1 = new THREE.DirectionalLight(0xaaccff, 2.0);
+fill1.position.set(-30, 20, -20); scene.add(fill1);
+const fill2 = new THREE.DirectionalLight(0xffeedd, 1.5);
+fill2.position.set(0, -10, 30); scene.add(fill2);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.5));
 
-/* ── Reference grid + floor planes ── */
+/* ── Grid + floors ── */
 const grid = new THREE.GridHelper(80, 40, 0x2dd4bf, 0x1a2535);
-grid.material.opacity = 0.15; grid.material.transparent = true;
-scene.add(grid);
+grid.material.opacity = 0.12; grid.material.transparent = true; scene.add(grid);
 
-const floorMat = new THREE.MeshBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.04, side: THREE.DoubleSide });
-[0, 4, 8, 12, 16].forEach(y => {
-  const p = new THREE.Mesh(new THREE.PlaneGeometry(70, 55), floorMat);
-  p.rotation.x = -Math.PI / 2; p.position.y = y; scene.add(p);
+const floorMat = new THREE.MeshBasicMaterial({ color:0x2dd4bf, transparent:true, opacity:0.03, side:THREE.DoubleSide });
+[0,4,8,12,16].forEach(y => {
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(70,55), floorMat);
+  p.rotation.x = -Math.PI/2; p.position.y = y; scene.add(p);
 });
 
-/* ═══════════════════════════════════════════
-   LOAD MEP MODEL
-═══════════════════════════════════════════ */
+/* ══════════════════════════════════════════ LOAD MODEL ══════════════════════════════════════════ */
 const loadingEl = document.getElementById('loadText');
-const statusEl = document.getElementById('status');
-const allMeshes = [];
+const allMeshes = [];         // all mesh objects
+const systemMeshes = [];      // { mesh, sysIndex, visible }
+const systemVisible = new Array(8).fill(true);
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
@@ -192,22 +215,33 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   const model = gltf.scene;
   scene.add(model);
 
-  let meshCount = 0;
+  let meshIdx = 0;
   model.traverse(child => {
     if (child.isMesh) {
-      meshCount++;
       allMeshes.push(child);
-      // Ensure emissive for VR visibility
-      if (child.material) {
-        child.material.emissive = child.material.color.clone();
-        child.material.emissiveIntensity = 0.3;
-        child.material.side = THREE.DoubleSide;
-      }
+
+      const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
+      const sys = SYSTEM_INFO[sysIdx];
+
+      // Apply distinctive material per system
+      child.material = new THREE.MeshStandardMaterial({
+        color: sys.hex,
+        emissive: sys.hex,
+        emissiveIntensity: 0.35,
+        metalness: 0.3,
+        roughness: 0.4,
+        side: THREE.DoubleSide,
+      });
+
+      child.userData.sysIndex = sysIdx;
+      child.userData.sysLabel = sys.label;
+      systemMeshes.push({ mesh: child, sysIndex: sysIdx });
+      meshIdx++;
     }
   });
 
   document.getElementById('loading').style.display = 'none';
-  statusEl.textContent = `${meshCount} MEP meshes · Use joysticks or WASD to explore`;
+  buildLegend();
   setupXR();
 
 }, (progress) => {
@@ -218,391 +252,327 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   loadingEl.style.color = '#f87171';
 });
 
-/* ═══════════════════════════════════════════
-   FIRST-PERSON KEYBOARD CONTROLS (WASD)
-═══════════════════════════════════════════ */
-const keys = {};
-const moveDir = new THREE.Vector3();
-const FP_SPEED = 0.15;
-let firstPersonMode = false;
+/* ══════════════════════════════════════════ LEGEND + TOGGLES ══════════════════════════════════════════ */
+function buildLegend() {
+  const list = document.getElementById('systemList');
 
-window.addEventListener('keydown', (e) => {
-  keys[e.code] = true;
-  // Switch to first-person on WASD press
-  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE'].includes(e.code)) {
-    if (!firstPersonMode) {
-      firstPersonMode = true;
-      orbitControls.enabled = false;
-      renderer.domElement.requestPointerLock?.();
-    }
-  }
-  if (e.code === 'Escape') {
-    firstPersonMode = false;
-    orbitControls.enabled = true;
-    document.exitPointerLock?.();
-  }
-});
-window.addEventListener('keyup', (e) => keys[e.code] = false);
+  // Count faces per system
+  const counts = {};
+  systemMeshes.forEach(sm => {
+    const geo = sm.mesh.geometry;
+    const faceCount = geo.index ? geo.index.count / 3 : 0;
+    counts[sm.sysIndex] = (counts[sm.sysIndex] || 0) + faceCount;
+  });
 
-// Mouse look in first-person mode
-document.addEventListener('mousemove', (e) => {
-  if (!firstPersonMode || !document.pointerLockElement) return;
-  camera.rotation.y -= e.movementX * 0.002;
-  camera.rotation.x -= e.movementY * 0.002;
-  camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-});
+  SYSTEM_INFO.forEach((sys, i) => {
+    if (!counts[i]) return; // skip empty systems
 
-document.addEventListener('pointerlockchange', () => {
-  if (!document.pointerLockElement) {
-    firstPersonMode = false;
-    orbitControls.enabled = true;
-  }
-});
-
-function updateFirstPerson() {
-  if (!firstPersonMode) return;
-  
-  moveDir.set(0, 0, 0);
-  if (keys['KeyW']) moveDir.z -= 1;
-  if (keys['KeyS']) moveDir.z += 1;
-  if (keys['KeyA']) moveDir.x -= 1;
-  if (keys['KeyD']) moveDir.x += 1;
-  if (keys['KeyQ']) moveDir.y -= 1;
-  if (keys['KeyE']) moveDir.y += 1;
-
-  if (moveDir.length() > 0) {
-    moveDir.normalize().multiplyScalar(FP_SPEED);
-    // Rotate movement by camera yaw only
-    const yaw = camera.rotation.y;
-    const sin = Math.sin(yaw), cos = Math.cos(yaw);
-    const mx = moveDir.x * cos - moveDir.z * sin;
-    const mz = moveDir.x * sin + moveDir.z * cos;
-    camera.position.x += mx;
-    camera.position.y += moveDir.y * FP_SPEED;
-    camera.position.z += mz;
-  }
-
-  // Arrow keys for looking
-  if (keys['ArrowLeft']) camera.rotation.y += 0.02;
-  if (keys['ArrowRight']) camera.rotation.y -= 0.02;
-  if (keys['ArrowUp']) camera.rotation.x += 0.02;
-  if (keys['ArrowDown']) camera.rotation.x -= 0.02;
+    const row = document.createElement('div');
+    row.className = 'sys-row';
+    row.dataset.idx = i;
+    row.innerHTML = `
+      <div class="sys-dot" style="background:${sys.color}"></div>
+      <span class="sys-name">${sys.label}</span>
+      <span class="sys-count">${Math.round(counts[i] / 1000)}K</span>
+    `;
+    row.addEventListener('click', () => toggleSystem(i, row));
+    list.appendChild(row);
+  });
 }
 
-/* ═══════════════════════════════════════════
-   ON-SCREEN JOYSTICKS (Quest browser / mobile)
-═══════════════════════════════════════════ */
-const joystickState = { move: {x:0, y:0}, look: {x:0, y:0} };
+function toggleSystem(idx, row) {
+  systemVisible[idx] = !systemVisible[idx];
+  row.classList.toggle('off', !systemVisible[idx]);
 
-function setupJoystick(zoneId, knobId, stateKey) {
-  const zone = document.getElementById(zoneId);
-  const knob = document.getElementById(knobId);
-  let active = false;
-  const rect = { cx: 0, cy: 0, r: 50 };
-
-  function start(e) {
-    e.preventDefault();
-    active = true;
-    const touch = e.touches ? e.touches[0] : e;
-    const box = zone.getBoundingClientRect();
-    rect.cx = box.left + box.width / 2;
-    rect.cy = box.top + box.height / 2;
-    update(touch);
-  }
-
-  function update(e) {
-    if (!active) return;
-    const touch = e.touches ? e.touches[0] : e;
-    let dx = (touch.clientX - rect.cx) / rect.r;
-    let dy = (touch.clientY - rect.cy) / rect.r;
-    const len = Math.sqrt(dx*dx + dy*dy);
-    if (len > 1) { dx /= len; dy /= len; }
-    joystickState[stateKey].x = dx;
-    joystickState[stateKey].y = dy;
-    knob.style.transform = `translate(calc(-50% + ${dx*30}px), calc(-50% + ${dy*30}px))`;
-  }
-
-  function end() {
-    active = false;
-    joystickState[stateKey].x = 0;
-    joystickState[stateKey].y = 0;
-    knob.style.transform = 'translate(-50%, -50%)';
-  }
-
-  zone.addEventListener('touchstart', start, { passive: false });
-  zone.addEventListener('touchmove', (e) => { e.preventDefault(); update(e); }, { passive: false });
-  zone.addEventListener('touchend', end);
-  zone.addEventListener('touchcancel', end);
-  // Mouse fallback
-  zone.addEventListener('mousedown', start);
-  window.addEventListener('mousemove', (e) => { if (active) update(e); });
-  window.addEventListener('mouseup', () => { if (active) end(); });
-}
-
-setupJoystick('joystickMove', 'moveKnob', 'move');
-setupJoystick('joystickLook', 'lookKnob', 'look');
-
-function updateJoystickMovement() {
-  const { move, look } = joystickState;
-  if (Math.abs(move.x) > 0.1 || Math.abs(move.y) > 0.1) {
-    if (!firstPersonMode) {
-      firstPersonMode = true;
-      orbitControls.enabled = false;
-    }
-    const yaw = camera.rotation.y;
-    const sin = Math.sin(yaw), cos = Math.cos(yaw);
-    const speed = FP_SPEED * 0.7;
-    camera.position.x += (move.x * cos - (-move.y) * sin) * speed;
-    camera.position.z += (move.x * sin + (-move.y) * cos) * speed;
-  }
-  if (Math.abs(look.x) > 0.1 || Math.abs(look.y) > 0.1) {
-    if (!firstPersonMode) {
-      firstPersonMode = true;
-      orbitControls.enabled = false;
-    }
-    camera.rotation.y -= look.x * 0.03;
-    camera.rotation.x -= look.y * 0.02;
-    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-  }
-}
-
-/* ═══════════════════════════════════════════
-   FLOOR QUICK-NAV
-═══════════════════════════════════════════ */
-document.getElementById('floorIndicator').addEventListener('click', (e) => {
-  const btn = e.target.closest('.floor-btn');
-  if (!btn) return;
-  const y = parseFloat(btn.dataset.y);
-  camera.position.y = y;
-  document.querySelectorAll('.floor-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  if (!firstPersonMode) {
-    firstPersonMode = true;
-    orbitControls.enabled = false;
-  }
-});
-
-/* ═══════════════════════════════════════════
-   RAYCASTER — click/touch to inspect MEP
-═══════════════════════════════════════════ */
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-let highlightedMesh = null;
-const defaultMats = new Map();
-
-renderer.domElement.addEventListener('click', (e) => {
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  
-  const hits = raycaster.intersectObjects(allMeshes, false);
-  
-  // Restore previous
-  if (highlightedMesh && defaultMats.has(highlightedMesh.uuid)) {
-    highlightedMesh.material = defaultMats.get(highlightedMesh.uuid);
-  }
-  
-  if (hits.length > 0) {
-    const mesh = hits[0].object;
-    defaultMats.set(mesh.uuid, mesh.material);
-    highlightedMesh = mesh;
-    
-    mesh.material = new THREE.MeshStandardMaterial({
-      color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8,
-      metalness: 0.1, roughness: 0.3, side: THREE.DoubleSide
-    });
-
-    const p = hits[0].point;
-    let floor = 'B1';
-    if (p.y > 3) floor = 'L1';
-    if (p.y > 7) floor = 'L2';
-    if (p.y > 11) floor = 'L3';
-    if (p.y > 15) floor = 'SRV';
-    
-    const name = mesh.name || mesh.parent?.name || 'MEP Element';
-    statusEl.textContent = `${name} · Floor ${floor} · Y=${p.y.toFixed(1)}m`;
-  }
-});
-
-/* ═══════════════════════════════════════════
-   XR CONTROLLERS + SESSION
-═══════════════════════════════════════════ */
-const xrRay = new THREE.Raycaster();
-const tmpMat = new THREE.Matrix4();
-
-const c0 = renderer.xr.getController(0);
-c0.addEventListener('selectstart', onXRSelect);
-scene.add(c0);
-const c1 = renderer.xr.getController(1);
-c1.addEventListener('selectstart', onXRSelect);
-scene.add(c1);
-
-function makeRay() {
-  const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-20)]);
-  return new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x00ffff }));
-}
-c0.add(makeRay());
-c1.add(makeRay());
-
-const factory = new XRControllerModelFactory();
-const g0 = renderer.xr.getControllerGrip(0);
-g0.add(factory.createControllerModel(g0));
-scene.add(g0);
-const g1 = renderer.xr.getControllerGrip(1);
-g1.add(factory.createControllerModel(g1));
-scene.add(g1);
-
-const hitDot = new THREE.Mesh(
-  new THREE.SphereGeometry(0.12, 16, 16),
-  new THREE.MeshBasicMaterial({ color: 0xff3333 })
-);
-hitDot.visible = false;
-scene.add(hitDot);
-
-function onXRSelect(event) {
-  const ctrl = event.target;
-  tmpMat.identity().extractRotation(ctrl.matrixWorld);
-  xrRay.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
-  xrRay.ray.direction.set(0, 0, -1).applyMatrix4(tmpMat);
-  const hits = xrRay.intersectObjects(allMeshes, false);
-  if (hits.length > 0) {
-    hitDot.position.copy(hits[0].point);
-    hitDot.visible = true;
-  }
-}
-
-/* ── XR Session ── */
-let xrSession = null;
-
-async function setupXR() {
-  const btn = document.getElementById('enterXR');
-  if (!navigator.xr) return;
-
-  const arOK = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
-  const vrOK = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
-  if (!arOK && !vrOK) return;
-
-  const mode = arOK ? 'immersive-ar' : 'immersive-vr';
-  btn.textContent = arOK ? '🥽 ENTER AR' : '🥽 ENTER VR';
-  btn.style.display = 'block';
-
-  btn.addEventListener('click', async () => {
-    if (xrSession) { xrSession.end(); return; }
-    try {
-      const session = await navigator.xr.requestSession(mode, {
-        requiredFeatures: ['local-floor'],
-        optionalFeatures: mode === 'immersive-ar' ? ['plane-detection','hand-tracking'] : ['hand-tracking']
-      });
-
-      renderer.setClearColor(mode === 'immersive-ar' ? 0x000000 : 0x0d1117, mode === 'immersive-ar' ? 0 : 1);
-      grid.visible = false;
-      scene.fog = null;
-
-      // Hide 2D UI elements
-      document.getElementById('joystickMove').style.display = 'none';
-      document.getElementById('joystickLook').style.display = 'none';
-      document.getElementById('floorIndicator').style.display = 'none';
-      document.getElementById('info').style.display = 'none';
-
-      renderer.xr.setReferenceSpaceType('local-floor');
-      renderer.xr.setSession(session);
-      xrSession = session;
-      btn.textContent = '✕ EXIT';
-
-      session.addEventListener('end', () => {
-        xrSession = null;
-        btn.textContent = mode === 'immersive-ar' ? '🥽 ENTER AR' : '🥽 ENTER VR';
-        renderer.setClearColor(0x0a0e1a, 1);
-        grid.visible = true;
-        scene.fog = new THREE.FogExp2(0x0a0e1a, 0.008);
-        document.getElementById('joystickMove').style.display = '';
-        document.getElementById('joystickLook').style.display = '';
-        document.getElementById('floorIndicator').style.display = '';
-        document.getElementById('info').style.display = '';
-      });
-    } catch (e) {
-      console.error('XR error:', e);
+  systemMeshes.forEach(sm => {
+    if (sm.sysIndex === idx) {
+      sm.mesh.visible = systemVisible[idx];
     }
   });
 }
 
-/* ═══════════════════════════════════════════
-   VR LOCOMOTION (thumbstick)
-═══════════════════════════════════════════ */
-const VR_MOVE = 0.12;
-const VR_ROT = 0.025;
+/* ══════════════════════════════════════════ CLICK TO INSPECT ══════════════════════════════════════════ */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const clickInfo = document.getElementById('clickInfo');
+const ciTag = document.getElementById('ciTag');
+const ciDetail = document.getElementById('ciDetail');
+let highlightedMesh = null;
+let originalMat = null;
 
-function processVRInput() {
-  const session = renderer.xr.getSession();
-  if (!session) return;
-  const cam = renderer.xr.getCamera();
+renderer.domElement.addEventListener('click', (e) => {
+  // Ignore if joystick area
+  if (e.target !== renderer.domElement) return;
 
-  for (const src of session.inputSources) {
-    if (!src.gamepad) continue;
-    const ax = src.gamepad.axes;
-    if (ax.length < 4) continue;
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
 
-    if (src.handedness === 'left') {
-      const dx = ax[2], dz = ax[3];
-      if (Math.abs(dx) > 0.1 || Math.abs(dz) > 0.1) {
-        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-        fwd.y = 0; fwd.normalize();
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
-        right.y = 0; right.normalize();
+  const hits = raycaster.intersectObjects(allMeshes, false);
 
-        const offset = new THREE.Vector3();
-        offset.addScaledVector(right, dx * VR_MOVE);
-        offset.addScaledVector(fwd, -dz * VR_MOVE);
+  // Restore previous
+  if (highlightedMesh && originalMat) {
+    highlightedMesh.material = originalMat;
+  }
 
-        try {
-          const ref = renderer.xr.getReferenceSpace();
-          const xform = new XRRigidTransform({ x: -offset.x, y: 0, z: -offset.z, w: 1 });
-          renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(xform));
-        } catch(e) {}
+  if (hits.length > 0) {
+    const mesh = hits[0].object;
+    const point = hits[0].point;
+    const sysIdx = mesh.userData.sysIndex ?? 0;
+    const sys = SYSTEM_INFO[sysIdx];
+
+    // Highlight
+    originalMat = mesh.material;
+    highlightedMesh = mesh;
+    mesh.material = new THREE.MeshStandardMaterial({
+      color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.7,
+      metalness: 0.1, roughness: 0.2, side: THREE.DoubleSide
+    });
+
+    // Floor detection
+    let floor = 'B1';
+    if (point.y > 3) floor = 'L1';
+    if (point.y > 7) floor = 'L2';
+    if (point.y > 11) floor = 'L3';
+    if (point.y > 15) floor = 'SRV';
+
+    ciTag.textContent = sys.label;
+    ciTag.style.background = sys.color;
+    ciTag.style.color = '#000';
+    ciDetail.textContent = `Floor ${floor} · Height ${point.y.toFixed(1)}m · (${point.x.toFixed(1)}, ${point.z.toFixed(1)})`;
+    clickInfo.style.display = 'block';
+  } else {
+    clickInfo.style.display = 'none';
+    highlightedMesh = null;
+    originalMat = null;
+  }
+});
+
+/* ══════════════════════════════════════════ FLOOR NAV ══════════════════════════════════════════ */
+document.getElementById('floorNav').addEventListener('click', (e) => {
+  const btn = e.target.closest('.fl-btn');
+  if (!btn) return;
+  camera.position.y = parseFloat(btn.dataset.y);
+  document.querySelectorAll('.fl-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (!fpMode) { fpMode = true; orbitControls.enabled = false; }
+});
+
+/* ══════════════════════════════════════════ FIRST PERSON (WASD) ══════════════════════════════════════════ */
+const keys = {};
+let fpMode = false;
+const FP_SPEED = 0.15;
+
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE'].includes(e.code) && !fpMode) {
+    fpMode = true; orbitControls.enabled = false;
+    renderer.domElement.requestPointerLock?.();
+  }
+  if (e.code === 'Escape') { fpMode = false; orbitControls.enabled = true; document.exitPointerLock?.(); }
+});
+window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+document.addEventListener('mousemove', (e) => {
+  if (!fpMode || !document.pointerLockElement) return;
+  camera.rotation.y -= e.movementX * 0.002;
+  camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x - e.movementY * 0.002));
+});
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement) { fpMode = false; orbitControls.enabled = true; }
+});
+
+function updateFP() {
+  if (!fpMode) return;
+  let mx=0, my=0, mz=0;
+  if (keys['KeyW']) mz=-1; if (keys['KeyS']) mz=1;
+  if (keys['KeyA']) mx=-1; if (keys['KeyD']) mx=1;
+  if (keys['KeyQ']) my=-1; if (keys['KeyE']) my=1;
+  if (keys['ArrowLeft']) camera.rotation.y += 0.02;
+  if (keys['ArrowRight']) camera.rotation.y -= 0.02;
+  if (keys['ArrowUp']) camera.rotation.x += 0.015;
+  if (keys['ArrowDown']) camera.rotation.x -= 0.015;
+
+  if (mx || mz) {
+    const yaw = camera.rotation.y;
+    const s = Math.sin(yaw), c = Math.cos(yaw);
+    camera.position.x += (mx*c - mz*s) * FP_SPEED;
+    camera.position.z += (mx*s + mz*c) * FP_SPEED;
+  }
+  camera.position.y += my * FP_SPEED * 0.7;
+}
+
+/* ══════════════════════════════════════════ JOYSTICKS ══════════════════════════════════════════ */
+const joy = { move:{x:0,y:0}, look:{x:0,y:0} };
+
+function initJoy(zoneId, knobId, key) {
+  const zone = document.getElementById(zoneId);
+  const knob = document.getElementById(knobId);
+  let active = false, cx=0, cy=0;
+
+  function start(e) { e.preventDefault(); active=true;
+    const r=zone.getBoundingClientRect(); cx=r.left+r.width/2; cy=r.top+r.height/2; move(e); }
+  function move(e) { if(!active) return; const t=e.touches?e.touches[0]:e;
+    let dx=(t.clientX-cx)/50, dy=(t.clientY-cy)/50;
+    const l=Math.sqrt(dx*dx+dy*dy); if(l>1){dx/=l;dy/=l;}
+    joy[key].x=dx; joy[key].y=dy;
+    knob.style.transform=`translate(calc(-50% + ${dx*25}px), calc(-50% + ${dy*25}px))`; }
+  function end() { active=false; joy[key]={x:0,y:0};
+    knob.style.transform='translate(-50%,-50%)'; }
+
+  zone.addEventListener('touchstart',start,{passive:false});
+  zone.addEventListener('touchmove',(e)=>{e.preventDefault();move(e);},{passive:false});
+  zone.addEventListener('touchend',end); zone.addEventListener('touchcancel',end);
+  zone.addEventListener('mousedown',start);
+  window.addEventListener('mousemove',(e)=>{if(active)move(e);});
+  window.addEventListener('mouseup',()=>{if(active)end();});
+}
+initJoy('joystickMove','moveKnob','move');
+initJoy('joystickLook','lookKnob','look');
+
+function updateJoy() {
+  const {move,look} = joy;
+  if (Math.abs(move.x)>0.1 || Math.abs(move.y)>0.1) {
+    if(!fpMode){fpMode=true;orbitControls.enabled=false;}
+    const yaw=camera.rotation.y, s=Math.sin(yaw), c=Math.cos(yaw), sp=FP_SPEED*0.6;
+    camera.position.x += (move.x*c - (-move.y)*s)*sp;
+    camera.position.z += (move.x*s + (-move.y)*c)*sp;
+  }
+  if (Math.abs(look.x)>0.1 || Math.abs(look.y)>0.1) {
+    if(!fpMode){fpMode=true;orbitControls.enabled=false;}
+    camera.rotation.y -= look.x*0.03;
+    camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x - look.y*0.02));
+  }
+}
+
+/* ══════════════════════════════════════════ XR ══════════════════════════════════════════ */
+const xrRay = new THREE.Raycaster();
+const tmpMat = new THREE.Matrix4();
+
+const c0 = renderer.xr.getController(0);
+c0.addEventListener('selectstart', onXR); scene.add(c0);
+const c1 = renderer.xr.getController(1);
+c1.addEventListener('selectstart', onXR); scene.add(c1);
+
+function mkRay(){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-20)]);
+return new THREE.Line(g,new THREE.LineBasicMaterial({color:0x00ffff}));}
+c0.add(mkRay()); c1.add(mkRay());
+
+const fac=new XRControllerModelFactory();
+const gr0=renderer.xr.getControllerGrip(0); gr0.add(fac.createControllerModel(gr0)); scene.add(gr0);
+const gr1=renderer.xr.getControllerGrip(1); gr1.add(fac.createControllerModel(gr1)); scene.add(gr1);
+
+const hitDot=new THREE.Mesh(new THREE.SphereGeometry(0.1,16,16),new THREE.MeshBasicMaterial({color:0xff3333}));
+hitDot.visible=false; scene.add(hitDot);
+
+// 3D label sprite for VR
+let vrLabel = null;
+function makeVRLabel(text, bgColor) {
+  const cv = document.createElement('canvas'); cv.width=512; cv.height=96;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle=bgColor; ctx.fillRect(0,0,512,96);
+  ctx.fillStyle='#000'; ctx.font='bold 32px system-ui'; ctx.textAlign='center';
+  ctx.fillText(text,256,58);
+  const tex=new THREE.CanvasTexture(cv);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));
+  sp.scale.set(2.5,0.5,1);
+  return sp;
+}
+
+function onXR(event) {
+  const ctrl=event.target;
+  tmpMat.identity().extractRotation(ctrl.matrixWorld);
+  xrRay.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+  xrRay.ray.direction.set(0,0,-1).applyMatrix4(tmpMat);
+  const hits=xrRay.intersectObjects(allMeshes,false);
+  if(hits.length>0){
+    const pt=hits[0].point;
+    hitDot.position.copy(pt); hitDot.visible=true;
+    const sysIdx=hits[0].object.userData.sysIndex??0;
+    const sys=SYSTEM_INFO[sysIdx];
+    // Show floating label
+    if(vrLabel) scene.remove(vrLabel);
+    vrLabel=makeVRLabel(sys.label, sys.color);
+    vrLabel.position.copy(pt); vrLabel.position.y+=0.5;
+    scene.add(vrLabel);
+  }
+}
+
+let xrSession=null;
+async function setupXR(){
+  const btn=document.getElementById('enterXR');
+  if(!navigator.xr)return;
+  const arOK=await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
+  const vrOK=await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);
+  if(!arOK&&!vrOK)return;
+  const mode=arOK?'immersive-ar':'immersive-vr';
+  btn.textContent=arOK?'🥽 ENTER AR':'🥽 ENTER VR';
+  btn.style.display='block';
+
+  btn.addEventListener('click',async()=>{
+    if(xrSession){xrSession.end();return;}
+    try{
+      const session=await navigator.xr.requestSession(mode,{
+        requiredFeatures:['local-floor'],
+        optionalFeatures:mode==='immersive-ar'?['plane-detection','hand-tracking']:['hand-tracking']
+      });
+      renderer.setClearColor(mode==='immersive-ar'?0x000000:0x0d1117, mode==='immersive-ar'?0:1);
+      grid.visible=false; scene.fog=null;
+      ['legend','clickInfo','floorNav','joystickMove','joystickLook','ctrlHint'].forEach(id=>
+        document.getElementById(id).style.display='none');
+      renderer.xr.setReferenceSpaceType('local-floor');
+      renderer.xr.setSession(session);
+      xrSession=session; btn.textContent='✕ EXIT';
+      session.addEventListener('end',()=>{
+        xrSession=null; btn.textContent=mode==='immersive-ar'?'🥽 ENTER AR':'🥽 ENTER VR';
+        renderer.setClearColor(0x0a0e1a,1); grid.visible=true;
+        scene.fog=new THREE.FogExp2(0x0a0e1a,0.006);
+        ['legend','floorNav','joystickMove','joystickLook','ctrlHint'].forEach(id=>
+          document.getElementById(id).style.display='');
+      });
+    }catch(e){console.error('XR error:',e);}
+  });
+}
+
+/* VR locomotion */
+const VM=0.12, VR=0.025;
+function vrInput(){
+  const session=renderer.xr.getSession(); if(!session)return;
+  const cam=renderer.xr.getCamera();
+  for(const src of session.inputSources){
+    if(!src.gamepad)continue; const ax=src.gamepad.axes; if(ax.length<4)continue;
+    if(src.handedness==='left'){
+      const dx=ax[2],dz=ax[3];
+      if(Math.abs(dx)>0.1||Math.abs(dz)>0.1){
+        const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);
+        fwd.y=0;fwd.normalize();
+        const rt=new THREE.Vector3(1,0,0).applyQuaternion(cam.quaternion);
+        rt.y=0;rt.normalize();
+        const off=new THREE.Vector3(); off.addScaledVector(rt,dx*VM); off.addScaledVector(fwd,-dz*VM);
+        try{const ref=renderer.xr.getReferenceSpace();
+        renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(new XRRigidTransform({x:-off.x,y:0,z:-off.z,w:1})));}catch(e){}
       }
     }
-
-    if (src.handedness === 'right') {
-      const rotX = ax[2];
-      if (Math.abs(rotX) > 0.1) {
-        try {
-          const angle = -rotX * VR_ROT;
-          const ref = renderer.xr.getReferenceSpace();
-          const q = { x: 0, y: Math.sin(angle/2), z: 0, w: Math.cos(angle/2) };
-          const xform = new XRRigidTransform({ x:0, y:0, z:0, w:1 }, q);
-          renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(xform));
-        } catch(e) {}
-      }
-      const moveY = ax[3];
-      if (Math.abs(moveY) > 0.15) {
-        try {
-          const ref = renderer.xr.getReferenceSpace();
-          const xform = new XRRigidTransform({ x:0, y: moveY * VR_MOVE * 0.5, z:0, w:1 });
-          renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(xform));
-        } catch(e) {}
-      }
+    if(src.handedness==='right'){
+      if(Math.abs(ax[2])>0.1){try{const a=-ax[2]*VR;const ref=renderer.xr.getReferenceSpace();
+        renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(new XRRigidTransform({x:0,y:0,z:0,w:1},{x:0,y:Math.sin(a/2),z:0,w:Math.cos(a/2)})));}catch(e){}}
+      if(Math.abs(ax[3])>0.15){try{const ref=renderer.xr.getReferenceSpace();
+        renderer.xr.setReferenceSpace(ref.getOffsetReferenceSpace(new XRRigidTransform({x:0,y:ax[3]*VM*0.5,z:0,w:1})));}catch(e){}}
     }
   }
 }
 
-/* ═══════════════════════════════════════════
-   RENDER LOOP
-═══════════════════════════════════════════ */
-renderer.setAnimationLoop(() => {
-  if (renderer.xr.isPresenting) {
-    processVRInput();
-  } else {
-    updateFirstPerson();
-    updateJoystickMovement();
-    if (!firstPersonMode) orbitControls.update();
-  }
-  renderer.render(scene, camera);
+/* ══════════════════════════════════════════ RENDER ══════════════════════════════════════════ */
+renderer.setAnimationLoop(()=>{
+  if(renderer.xr.isPresenting){ vrInput(); }
+  else { updateFP(); updateJoy(); if(!fpMode) orbitControls.update(); }
+  renderer.render(scene,camera);
 });
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(window.innerWidth,window.innerHeight);
 });
 </script>
 </body>
