@@ -128,7 +128,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v14 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v15 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -274,11 +274,45 @@ bldgToggle.addEventListener('click', () => {
     gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
       buildingModel = gltf.scene;
 
+      // Compute MEP bounding box for alignment
+      const mepBox = new THREE.Box3();
+      allMeshes.forEach(m => { m.updateWorldMatrix(true, false); mepBox.expandByObject(m); });
+      const mepCenter = mepBox.getCenter(new THREE.Vector3());
+      const mepSize = mepBox.getSize(new THREE.Vector3());
+
+      // Compute building bounding box
+      const bldgBox = new THREE.Box3().setFromObject(buildingModel);
+      const bldgCenter = bldgBox.getCenter(new THREE.Vector3());
+      const bldgSize = bldgBox.getSize(new THREE.Vector3());
+
+      console.log('MEP center:', mepCenter, 'size:', mepSize);
+      console.log('Bldg center:', bldgCenter, 'size:', bldgSize);
+
+      // Scale: match the largest dimension
+      const mepMax = Math.max(mepSize.x, mepSize.y, mepSize.z);
+      const bldgMax = Math.max(bldgSize.x, bldgSize.y, bldgSize.z);
+      const scaleFactor = mepMax / bldgMax;
+      buildingModel.scale.setScalar(scaleFactor);
+
+      // Recompute bounding box after scaling
+      const bldgBox2 = new THREE.Box3().setFromObject(buildingModel);
+      const bldgCenter2 = bldgBox2.getCenter(new THREE.Vector3());
+
+      // Align centers
+      buildingModel.position.sub(bldgCenter2).add(mepCenter);
+
+      // Align ground: match bottom Y
+      const bldgBox3 = new THREE.Box3().setFromObject(buildingModel);
+      buildingModel.position.y += (mepBox.min.y - bldgBox3.min.y);
+
+      console.log('Scale factor:', scaleFactor);
+      console.log('Building aligned to MEP');
+
       // Make ALL meshes ghostly transparent
       buildingModel.traverse(child => {
         if (child.isMesh) {
           child.material = ghostMat;
-          child.renderOrder = -1; // render behind MEP
+          child.renderOrder = -1;
         }
       });
 
