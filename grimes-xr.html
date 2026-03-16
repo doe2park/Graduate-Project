@@ -128,7 +128,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v18 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v19 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -273,37 +273,53 @@ bldgToggle.addEventListener('click', () => {
 
     gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
       buildingModel = gltf.scene;
-      buildingModel.updateMatrixWorld(true);
 
-      // Compute MEP bounding box for alignment
-      const mepBox = new THREE.Box3();
-      allMeshes.forEach(m => { m.updateWorldMatrix(true, false); mepBox.expandByObject(m); });
-      const mepCenter = mepBox.getCenter(new THREE.Vector3());
-      const mepSize = mepBox.getSize(new THREE.Vector3());
-
-      // Building GLB is in feet, MEP is in meters
       // Step 1: Scale feet → meters
       const FT_TO_M = 0.3048;
       buildingModel.scale.setScalar(FT_TO_M);
       buildingModel.updateMatrixWorld(true);
 
-      // Step 2: Compute building box after ft→m conversion
-      const bldgBox = new THREE.Box3().setFromObject(buildingModel);
-      const bldgCenter = bldgBox.getCenter(new THREE.Vector3());
-      const bldgSize = bldgBox.getSize(new THREE.Vector3());
-
-      console.log('MEP center:', mepCenter, 'size:', mepSize);
-      console.log('Bldg center (meters):', bldgCenter, 'size:', bldgSize);
-
-      // Step 3: Align center X/Z, match bottom Y
-      buildingModel.position.x += (mepCenter.x - bldgCenter.x);
-      buildingModel.position.z += (mepCenter.z - bldgCenter.z);
+      // Step 2: Building is Z-up (Z=20m height), need Y-up
+      // Rotate -90° around X, but around the model's own center
+      const preBox = new THREE.Box3().setFromObject(buildingModel);
+      const preCenter = preBox.getCenter(new THREE.Vector3());
       
-      // Recompute after X/Z shift
-      const bldgBox2 = new THREE.Box3().setFromObject(buildingModel);
-      buildingModel.position.y += (mepBox.min.y - bldgBox2.min.y);
+      // Move to origin, rotate, move back
+      buildingModel.position.sub(preCenter);
+      buildingModel.rotation.x = -Math.PI / 2;
+      buildingModel.updateMatrixWorld(true);
+      
+      // After rotation, recompute center and shift back
+      const postBox = new THREE.Box3().setFromObject(buildingModel);
+      const postCenter = postBox.getCenter(new THREE.Vector3());
+      buildingModel.position.sub(postCenter); // now centered at origin
+      buildingModel.updateMatrixWorld(true);
 
-      console.log('Building aligned. Final box:', new THREE.Box3().setFromObject(buildingModel));
+      // Step 3: Compute MEP bounding box
+      const mepBox = new THREE.Box3();
+      allMeshes.forEach(m => { m.updateWorldMatrix(true, false); mepBox.expandByObject(m); });
+      const mepCenter = mepBox.getCenter(new THREE.Vector3());
+      const mepSize = mepBox.getSize(new THREE.Vector3());
+
+      const bldgBox = new THREE.Box3().setFromObject(buildingModel);
+      const bldgSize = bldgBox.getSize(new THREE.Vector3());
+      const bldgCenter = bldgBox.getCenter(new THREE.Vector3());
+
+      console.log('MEP size:', mepSize);
+      console.log('Bldg size (rotated):', bldgSize);
+
+      // Step 4: Align center to MEP center
+      buildingModel.position.x += (mepCenter.x - bldgCenter.x);
+      buildingModel.position.y += (mepCenter.y - bldgCenter.y);
+      buildingModel.position.z += (mepCenter.z - bldgCenter.z);
+
+      // Step 5: Align bottoms
+      buildingModel.updateMatrixWorld(true);
+      const finalBox = new THREE.Box3().setFromObject(buildingModel);
+      buildingModel.position.y += (mepBox.min.y - finalBox.min.y);
+
+      console.log('Building aligned. MEP Y range:', mepBox.min.y.toFixed(1), '→', mepBox.max.y.toFixed(1));
+      console.log('Bldg Y range:', new THREE.Box3().setFromObject(buildingModel).min.y.toFixed(1), '→', new THREE.Box3().setFromObject(buildingModel).max.y.toFixed(1));
 
       // Make ALL meshes ghostly transparent
       buildingModel.traverse(child => {
