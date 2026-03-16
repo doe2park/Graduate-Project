@@ -126,7 +126,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v12 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -193,6 +193,7 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x0f1320, 0.003);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 300);
 camera.position.set(0, 6, 0);
+camera.rotation.order = 'YXZ'; // critical for FPS: yaw first, then pitch
 const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping = true; orbitControls.dampingFactor = 0.1;
 orbitControls.target.set(0, 6, -5);
@@ -227,7 +228,7 @@ gltfLoader.load('grimes-mep-only.glb', (gltf) => {
     allMeshes.push(child);
     const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length-1);
     const sys = SYSTEM_INFO[sysIdx];
-    const mat = new THREE.MeshStandardMaterial({ color:sys.hex, emissive:sys.hex, emissiveIntensity:0.6, metalness:0.2, roughness:0.4, side:THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ color:sys.hex, side:THREE.DoubleSide, transparent:true, opacity:0.85 });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
     child.userData.sysId = sys.id;
@@ -297,9 +298,8 @@ function applyViewMode() {
       color = new THREE.Color(0x333333);
     }
 
-    sm.mesh.material = new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 0.4,
-      metalness: 0.2, roughness: 0.4, side: THREE.DoubleSide
+    sm.mesh.material = new THREE.MeshBasicMaterial({
+      color, side: THREE.DoubleSide, transparent: true, opacity: 0.85
     });
   });
 }
@@ -389,7 +389,7 @@ renderer.domElement.addEventListener('click', e => {
     const data = SIM_DATA[sysId];
 
     highlightedMesh = mesh;
-    mesh.material = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xffffff, emissiveIntensity:0.7, metalness:0.1, roughness:0.2, side:THREE.DoubleSide });
+    mesh.material = new THREE.MeshBasicMaterial({ color:0xffffff, side:THREE.DoubleSide, transparent:true, opacity:0.9 });
 
     let floor = 'B1';
     if (point.y > 3) floor = 'L1'; if (point.y > 7) floor = 'L2';
