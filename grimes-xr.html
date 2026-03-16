@@ -16,14 +16,16 @@
   #enterXR { position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--cyan);color:#000;font-weight:800;font-size:20px;padding:18px 48px;border:none;border-radius:16px;cursor:pointer;box-shadow:0 6px 32px rgba(45,212,191,.5);z-index:50;display:none; }
 
   /* ── Top Bar ── */
-  #topbar { position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);backdrop-filter:blur(12px);border-bottom:1px solid var(--border); }
-  #topbar h1 { font-size:15px;color:var(--cyan);flex:1;white-space:nowrap; }
+  #topbar { position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch; }
+  #topbar h1 { font-size:15px;color:var(--cyan);flex-shrink:0;white-space:nowrap; }
+  @media(max-width:768px) { #topbar h1 { font-size:12px; } .view-btn { font-size:10px;padding:5px 8px; } #topbar { gap:5px;padding:6px 8px; } }
   .view-btn { background:rgba(45,212,191,.08);border:1px solid var(--border);color:#94a3b8;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:600; }
   .view-btn.active { background:var(--cyan);color:#000;border-color:var(--cyan); }
 
   /* ── Legend ── */
   #legend { position:fixed;top:52px;left:12px;z-index:50;background:var(--panel);padding:12px 14px;border-radius:10px;backdrop-filter:blur(10px);border:1px solid var(--border);max-width:200px;font-size:11px; }
-  #legend h3 { font-size:12px;color:var(--cyan);margin-bottom:8px; }
+  #legend h3 { font-size:12px;color:var(--cyan);margin-bottom:8px;cursor:pointer; }
+  @media(max-width:768px) { #legend { display:none; } #dashboard { display:none; } }
   .sys-row { display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;user-select:none;transition:opacity .2s; }
   .sys-row:hover { opacity:.8; } .sys-row.off { opacity:.25;text-decoration:line-through; }
   .sys-dot { width:12px;height:12px;border-radius:3px;flex-shrink:0;border:1px solid rgba(255,255,255,.15); }
@@ -128,7 +130,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v19 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v20 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
