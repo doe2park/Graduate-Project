@@ -112,7 +112,7 @@
 <script>
 const BUILDINGS = [
   // ═══ ENGINEERING ═══
-  { id:'grimes', name:'Bechtel Engineering Center', alias:'Grimes Building', lat:37.87465, lng:-122.25866, type:'Engineering', cat:'Engineering', floors:4, sqft:'83,000', year:1980, hasBIM:true, glbUrl:'grimes-mep-only.glb', viewerUrl:'grimes-xr.html', mepSystems:8, sensors:10, energy:'87 kW', status:'live' },
+  { id:'grimes', name:'Bechtel Engineering Center', alias:'Grimes Building', lat:37.87620, lng:-122.25840, type:'Engineering Student Services', cat:'Engineering', floors:4, sqft:'118,500', year:'1980 (2025 expansion)', hasBIM:true, glbUrl:'grimes-mep-only.glb', viewerUrl:'grimes-xr.html', mepSystems:8, sensors:10, energy:'87 kW', status:'live' },
   { id:'davis', name:'Davis Hall', lat:37.87515, lng:-122.25775, type:'Civil & Environmental Eng.', cat:'Engineering', floors:7, sqft:'142,000', year:1931, hasBIM:false, status:'offline' },
   { id:'etcheverry', name:'Etcheverry Hall', lat:37.87584, lng:-122.25920, type:'Mechanical / Nuclear Eng.', cat:'Engineering', floors:6, sqft:'193,000', year:1964, hasBIM:false, status:'offline' },
   { id:'soda', name:'Soda Hall', lat:37.87564, lng:-122.25868, type:'Computer Science (EECS)', cat:'Engineering', floors:7, sqft:'112,000', year:1994, hasBIM:false, status:'offline' },
@@ -174,7 +174,34 @@ const BUILDINGS = [
 
 /* ═══ MAP ═══ */
 const map = L.map('map', { center:[37.87220,-122.25780], zoom:16, zoomControl:false });
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:20, subdomains:'abcd', attribution:'&copy; OSM &copy; CARTO' }).addTo(map);
+const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:20, subdomains:'abcd', attribution:'&copy; OSM &copy; CARTO' });
+const satelliteTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:20, attribution:'&copy; Esri' });
+const labelTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', { maxZoom:20, subdomains:'abcd' });
+
+// Default to satellite
+satelliteTile.addTo(map);
+labelTile.addTo(map);
+let isSatellite = true;
+
+// Map style toggle button
+const styleBtn = document.createElement('button');
+styleBtn.textContent = '🌙 Dark';
+styleBtn.style.cssText = 'position:fixed;bottom:16px;left:270px;z-index:1000;background:var(--surface);border:1px solid var(--border);color:var(--cyan);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;font-family:var(--font);backdrop-filter:blur(8px);';
+document.body.appendChild(styleBtn);
+styleBtn.addEventListener('click', () => {
+  if (isSatellite) {
+    map.removeLayer(satelliteTile);
+    map.removeLayer(labelTile);
+    darkTile.addTo(map);
+    styleBtn.textContent = '🛰️ Satellite';
+  } else {
+    map.removeLayer(darkTile);
+    satelliteTile.addTo(map);
+    labelTile.addTo(map);
+    styleBtn.textContent = '🌙 Dark';
+  }
+  isSatellite = !isSatellite;
+});
 L.control.zoom({ position:'bottomright' }).addTo(map);
 
 /* ═══ MARKERS ═══ */
