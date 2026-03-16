@@ -128,7 +128,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v17 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v18 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -281,36 +281,29 @@ bldgToggle.addEventListener('click', () => {
       const mepCenter = mepBox.getCenter(new THREE.Vector3());
       const mepSize = mepBox.getSize(new THREE.Vector3());
 
-      // Compute building bounding box
+      // Building GLB is in feet, MEP is in meters
+      // Step 1: Scale feet → meters
+      const FT_TO_M = 0.3048;
+      buildingModel.scale.setScalar(FT_TO_M);
+      buildingModel.updateMatrixWorld(true);
+
+      // Step 2: Compute building box after ft→m conversion
       const bldgBox = new THREE.Box3().setFromObject(buildingModel);
       const bldgCenter = bldgBox.getCenter(new THREE.Vector3());
       const bldgSize = bldgBox.getSize(new THREE.Vector3());
 
       console.log('MEP center:', mepCenter, 'size:', mepSize);
-      console.log('Bldg center:', bldgCenter, 'size:', bldgSize);
+      console.log('Bldg center (meters):', bldgCenter, 'size:', bldgSize);
 
-      // The building GLB uses ft, MEP uses meters (0.3048 conversion was done in extraction)
-      // Building GLB from Navisworks: likely still in feet or already converted
-      // Use uniform scale based on matching the horizontal footprint
-      const mepFootprint = Math.max(mepSize.x, mepSize.z);
-      const bldgFootprint = Math.max(bldgSize.x, bldgSize.z);
-      const scaleFactor = mepFootprint / bldgFootprint;
-      buildingModel.scale.setScalar(scaleFactor);
-      buildingModel.updateMatrixWorld(true);
-
-      // Recompute after scaling
-      const bldgBox2 = new THREE.Box3().setFromObject(buildingModel);
-      const bldgCenter2 = bldgBox2.getCenter(new THREE.Vector3());
-
-      // Align: center X/Z, match bottom Y
-      buildingModel.position.x += (mepCenter.x - bldgCenter2.x);
-      buildingModel.position.z += (mepCenter.z - bldgCenter2.z);
+      // Step 3: Align center X/Z, match bottom Y
+      buildingModel.position.x += (mepCenter.x - bldgCenter.x);
+      buildingModel.position.z += (mepCenter.z - bldgCenter.z);
       
-      const bldgBox3 = new THREE.Box3().setFromObject(buildingModel);
-      buildingModel.position.y += (mepBox.min.y - bldgBox3.min.y);
+      // Recompute after X/Z shift
+      const bldgBox2 = new THREE.Box3().setFromObject(buildingModel);
+      buildingModel.position.y += (mepBox.min.y - bldgBox2.min.y);
 
-      console.log('Scale factor:', scaleFactor);
-      console.log('Aligned. Bldg final:', new THREE.Box3().setFromObject(buildingModel));
+      console.log('Building aligned. Final box:', new THREE.Box3().setFromObject(buildingModel));
 
       // Make ALL meshes ghostly transparent
       buildingModel.traverse(child => {
@@ -387,7 +380,9 @@ function applyViewMode() {
   hl.style.display = 'block';
 
   systemMeshes.forEach(sm => {
-    const sysId = SYSTEM_INFO[sm.sysIndex].id;
+    const sys = SYSTEM_INFO[sm.sysIndex];
+    if (!sys) return;
+    const sysId = sys.id;
     const data = SIM_DATA[sysId];
     let color;
 
