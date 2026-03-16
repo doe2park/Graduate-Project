@@ -453,8 +453,8 @@ function initJoy(zid,kid,k){const z=document.getElementById(zid),kn=document.get
   window.addEventListener('mousemove',ev=>{if(a)m(ev);});window.addEventListener('mouseup',()=>{if(a)e2();});}
 initJoy('joystickMove','moveKnob','move');initJoy('joystickLook','lookKnob','look');
 function updateJoy(){const{move,look}=joy;
-  if(Math.abs(move.x)>.1||Math.abs(move.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}const y=camera.rotation.y,s=Math.sin(y),c=Math.cos(y),sp=FP_SPEED*.6;camera.position.x+=(move.x*c-(-move.y)*s)*sp;camera.position.z+=(move.x*s+(-move.y)*c)*sp;}
-  if(Math.abs(look.x)>.1||Math.abs(look.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}camera.rotation.y-=look.x*.03;camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-look.y*.02));}}
+  if(Math.abs(move.x)>.1||Math.abs(move.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}const y=camera.rotation.y,s=Math.sin(y),c=Math.cos(y),sp=FP_SPEED*.6;camera.position.x+=(-move.x*c-(move.y)*s)*sp;camera.position.z+=(-move.x*s+(move.y)*c)*sp;}
+  if(Math.abs(look.x)>.1||Math.abs(look.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}camera.rotation.y+=look.x*.03;camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x+look.y*.02));}}
 
 /* ══════════════════════════════════════════ XR ══════════════════════════════════════════ */
 const xrRay=new THREE.Raycaster(),tmpMat=new THREE.Matrix4();
