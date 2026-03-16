@@ -37,12 +37,12 @@
   .stat-val.warn { color:#fb923c; } .stat-val.ok { color:var(--cyan); } .stat-val.crit { color:#f87171; }
 
   /* ── Click Detail Panel ── */
-  #detailPanel { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--panel);padding:16px 24px;border-radius:14px;backdrop-filter:blur(12px);border:1px solid var(--border);z-index:55;display:none;min-width:320px;max-width:420px; }
+  #detailPanel { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--panel);padding:16px 24px;border-radius:14px;backdrop-filter:blur(12px);border:1px solid var(--border);z-index:55;display:none;min-width:360px;max-width:480px; }
   .dp-header { display:flex;align-items:center;gap:10px;margin-bottom:10px; }
   .dp-tag { padding:4px 12px;border-radius:6px;font-weight:700;font-size:12px;color:#000; }
   .dp-title { font-size:14px;font-weight:600; }
   .dp-floor { font-size:11px;color:#64748b; }
-  .dp-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px; }
+  .dp-grid { display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px; }
   .dp-sensor { background:rgba(255,255,255,.03);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.05); }
   .dp-sensor-label { font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.5px; }
   .dp-sensor-val { font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px; }
@@ -104,6 +104,7 @@
     <div><div class="dp-title" id="dpTitle">—</div><div class="dp-floor" id="dpFloor">—</div></div>
   </div>
   <div class="dp-grid" id="dpSensors"></div>
+  <div style="margin-top:8px;font-size:8px;color:#334155;text-align:center">SIM — values vary by location</div>
 </div>
 
 <!-- Heatmap Legend -->
@@ -126,7 +127,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v12 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v13 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -363,6 +364,72 @@ const mouse = new THREE.Vector2();
 const detailPanel = document.getElementById('detailPanel');
 let highlightedMesh = null;
 
+// Position-based pseudo-random (consistent for same location)
+function posHash(x, y, z) { return Math.abs(Math.sin(x*127.1+y*311.7+z*74.7)*43758.5453) % 1; }
+
+// Generate zone/room name from position
+function getZone(point, floor) {
+  const zones = {
+    'B1': ['Mechanical Room','Chiller Plant','Boiler Room','Utility Vault','Electrical Room','Fire Pump Room','Storage'],
+    'L1': ['Main Lobby','Office 101','Lab 102','Corridor','Conference Room','Copy Room','Restroom Area'],
+    'L2': ['Open Office','Lab 201','Lab 202','Server Room','Study Area','Faculty Office','Break Room'],
+    'L3': ['Research Lab 301','Grad Office 302','Seminar Room','Equipment Room','Peer Advising 310','Library'],
+    'SRV': ['Rooftop Equipment','AHU Platform','Cooling Tower Area','Elevator Machine Room']
+  };
+  const floorZones = zones[floor] || zones['L1'];
+  const idx = Math.floor(posHash(point.x, point.y, point.z) * floorZones.length);
+  return floorZones[idx];
+}
+
+// Generate equipment tag from system + position
+function getEquipTag(sysId, point) {
+  const prefixes = { hvac_duct:'AHU', hvac_equip:'FCU', pipe:'PMP', sprinkler:'SPK', conduit:'PNL', diffuser:'DFR', pump:'CHP', spiral:'SPI', elec:'ELP' };
+  const prefix = prefixes[sysId] || 'MEP';
+  const num = Math.floor(posHash(point.x, point.z, point.y) * 900) + 100;
+  return `${prefix}-${num}`;
+}
+
+// Generate unique sensor values based on position
+function getLocalSensors(sysId, point) {
+  const h = (a,b) => posHash(point.x*a, point.y*b, point.z);
+  const base = SIM_DATA[sysId];
+  const result = [];
+
+  for (const [key, sensor] of Object.entries(base)) {
+    if (typeof sensor.val === 'number' && sensor.val > 0) {
+      // Vary ±20% based on position
+      const variation = 0.8 + h(key.length, key.charCodeAt(0)) * 0.4;
+      const localVal = Math.round(sensor.val * variation * 10) / 10;
+      let status = 'ok';
+      if (key === 'temp' && localVal > 100) status = 'warn';
+      if (key === 'temp' && localVal > 140) status = 'crit';
+      if (key === 'energy' && localVal > 50) status = 'warn';
+      if (key === 'pressure' && localVal > 100) status = 'warn';
+      result.push({ label: sensor.label, val: localVal, unit: sensor.unit, status });
+    } else if (typeof sensor.val === 'string') {
+      const states = ['Running','Running','Running','Standby','Warning'];
+      const state = states[Math.floor(h(3,7) * states.length)];
+      result.push({ label: sensor.label, val: state, unit: '', status: state === 'Warning' ? 'warn' : 'ok' });
+    }
+  }
+  return result;
+}
+
+// Generate maintenance info
+function getMaintenanceInfo(point) {
+  const h = posHash(point.x + 1, point.y + 2, point.z + 3);
+  const daysAgo = Math.floor(h * 180) + 5;
+  const nextDays = Math.floor(posHash(point.z, point.x, point.y) * 90) + 10;
+  const conditions = ['Good','Good','Good','Fair','Needs Attention'];
+  const condition = conditions[Math.floor(h * conditions.length)];
+  const lastDate = new Date(Date.now() - daysAgo * 86400000);
+  return {
+    lastInspection: lastDate.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }),
+    nextService: `${nextDays} days`,
+    condition
+  };
+}
+
 document.getElementById('dpClose').addEventListener('click', () => {
   detailPanel.style.display = 'none';
   if (highlightedMesh) { highlightedMesh.material = originalMaterials.get(highlightedMesh.uuid) || highlightedMesh.material; highlightedMesh = null; }
@@ -386,31 +453,41 @@ renderer.domElement.addEventListener('click', e => {
     const sysIdx = mesh.userData.sysIndex ?? 0;
     const sys = SYSTEM_INFO[sysIdx];
     const sysId = sys.id;
-    const data = SIM_DATA[sysId];
 
     highlightedMesh = mesh;
     mesh.material = new THREE.MeshBasicMaterial({ color:0xffffff, side:THREE.DoubleSide, transparent:true, opacity:0.9 });
 
+    // Floor detection
     let floor = 'B1';
     if (point.y > 3) floor = 'L1'; if (point.y > 7) floor = 'L2';
     if (point.y > 11) floor = 'L3'; if (point.y > 15) floor = 'SRV';
 
+    const zone = getZone(point, floor);
+    const tag = getEquipTag(sysId, point);
+    const sensors = getLocalSensors(sysId, point);
+    const maint = getMaintenanceInfo(point);
+
     document.getElementById('dpTag').textContent = sys.label;
     document.getElementById('dpTag').style.background = sys.color;
-    document.getElementById('dpTitle').textContent = sys.label;
-    document.getElementById('dpFloor').textContent = `Floor ${floor} · Height ${point.y.toFixed(1)}m · (${point.x.toFixed(1)}, ${point.z.toFixed(1)})`;
+    document.getElementById('dpTitle').textContent = tag;
+    document.getElementById('dpFloor').textContent = `${floor} · ${zone}`;
 
     const sensorsEl = document.getElementById('dpSensors');
     sensorsEl.innerHTML = '';
-    for (const [key, sensor] of Object.entries(data)) {
-      if (key === 'status') {
-        sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">${sensor.label}</div><div class="dp-sensor-val" style="color:var(--cyan)">${sensor.val}</div></div>`;
-      } else if (sensor.val > 0) {
-        const valColor = key === 'temp' ? (sensor.val > 100 ? '#fb923c' : sensor.val < 50 ? '#38bdf8' : '#2dd4bf') :
-                         key === 'energy' ? (sensor.val > 50 ? '#fb923c' : '#2dd4bf') : '#e2e8f0';
-        sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">${sensor.label}</div><div class="dp-sensor-val" style="color:${valColor}">${typeof sensor.val === 'number' ? sensor.val.toFixed(1) : sensor.val} <span class="dp-sensor-unit">${sensor.unit}</span></div></div>`;
-      }
-    }
+
+    // Sensor readings
+    sensors.forEach(s => {
+      const colors = { ok:'var(--cyan)', warn:'#fb923c', crit:'#f87171' };
+      const valDisplay = typeof s.val === 'number' ? s.val.toFixed(1) : s.val;
+      sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">${s.label}</div><div class="dp-sensor-val" style="color:${colors[s.status]||'#e2e8f0'}">${valDisplay} <span class="dp-sensor-unit">${s.unit}</span></div></div>`;
+    });
+
+    // Maintenance info
+    const condColor = maint.condition === 'Good' ? 'var(--cyan)' : maint.condition === 'Fair' ? '#f59e0b' : '#f87171';
+    sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">Condition</div><div class="dp-sensor-val" style="color:${condColor}">${maint.condition}</div></div>`;
+    sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">Last Inspected</div><div class="dp-sensor-val" style="font-size:13px">${maint.lastInspection}</div></div>`;
+    sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">Next Service</div><div class="dp-sensor-val" style="font-size:13px">${maint.nextService}</div></div>`;
+
     detailPanel.style.display = 'block';
   } else {
     detailPanel.style.display = 'none';
@@ -523,14 +600,15 @@ function xrContinuousRaycast() {
     
     const sysIdx = bestHit.object.userData.sysIndex ?? 0;
     const sys = SYSTEM_INFO[sysIdx];
-    const data = SIM_DATA[sys.id];
+    const tag = getEquipTag(sys.id, pt);
+    const sensors = getLocalSensors(sys.id, pt);
     
     if (vrLabel) scene.remove(vrLabel);
-    const lines = [sys.label];
-    for (const [k, s] of Object.entries(data)) {
-      if (typeof s.val === 'number' && s.val > 0) lines.push(`${s.label}: ${s.val.toFixed(1)} ${s.unit}`);
-      else if (typeof s.val === 'string') lines.push(`${s.label}: ${s.val}`);
-    }
+    const lines = [`${tag} · ${sys.label}`];
+    sensors.forEach(s => {
+      const valStr = typeof s.val === 'number' ? s.val.toFixed(1) : s.val;
+      lines.push(`${s.label}: ${valStr} ${s.unit}`);
+    });
     vrLabel = makeVRLabel(lines.slice(0, 5), sys.color);
     vrLabel.position.copy(pt); vrLabel.position.y += 0.8;
     scene.add(vrLabel);
