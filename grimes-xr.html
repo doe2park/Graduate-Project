@@ -182,26 +182,26 @@ let viewMode = 'system'; // 'system' | 'temp' | 'flow' | 'energy'
 const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setClearColor(0x0a0e1a, 1);
+renderer.setClearColor(0x0f1320, 1);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 2.2;
+renderer.toneMappingExposure = 2.8;
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 /* ══════════════════════════════════════════ SCENE ══════════════════════════════════════════ */
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0e1a, 0.006);
+scene.fog = new THREE.FogExp2(0x0f1320, 0.003);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 300);
 camera.position.set(0, 6, 0);
 const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping = true; orbitControls.dampingFactor = 0.1;
 orbitControls.target.set(0, 6, -5);
 
-scene.add(new THREE.AmbientLight(0xffffff, 2.0));
-const sun = new THREE.DirectionalLight(0xffffff, 3.0); sun.position.set(30,50,20); scene.add(sun);
-scene.add(new THREE.DirectionalLight(0xaaccff, 2.0).translateX(-30).translateY(20));
-scene.add(new THREE.DirectionalLight(0xffeedd, 1.5).translateZ(30).translateY(-10));
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.5));
+scene.add(new THREE.AmbientLight(0xffffff, 3.0));
+const sun = new THREE.DirectionalLight(0xffffff, 3.5); sun.position.set(30,50,20); scene.add(sun);
+scene.add(new THREE.DirectionalLight(0xaaccff, 2.5).translateX(-30).translateY(20));
+scene.add(new THREE.DirectionalLight(0xffeedd, 2.0).translateZ(30).translateY(-10));
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 2.0));
 
 const grid = new THREE.GridHelper(80,40,0x2dd4bf,0x1a2535);
 grid.material.opacity=0.12; grid.material.transparent=true; scene.add(grid);
@@ -227,7 +227,7 @@ gltfLoader.load('grimes-mep-only.glb', (gltf) => {
     allMeshes.push(child);
     const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length-1);
     const sys = SYSTEM_INFO[sysIdx];
-    const mat = new THREE.MeshStandardMaterial({ color:sys.hex, emissive:sys.hex, emissiveIntensity:0.35, metalness:0.3, roughness:0.4, side:THREE.DoubleSide });
+    const mat = new THREE.MeshStandardMaterial({ color:sys.hex, emissive:sys.hex, emissiveIntensity:0.6, metalness:0.2, roughness:0.4, side:THREE.DoubleSide });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
     child.userData.sysId = sys.id;
@@ -453,8 +453,14 @@ function initJoy(zid,kid,k){const z=document.getElementById(zid),kn=document.get
   window.addEventListener('mousemove',ev=>{if(a)m(ev);});window.addEventListener('mouseup',()=>{if(a)e2();});}
 initJoy('joystickMove','moveKnob','move');initJoy('joystickLook','lookKnob','look');
 function updateJoy(){const{move,look}=joy;
-  if(Math.abs(move.x)>.1||Math.abs(move.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}const y=camera.rotation.y,s=Math.sin(y),c=Math.cos(y),sp=FP_SPEED*.6;camera.position.x+=(-move.x*c-(move.y)*s)*sp;camera.position.z+=(-move.x*s+(move.y)*c)*sp;}
-  if(Math.abs(look.x)>.1||Math.abs(look.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}camera.rotation.y+=look.x*.03;camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x+look.y*.02));}}
+  if(Math.abs(move.x)>.1||Math.abs(move.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}const yaw=camera.rotation.y,s=Math.sin(yaw),c=Math.cos(yaw),sp=FP_SPEED*.6;
+    // stick up(y<0)=forward, stick right(x>0)=strafe right
+    camera.position.x+=(move.x*c+move.y*s)*sp;
+    camera.position.z+=(-move.x*s+move.y*c)*sp;}
+  if(Math.abs(look.x)>.1||Math.abs(look.y)>.1){if(!fpMode){fpMode=true;orbitControls.enabled=false;}
+    // stick right=look right(decrease yaw), stick down=look down
+    camera.rotation.y-=look.x*.03;
+    camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-look.y*.02));}}
 
 /* ══════════════════════════════════════════ XR ══════════════════════════════════════════ */
 const xrRay=new THREE.Raycaster(),tmpMat=new THREE.Matrix4();
@@ -549,7 +555,7 @@ async function setupXR(){
       ['legend','clickInfo','floorNav','joystickMove','joystickLook','ctrlHint','topbar','dashboard','heatLegend','detailPanel'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
       renderer.xr.setReferenceSpaceType('local-floor');renderer.xr.setSession(session);xrSession=session;btn.textContent='✕ EXIT';
       session.addEventListener('end',()=>{xrSession=null;btn.textContent=mode==='immersive-ar'?'🥽 ENTER AR':'🥽 ENTER VR';
-        renderer.setClearColor(0x0a0e1a,1);grid.visible=true;scene.fog=new THREE.FogExp2(0x0a0e1a,.006);
+        renderer.setClearColor(0x0f1320,1);grid.visible=true;scene.fog=new THREE.FogExp2(0x0f1320,.003);
         ['legend','floorNav','joystickMove','joystickLook','ctrlHint','topbar','dashboard'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});});
     }catch(e){console.error('XR:',e);}});
 }
