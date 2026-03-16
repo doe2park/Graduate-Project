@@ -32,7 +32,10 @@
   .cat-btn:hover { border-color:rgba(255,255,255,.15); }
 
   /* Side panel */
-  #sidePanel { position:fixed; top:52px; left:0; bottom:0; z-index:1000; width:250px; background:rgba(13,18,32,.94); backdrop-filter:blur(16px); border-right:1px solid var(--border); padding:12px; overflow-y:auto; }
+  #sidePanel { position:fixed; top:52px; left:0; bottom:0; z-index:1000; width:250px; background:rgba(13,18,32,.94); backdrop-filter:blur(16px); border-right:1px solid var(--border); padding:12px; overflow-y:auto; transition:transform .3s; }
+  #sidePanel.hidden { transform:translateX(-260px); }
+  #spToggle { position:fixed; top:60px; left:8px; z-index:1001; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--border); color:var(--cyan); font-size:16px; cursor:pointer; display:none; }
+  @media(max-width:768px) { #sidePanel { transform:translateX(-260px); } #sidePanel.show { transform:translateX(0); } #spToggle { display:block; } #filters { left:50px; transform:none; font-size:9px; } }
   #sidePanel h2 { font-size:12px; color:var(--cyan); margin-bottom:8px; letter-spacing:.5px; text-transform:uppercase; padding:0 4px; }
   .sp-search { width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,.03); color:var(--text); font-family:var(--font); font-size:12px; margin-bottom:8px; outline:none; }
   .sp-search:focus { border-color:var(--cyan); }
@@ -99,6 +102,7 @@
   <button class="cat-btn" data-cat="Other">Other</button>
 </div>
 
+<button id="spToggle">☰</button>
 <div id="sidePanel">
   <h2>Campus Buildings</h2>
   <input class="sp-search" id="search" placeholder="Search buildings..." />
@@ -298,6 +302,12 @@ if (navigator.geolocation) {
     } else userMarker.setLatLng([lat,lng]);
   }, () => {}, { enableHighAccuracy:true, maximumAge:5000 });
 }
+
+/* ═══ SIDEBAR TOGGLE (mobile) ═══ */
+document.getElementById('spToggle').addEventListener('click', () => {
+  const sp = document.getElementById('sidePanel');
+  sp.classList.toggle('show');
+});
 
 /* ═══ STATS ═══ */
 document.getElementById('tsB').textContent = BUILDINGS.length;
