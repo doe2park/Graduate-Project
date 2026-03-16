@@ -78,6 +78,7 @@
   <button class="view-btn" data-mode="temp">🌡️ Temp</button>
   <button class="view-btn" data-mode="flow">💧 Flow</button>
   <button class="view-btn" data-mode="energy">⚡ Energy</button>
+  <button class="view-btn" id="bldgToggle" style="margin-left:8px;border-color:rgba(148,163,184,0.3)">🏢 Building</button>
 </div>
 
 <!-- Legend -->
@@ -127,7 +128,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v13 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v14 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -244,6 +245,69 @@ gltfLoader.load('grimes-mep-only.glb', (gltf) => {
   setupXR();
 }, p => { loadingEl.textContent = `Loading MEP... ${(p.loaded/1024/1024).toFixed(1)} MB`; },
 () => { loadingEl.textContent = 'Error'; loadingEl.style.color = '#f87171'; });
+
+/* ══════════════════════════════════════════ BUILDING MODEL (transparent overlay) ══════════════════════════════════════════ */
+let buildingModel = null;
+let buildingLoaded = false;
+let buildingVisible = false;
+let buildingLoading = false;
+
+const bldgToggle = document.getElementById('bldgToggle');
+
+const ghostMat = new THREE.MeshBasicMaterial({
+  color: 0x8899aa,
+  transparent: true,
+  opacity: 0.07,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+
+bldgToggle.addEventListener('click', () => {
+  if (buildingLoading) return;
+
+  if (!buildingLoaded) {
+    // First click: load the full building model
+    buildingLoading = true;
+    bldgToggle.textContent = '⏳ Loading...';
+    bldgToggle.style.opacity = '0.5';
+
+    gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
+      buildingModel = gltf.scene;
+
+      // Make ALL meshes ghostly transparent
+      buildingModel.traverse(child => {
+        if (child.isMesh) {
+          child.material = ghostMat;
+          child.renderOrder = -1; // render behind MEP
+        }
+      });
+
+      scene.add(buildingModel);
+      buildingLoaded = true;
+      buildingVisible = true;
+      buildingLoading = false;
+      bldgToggle.textContent = '🏢 Building ✓';
+      bldgToggle.classList.add('active');
+      bldgToggle.style.opacity = '1';
+
+    }, (p) => {
+      const mb = (p.loaded / 1024 / 1024).toFixed(0);
+      bldgToggle.textContent = `⏳ ${mb} MB`;
+    }, () => {
+      buildingLoading = false;
+      bldgToggle.textContent = '🏢 Failed';
+      bldgToggle.style.opacity = '1';
+      setTimeout(() => { bldgToggle.textContent = '🏢 Building'; }, 2000);
+    });
+
+  } else {
+    // Toggle visibility
+    buildingVisible = !buildingVisible;
+    buildingModel.visible = buildingVisible;
+    bldgToggle.classList.toggle('active', buildingVisible);
+    bldgToggle.textContent = buildingVisible ? '🏢 Building ✓' : '🏢 Building';
+  }
+});
 
 /* ══════════════════════════════════════════ HEATMAP COLORING ══════════════════════════════════════════ */
 function tempToColor(t) {
@@ -630,10 +694,12 @@ async function setupXR(){
     try{const session=await navigator.xr.requestSession(mode,{requiredFeatures:['local-floor'],optionalFeatures:mode==='immersive-ar'?['plane-detection','hand-tracking']:['hand-tracking']});
       renderer.setClearColor(mode==='immersive-ar'?0x000000:0x0d1117,mode==='immersive-ar'?0:1);
       grid.visible=false;scene.fog=null;
+      if(buildingModel) buildingModel.visible=false; // too heavy for Quest
       ['legend','clickInfo','floorNav','joystickMove','joystickLook','ctrlHint','topbar','dashboard','heatLegend','detailPanel'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
       renderer.xr.setReferenceSpaceType('local-floor');renderer.xr.setSession(session);xrSession=session;btn.textContent='✕ EXIT';
       session.addEventListener('end',()=>{xrSession=null;btn.textContent=mode==='immersive-ar'?'🥽 ENTER AR':'🥽 ENTER VR';
         renderer.setClearColor(0x0f1320,1);grid.visible=true;scene.fog=new THREE.FogExp2(0x0f1320,.003);
+        if(buildingModel && buildingVisible) buildingModel.visible=true;
         ['legend','floorNav','joystickMove','joystickLook','ctrlHint','topbar','dashboard'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});});
     }catch(e){console.error('XR:',e);}});
 }
