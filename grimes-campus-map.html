@@ -7,499 +7,274 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;600;700;800&display=swap');
-
-  :root {
-    --bg: #070b14;
-    --surface: #0d1220;
-    --border: rgba(45,212,191,0.12);
-    --cyan: #2dd4bf;
-    --cyan-dim: rgba(45,212,191,0.15);
-    --text: #e2e8f0;
-    --muted: #64748b;
-    --font: 'Outfit', system-ui, sans-serif;
-    --mono: 'JetBrains Mono', monospace;
-  }
-
+  :root { --bg:#070b14; --surface:#0d1220; --border:rgba(45,212,191,.12); --cyan:#2dd4bf; --dim:rgba(45,212,191,.15); --text:#e2e8f0; --muted:#64748b; --font:'Outfit',system-ui,sans-serif; --mono:'JetBrains Mono',monospace; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:var(--bg); color:var(--text); font-family:var(--font); overflow:hidden; height:100vh; }
-
-  /* ── Map container ── */
   #map { position:absolute; inset:0; z-index:1; }
 
-  /* ── Leaflet overrides ── */
-  .leaflet-control-zoom { border:none !important; }
-  .leaflet-control-zoom a { background:var(--surface) !important; color:var(--cyan) !important; border:1px solid var(--border) !important; border-radius:8px !important; width:36px !important; height:36px !important; line-height:36px !important; font-size:18px !important; }
-  .leaflet-control-zoom a:hover { background:var(--cyan-dim) !important; }
-  .leaflet-control-attribution { background:rgba(7,11,20,0.8) !important; color:var(--muted) !important; font-size:9px !important; }
-  .leaflet-control-attribution a { color:var(--cyan) !important; }
+  .leaflet-control-zoom { border:none!important; }
+  .leaflet-control-zoom a { background:var(--surface)!important; color:var(--cyan)!important; border:1px solid var(--border)!important; border-radius:8px!important; width:36px!important; height:36px!important; line-height:36px!important; font-size:18px!important; }
+  .leaflet-control-attribution { background:rgba(7,11,20,.8)!important; color:var(--muted)!important; font-size:9px!important; }
+  .leaflet-control-attribution a { color:var(--cyan)!important; }
 
-  /* ── Top bar ── */
-  #topbar {
-    position:fixed; top:0; left:0; right:0; z-index:1000;
-    display:flex; align-items:center; gap:16px;
-    padding:14px 24px;
-    background:rgba(7,11,20,0.88);
-    backdrop-filter:blur(16px);
-    border-bottom:1px solid var(--border);
-  }
+  #topbar { position:fixed; top:0; left:0; right:0; z-index:1000; display:flex; align-items:center; gap:16px; padding:12px 20px; background:rgba(7,11,20,.9); backdrop-filter:blur(16px); border-bottom:1px solid var(--border); }
   .logo { display:flex; align-items:center; gap:10px; }
-  .logo-mark {
-    width:36px; height:36px; border-radius:10px;
-    background:linear-gradient(135deg, var(--cyan), #38bdf8);
-    display:flex; align-items:center; justify-content:center;
-    font-family:var(--mono); font-weight:700; font-size:13px; color:#000;
-  }
-  .logo h1 { font-size:18px; font-weight:700; letter-spacing:-0.5px; }
+  .logo-mark { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,var(--cyan),#38bdf8); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; font-size:12px; color:#000; }
+  .logo h1 { font-size:16px; font-weight:700; letter-spacing:-.5px; white-space:nowrap; }
   .logo h1 span { color:var(--cyan); }
-
-  .topbar-stats {
-    margin-left:auto; display:flex; gap:20px; font-size:12px; color:var(--muted);
-  }
+  .topbar-stats { margin-left:auto; display:flex; gap:16px; font-size:11px; color:var(--muted); }
   .topbar-stats .val { color:var(--cyan); font-weight:600; font-family:var(--mono); }
 
-  /* ── Building card popup ── */
-  .building-popup {
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:16px 20px;
-    min-width:260px;
-    box-shadow:0 12px 48px rgba(0,0,0,0.6);
-    font-family:var(--font);
-  }
-  .building-popup h3 {
-    font-size:16px; font-weight:700; margin-bottom:4px;
-    color:var(--text); letter-spacing:-0.3px;
-  }
-  .building-popup .bp-type {
-    font-size:11px; color:var(--muted); margin-bottom:12px;
-    text-transform:uppercase; letter-spacing:0.5px;
-  }
-  .bp-stats {
-    display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:14px;
-  }
-  .bp-stat {
-    background:rgba(45,212,191,0.05);
-    border:1px solid rgba(45,212,191,0.08);
-    border-radius:8px; padding:8px 10px;
-  }
-  .bp-stat-label { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
-  .bp-stat-val { font-size:15px; font-weight:700; font-family:var(--mono); color:var(--text); margin-top:2px; }
-  .bp-stat-val.ok { color:var(--cyan); }
-  .bp-stat-val.warn { color:#fb923c; }
+  /* Category filters */
+  #filters { position:fixed; top:52px; left:50%; transform:translateX(-50%); z-index:1000; display:flex; gap:6px; padding:8px 12px; background:rgba(7,11,20,.9); backdrop-filter:blur(12px); border-radius:0 0 12px 12px; border:1px solid var(--border); border-top:none; }
+  .cat-btn { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:var(--muted); padding:5px 10px; border-radius:6px; cursor:pointer; font-size:10px; font-weight:600; font-family:var(--font); transition:all .15s; }
+  .cat-btn.active { background:var(--dim); color:var(--cyan); border-color:var(--cyan); }
+  .cat-btn:hover { border-color:rgba(255,255,255,.15); }
 
-  .bp-enter {
-    display:block; width:100%; padding:10px 0; border:none; border-radius:10px;
-    background:var(--cyan); color:#000; font-weight:700; font-size:14px;
-    font-family:var(--font); cursor:pointer;
-    transition:all 0.2s;
-  }
-  .bp-enter:hover { filter:brightness(1.1); transform:translateY(-1px); }
-  .bp-enter:disabled { opacity:0.3; cursor:default; transform:none; }
-  .bp-no-bim { text-align:center; color:var(--muted); font-size:11px; padding:8px 0; }
+  /* Side panel */
+  #sidePanel { position:fixed; top:52px; left:0; bottom:0; z-index:1000; width:250px; background:rgba(13,18,32,.94); backdrop-filter:blur(16px); border-right:1px solid var(--border); padding:12px; overflow-y:auto; }
+  #sidePanel h2 { font-size:12px; color:var(--cyan); margin-bottom:8px; letter-spacing:.5px; text-transform:uppercase; padding:0 4px; }
+  .sp-search { width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,.03); color:var(--text); font-family:var(--font); font-size:12px; margin-bottom:8px; outline:none; }
+  .sp-search:focus { border-color:var(--cyan); }
+  .sp-item { display:flex; align-items:center; gap:8px; padding:8px; border-radius:8px; cursor:pointer; transition:background .15s; margin-bottom:2px; }
+  .sp-item:hover { background:var(--dim); }
+  .sp-icon { width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
+  .sp-icon.active { background:linear-gradient(135deg,var(--cyan),#38bdf8); color:#000; }
+  .sp-icon.inactive { background:rgba(100,116,139,.15); color:#64748b; }
+  .sp-name { font-size:11px; font-weight:600; line-height:1.2; }
+  .sp-sub { font-size:9px; color:var(--muted); }
+  .sp-badge { margin-left:auto; font-size:8px; padding:2px 5px; border-radius:3px; font-weight:600; font-family:var(--mono); }
+  .sp-badge.live { background:rgba(45,212,191,.15); color:var(--cyan); }
+  .sp-badge.offline { background:rgba(100,116,139,.1); color:#475569; }
 
-  /* ── Custom marker ── */
-  .bldg-marker {
-    width:40px; height:40px; border-radius:12px;
-    display:flex; align-items:center; justify-content:center;
-    font-size:16px; font-weight:700;
-    box-shadow:0 4px 20px rgba(0,0,0,0.4);
-    border:2px solid rgba(255,255,255,0.15);
-    transition:all 0.2s;
-    cursor:pointer;
-  }
-  .bldg-marker:hover { transform:scale(1.15); }
-  .bldg-marker.has-bim {
-    background:linear-gradient(135deg, var(--cyan), #38bdf8);
-    color:#000;
-  }
-  .bldg-marker.no-bim {
-    background:rgba(100,116,139,0.3);
-    color:#94a3b8;
-    border-color:rgba(100,116,139,0.3);
-  }
+  .sp-count { font-size:10px; color:var(--muted); padding:4px; text-align:center; }
 
-  .bldg-marker .pulse {
-    position:absolute; inset:-6px; border-radius:16px;
-    border:2px solid var(--cyan);
-    animation:pulse 2s ease-out infinite;
-  }
-  @keyframes pulse {
-    0% { opacity:0.6; transform:scale(1); }
-    100% { opacity:0; transform:scale(1.5); }
-  }
+  /* Popup */
+  .building-popup { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; min-width:240px; box-shadow:0 12px 48px rgba(0,0,0,.6); font-family:var(--font); }
+  .building-popup h3 { font-size:14px; font-weight:700; margin-bottom:2px; color:var(--text); }
+  .building-popup .bp-type { font-size:10px; color:var(--muted); margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px; }
+  .bp-stats { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:12px; }
+  .bp-stat { background:rgba(45,212,191,.04); border:1px solid rgba(45,212,191,.06); border-radius:6px; padding:6px 8px; }
+  .bp-stat-label { font-size:8px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .bp-stat-val { font-size:13px; font-weight:700; font-family:var(--mono); color:var(--text); margin-top:1px; }
+  .bp-stat-val.ok { color:var(--cyan); } .bp-stat-val.warn { color:#fb923c; }
+  .bp-enter { display:block; width:100%; padding:9px 0; border:none; border-radius:8px; background:var(--cyan); color:#000; font-weight:700; font-size:13px; font-family:var(--font); cursor:pointer; }
+  .bp-enter:hover { filter:brightness(1.1); }
+  .bp-enter:disabled { opacity:.25; cursor:default; }
+  .bp-no-bim { text-align:center; color:var(--muted); font-size:10px; padding:6px 0; }
 
-  /* ── Side panel ── */
-  #sidePanel {
-    position:fixed; top:64px; left:16px; bottom:16px; z-index:1000;
-    width:240px; background:rgba(13,18,32,0.92);
-    backdrop-filter:blur(16px); border-radius:14px;
-    border:1px solid var(--border); padding:16px;
-    overflow-y:auto;
-  }
-  #sidePanel h2 { font-size:13px; color:var(--cyan); margin-bottom:12px; letter-spacing:0.5px; text-transform:uppercase; }
-  .sp-item {
-    display:flex; align-items:center; gap:10px; padding:10px;
-    border-radius:10px; cursor:pointer; transition:background 0.2s;
-    margin-bottom:4px;
-  }
-  .sp-item:hover { background:var(--cyan-dim); }
-  .sp-icon {
-    width:32px; height:32px; border-radius:8px;
-    display:flex; align-items:center; justify-content:center;
-    font-size:14px; font-weight:700; flex-shrink:0;
-  }
-  .sp-icon.active { background:linear-gradient(135deg, var(--cyan), #38bdf8); color:#000; }
-  .sp-icon.inactive { background:rgba(100,116,139,0.2); color:#64748b; }
-  .sp-name { font-size:12px; font-weight:600; }
-  .sp-sub { font-size:10px; color:var(--muted); }
-  .sp-badge {
-    margin-left:auto; font-size:9px; padding:2px 6px; border-radius:4px;
-    font-weight:600; font-family:var(--mono);
-  }
-  .sp-badge.live { background:rgba(45,212,191,0.15); color:var(--cyan); }
-  .sp-badge.offline { background:rgba(100,116,139,0.15); color:#64748b; }
+  .leaflet-popup-custom .leaflet-popup-content-wrapper { background:transparent; box-shadow:none; border-radius:0; padding:0; }
+  .leaflet-popup-custom .leaflet-popup-content { margin:0; }
+  .leaflet-popup-custom .leaflet-popup-tip { background:var(--surface); }
+  .leaflet-popup-close-button { color:var(--muted)!important; font-size:16px!important; top:6px!important; right:8px!important; }
+
+  /* Marker */
+  .bldg-marker { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:12px; box-shadow:0 3px 12px rgba(0,0,0,.4); border:2px solid rgba(255,255,255,.1); cursor:pointer; transition:transform .15s; }
+  .bldg-marker:hover { transform:scale(1.2); }
+  .bldg-marker.has-bim { background:linear-gradient(135deg,var(--cyan),#38bdf8); color:#000; font-weight:700; }
+  .bldg-marker.no-bim { background:rgba(100,116,139,.25); color:#94a3b8; border-color:rgba(100,116,139,.2); }
+  .bldg-marker .pulse { position:absolute; inset:-5px; border-radius:12px; border:2px solid var(--cyan); animation:pulse 2s ease-out infinite; }
+  @keyframes pulse { 0%{opacity:.6;transform:scale(1)} 100%{opacity:0;transform:scale(1.5)} }
 </style>
 </head>
 <body>
 
-<!-- Top Bar -->
 <div id="topbar">
-  <div class="logo">
-    <div class="logo-mark">DT</div>
-    <h1>UC Berkeley · <span>Campus Digital Twin</span></h1>
-  </div>
+  <div class="logo"><div class="logo-mark">DT</div><h1>UC Berkeley · <span>Campus Digital Twin</span></h1></div>
   <div class="topbar-stats">
-    <div>Buildings <span class="val" id="tsBuildings">12</span></div>
-    <div>BIM Models <span class="val" id="tsBim">1</span></div>
-    <div>Sensors <span class="val" id="tsSensors">10</span></div>
+    <div>Buildings <span class="val" id="tsB">0</span></div>
+    <div>BIM Models <span class="val" id="tsBim">0</span></div>
+    <div>With Energy Data <span class="val" id="tsE">149</span></div>
   </div>
 </div>
 
-<!-- Side Panel -->
+<div id="filters">
+  <button class="cat-btn active" data-cat="all">All</button>
+  <button class="cat-btn" data-cat="Engineering">Engineering</button>
+  <button class="cat-btn" data-cat="Science">Science</button>
+  <button class="cat-btn" data-cat="Humanities">Humanities</button>
+  <button class="cat-btn" data-cat="Professional">Professional</button>
+  <button class="cat-btn" data-cat="Student">Student Life</button>
+  <button class="cat-btn" data-cat="Library">Libraries</button>
+  <button class="cat-btn" data-cat="Other">Other</button>
+</div>
+
 <div id="sidePanel">
   <h2>Campus Buildings</h2>
+  <input class="sp-search" id="search" placeholder="Search buildings..." />
   <div id="buildingList"></div>
+  <div class="sp-count" id="spCount"></div>
 </div>
 
-<!-- Map -->
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* ═══════════════════════════════════════════
-   BUILDING DATA
-═══════════════════════════════════════════ */
 const BUILDINGS = [
-  {
-    id: 'grimes',
-    name: 'Bechtel Engineering Center',
-    alias: 'Grimes Building',
-    lat: 37.87465,
-    lng: -122.25866,
-    type: 'Engineering / Research',
-    floors: 4,
-    sqft: '62,000',
-    year: 1980,
-    hasBIM: true,
-    glbUrl: 'grimes-mep-only.glb',
-    viewerUrl: 'grimes-xr.html',
-    mepSystems: 8,
-    sensors: 10,
-    energy: '87 kW',
-    status: 'live'
-  },
-  {
-    id: 'davis',
-    name: 'Davis Hall',
-    lat: 37.87515,
-    lng: -122.25775,
-    type: 'Civil & Environmental Eng.',
-    floors: 4,
-    sqft: '83,000',
-    year: 1930,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'etcheverry',
-    name: 'Etcheverry Hall',
-    lat: 37.87584,
-    lng: -122.25920,
-    type: 'Mechanical Engineering',
-    floors: 3,
-    sqft: '55,000',
-    year: 1964,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'soda',
-    name: 'Soda Hall',
-    lat: 37.87564,
-    lng: -122.25868,
-    type: 'Computer Science',
-    floors: 5,
-    sqft: '110,000',
-    year: 1994,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'cory',
-    name: 'Cory Hall',
-    lat: 37.87515,
-    lng: -122.25698,
-    type: 'EECS',
-    floors: 5,
-    sqft: '82,000',
-    year: 1950,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'hearst_mining',
-    name: 'Hearst Memorial Mining',
-    lat: 37.87488,
-    lng: -122.25720,
-    type: 'Materials Science',
-    floors: 3,
-    sqft: '112,000',
-    year: 1907,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'mclaughlin',
-    name: "O'Brien Hall",
-    lat: 37.87530,
-    lng: -122.25838,
-    type: 'Civil Engineering Lab',
-    floors: 2,
-    sqft: '22,000',
-    year: 1960,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'stanley',
-    name: 'Stanley Hall',
-    lat: 37.87395,
-    lng: -122.25559,
-    type: 'Bioengineering',
-    floors: 6,
-    sqft: '285,000',
-    year: 2007,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'sutardja',
-    name: 'Sutardja Dai Hall',
-    lat: 37.87547,
-    lng: -122.25828,
-    type: 'CITRIS',
-    floors: 4,
-    sqft: '141,000',
-    year: 2009,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'hesse',
-    name: 'Hesse Hall',
-    lat: 37.87449,
-    lng: -122.25782,
-    type: 'Mechanical Engineering Lab',
-    floors: 2,
-    sqft: '23,000',
-    year: 1924,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'tan',
-    name: 'Tan Hall',
-    lat: 37.87349,
-    lng: -122.25686,
-    type: 'Chemistry / ChemE',
-    floors: 4,
-    sqft: '60,000',
-    year: 1997,
-    hasBIM: false,
-    status: 'offline'
-  },
-  {
-    id: 'gilman',
-    name: 'Gilman Hall',
-    lat: 37.87326,
-    lng: -122.25613,
-    type: 'Chemistry',
-    floors: 3,
-    sqft: '92,000',
-    year: 1917,
-    hasBIM: false,
-    status: 'offline'
-  },
+  // ═══ ENGINEERING ═══
+  { id:'grimes', name:'Bechtel Engineering Center', alias:'Grimes Building', lat:37.87465, lng:-122.25866, type:'Engineering', cat:'Engineering', floors:4, sqft:'83,000', year:1980, hasBIM:true, glbUrl:'grimes-mep-only.glb', viewerUrl:'grimes-xr.html', mepSystems:8, sensors:10, energy:'87 kW', status:'live' },
+  { id:'davis', name:'Davis Hall', lat:37.87515, lng:-122.25775, type:'Civil & Environmental Eng.', cat:'Engineering', floors:7, sqft:'142,000', year:1931, hasBIM:false, status:'offline' },
+  { id:'etcheverry', name:'Etcheverry Hall', lat:37.87584, lng:-122.25920, type:'Mechanical / Nuclear Eng.', cat:'Engineering', floors:6, sqft:'193,000', year:1964, hasBIM:false, status:'offline' },
+  { id:'soda', name:'Soda Hall', lat:37.87564, lng:-122.25868, type:'Computer Science (EECS)', cat:'Engineering', floors:7, sqft:'112,000', year:1994, hasBIM:false, status:'offline' },
+  { id:'cory', name:'Cory Hall', lat:37.87515, lng:-122.25698, type:'Electrical Engineering (EECS)', cat:'Engineering', floors:5, sqft:'138,000', year:1950, hasBIM:false, status:'offline' },
+  { id:'hearst_mining', name:'Hearst Memorial Mining', lat:37.87488, lng:-122.25720, type:'Materials Science & Eng.', cat:'Engineering', floors:3, sqft:'143,000', year:1907, hasBIM:false, status:'offline' },
+  { id:'obrien', name:"O'Brien Hall", lat:37.87530, lng:-122.25838, type:'Environmental Eng. Lab', cat:'Engineering', floors:3, sqft:'23,000', year:1959, hasBIM:false, status:'offline' },
+  { id:'stanley', name:'Stanley Hall', lat:37.87395, lng:-122.25559, type:'Bioengineering / QB3', cat:'Engineering', floors:11, sqft:'285,000', year:2007, hasBIM:false, status:'offline' },
+  { id:'sutardja', name:'Sutardja Dai Hall', lat:37.87547, lng:-122.25828, type:'CITRIS / Nanofab', cat:'Engineering', floors:7, sqft:'141,000', year:2009, hasBIM:false, status:'offline' },
+  { id:'hesse', name:'Hesse Hall', lat:37.87449, lng:-122.25782, type:'Mechanical Eng. Lab', cat:'Engineering', floors:3, sqft:'84,000', year:1924, hasBIM:false, status:'offline' },
+  // ═══ SCIENCE ═══
+  { id:'tan', name:'Tan Hall', lat:37.87349, lng:-122.25686, type:'Chemistry / ChemE', cat:'Science', floors:9, sqft:'100,000', year:1997, hasBIM:false, status:'offline' },
+  { id:'gilman', name:'Gilman Hall', lat:37.87326, lng:-122.25613, type:'Chemistry', cat:'Science', floors:3, sqft:'44,700', year:1917, hasBIM:false, status:'offline' },
+  { id:'latimer', name:'Latimer Hall', lat:37.87369, lng:-122.25595, type:'Chemistry', cat:'Science', floors:5, sqft:'130,000', year:1963, hasBIM:false, status:'offline' },
+  { id:'hildebrand', name:'Hildebrand Hall', lat:37.87399, lng:-122.25498, type:'Chemistry', cat:'Science', floors:4, sqft:'45,000', year:1966, hasBIM:false, status:'offline' },
+  { id:'lewis', name:'Lewis Hall', lat:37.87390, lng:-122.25640, type:'Chemistry', cat:'Science', floors:4, sqft:'48,000', year:1948, hasBIM:false, status:'offline' },
+  { id:'calvin', name:'Calvin Laboratory', lat:37.87420, lng:-122.25490, type:'Chemistry Research', cat:'Science', floors:3, sqft:'25,000', year:1963, hasBIM:false, status:'offline' },
+  { id:'barker', name:'Barker Hall', lat:37.87370, lng:-122.26095, type:'Genetics & Plant Biology', cat:'Science', floors:4, sqft:'60,000', year:1964, hasBIM:false, status:'offline' },
+  { id:'koshland', name:'Koshland Hall', lat:37.87405, lng:-122.26110, type:'Molecular & Cell Biology', cat:'Science', floors:5, sqft:'80,000', year:1989, hasBIM:false, status:'offline' },
+  { id:'weill', name:'Weill Hall', lat:37.87360, lng:-122.25440, type:'Neuroscience', cat:'Science', floors:3, sqft:'45,000', year:2012, hasBIM:false, status:'offline' },
+  { id:'vlsb', name:'Valley Life Sciences', lat:37.87145, lng:-122.26175, type:'Biology / Museums', cat:'Science', floors:5, sqft:'236,000', year:1930, hasBIM:false, status:'offline' },
+  { id:'leconte', name:'Le Conte Hall', lat:37.87270, lng:-122.25668, type:'Physics', cat:'Science', floors:5, sqft:'90,000', year:1924, hasBIM:false, status:'offline' },
+  { id:'birge', name:'Birge Hall', lat:37.87222, lng:-122.25715, type:'Physics', cat:'Science', floors:4, sqft:'65,000', year:1964, hasBIM:false, status:'offline' },
+  { id:'evans', name:'Evans Hall', lat:37.87380, lng:-122.25770, type:'Mathematics / Statistics', cat:'Science', floors:10, sqft:'170,000', year:1971, hasBIM:false, status:'offline' },
+  { id:'campbell', name:'Campbell Hall', lat:37.87225, lng:-122.25760, type:'Astronomy', cat:'Science', floors:3, sqft:'38,000', year:1959, hasBIM:false, status:'offline' },
+  { id:'mccone', name:'McCone Hall', lat:37.87410, lng:-122.25990, type:'Earth & Planetary Science', cat:'Science', floors:6, sqft:'85,000', year:1961, hasBIM:false, status:'offline' },
+  { id:'giannini', name:'Giannini Hall', lat:37.87370, lng:-122.26210, type:'Agricultural Economics', cat:'Science', floors:4, sqft:'60,000', year:1930, hasBIM:false, status:'offline' },
+  // ═══ HUMANITIES ═══
+  { id:'dwinelle', name:'Dwinelle Hall', lat:37.87055, lng:-122.26075, type:'Languages / Humanities', cat:'Humanities', floors:5, sqft:'167,000', year:1952, hasBIM:false, status:'offline' },
+  { id:'wheeler', name:'Wheeler Hall', lat:37.87130, lng:-122.25935, type:'English / Rhetoric', cat:'Humanities', floors:4, sqft:'90,000', year:1917, hasBIM:false, status:'offline' },
+  { id:'barrows', name:'Barrows Hall', lat:37.87000, lng:-122.25815, type:'Social Sciences', cat:'Humanities', floors:8, sqft:'120,000', year:1964, hasBIM:false, status:'offline' },
+  { id:'south', name:'South Hall', lat:37.87135, lng:-122.25800, type:'School of Information (1873)', cat:'Humanities', floors:3, sqft:'30,000', year:1873, hasBIM:false, status:'offline' },
+  { id:'stephens', name:'Stephens Hall', lat:37.87160, lng:-122.25735, type:'International Studies', cat:'Humanities', floors:4, sqft:'40,000', year:1923, hasBIM:false, status:'offline' },
+  { id:'moses', name:'Moses Hall', lat:37.87195, lng:-122.25825, type:'Economics / Philosophy', cat:'Humanities', floors:4, sqft:'56,000', year:1931, hasBIM:false, status:'offline' },
+  // ═══ PROFESSIONAL ═══
+  { id:'haas', name:'Haas School of Business', lat:37.87155, lng:-122.25375, type:'Business', cat:'Professional', floors:4, sqft:'190,000', year:1995, hasBIM:false, status:'offline' },
+  { id:'chou', name:'Chou Hall', lat:37.87195, lng:-122.25355, type:'Business', cat:'Professional', floors:6, sqft:'80,000', year:2017, hasBIM:false, status:'offline' },
+  { id:'boalt', name:'Berkeley Law (Boalt)', lat:37.86950, lng:-122.25330, type:'Law', cat:'Professional', floors:5, sqft:'110,000', year:1951, hasBIM:false, status:'offline' },
+  { id:'wurster', name:'Bauer Wurster Hall', lat:37.87065, lng:-122.25510, type:'Architecture / Planning', cat:'Professional', floors:10, sqft:'106,000', year:1964, hasBIM:false, status:'offline' },
+  { id:'goldman', name:'Goldman School', lat:37.87595, lng:-122.25815, type:'Public Policy', cat:'Professional', floors:3, sqft:'45,000', year:1990, hasBIM:false, status:'offline' },
+  { id:'berkeley_way', name:'Berkeley Way West', lat:37.87190, lng:-122.26880, type:'Psychology / Education', cat:'Professional', floors:9, sqft:'290,000', year:2021, hasBIM:false, status:'offline' },
+  // ═══ LIBRARIES ═══
+  { id:'doe', name:'Doe Memorial Library', lat:37.87230, lng:-122.25935, type:'Main Library', cat:'Library', floors:4, sqft:'100,000', year:1911, hasBIM:false, status:'offline' },
+  { id:'moffitt', name:'Moffitt Library', lat:37.87270, lng:-122.26055, type:'Undergraduate Library', cat:'Library', floors:5, sqft:'95,000', year:1970, hasBIM:false, status:'offline' },
+  { id:'bancroft', name:'Bancroft Library', lat:37.87260, lng:-122.25880, type:'Archives / Special Coll.', cat:'Library', floors:3, sqft:'55,000', year:1911, hasBIM:false, status:'offline' },
+  // ═══ STUDENT LIFE ═══
+  { id:'sproul', name:'Sproul Hall', lat:37.86960, lng:-122.25865, type:'Administration', cat:'Student', floors:4, sqft:'88,000', year:1941, hasBIM:false, status:'offline' },
+  { id:'mlk', name:'MLK Jr. Student Union', lat:37.86890, lng:-122.26010, type:'Student Union', cat:'Student', floors:4, sqft:'75,000', year:1961, hasBIM:false, status:'offline' },
+  { id:'rsf', name:'Recreational Sports Facility', lat:37.86860, lng:-122.26200, type:'Recreation', cat:'Student', floors:3, sqft:'100,000', year:1984, hasBIM:false, status:'offline' },
+  { id:'tang', name:'Tang Center', lat:37.86755, lng:-122.25550, type:'Health Services', cat:'Student', floors:4, sqft:'65,000', year:2004, hasBIM:false, status:'offline' },
+  // ═══ OTHER ═══
+  { id:'zellerbach', name:'Zellerbach Hall', lat:37.86885, lng:-122.26085, type:'Performing Arts', cat:'Other', floors:3, sqft:'78,000', year:1968, hasBIM:false, status:'offline' },
+  { id:'bampfa', name:'BAMPFA', lat:37.86860, lng:-122.25600, type:'Art Museum / Film', cat:'Other', floors:5, sqft:'83,000', year:2016, hasBIM:false, status:'offline' },
+  { id:'california', name:'California Hall', lat:37.87185, lng:-122.25960, type:'Administration', cat:'Other', floors:3, sqft:'60,000', year:1905, hasBIM:false, status:'offline' },
+  { id:'stadium', name:'Memorial Stadium', lat:37.87090, lng:-122.25060, type:'Athletics', cat:'Other', floors:5, sqft:'270,000', year:1923, hasBIM:false, status:'offline' },
+  { id:'campanile', name:'Campanile (Sather Tower)', lat:37.87220, lng:-122.25780, type:'Landmark (1914)', cat:'Other', floors:1, sqft:'5,000', year:1914, hasBIM:false, status:'offline' },
+  { id:'hearst_gym', name:'Hearst Gymnasium', lat:37.86960, lng:-122.25665, type:'Athletics / Recreation', cat:'Other', floors:3, sqft:'85,000', year:1927, hasBIM:false, status:'offline' },
+  { id:'donner', name:'Donner Laboratory', lat:37.87520, lng:-122.25560, type:'Research', cat:'Other', floors:3, sqft:'40,000', year:1942, hasBIM:false, status:'offline' },
 ];
 
-/* ═══════════════════════════════════════════
-   MAP SETUP
-═══════════════════════════════════════════ */
-const map = L.map('map', {
-  center: [37.87470, -122.25780],
-  zoom: 17,
-  zoomControl: false,
-  attributionControl: true,
-});
+/* ═══ MAP ═══ */
+const map = L.map('map', { center:[37.87220,-122.25780], zoom:16, zoomControl:false });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:20, subdomains:'abcd', attribution:'&copy; OSM &copy; CARTO' }).addTo(map);
+L.control.zoom({ position:'bottomright' }).addTo(map);
 
-// Dark map tiles
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  maxZoom: 20,
-  subdomains: 'abcd',
-  attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-}).addTo(map);
-
-L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-/* ═══════════════════════════════════════════
-   MARKERS
-═══════════════════════════════════════════ */
+/* ═══ MARKERS ═══ */
 const markers = {};
+const markerLayer = L.layerGroup().addTo(map);
+let activeCategory = 'all';
 
-BUILDINGS.forEach(bldg => {
-  const iconHtml = bldg.hasBIM
-    ? `<div class="bldg-marker has-bim"><div class="pulse"></div>🏢</div>`
-    : `<div class="bldg-marker no-bim">🏢</div>`;
+function createMarkers(filter) {
+  markerLayer.clearLayers();
+  const filtered = filter === 'all' ? BUILDINGS : BUILDINGS.filter(b => b.cat === filter);
 
-  const icon = L.divIcon({
-    html: iconHtml,
-    className: '',
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
-    popupAnchor: [0, -24],
-  });
+  filtered.forEach(bldg => {
+    const iconHtml = bldg.hasBIM
+      ? '<div class="bldg-marker has-bim"><div class="pulse"></div>🏢</div>'
+      : '<div class="bldg-marker no-bim">🏢</div>';
+    const icon = L.divIcon({ html:iconHtml, className:'', iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-18] });
+    const marker = L.marker([bldg.lat, bldg.lng], { icon }).addTo(markerLayer);
 
-  const marker = L.marker([bldg.lat, bldg.lng], { icon }).addTo(map);
-
-  // Popup content
-  let popupHtml = `<div class="building-popup"><h3>${bldg.name}</h3>`;
-  if (bldg.alias) popupHtml += `<div style="font-size:11px;color:#94a3b8;margin-bottom:2px">${bldg.alias}</div>`;
-  popupHtml += `<div class="bp-type">${bldg.type}</div>`;
-  popupHtml += `<div class="bp-stats">`;
-  popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Floors</div><div class="bp-stat-val">${bldg.floors}</div></div>`;
-  popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Area</div><div class="bp-stat-val">${bldg.sqft} ft²</div></div>`;
-
-  if (bldg.hasBIM) {
-    popupHtml += `<div class="bp-stat"><div class="bp-stat-label">MEP Systems</div><div class="bp-stat-val ok">${bldg.mepSystems}</div></div>`;
-    popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Energy</div><div class="bp-stat-val warn">${bldg.energy}</div></div>`;
-    popupHtml += `</div>`;
-    popupHtml += `<button class="bp-enter" data-url="${bldg.viewerUrl}">Enter 3D Digital Twin →</button>`;
-  } else {
-    popupHtml += `<div class="bp-stat"><div class="bp-stat-label">Built</div><div class="bp-stat-val">${bldg.year}</div></div>`;
-    popupHtml += `<div class="bp-stat"><div class="bp-stat-label">BIM</div><div class="bp-stat-val" style="color:#64748b">—</div></div>`;
-    popupHtml += `</div>`;
-    popupHtml += `<div class="bp-no-bim">BIM model not yet available</div>`;
-    popupHtml += `<button class="bp-enter" disabled>No BIM Data</button>`;
-  }
-  popupHtml += `</div>`;
-
-  marker.bindPopup(popupHtml, {
-    className: 'leaflet-popup-custom',
-    maxWidth: 300,
-    closeButton: true,
-  });
-
-  markers[bldg.id] = marker;
-});
-
-/* Override Leaflet popup styles */
-const style = document.createElement('style');
-style.textContent = `
-  .leaflet-popup-custom .leaflet-popup-content-wrapper { background:transparent; box-shadow:none; border-radius:0; padding:0; }
-  .leaflet-popup-custom .leaflet-popup-content { margin:0; }
-  .leaflet-popup-custom .leaflet-popup-tip { background:var(--surface); border:1px solid var(--border); }
-  .leaflet-popup-close-button { color:var(--muted) !important; font-size:18px !important; top:8px !important; right:10px !important; }
-`;
-document.head.appendChild(style);
-
-/* ═══════════════════════════════════════════
-   SIDE PANEL
-═══════════════════════════════════════════ */
-const listEl = document.getElementById('buildingList');
-
-BUILDINGS.forEach(bldg => {
-  const item = document.createElement('div');
-  item.className = 'sp-item';
-  item.innerHTML = `
-    <div class="sp-icon ${bldg.hasBIM ? 'active' : 'inactive'}">🏢</div>
-    <div>
-      <div class="sp-name">${bldg.alias || bldg.name}</div>
-      <div class="sp-sub">${bldg.type}</div>
-    </div>
-    <span class="sp-badge ${bldg.hasBIM ? 'live' : 'offline'}">${bldg.hasBIM ? 'LIVE' : '—'}</span>
-  `;
-  item.addEventListener('click', () => {
-    map.flyTo([bldg.lat, bldg.lng], 18, { duration: 0.8 });
-    setTimeout(() => markers[bldg.id].openPopup(), 400);
-  });
-  listEl.appendChild(item);
-});
-
-/* ═══════════════════════════════════════════
-   GPS LOCATION (if available)
-═══════════════════════════════════════════ */
-let userMarker = null;
-
-if (navigator.geolocation) {
-  navigator.geolocation.watchPosition(pos => {
-    const { latitude: lat, longitude: lng } = pos.coords;
-
-    if (!userMarker) {
-      const icon = L.divIcon({
-        html: '<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 12px rgba(59,130,246,0.6)"></div>',
-        className: '',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8],
-      });
-      userMarker = L.marker([lat, lng], { icon }).addTo(map);
+    let popup = `<div class="building-popup"><h3>${bldg.name}</h3>`;
+    if (bldg.alias) popup += `<div style="font-size:10px;color:#94a3b8;margin-bottom:1px">${bldg.alias}</div>`;
+    popup += `<div class="bp-type">${bldg.type}</div><div class="bp-stats">`;
+    popup += `<div class="bp-stat"><div class="bp-stat-label">Floors</div><div class="bp-stat-val">${bldg.floors}</div></div>`;
+    popup += `<div class="bp-stat"><div class="bp-stat-label">Area</div><div class="bp-stat-val">${bldg.sqft} ft²</div></div>`;
+    if (bldg.hasBIM) {
+      popup += `<div class="bp-stat"><div class="bp-stat-label">MEP Systems</div><div class="bp-stat-val ok">${bldg.mepSystems}</div></div>`;
+      popup += `<div class="bp-stat"><div class="bp-stat-label">Energy</div><div class="bp-stat-val warn">${bldg.energy}</div></div>`;
+      popup += `</div><button class="bp-enter" data-url="${bldg.viewerUrl}">Enter 3D Digital Twin →</button>`;
     } else {
-      userMarker.setLatLng([lat, lng]);
+      popup += `<div class="bp-stat"><div class="bp-stat-label">Built</div><div class="bp-stat-val">${bldg.year}</div></div>`;
+      popup += `<div class="bp-stat"><div class="bp-stat-label">BIM</div><div class="bp-stat-val" style="color:#475569">—</div></div>`;
+      popup += `</div><div class="bp-no-bim">BIM model not yet available</div><button class="bp-enter" disabled>No BIM Data</button>`;
     }
-
-    // Check proximity to buildings
-    BUILDINGS.forEach(bldg => {
-      const dist = map.distance([lat, lng], [bldg.lat, bldg.lng]);
-      if (dist < 50 && bldg.hasBIM) {
-        // User is near a BIM building — could auto-open popup
-        // For now just log
-        console.log(`📍 Near ${bldg.name} (${Math.round(dist)}m)`);
-      }
-    });
-  }, err => {
-    console.log('GPS not available:', err.message);
-  }, {
-    enableHighAccuracy: true,
-    maximumAge: 5000,
+    popup += '</div>';
+    marker.bindPopup(popup, { className:'leaflet-popup-custom', maxWidth:280 });
+    markers[bldg.id] = marker;
   });
+
+  return filtered;
 }
 
-/* ═══════════════════════════════════════════
-   POPUP BUTTON HANDLER (event delegation)
-═══════════════════════════════════════════ */
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.bp-enter');
-  if (btn && btn.dataset.url) {
-    window.location.href = btn.dataset.url;
-  }
+createMarkers('all');
+
+/* ═══ CATEGORY FILTERS ═══ */
+document.getElementById('filters').addEventListener('click', e => {
+  const btn = e.target.closest('.cat-btn');
+  if (!btn) return;
+  activeCategory = btn.dataset.cat;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b === btn));
+  createMarkers(activeCategory);
+  buildSidePanel(activeCategory);
 });
 
-/* ═══════════════════════════════════════════
-   STATS
-═══════════════════════════════════════════ */
-document.getElementById('tsBuildings').textContent = BUILDINGS.length;
+/* ═══ POPUP BUTTON ═══ */
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.bp-enter');
+  if (btn && btn.dataset.url) window.location.href = btn.dataset.url;
+});
+
+/* ═══ SIDE PANEL ═══ */
+function buildSidePanel(filter) {
+  const list = document.getElementById('buildingList');
+  list.innerHTML = '';
+  const filtered = filter === 'all' ? BUILDINGS : BUILDINGS.filter(b => b.cat === filter);
+  const search = document.getElementById('search').value.toLowerCase();
+
+  const shown = search ? filtered.filter(b => b.name.toLowerCase().includes(search) || b.type.toLowerCase().includes(search) || (b.alias && b.alias.toLowerCase().includes(search))) : filtered;
+
+  shown.forEach(bldg => {
+    const item = document.createElement('div');
+    item.className = 'sp-item';
+    item.innerHTML = `
+      <div class="sp-icon ${bldg.hasBIM ? 'active' : 'inactive'}">🏢</div>
+      <div><div class="sp-name">${bldg.alias || bldg.name}</div><div class="sp-sub">${bldg.type}</div></div>
+      <span class="sp-badge ${bldg.hasBIM ? 'live' : 'offline'}">${bldg.hasBIM ? 'LIVE' : ''}</span>`;
+    item.addEventListener('click', () => {
+      map.flyTo([bldg.lat, bldg.lng], 18, { duration:.6 });
+      setTimeout(() => { if (markers[bldg.id]) markers[bldg.id].openPopup(); }, 300);
+    });
+    list.appendChild(item);
+  });
+  document.getElementById('spCount').textContent = `${shown.length} of ${BUILDINGS.length} buildings`;
+}
+buildSidePanel('all');
+
+document.getElementById('search').addEventListener('input', () => buildSidePanel(activeCategory));
+
+/* ═══ GPS ═══ */
+if (navigator.geolocation) {
+  let userMarker = null;
+  navigator.geolocation.watchPosition(pos => {
+    const { latitude:lat, longitude:lng } = pos.coords;
+    if (!userMarker) {
+      userMarker = L.marker([lat,lng], { icon: L.divIcon({ html:'<div style="width:14px;height:14px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 10px rgba(59,130,246,.6)"></div>', className:'', iconSize:[14,14], iconAnchor:[7,7] }) }).addTo(map);
+    } else userMarker.setLatLng([lat,lng]);
+  }, () => {}, { enableHighAccuracy:true, maximumAge:5000 });
+}
+
+/* ═══ STATS ═══ */
+document.getElementById('tsB').textContent = BUILDINGS.length;
 document.getElementById('tsBim').textContent = BUILDINGS.filter(b => b.hasBIM).length;
-document.getElementById('tsSensors').textContent = BUILDINGS.reduce((s, b) => s + (b.sensors || 0), 0);
 </script>
 </body>
 </html>
