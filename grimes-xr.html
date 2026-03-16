@@ -128,7 +128,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v15 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v17 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -273,6 +273,7 @@ bldgToggle.addEventListener('click', () => {
 
     gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
       buildingModel = gltf.scene;
+      buildingModel.updateMatrixWorld(true);
 
       // Compute MEP bounding box for alignment
       const mepBox = new THREE.Box3();
@@ -288,25 +289,28 @@ bldgToggle.addEventListener('click', () => {
       console.log('MEP center:', mepCenter, 'size:', mepSize);
       console.log('Bldg center:', bldgCenter, 'size:', bldgSize);
 
-      // Scale: match the largest dimension
-      const mepMax = Math.max(mepSize.x, mepSize.y, mepSize.z);
-      const bldgMax = Math.max(bldgSize.x, bldgSize.y, bldgSize.z);
-      const scaleFactor = mepMax / bldgMax;
+      // The building GLB uses ft, MEP uses meters (0.3048 conversion was done in extraction)
+      // Building GLB from Navisworks: likely still in feet or already converted
+      // Use uniform scale based on matching the horizontal footprint
+      const mepFootprint = Math.max(mepSize.x, mepSize.z);
+      const bldgFootprint = Math.max(bldgSize.x, bldgSize.z);
+      const scaleFactor = mepFootprint / bldgFootprint;
       buildingModel.scale.setScalar(scaleFactor);
+      buildingModel.updateMatrixWorld(true);
 
-      // Recompute bounding box after scaling
+      // Recompute after scaling
       const bldgBox2 = new THREE.Box3().setFromObject(buildingModel);
       const bldgCenter2 = bldgBox2.getCenter(new THREE.Vector3());
 
-      // Align centers
-      buildingModel.position.sub(bldgCenter2).add(mepCenter);
-
-      // Align ground: match bottom Y
+      // Align: center X/Z, match bottom Y
+      buildingModel.position.x += (mepCenter.x - bldgCenter2.x);
+      buildingModel.position.z += (mepCenter.z - bldgCenter2.z);
+      
       const bldgBox3 = new THREE.Box3().setFromObject(buildingModel);
       buildingModel.position.y += (mepBox.min.y - bldgBox3.min.y);
 
       console.log('Scale factor:', scaleFactor);
-      console.log('Building aligned to MEP');
+      console.log('Aligned. Bldg final:', new THREE.Box3().setFromObject(buildingModel));
 
       // Make ALL meshes ghostly transparent
       buildingModel.traverse(child => {
