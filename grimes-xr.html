@@ -297,6 +297,7 @@ const floorMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,op
 /* ══════════════════════════════════════════ LOAD MODEL ══════════════════════════════════════════ */
 const loadingEl = document.getElementById('loadText');
 const allMeshes = [];
+window._allMeshes = allMeshes; // debug access
 const systemMeshes = [];
 const systemVisible = new Array(8).fill(true);
 const originalMaterials = new Map();
@@ -449,17 +450,17 @@ bldgToggle.addEventListener('click', () => {
 });
 
 // Building alignment: Shift + Arrow keys to nudge position
-// Shows offset in console so you can hardcode it later
+// Shift+←→ = X, Shift+↑↓ = Y (height), Shift+[/] = Z (depth)
 window.addEventListener('keydown', e => {
   if (!e.shiftKey || !buildingModel || !buildingVisible) return;
   const step = 0.5; // meters
   let moved = false;
   if (e.code === 'ArrowRight') { buildingModel.position.x += step; moved = true; }
   if (e.code === 'ArrowLeft')  { buildingModel.position.x -= step; moved = true; }
-  if (e.code === 'ArrowUp')    { buildingModel.position.z -= step; moved = true; }
-  if (e.code === 'ArrowDown')  { buildingModel.position.z += step; moved = true; }
-  if (e.code === 'PageUp')     { buildingModel.position.y += step; moved = true; }
-  if (e.code === 'PageDown')   { buildingModel.position.y -= step; moved = true; }
+  if (e.code === 'ArrowUp')    { buildingModel.position.y += step; moved = true; }
+  if (e.code === 'ArrowDown')  { buildingModel.position.y -= step; moved = true; }
+  if (e.code === 'BracketRight') { buildingModel.position.z += step; moved = true; }
+  if (e.code === 'BracketLeft')  { buildingModel.position.z -= step; moved = true; }
   if (moved) {
     e.preventDefault();
     const p = buildingModel.position;
