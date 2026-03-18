@@ -297,7 +297,7 @@ const floorMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,op
 /* ══════════════════════════════════════════ LOAD MODEL ══════════════════════════════════════════ */
 const loadingEl = document.getElementById('loadText');
 const allMeshes = [];
-window._allMeshes = allMeshes; // debug access
+window.allMeshes = allMeshes;
 const systemMeshes = [];
 const systemVisible = new Array(8).fill(true);
 const originalMaterials = new Map();
