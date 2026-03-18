@@ -211,7 +211,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v35 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v36 · LIVE DATA · WASD move · QE up/down · Click MEP · Shift+Arrows nudge building · ESC orbit</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -235,7 +235,7 @@ const SYSTEM_INFO = [
   { id:'hvac_duct',  label:'HVAC Ductwork',    color:'#2dd4bf', hex:0x2dd4bf },
   { id:'hvac_equip', label:'HVAC Equipment',    color:'#1ab3a6', hex:0x1ab3a6 },
   { id:'pipe',       label:'Plumbing / Piping', color:'#38bdf8', hex:0x38bdf8 },
-  { id:'sprinkler',  label:'Fire Protection',   color:'#fb923c', hex:0xfb923c },
+  { id:'sprinkler',  label:'Fire Protection',   color:'#f87171', hex:0xf87171 },
   { id:'conduit',    label:'Electrical',        color:'#f59e0b', hex:0xf59e0b },
   { id:'diffuser',   label:'Diffusers / Grilles', color:'#80f2cc', hex:0x80f2cc },
   { id:'pump',       label:'Pumps / Valves',    color:'#e879f9', hex:0xe879f9 },
@@ -443,6 +443,25 @@ bldgToggle.addEventListener('click', () => {
       bldgToggle.textContent = '🏢 Solid';
       bldgToggle.classList.add('active');
     }
+  }
+});
+
+// Building alignment: Shift + Arrow keys to nudge position
+// Shows offset in console so you can hardcode it later
+window.addEventListener('keydown', e => {
+  if (!e.shiftKey || !buildingModel || !buildingVisible) return;
+  const step = 0.5; // meters
+  let moved = false;
+  if (e.code === 'ArrowRight') { buildingModel.position.x += step; moved = true; }
+  if (e.code === 'ArrowLeft')  { buildingModel.position.x -= step; moved = true; }
+  if (e.code === 'ArrowUp')    { buildingModel.position.z -= step; moved = true; }
+  if (e.code === 'ArrowDown')  { buildingModel.position.z += step; moved = true; }
+  if (e.code === 'PageUp')     { buildingModel.position.y += step; moved = true; }
+  if (e.code === 'PageDown')   { buildingModel.position.y -= step; moved = true; }
+  if (moved) {
+    e.preventDefault();
+    const p = buildingModel.position;
+    console.log(`Building offset: x=${p.x.toFixed(2)}, y=${p.y.toFixed(2)}, z=${p.z.toFixed(2)}`);
   }
 });
 
