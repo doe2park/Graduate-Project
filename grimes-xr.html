@@ -211,7 +211,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v32 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v33 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -723,6 +723,78 @@ function drawDonut(roof, hvac, outlets, total) {
 }
 
 let chartsInitialized = false;
+let dpMiniChartData = null;
+
+function drawMiniChart(hoverIdx) {
+  if (!dpMiniChartData) return;
+  const { vals, times, maxV, color } = dpMiniChartData;
+  const mc = document.getElementById('dpChart');
+  if (!mc) return;
+  const W = mc.width = mc.offsetWidth * 2;
+  const H = mc.height = 72;
+  const ctx = mc.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  // Fill
+  ctx.beginPath(); ctx.moveTo(0, H);
+  vals.forEach((v, i) => ctx.lineTo((i/(vals.length-1))*W, H-(v/maxV)*H));
+  ctx.lineTo(W, H); ctx.closePath();
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0, color+'4D'); g.addColorStop(1, 'transparent');
+  ctx.fillStyle = g; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  vals.forEach((v, i) => { const x=(i/(vals.length-1))*W, y=H-(v/maxV)*H; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+
+  // End dot
+  ctx.beginPath(); ctx.arc(W-2, H-(vals[vals.length-1]/maxV)*H, 3, 0, Math.PI*2);
+  ctx.fillStyle = color; ctx.fill();
+
+  // Hover tooltip
+  if (hoverIdx != null && hoverIdx >= 0 && hoverIdx < vals.length) {
+    const cx = (hoverIdx/(vals.length-1))*W;
+    const cy = H-(vals[hoverIdx]/maxV)*H;
+    // Crosshair
+    ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,H);
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+    // Dot
+    ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,2,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+    // Label
+    const val = vals[hoverIdx] < 10 ? vals[hoverIdx].toFixed(2) : vals[hoverIdx].toFixed(1);
+    let timeStr = '';
+    if (times?.[hoverIdx]) { const t = times[hoverIdx]; timeStr = (t.includes(' ') ? t.split(' ')[1] : t).substring(0,5) + '  '; }
+    const label = timeStr + val;
+    ctx.font = '600 16px monospace';
+    const tw = ctx.measureText(label).width;
+    const lx = Math.min(cx+8, W-tw-8);
+    const ly = Math.max(18, cy-8);
+    ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(lx-4,ly-12,tw+8,18);
+    ctx.fillStyle='#fff'; ctx.fillText(label,lx,ly);
+  }
+}
+
+// Setup mini chart hover/touch
+(function() {
+  const wrap = document.getElementById('dpMiniChart');
+  if (!wrap) return;
+  const handleMove = (clientX) => {
+    if (!dpMiniChartData) return;
+    const mc = document.getElementById('dpChart');
+    if (!mc) return;
+    const rect = mc.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX-rect.left)/rect.width));
+    const idx = Math.round(pct * (dpMiniChartData.vals.length-1));
+    drawMiniChart(idx);
+  };
+  wrap.style.cursor = 'crosshair';
+  wrap.addEventListener('mousemove', e => handleMove(e.clientX));
+  wrap.addEventListener('mouseleave', () => drawMiniChart());
+  wrap.addEventListener('touchmove', e => { e.preventDefault(); handleMove(e.touches[0].clientX); }, {passive:false});
+  wrap.addEventListener('touchend', () => drawMiniChart());
+})();
 
 function drawCharts() {
   if (!liveData) return;
@@ -944,11 +1016,12 @@ renderer.domElement.addEventListener('click', e => {
     const sensorsEl = document.getElementById('dpSensors');
     sensorsEl.innerHTML = '';
 
-    // Check if this is an electrical system with LIVE BMO data
+    // Check if this is an electrical or pipe system with LIVE BMO data
     const isElectrical = (sysId === 'conduit' || sysId === 'elec');
-    const hasLive = isElectrical && liveData;
+    const isPipe = (sysId === 'pipe');
+    const hasLive = (isElectrical || isPipe) && liveData;
 
-    if (hasLive) {
+    if (isElectrical && liveData) {
       // Show REAL BMO data for electrical systems
       const m3 = liveData.meters?.['3']?.latest || {};
       const m76 = liveData.meters?.['76']?.latest || {};
@@ -970,87 +1043,84 @@ renderer.domElement.addEventListener('click', e => {
         const v = typeof r.val === 'number' ? (r.unit === '' && r.val < 2 ? r.val.toFixed(3) : r.val.toFixed(1)) : r.val;
         sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${r.label} <span style="color:#2dd4bf;font-size:7px">LIVE</span></div><div class="dp-card-val" style="color:${r.color}">${v} <span class="dp-card-unit">${r.unit}</span></div></div>`;
       });
+    } else if (isPipe && liveData) {
+      // Show REAL BMO water data for pipe systems
+      const w = liveData.water?.latest || {};
+      const waterReadings = [
+        { label:'WATER FLOW', val:w.water1_rate_cfm, unit:'cf/min', color: w.water1_rate_cfm > 0 ? '#38bdf8' : '#64748b' },
+        { label:'WATER TOTAL', val:w.water1_total_cf, unit:'cf', color:'#38bdf8', fmt:'int' },
+        { label:'STEAM', val:w.steam_rate_gpm, unit:'gpm', color: w.steam_rate_gpm > 0 ? '#a78bfa' : '#64748b' },
+        { label:'STEAM TOTAL', val:w.steam_total_gal, unit:'gal', color:'#a78bfa', fmt:'int' },
+        { label:'IRRIGATION', val:w.irrigation_rate_gpm, unit:'gpm', color: (w.irrigation_rate_gpm && w.irrigation_rate_gpm > 0) ? '#2dd4bf' : '#64748b' },
+      ];
+      waterReadings.forEach(r => {
+        if (r.val == null) return;
+        let v;
+        if (r.fmt === 'int') v = r.val > 1e6 ? (r.val/1e6).toFixed(1)+'M' : r.val > 1000 ? (r.val/1000).toFixed(0)+'K' : r.val.toFixed(0);
+        else v = typeof r.val === 'number' ? r.val.toFixed(2) : r.val;
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${r.label} <span style="color:#2dd4bf;font-size:7px">LIVE</span></div><div class="dp-card-val" style="color:${r.color}">${v} <span class="dp-card-unit">${r.unit}</span></div></div>`;
+      });
+      // Also show SIM sensor data
+      sensors.forEach(s => {
+        const colors = { ok:'#2dd4bf', warn:'#fb923c', crit:'#f87171' };
+        const valDisplay = typeof s.val === 'number' ? s.val.toFixed(1) : s.val;
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${s.label} <span style="color:#64748b;font-size:7px">SIM</span></div><div class="dp-card-val" style="color:${colors[s.status]||'#e2e8f0'}">${valDisplay} <span class="dp-card-unit">${s.unit}</span></div></div>`;
+      });
     } else {
-      // No sensors on individual components — show what we actually know from BIM
-      const sysDescriptions = {
-        hvac_duct: { desc:'Air distribution ductwork', spec:'Sheet metal, rectangular/round', serves:'Supply/return air to occupied spaces' },
-        hvac_equip: { desc:'HVAC equipment (AHU/FCU)', spec:'Heating/cooling coil unit', serves:'Conditions air for the zone' },
-        pipe: { desc:'Hydronic piping', spec:'Copper/steel, insulated', serves:'Chilled/hot water distribution' },
-        sprinkler: { desc:'Fire sprinkler line', spec:'Steel, wet pipe system', serves:'Fire suppression coverage' },
-        diffuser: { desc:'Air diffuser/grille', spec:'Ceiling-mounted supply/return', serves:'Delivers conditioned air to room' },
-        pump: { desc:'Pump or valve assembly', spec:'Inline/base-mounted', serves:'Fluid circulation & control' },
-        spiral: { desc:'Spiral ductwork', spec:'Round galvanized steel', serves:'Air distribution (round section)' },
-      };
-      const info = sysDescriptions[sysId] || { desc:'MEP component', spec:'From BIM model', serves:'Building system element' };
+      // Simulated sensor data for other systems
+      sensors.forEach(s => {
+        const colors = { ok:'#2dd4bf', warn:'#fb923c', crit:'#f87171' };
+        const valDisplay = typeof s.val === 'number' ? s.val.toFixed(1) : s.val;
+        const valColor = colors[s.status] || '#e2e8f0';
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${s.label} <span style="color:#64748b;font-size:7px">SIM</span></div><div class="dp-card-val" style="color:${valColor}">${valDisplay} <span class="dp-card-unit">${s.unit}</span></div></div>`;
+      });
 
       // Floor-level energy from real BMO data
       const floorKw = getFloorEnergy(point.y);
-      const floorLabel = point.y > 15 ? 'SRV (Roof Electric)' : point.y > 7 ? 'L2-L3 (480/277V HVAC)' : 'B1-L1 (208/120V)';
-
-      sensorsEl.innerHTML = `
-        <div class="dp-card" style="min-width:100%"><div class="dp-card-label">Description</div><div class="dp-card-val" style="font-size:12px;color:#94a3b8">${info.desc}</div></div>
-        <div class="dp-card"><div class="dp-card-label">Specification</div><div class="dp-card-val" style="font-size:11px;color:#94a3b8">${info.spec}</div></div>
-        <div class="dp-card"><div class="dp-card-label">Serves</div><div class="dp-card-val" style="font-size:11px;color:#94a3b8">${info.serves}</div></div>
-      `;
-
-      // Show floor-level energy if available from BMO
       if (floorKw != null && floorKw > 0) {
         sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">Floor load <span style="color:#2dd4bf;font-size:7px">LIVE</span></div><div class="dp-card-val" style="color:#2dd4bf">${floorKw.toFixed(1)} <span class="dp-card-unit">kW</span></div></div>`;
-        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">Meter zone</div><div class="dp-card-val" style="font-size:10px;color:#64748b">${floorLabel}</div></div>`;
       }
     }
 
-    // Maintenance — only show for electrical (where we have real data context)
+    // Maintenance
     const maintEl = document.getElementById('dpMaint');
-    if (hasLive) {
-      const condColor = maint.condition === 'Good' ? '#2dd4bf' : maint.condition === 'Fair' ? '#f59e0b' : '#f87171';
-      maintEl.innerHTML = `
-        <div class="dp-maint-pill"><div class="dp-maint-val" style="color:${condColor}">${maint.condition}</div><div class="dp-maint-label">Condition</div></div>
-        <div class="dp-maint-pill"><div class="dp-maint-val">${maint.lastInspection}</div><div class="dp-maint-label">Last inspected</div></div>
-        <div class="dp-maint-pill"><div class="dp-maint-val">${maint.nextService}</div><div class="dp-maint-label">Next service</div></div>
-      `;
-    } else {
-      maintEl.innerHTML = `
-        <div class="dp-maint-pill" style="flex:1"><div class="dp-maint-val" style="color:#475569;font-size:10px">No sensor on this component</div><div class="dp-maint-label">BAS (WebCtrl) integration needed for real-time data</div></div>
-      `;
-    }
+    const condColor = maint.condition === 'Good' ? '#2dd4bf' : maint.condition === 'Fair' ? '#f59e0b' : '#f87171';
+    maintEl.innerHTML = `
+      <div class="dp-maint-pill"><div class="dp-maint-val" style="color:${condColor}">${maint.condition}</div><div class="dp-maint-label">Condition <span style="color:#64748b;font-size:6px">SIM</span></div></div>
+      <div class="dp-maint-pill"><div class="dp-maint-val">${maint.lastInspection}</div><div class="dp-maint-label">Last inspected <span style="color:#64748b;font-size:6px">SIM</span></div></div>
+      <div class="dp-maint-pill"><div class="dp-maint-val">${maint.nextService}</div><div class="dp-maint-label">Next service <span style="color:#64748b;font-size:6px">SIM</span></div></div>
+    `;
 
-    // Update SIM label
+    // Update label
     document.querySelector('.dp-sim').innerHTML = hasLive
       ? '<span style="color:#2dd4bf">LIVE</span> — BMO Campus Metering System'
-      : 'BIM geometry · Floor energy from BMO';
+      : '<span style="color:#64748b">SIM</span> — Simulated · Floor load from BMO <span style="color:#2dd4bf">LIVE</span>';
 
-    // Mini chart for electrical systems
+    // Mini chart for electrical (power) and pipe (water) systems
     const miniChartEl = document.getElementById('dpMiniChart');
-    if (hasLive && liveData.meters?.['3']?.timeseries_kw) {
+    const hasPowerTs = isElectrical && liveData?.meters?.['3']?.timeseries_kw;
+    const hasWaterTs = isPipe && liveData?.water?.timeseries_water;
+
+    if (hasPowerTs || hasWaterTs) {
       miniChartEl.style.display = 'block';
+      const chartLabel = document.querySelector('#dpMiniChart > div');
+      chartLabel.innerHTML = hasPowerTs
+        ? '24hr power (kW) <span style="color:#2dd4bf;font-size:7px">LIVE</span>'
+        : '24hr water (cf/min) <span style="color:#38bdf8;font-size:7px">LIVE</span>';
       setTimeout(() => {
-        const tsKw = liveData.meters['3'].timeseries_kw;
-        const vals = tsKw.map(p => p.v);
-        const mc = document.getElementById('dpChart');
-        if (!mc) return;
-        const W = mc.width = mc.offsetWidth * 2;
-        const H = mc.height = 72;
-        const ctx = mc.getContext('2d');
-        ctx.clearRect(0, 0, W, H);
-        const maxV = Math.max(...vals, 10);
-        // Fill
-        ctx.beginPath(); ctx.moveTo(0, H);
-        vals.forEach((v, i) => ctx.lineTo((i/(vals.length-1))*W, H-(v/maxV)*H));
-        ctx.lineTo(W, H); ctx.closePath();
-        const g = ctx.createLinearGradient(0,0,0,H);
-        g.addColorStop(0, 'rgba(45,212,191,0.3)'); g.addColorStop(1, 'transparent');
-        ctx.fillStyle = g; ctx.fill();
-        // Line
-        ctx.beginPath();
-        vals.forEach((v, i) => { const x=(i/(vals.length-1))*W, y=H-(v/maxV)*H; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-        ctx.strokeStyle = '#2dd4bf'; ctx.lineWidth = 2; ctx.stroke();
-        // Dot
-        ctx.beginPath(); ctx.arc(W-2, H-(vals[vals.length-1]/maxV)*H, 3, 0, Math.PI*2);
-        ctx.fillStyle = '#2dd4bf'; ctx.fill();
+        const ts = hasPowerTs ? liveData.meters['3'].timeseries_kw : liveData.water.timeseries_water;
+        const vals = ts.map(p => p.v);
+        const times = ts.map(p => p.t);
+        const color = hasPowerTs ? '#2dd4bf' : '#38bdf8';
+        const maxV = Math.max(...vals, hasPowerTs ? 10 : 1);
+
+        // Store for hover
+        dpMiniChartData = { vals, times, maxV, color };
+        drawMiniChart();
       }, 30);
     } else {
       miniChartEl.style.display = 'none';
+      dpMiniChartData = null;
     }
 
     detailPanel.style.display = 'block';
