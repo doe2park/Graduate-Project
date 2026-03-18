@@ -94,6 +94,8 @@
   <div style="text-align:center;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px">
     <div style="font-size:28px;font-weight:700;font-family:var(--mono)" id="dTotal">—</div>
     <div style="font-size:9px;color:var(--muted)">Total Building Load</div>
+    <canvas id="chartKw" width="180" height="50" style="margin-top:6px;width:100%;height:50px;border-radius:6px;background:rgba(45,212,191,0.03)"></canvas>
+    <div style="display:flex;justify-content:space-between;font-size:8px;color:#334155"><span id="chartMin">—</span><span>24hr</span><span id="chartMax">—</span></div>
   </div>
 
   <div style="font-size:9px;color:#475569;margin-bottom:4px">DISTRIBUTION</div>
@@ -151,7 +153,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v24 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v25 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -198,7 +200,7 @@ const SIM_DATA = {
 const HEAT_RANGES = {
   temp:   { min:40, max:160, unit:'°F', label:'Temperature',  gradient:'linear-gradient(90deg, #38bdf8, #2dd4bf, #f59e0b, #fb923c, #f87171)' },
   flow:   { min:0,  max:2500, unit:'',   label:'Flow Rate',    gradient:'linear-gradient(90deg, #1e293b, #38bdf8, #2dd4bf, #22d3ee)' },
-  energy: { min:0,  max:100,  unit:'kW', label:'Energy Load',  gradient:'linear-gradient(90deg, #22c55e, #f59e0b, #f87171)' },
+  energy: { min:0,  max:100,  unit:'kW', label:'Energy Load (LIVE)',  gradient:'linear-gradient(90deg, #22c55e, #f59e0b, #f87171)' },
 };
 
 let viewMode = 'system'; // 'system' | 'temp' | 'flow' | 'energy'
@@ -429,8 +431,18 @@ function applyViewMode() {
       color = tempToColor(data.temp.val);
     } else if (viewMode === 'flow' && data.flow) {
       color = flowToColor(data.flow.val);
-    } else if (viewMode === 'energy' && data.energy) {
-      color = energyToColor(data.energy.val);
+    } else if (viewMode === 'energy') {
+      // Use real floor-based energy data if available
+      const bbox = new THREE.Box3().setFromObject(sm.mesh);
+      const meshY = (bbox.min.y + bbox.max.y) / 2;
+      const floorKw = getFloorEnergy(meshY);
+      if (floorKw !== null && floorKw > 0) {
+        color = energyToColor(floorKw);
+      } else if (data.energy) {
+        color = energyToColor(data.energy.val);
+      } else {
+        color = new THREE.Color(0x333333);
+      }
     } else {
       color = new THREE.Color(0x333333);
     }
@@ -573,6 +585,9 @@ function updateDashboard() {
     ? `<span style="color:var(--cyan)">🟢 LIVE</span> · ${online}/3 meters · 15min refresh`
     : `<span style="color:#f87171">🔴 OFFLINE</span> · check BMO connection`;
 
+  // ── 24hr Power Chart ──
+  drawPowerChart();
+
   // ── Feed real data into SIM_DATA for click panels ──
   if (m3.kw) {
     SIM_DATA.conduit.energy.val = m3.kw;
@@ -600,6 +615,82 @@ function updateDashboard() {
     SIM_DATA.elec.pressure.label = '208/120V kW';
     SIM_DATA.elec.pressure.unit = 'kW';
   }
+}
+
+/* ══════════════════════════════════════════ 24HR POWER CHART ══════════════════════════════════════════ */
+function drawPowerChart() {
+  if (!liveData) return;
+  const ts = liveData.meters?.['3']?.timeseries_kw;
+  if (!ts || ts.length < 2) return;
+
+  const canvas = document.getElementById('chartKw');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.offsetWidth * 2;
+  const H = canvas.height = 100;
+  ctx.clearRect(0, 0, W, H);
+
+  const values = ts.map(p => p.v);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  // Fill gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(45,212,191,0.3)');
+  grad.addColorStop(1, 'rgba(45,212,191,0)');
+
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  values.forEach((v, i) => {
+    const x = (i / (values.length - 1)) * W;
+    const y = H - ((v - min) / range) * (H - 8) - 4;
+    if (i === 0) ctx.lineTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  values.forEach((v, i) => {
+    const x = (i / (values.length - 1)) * W;
+    const y = H - ((v - min) / range) * (H - 8) - 4;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#2dd4bf';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Current value dot
+  const lastX = W;
+  const lastY = H - ((values[values.length-1] - min) / range) * (H - 8) - 4;
+  ctx.beginPath();
+  ctx.arc(lastX - 2, lastY, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#2dd4bf';
+  ctx.fill();
+
+  // Labels
+  document.getElementById('chartMin').textContent = min.toFixed(0) + ' kW';
+  document.getElementById('chartMax').textContent = max.toFixed(0) + ' kW';
+}
+
+/* ══════════════════════════════════════════ FLOOR ENERGY HEATMAP ══════════════════════════════════════════ */
+// Maps real meter data to floor zones for Energy view mode
+// Roof Electric (meter 3) → SRV floor (rooftop AHUs, exhaust fans)
+// 480/277V (meter 76) → L2, L3 (HVAC, lighting — high voltage loads)
+// 208/120V (meter 77) → B1, L1 (outlets, computers, IT — standard voltage)
+function getFloorEnergy(yPos) {
+  if (!liveData) return null;
+  const m3 = liveData.meters?.['3']?.latest;
+  const m76 = liveData.meters?.['76']?.latest;
+  const m77 = liveData.meters?.['77']?.latest;
+
+  if (yPos > 15) return m3?.kw || 0;   // SRV → Roof Electric
+  if (yPos > 7)  return m76?.kw || 0;  // L2-L3 → 480/277V HVAC
+  return m77?.kw || 0;                  // B1-L1 → 208/120V Outlets
 }
 
 function startSimulation() {

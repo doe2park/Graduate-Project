@@ -310,15 +310,26 @@ document.getElementById('spToggle').addEventListener('click', () => {
 });
 
 /* ═══ LIVE DATA for Grimes ═══ */
+let grimesLiveData = null;
 fetch('https://doe2park.github.io/Graduate-Project/data/building_data.json?t=' + Date.now())
   .then(r => r.json())
   .then(data => {
+    grimesLiveData = data;
     const m = data.meters;
     const total = (m['3']?.latest?.kw||0) + (m['76']?.latest?.kw||0) + (m['77']?.latest?.kw||0);
     const grimes = BUILDINGS.find(b => b.id === 'grimes');
     if (grimes && total > 0) {
-      grimes.energy = total.toFixed(1) + ' kW';
+      grimes.energy = total.toFixed(0) + ' kW';
       grimes.status = 'live';
+      // Update marker with live kW badge
+      if (markers['grimes']) {
+        const m = markers['grimes'];
+        const newIcon = L.divIcon({
+          html: `<div class="bldg-marker has-bim"><div class="pulse"></div>🏢</div><div style="position:absolute;top:-8px;right:-12px;background:#2dd4bf;color:#000;font-size:9px;font-weight:700;padding:1px 4px;border-radius:4px;white-space:nowrap;font-family:var(--mono)">${total.toFixed(0)}kW</div>`,
+          className: '', iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-18]
+        });
+        m.setIcon(newIcon);
+      }
       console.log('📡 Live energy:', grimes.energy);
     }
   }).catch(() => {});
