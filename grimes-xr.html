@@ -211,7 +211,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v34 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v35 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -345,13 +345,7 @@ const ghostMat = new THREE.MeshBasicMaterial({
   depthWrite: false,
 });
 
-const solidMat = new THREE.MeshBasicMaterial({
-  color: 0x667788,
-  transparent: true,
-  opacity: 0.55,
-  side: THREE.DoubleSide,
-  depthWrite: true,
-});
+const bldgOriginalMats = new Map();
 
 let buildingMode = 0; // 0=off, 1=ghost, 2=solid
 
@@ -359,7 +353,6 @@ bldgToggle.addEventListener('click', () => {
   if (buildingLoading) return;
 
   if (!buildingLoaded) {
-    // First click: load the full building model
     buildingLoading = true;
     bldgToggle.textContent = '⏳ Loading...';
     bldgToggle.style.opacity = '0.5';
@@ -367,12 +360,10 @@ bldgToggle.addEventListener('click', () => {
     gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
       buildingModel = gltf.scene;
 
-      // Step 1: Scale feet → meters
       const FT_TO_M = 0.3048;
       buildingModel.scale.setScalar(FT_TO_M);
       buildingModel.updateMatrixWorld(true);
 
-      // Step 2: Building is Z-up (Z=20m height), need Y-up
       const preBox = new THREE.Box3().setFromObject(buildingModel);
       const preCenter = preBox.getCenter(new THREE.Vector3());
       buildingModel.position.sub(preCenter);
@@ -383,7 +374,6 @@ bldgToggle.addEventListener('click', () => {
       buildingModel.position.sub(postCenter);
       buildingModel.updateMatrixWorld(true);
 
-      // Step 3: Align to MEP
       const mepBox = new THREE.Box3();
       allMeshes.forEach(m => { m.updateWorldMatrix(true, false); mepBox.expandByObject(m); });
       const mepCenter = mepBox.getCenter(new THREE.Vector3());
@@ -396,9 +386,13 @@ bldgToggle.addEventListener('click', () => {
       const finalBox = new THREE.Box3().setFromObject(buildingModel);
       buildingModel.position.y += (mepBox.min.y - finalBox.min.y);
 
-      // Start in ghost mode
+      // Store original materials BEFORE applying ghost
       buildingModel.traverse(child => {
-        if (child.isMesh) { child.material = ghostMat; child.renderOrder = -1; }
+        if (child.isMesh) {
+          bldgOriginalMats.set(child.uuid, child.material);
+          child.material = ghostMat;
+          child.renderOrder = -1;
+        }
       });
 
       scene.add(buildingModel);
@@ -421,7 +415,6 @@ bldgToggle.addEventListener('click', () => {
     });
 
   } else {
-    // Cycle: ghost → solid → off → ghost
     buildingMode = (buildingMode + 1) % 3;
     if (buildingMode === 0) {
       buildingModel.visible = false;
@@ -437,10 +430,15 @@ bldgToggle.addEventListener('click', () => {
       bldgToggle.textContent = '🏢 Ghost';
       bldgToggle.classList.add('active');
     } else {
+      // Solid = restore original BIM materials
       buildingModel.visible = true;
       buildingVisible = true;
       buildingModel.traverse(child => {
-        if (child.isMesh) { child.material = solidMat; child.renderOrder = -1; }
+        if (child.isMesh) {
+          const orig = bldgOriginalMats.get(child.uuid);
+          if (orig) child.material = orig;
+          child.renderOrder = 0;
+        }
       });
       bldgToggle.textContent = '🏢 Solid';
       bldgToggle.classList.add('active');
