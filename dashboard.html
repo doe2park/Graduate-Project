@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grimes Engineering Center — Energy Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0a0f1a;
+    --bg2: #111827;
+    --bg3: #1a2332;
+    --text: #e8edf5;
+    --text2: #8896ab;
+    --text3: #556070;
+    --accent: #3b8bdd;
+    --green: #1d9e75;
+    --orange: #d85a30;
+    --amber: #ef9f27;
+    --red: #e24b4a;
+    --border: rgba(255,255,255,0.06);
+    --glow: rgba(59,139,221,0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ──────────────────────────────────── */
+  .header {
+    padding: 24px 32px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+  .header .subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s ease infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(29,158,117,0.4); }
+    50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(29,158,117,0); }
+  }
+
+  /* ── Metric Cards ────────────────────────────── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-card {
+    background: var(--bg);
+    padding: 20px 24px;
+    position: relative;
+  }
+  .metric-card .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text3);
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .metric-card .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -1px;
+  }
+  .metric-card .unit {
+    font-size: 14px;
+    color: var(--text2);
+    font-weight: 400;
+    margin-left: 2px;
+  }
+  .metric-card .detail {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 4px;
+  }
+  .metric-card .bar {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 2px;
+  }
+
+  /* ── Chart Section ───────────────────────────── */
+  .chart-section {
+    padding: 24px 32px;
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .chart-title {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .legend {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+  }
+  .chart-wrap {
+    position: relative;
+    height: 280px;
+    background: var(--bg2);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Bottom Grid ─────────────────────────────── */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-top: 1px solid var(--border);
+  }
+  .panel {
+    background: var(--bg);
+    padding: 24px 32px;
+  }
+  .panel-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .stat-label { color: var(--text2); }
+  .stat-row .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 14px;
+  }
+
+  /* ── Meter bars ──────────────────────────────── */
+  .meter-bars { display: flex; flex-direction: column; gap: 12px; }
+  .meter-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .meter-bar-label {
+    font-size: 12px;
+    color: var(--text2);
+    width: 100px;
+    flex-shrink: 0;
+  }
+  .meter-bar-track {
+    flex: 1;
+    height: 22px;
+    background: var(--bg3);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .meter-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: white;
+  }
+
+  /* ── Footer ──────────────────────────────────── */
+  .footer {
+    padding: 16px 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  /* ── Responsive ──────────────────────────────── */
+  @media (max-width: 768px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .bottom-grid { grid-template-columns: 1fr; }
+    .metric-card .value { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Grimes Engineering Center</h1>
+    <div class="subtitle">UC Berkeley Campus — Building Metering System</div>
+  </div>
+  <div class="status-pill">
+    <span class="status-dot"></span>
+    <span id="status-text">Loading...</span>
+  </div>
+</div>
+
+<div class="metrics">
+  <div class="metric-card">
+    <div class="bar" style="background: linear-gradient(90deg, var(--accent), transparent);"></div>
+    <div class="label">Main Panel #3</div>
+    <div class="value" id="v-m3">—<span class="unit">kW</span></div>
+    <div class="detail" id="d-m3">480V 3-phase</div>
+  </div>
+  <div class="metric-card">
+    <div class="bar" style="background: linear-gradient(90deg, var(--green), transparent);"></div>
+    <div class="label">Sub-Panel #76</div>
+    <div class="value" id="v-m76">—<span class="unit">kW</span></div>
+    <div class="detail" id="d-m76">480V</div>
+  </div>
+  <div class="metric-card">
+    <div class="bar" style="background: linear-gradient(90deg, var(--orange), transparent);"></div>
+    <div class="label">Sub-Panel #77</div>
+    <div class="value" id="v-m77">—<span class="unit">kW</span></div>
+    <div class="detail" id="d-m77">208V</div>
+  </div>
+  <div class="metric-card">
+    <div class="bar" style="background: linear-gradient(90deg, var(--amber), transparent);"></div>
+    <div class="label">Combined Total</div>
+    <div class="value" id="v-total">—<span class="unit">kW</span></div>
+    <div class="detail" id="d-total">All meters</div>
+  </div>
+</div>
+
+<div class="chart-section">
+  <div class="chart-header">
+    <div class="chart-title">Power consumption — today</div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:#3b8bdd"></span>Main #3</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#1d9e75"></span>Sub #76</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#d85a30"></span>Sub #77</span>
+      <span class="legend-item"><span class="legend-dot" style="background:rgba(255,255,255,0.15)"></span>Combined</span>
+    </div>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="powerChart"></canvas>
+  </div>
+</div>
+
+<div class="bottom-grid">
+  <div class="panel">
+    <div class="panel-title">Today's statistics</div>
+    <div id="stats-container">
+      <div class="stat-row">
+        <span class="stat-label">Peak demand</span>
+        <span class="stat-value" id="stat-peak">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Peak time</span>
+        <span class="stat-value" id="stat-peak-time">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Average load</span>
+        <span class="stat-value" id="stat-avg">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Overnight baseload</span>
+        <span class="stat-value" id="stat-base">~37 kW</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Water usage (cumulative)</span>
+        <span class="stat-value" id="stat-water">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Steam condensate</span>
+        <span class="stat-value" id="stat-steam">—</span>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Meter load distribution</div>
+    <div class="meter-bars" id="meter-bars">
+      <!-- filled by JS -->
+    </div>
+    <div style="margin-top: 20px;">
+      <div class="panel-title">Power factor</div>
+      <div id="pf-container"></div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Data source: BMO / Obvius — Device 001EC6000C5A — 15-min intervals</span>
+  <span>Last updated: <span id="last-update">—</span> · <a href="#" onclick="loadData()">Refresh</a></span>
+</div>
+
+<script>
+// ── Configuration ────────────────────────────────
+// Change this path to where your building_data.json lives
+const DATA_URL = './data/building_data.json';
+const REFRESH_MS = 15 * 60 * 1000; // 15 minutes
+
+const COLORS = {
+  '3':  { main: '#3b8bdd', bg: 'rgba(59,139,221,0.1)' },
+  '76': { main: '#1d9e75', bg: 'rgba(29,158,117,0.1)' },
+  '77': { main: '#d85a30', bg: 'rgba(216,90,48,0.1)' },
+};
+
+let chart = null;
+
+// ── Load & Render ────────────────────────────────
+async function loadData() {
+  try {
+    const res = await fetch(DATA_URL + '?t=' + Date.now());
+    const data = await res.json();
+    render(data);
+    document.getElementById('status-text').textContent = 'Live — 15 min interval';
+  } catch (e) {
+    console.error('Failed to load data:', e);
+    document.getElementById('status-text').textContent = 'Offline — check JSON path';
+  }
+}
+
+function render(data) {
+  const meters = data.meters;
+  const water = data.water;
+
+  // ── Metric Cards ──
+  const m3 = meters['3']?.stats_today || {};
+  const m76 = meters['76']?.stats_today || {};
+  const m77 = meters['77']?.stats_today || {};
+  const total = (m3.current || 0) + (m76.current || 0) + (m77.current || 0);
+
+  document.getElementById('v-m3').innerHTML = Math.round(m3.current || 0) + '<span class="unit">kW</span>';
+  document.getElementById('v-m76').innerHTML = Math.round(m76.current || 0) + '<span class="unit">kW</span>';
+  document.getElementById('v-m77').innerHTML = Math.round(m77.current || 0) + '<span class="unit">kW</span>';
+  document.getElementById('v-total').innerHTML = Math.round(total) + '<span class="unit">kW</span>';
+
+  document.getElementById('d-m3').textContent = `Peak: ${m3.max || '—'} kW`;
+  document.getElementById('d-m76').textContent = `Peak: ${m76.max || '—'} kW`;
+  document.getElementById('d-m77').textContent = `Peak: ${m77.max || '—'} kW`;
+  document.getElementById('d-total').textContent = `Avg: ${Math.round((m3.avg||0) + (m76.avg||0) + (m77.avg||0))} kW`;
+
+  // ── Stats ──
+  const peaks = [m3.max || 0, m76.max || 0, m77.max || 0];
+  const peakTotal = Math.round(Math.max(...peaks));
+  const peakMeter = ['#3', '#76', '#77'][peaks.indexOf(Math.max(...peaks))];
+  const peakTime = [m3, m76, m77][peaks.indexOf(Math.max(...peaks))].peak_time || '';
+
+  document.getElementById('stat-peak').textContent = peakTotal + ' kW (' + peakMeter + ')';
+  document.getElementById('stat-peak-time').textContent = peakTime.split(' ')[1] || '—';
+  document.getElementById('stat-avg').textContent = Math.round((m3.avg||0)+(m76.avg||0)+(m77.avg||0)) + ' kW';
+
+  if (water?.latest) {
+    const w = water.latest;
+    document.getElementById('stat-water').textContent = (w.water_cf || 0).toLocaleString() + ' cf';
+    document.getElementById('stat-steam').textContent = (w.steam_gal || 0).toLocaleString() + ' gal';
+  }
+
+  // ── Meter Bars ──
+  const maxKw = 140;
+  const barsHtml = Object.entries(meters).map(([id, m]) => {
+    const kw = m.stats_today?.current || 0;
+    const pct = Math.min(100, (kw / maxKw) * 100);
+    return `
+      <div class="meter-bar-row">
+        <span class="meter-bar-label">${m.name}</span>
+        <div class="meter-bar-track">
+          <div class="meter-bar-fill" style="width:${pct}%; background:${COLORS[id]?.main || '#888'}">
+            ${Math.round(kw)} kW
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('meter-bars').innerHTML = barsHtml;
+
+  // ── Power Factor ──
+  const pfHtml = Object.entries(meters).map(([id, m]) => {
+    const pf = m.latest?.power_factor;
+    const pfDisplay = pf != null ? (Math.abs(pf) < 2 ? pf.toFixed(3) : (pf / 100).toFixed(3)) : '—';
+    return `<div class="stat-row"><span class="stat-label">${m.name}</span><span class="stat-value">${pfDisplay}</span></div>`;
+  }).join('');
+  document.getElementById('pf-container').innerHTML = pfHtml;
+
+  // ── Chart ──
+  renderChart(meters);
+
+  // ── Timestamp ──
+  document.getElementById('last-update').textContent = data.generated_at;
+}
+
+function renderChart(meters) {
+  const labels = [];
+  const datasets = [];
+  const combinedData = [];
+
+  // Build time labels from meter #3 (most complete)
+  const m3readings = meters['3']?.readings_today || [];
+  m3readings.forEach((r, i) => {
+    const t = r.timestamp.split(' ')[1];
+    const h = parseInt(t.split(':')[0]);
+    const m = t.split(':')[1];
+    if (m === '00') {
+      labels.push(h === 0 ? '12a' : h < 12 ? h + 'a' : h === 12 ? '12p' : (h-12) + 'p');
+    } else {
+      labels.push('');
+    }
+  });
+
+  // Datasets
+  Object.entries(meters).forEach(([id, m]) => {
+    const readings = m.readings_today || [];
+    const values = readings.map(r => r.kw);
+    datasets.push({
+      label: m.name,
+      data: values,
+      borderColor: COLORS[id]?.main || '#888',
+      backgroundColor: COLORS[id]?.bg || 'transparent',
+      fill: true,
+      borderWidth: 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      tension: 0.3,
+    });
+  });
+
+  // Combined
+  const maxLen = Math.max(...Object.values(meters).map(m => (m.readings_today || []).length));
+  for (let i = 0; i < maxLen; i++) {
+    let sum = 0;
+    Object.values(meters).forEach(m => {
+      const r = (m.readings_today || [])[i];
+      if (r?.kw != null) sum += r.kw;
+    });
+    combinedData.push(sum);
+  }
+  datasets.push({
+    label: 'Combined',
+    data: combinedData,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    fill: true,
+    borderWidth: 1,
+    borderDash: [4, 4],
+    pointRadius: 0,
+    tension: 0.3,
+  });
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById('powerChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a2332',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleFont: { family: 'DM Sans', size: 12 },
+          bodyFont: { family: 'JetBrains Mono', size: 12 },
+          padding: 12,
+          callbacks: {
+            label: ctx => ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' kW'
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#556070', font: { family: 'DM Sans', size: 11 }, maxRotation: 0 },
+          border: { color: 'rgba(255,255,255,0.06)' },
+        },
+        y: {
+          title: { display: true, text: 'kW', color: '#556070', font: { family: 'DM Sans', size: 12 } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#556070', font: { family: 'JetBrains Mono', size: 11 } },
+          border: { color: 'rgba(255,255,255,0.06)' },
+          min: 0,
+        }
+      }
+    }
+  });
+}
+
+// ── Init ──────────────────────────────────────────
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>

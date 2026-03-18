@@ -1,0 +1,42 @@
+# .github/workflows/bmo-fetch.yml
+# Auto-fetch BMO energy data every 15 min → commit JSON → GitHub Pages serves it
+
+name: BMO Data Fetch
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # Every 15 minutes
+  workflow_dispatch:          # Manual trigger button in GitHub UI
+
+permissions:
+  contents: write             # Needed to commit building_data.json
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch BMO data
+        env:
+          BMO_USERNAME: ${{ secrets.BMO_USERNAME }}
+          BMO_PASSWORD: ${{ secrets.BMO_PASSWORD }}
+        run: python bmo_fetch.py --hours 24
+
+      - name: Commit & push JSON
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/building_data.json
+          git diff --cached --quiet || git commit -m "Update energy data $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
