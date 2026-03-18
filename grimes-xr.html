@@ -32,7 +32,7 @@
   .sys-name { flex:1;font-size:11px; } .sys-count { color:#475569;font-size:10px; }
 
   /* ── Dashboard ── */
-  #dashboard { position:fixed;top:52px;right:14px;z-index:50;background:var(--panel);padding:12px 14px;border-radius:10px;backdrop-filter:blur(10px);border:1px solid var(--border);width:200px; }
+  #dashboard { position:fixed;top:52px;right:14px;z-index:50;background:var(--panel);padding:12px 14px;border-radius:10px;backdrop-filter:blur(10px);border:1px solid var(--border);width:210px;max-height:calc(100vh - 70px);overflow-y:auto; }
   #dashboard h3 { font-size:12px;color:var(--cyan);margin-bottom:8px; }
   .stat-row { display:flex;justify-content:space-between;padding:3px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.04); }
   .stat-label { color:#64748b; } .stat-val { font-weight:600;font-variant-numeric:tabular-nums; }
@@ -88,15 +88,32 @@
 
 <!-- Dashboard -->
 <div id="dashboard">
-  <h3>⚡ Live Energy Data</h3>
+  <h3>⚡ Live Metering</h3>
+  <div style="font-size:9px;color:var(--cyan);margin-bottom:6px" id="dLiveStatus">connecting...</div>
+  
+  <div style="font-size:10px;color:#64748b;margin-bottom:4px">POWER</div>
   <div class="stat-row"><span class="stat-label">Main Panel</span><span class="stat-val ok" id="dMain">—</span></div>
   <div class="stat-row"><span class="stat-label">Sub-Panel A</span><span class="stat-val" id="dSubA">—</span></div>
   <div class="stat-row"><span class="stat-label">Sub-Panel B</span><span class="stat-val" id="dSubB">—</span></div>
-  <div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px"><span class="stat-label">Total Power</span><span class="stat-val warn" id="dTotal">—</span></div>
+  <div class="stat-row" style="border-top:1px solid var(--border);padding-top:4px;margin-top:4px"><span class="stat-label">Total</span><span class="stat-val warn" id="dTotal">—</span></div>
+  
+  <div style="font-size:10px;color:#64748b;margin:6px 0 4px">ELECTRICAL</div>
+  <div class="stat-row"><span class="stat-label">Voltage (L-L)</span><span class="stat-val" id="dVolt">—</span></div>
+  <div class="stat-row"><span class="stat-label">Current Avg</span><span class="stat-val" id="dCurrent">—</span></div>
+  <div class="stat-row"><span class="stat-label">Power Factor</span><span class="stat-val" id="dPF">—</span></div>
+  <div class="stat-row"><span class="stat-label">Frequency</span><span class="stat-val" id="dFreq">—</span></div>
+  <div class="stat-row"><span class="stat-label">Peak Demand</span><span class="stat-val" id="dPeak">—</span></div>
+  
+  <div style="font-size:10px;color:#64748b;margin:6px 0 4px">WATER / STEAM</div>
   <div class="stat-row"><span class="stat-label">Water Rate</span><span class="stat-val" id="dWater">—</span></div>
   <div class="stat-row"><span class="stat-label">Steam</span><span class="stat-val" id="dSteam">—</span></div>
-  <div class="stat-row"><span class="stat-label">Updated</span><span class="stat-val" id="dUpdated" style="font-size:10px;color:var(--muted)">—</span></div>
-  <div style="margin-top:6px;font-size:9px;color:var(--cyan)">🟢 LIVE — Campus Metering System</div>
+  
+  <div style="font-size:10px;color:#64748b;margin:6px 0 4px">TODAY'S STATS</div>
+  <div class="stat-row"><span class="stat-label">kW Min/Max</span><span class="stat-val" id="dMinMax" style="font-size:11px">—</span></div>
+  <div class="stat-row"><span class="stat-label">kW Average</span><span class="stat-val" id="dAvg">—</span></div>
+  <div class="stat-row"><span class="stat-label">kWh Today</span><span class="stat-val ok" id="dKwh">—</span></div>
+  
+  <div class="stat-row" style="margin-top:6px"><span class="stat-label">Updated</span><span class="stat-val" id="dUpdated" style="font-size:10px;color:var(--muted)">—</span></div>
 </div>
 
 <!-- Detail Panel -->
@@ -130,7 +147,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v21 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v22 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -447,41 +464,73 @@ function updateDashboard() {
   if (!liveData) return;
   const m = liveData.meters;
   const w = liveData.water?.latest;
+  const sum = liveData.summary;
 
-  // Meter readings
-  const mainKw = m['3']?.latest?.kw;
-  const subAKw = m['76']?.latest?.kw;
-  const subBKw = m['77']?.latest?.kw;
-  const totalKw = (mainKw || 0) + (subAKw || 0) + (subBKw || 0);
+  // Power readings
+  const m3 = m['3']?.latest || {};
+  const m76 = m['76']?.latest || {};
+  const m77 = m['77']?.latest || {};
 
-  document.getElementById('dMain').textContent = mainKw ? `${mainKw.toFixed(1)} kW` : '—';
-  document.getElementById('dSubA').textContent = subAKw ? `${subAKw.toFixed(1)} kW` : '—';
-  document.getElementById('dSubB').textContent = subBKw ? `${subBKw.toFixed(1)} kW` : '—';
+  document.getElementById('dMain').textContent = m3.kw ? `${m3.kw.toFixed(1)} kW` : '—';
+  document.getElementById('dSubA').textContent = m76.kw ? `${m76.kw.toFixed(1)} kW` : '—';
+  document.getElementById('dSubB').textContent = m77.kw ? `${m77.kw.toFixed(1)} kW` : '—';
+  
+  const totalKw = sum?.total_kw_now || 0;
   document.getElementById('dTotal').textContent = totalKw ? `${totalKw.toFixed(1)} kW` : '—';
-
-  // Color coding
   document.getElementById('dTotal').className = 'stat-val ' + (totalKw > 200 ? 'crit' : totalKw > 100 ? 'warn' : 'ok');
 
-  // Water
-  document.getElementById('dWater').textContent = w?.water_rate != null ? `${w.water_rate.toFixed(2)} cf/min` : '—';
-  document.getElementById('dSteam').textContent = w?.steam_gal != null ? `${(w.steam_gal/1e6).toFixed(1)}M gal` : '—';
+  // Electrical details (from Main Panel)
+  document.getElementById('dVolt').textContent = m3.voltage_ll ? `${m3.voltage_ll.toFixed(1)} V` : '—';
+  document.getElementById('dCurrent').textContent = m3.current_avg ? `${m3.current_avg.toFixed(1)} A` : '—';
+  document.getElementById('dPF').textContent = m3.power_factor ? `${m3.power_factor.toFixed(3)}` : '—';
+  document.getElementById('dPF').className = 'stat-val ' + (m3.power_factor < 0.85 ? 'warn' : 'ok');
+  document.getElementById('dFreq').textContent = m3.frequency ? `${m3.frequency.toFixed(2)} Hz` : '—';
+  document.getElementById('dPeak').textContent = m3.peak_demand_kw ? `${m3.peak_demand_kw.toFixed(1)} kW` : '—';
+  document.getElementById('dPeak').className = 'stat-val warn';
 
-  // Timestamp
+  // Water / Steam
+  document.getElementById('dWater').textContent = w?.water1_rate_cfm != null ? `${w.water1_rate_cfm.toFixed(2)} cf/min` : '—';
+  document.getElementById('dSteam').textContent = w?.steam_rate_gpm != null ? `${w.steam_rate_gpm.toFixed(1)} gpm` : '—';
+
+  // Today's stats
+  const statsKw = m['3']?.stats_today?.kw;
+  if (statsKw) {
+    document.getElementById('dMinMax').textContent = `${statsKw.min} / ${statsKw.max}`;
+    document.getElementById('dAvg').textContent = `${statsKw.avg} kW`;
+  }
+  document.getElementById('dKwh').textContent = m3.kwh_delivered ? `${Math.round(m3.kwh_delivered).toLocaleString()}` : '—';
+
+  // Timestamp + live indicator
   const ts = liveData.generated_at;
-  document.getElementById('dUpdated').textContent = ts ? ts.split(' ')[1] : '—';
+  document.getElementById('dUpdated').textContent = ts || '—';
+  document.getElementById('dLiveStatus').innerHTML = `🟢 LIVE — Campus Metering System (${liveData.summary?.meters_online || 0}/3 meters)`;
 
-  // Also update SIM_DATA with real values so click panels show real energy
-  if (mainKw) {
-    SIM_DATA.conduit.energy.val = totalKw / 3;
-    SIM_DATA.elec.energy.val = totalKw / 3;
-    SIM_DATA.hvac_equip.energy.val = totalKw / 3;
-    // Inject real current/voltage into electrical systems
-    SIM_DATA.conduit.temp.val = m['3']?.latest?.current_amps || 200;
+  // Feed real data into SIM_DATA for click panels
+  if (m3.kw) {
+    SIM_DATA.conduit.energy.val = m3.kw;
+    SIM_DATA.conduit.energy.label = 'MAIN PANEL';
+    SIM_DATA.conduit.temp.val = m3.current_avg || 0;
     SIM_DATA.conduit.temp.label = 'CURRENT';
     SIM_DATA.conduit.temp.unit = 'A';
-    SIM_DATA.elec.temp.val = m['76']?.latest?.voltage || 480;
-    SIM_DATA.elec.temp.label = 'VOLTAGE';
-    SIM_DATA.elec.temp.unit = 'V';
+    SIM_DATA.conduit.flow.val = m3.voltage_ll || 0;
+    SIM_DATA.conduit.flow.label = 'VOLTAGE';
+    SIM_DATA.conduit.flow.unit = 'V';
+    SIM_DATA.conduit.pressure.val = m3.power_factor || 0;
+    SIM_DATA.conduit.pressure.label = 'POWER FACTOR';
+    SIM_DATA.conduit.pressure.unit = '';
+  }
+  if (m76.kw) {
+    SIM_DATA.elec.energy.val = m76.kw;
+    SIM_DATA.elec.energy.label = 'SUB-PANEL A';
+    SIM_DATA.elec.temp.val = m76.current_avg || 0;
+    SIM_DATA.elec.temp.label = 'CURRENT';
+    SIM_DATA.elec.temp.unit = 'A';
+    SIM_DATA.elec.flow.val = m76.voltage_ln || 0;
+    SIM_DATA.elec.flow.label = 'VOLTAGE';
+    SIM_DATA.elec.flow.unit = 'V';
+    SIM_DATA.elec.pressure.val = m77.kw || 0;
+    SIM_DATA.elec.pressure.label = 'SUB-B kW';
+    SIM_DATA.elec.pressure.unit = 'kW';
   }
 }
 
