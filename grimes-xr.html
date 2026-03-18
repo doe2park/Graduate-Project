@@ -88,15 +88,15 @@
 
 <!-- Dashboard -->
 <div id="dashboard">
-  <h3>Building Status</h3>
-  <div class="stat-row"><span class="stat-label">Outdoor Temp</span><span class="stat-val" id="dOutTemp">72°F</span></div>
-  <div class="stat-row"><span class="stat-label">CHW Supply</span><span class="stat-val ok" id="dCHW">42°F</span></div>
-  <div class="stat-row"><span class="stat-label">CHW Return</span><span class="stat-val" id="dCHWR">54°F</span></div>
-  <div class="stat-row"><span class="stat-label">HW Supply</span><span class="stat-val warn" id="dHW">145°F</span></div>
-  <div class="stat-row"><span class="stat-label">Total Flow</span><span class="stat-val ok" id="dFlow">1,240 GPM</span></div>
-  <div class="stat-row"><span class="stat-label">Energy Now</span><span class="stat-val" id="dEnergy">87 kW</span></div>
-  <div class="stat-row"><span class="stat-label">Alerts</span><span class="stat-val crit" id="dAlerts">2 active</span></div>
-  <div style="margin-top:8px;font-size:9px;color:#334155">SIM — simulated data</div>
+  <h3>⚡ Live Energy Data</h3>
+  <div class="stat-row"><span class="stat-label">Main Panel</span><span class="stat-val ok" id="dMain">—</span></div>
+  <div class="stat-row"><span class="stat-label">Sub-Panel A</span><span class="stat-val" id="dSubA">—</span></div>
+  <div class="stat-row"><span class="stat-label">Sub-Panel B</span><span class="stat-val" id="dSubB">—</span></div>
+  <div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px"><span class="stat-label">Total Power</span><span class="stat-val warn" id="dTotal">—</span></div>
+  <div class="stat-row"><span class="stat-label">Water Rate</span><span class="stat-val" id="dWater">—</span></div>
+  <div class="stat-row"><span class="stat-label">Steam</span><span class="stat-val" id="dSteam">—</span></div>
+  <div class="stat-row"><span class="stat-label">Updated</span><span class="stat-val" id="dUpdated" style="font-size:10px;color:var(--muted)">—</span></div>
+  <div style="margin-top:6px;font-size:9px;color:var(--cyan)">🟢 LIVE — Campus Metering System</div>
 </div>
 
 <!-- Detail Panel -->
@@ -130,7 +130,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v20 · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v21 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -430,10 +430,70 @@ document.getElementById('topbar').addEventListener('click', e => {
 });
 
 /* ══════════════════════════════════════════ SIMULATION ══════════════════════════════════════════ */
+let liveData = null;
+
+async function fetchLiveData() {
+  try {
+    const res = await fetch('https://doe2park.github.io/Graduate-Project/data/building_data.json?t=' + Date.now());
+    liveData = await res.json();
+    updateDashboard();
+    console.log('📡 Live data updated:', liveData.generated_at);
+  } catch(e) {
+    console.warn('Live data fetch failed:', e);
+  }
+}
+
+function updateDashboard() {
+  if (!liveData) return;
+  const m = liveData.meters;
+  const w = liveData.water?.latest;
+
+  // Meter readings
+  const mainKw = m['3']?.latest?.kw;
+  const subAKw = m['76']?.latest?.kw;
+  const subBKw = m['77']?.latest?.kw;
+  const totalKw = (mainKw || 0) + (subAKw || 0) + (subBKw || 0);
+
+  document.getElementById('dMain').textContent = mainKw ? `${mainKw.toFixed(1)} kW` : '—';
+  document.getElementById('dSubA').textContent = subAKw ? `${subAKw.toFixed(1)} kW` : '—';
+  document.getElementById('dSubB').textContent = subBKw ? `${subBKw.toFixed(1)} kW` : '—';
+  document.getElementById('dTotal').textContent = totalKw ? `${totalKw.toFixed(1)} kW` : '—';
+
+  // Color coding
+  document.getElementById('dTotal').className = 'stat-val ' + (totalKw > 200 ? 'crit' : totalKw > 100 ? 'warn' : 'ok');
+
+  // Water
+  document.getElementById('dWater').textContent = w?.water_rate != null ? `${w.water_rate.toFixed(2)} cf/min` : '—';
+  document.getElementById('dSteam').textContent = w?.steam_gal != null ? `${(w.steam_gal/1e6).toFixed(1)}M gal` : '—';
+
+  // Timestamp
+  const ts = liveData.generated_at;
+  document.getElementById('dUpdated').textContent = ts ? ts.split(' ')[1] : '—';
+
+  // Also update SIM_DATA with real values so click panels show real energy
+  if (mainKw) {
+    SIM_DATA.conduit.energy.val = totalKw / 3;
+    SIM_DATA.elec.energy.val = totalKw / 3;
+    SIM_DATA.hvac_equip.energy.val = totalKw / 3;
+    // Inject real current/voltage into electrical systems
+    SIM_DATA.conduit.temp.val = m['3']?.latest?.current_amps || 200;
+    SIM_DATA.conduit.temp.label = 'CURRENT';
+    SIM_DATA.conduit.temp.unit = 'A';
+    SIM_DATA.elec.temp.val = m['76']?.latest?.voltage || 480;
+    SIM_DATA.elec.temp.label = 'VOLTAGE';
+    SIM_DATA.elec.temp.unit = 'V';
+  }
+}
+
 function startSimulation() {
+  // Fetch real data immediately, then every 60 seconds
+  fetchLiveData();
+  setInterval(fetchLiveData, 60000);
+
+  // Still fluctuate non-electrical SIM_DATA for other systems
   setInterval(() => {
-    // Fluctuate sensor values
     for (const [sysId, data] of Object.entries(SIM_DATA)) {
+      if (sysId === 'conduit' || sysId === 'elec') continue; // skip, using real data
       for (const [key, sensor] of Object.entries(data)) {
         if (typeof sensor.val === 'number' && sensor.val > 0) {
           sensor.val += (Math.random() - 0.5) * sensor.val * 0.02;
@@ -441,16 +501,6 @@ function startSimulation() {
         }
       }
     }
-
-    // Update dashboard
-    document.getElementById('dOutTemp').textContent = Math.round(68 + Math.random() * 8) + '°F';
-    document.getElementById('dCHW').textContent = SIM_DATA.hvac_equip.temp.val.toFixed(0) + '°F';
-    document.getElementById('dCHWR').textContent = (SIM_DATA.hvac_equip.temp.val + 12).toFixed(0) + '°F';
-    document.getElementById('dHW').textContent = Math.round(140 + Math.random() * 10) + '°F';
-    document.getElementById('dFlow').textContent = Math.round(SIM_DATA.pipe.flow.val + SIM_DATA.pump.flow.val + SIM_DATA.hvac_equip.flow.val).toLocaleString() + ' GPM';
-    document.getElementById('dEnergy').textContent = SIM_DATA.conduit.energy.val.toFixed(0) + ' kW';
-
-    // Re-apply heatmap if active
     if (viewMode !== 'system') applyViewMode();
   }, 2000);
 }

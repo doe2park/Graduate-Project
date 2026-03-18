@@ -309,6 +309,20 @@ document.getElementById('spToggle').addEventListener('click', () => {
   sp.classList.toggle('show');
 });
 
+/* ═══ LIVE DATA for Grimes ═══ */
+fetch('https://doe2park.github.io/Graduate-Project/data/building_data.json?t=' + Date.now())
+  .then(r => r.json())
+  .then(data => {
+    const m = data.meters;
+    const total = (m['3']?.latest?.kw||0) + (m['76']?.latest?.kw||0) + (m['77']?.latest?.kw||0);
+    const grimes = BUILDINGS.find(b => b.id === 'grimes');
+    if (grimes && total > 0) {
+      grimes.energy = total.toFixed(1) + ' kW';
+      grimes.status = 'live';
+      console.log('📡 Live energy:', grimes.energy);
+    }
+  }).catch(() => {});
+
 /* ═══ STATS ═══ */
 document.getElementById('tsB').textContent = BUILDINGS.length;
 document.getElementById('tsBim').textContent = BUILDINGS.filter(b => b.hasBIM).length;
