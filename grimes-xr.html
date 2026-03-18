@@ -211,7 +211,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v37 · LIVE DATA · WASD move · QE up/down · Click MEP · Shift+Arrows nudge building · ESC orbit</div>
+<div id="ctrlHint">v38 · LIVE DATA · WASD move · QE up/down · Click MEP · Shift+Arrows nudge building · ESC orbit</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -360,23 +360,33 @@ bldgToggle.addEventListener('click', () => {
     gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
       buildingModel = gltf.scene;
 
-      // GlobalOffset from Autodesk Viewer (Z-up, feet)
-      // MEP extraction already subtracted this; building GLB did not
-      const FT = 0.3048;
-      const GO_X = 115.23305297969578;
-      const GO_Y = 79.21397690038191;
-      const GO_Z = 345.0576627573971;
-
-      buildingModel.scale.setScalar(FT);
-      buildingModel.rotation.x = -Math.PI / 2;
-      // Exact offset: -(R(-90x) * Scale * GlobalOffset)
-      // Z-up (x,y,z) → Y-up (x,z,-y)
-      buildingModel.position.set(
-        -GO_X * FT,
-        -GO_Z * FT,
-         GO_Y * FT
-      );
+      const FT_TO_M = 0.3048;
+      buildingModel.scale.setScalar(FT_TO_M);
       buildingModel.updateMatrixWorld(true);
+
+      // Z-up → Y-up rotation around model center
+      const preBox = new THREE.Box3().setFromObject(buildingModel);
+      const preCenter = preBox.getCenter(new THREE.Vector3());
+      buildingModel.position.sub(preCenter);
+      buildingModel.rotation.x = -Math.PI / 2;
+      buildingModel.updateMatrixWorld(true);
+      const postBox = new THREE.Box3().setFromObject(buildingModel);
+      const postCenter = postBox.getCenter(new THREE.Vector3());
+      buildingModel.position.sub(postCenter);
+      buildingModel.updateMatrixWorld(true);
+
+      // Align to MEP bounding box
+      const mepBox = new THREE.Box3();
+      allMeshes.forEach(m => { m.updateWorldMatrix(true, false); mepBox.expandByObject(m); });
+      const mepCenter = mepBox.getCenter(new THREE.Vector3());
+      const bldgBox = new THREE.Box3().setFromObject(buildingModel);
+      const bldgCenter = bldgBox.getCenter(new THREE.Vector3());
+      buildingModel.position.x += (mepCenter.x - bldgCenter.x);
+      buildingModel.position.y += (mepCenter.y - bldgCenter.y);
+      buildingModel.position.z += (mepCenter.z - bldgCenter.z);
+      buildingModel.updateMatrixWorld(true);
+      const finalBox = new THREE.Box3().setFromObject(buildingModel);
+      buildingModel.position.y += (mepBox.min.y - finalBox.min.y);
 
       // Store original materials BEFORE applying ghost
       buildingModel.traverse(child => {
