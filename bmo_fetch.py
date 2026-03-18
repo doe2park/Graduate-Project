@@ -34,7 +34,6 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────
 BMO_BASE = "https://www.buildingmanageronline.com"
-BMO_LOGIN_URL = f"{BMO_BASE}/members/index.php"
 BMO_EXPORT_URL = f"{BMO_BASE}/members/mbdev_export.php"
 
 BMO_USERNAME = os.environ.get("BMO_USERNAME", "")
@@ -45,10 +44,10 @@ DB = "dbU216ucberkelF682"
 TIMEZONE = "US/Pacific"
 
 METERS = {
-    "3":   {"name": "Main Panel",  "voltage": "480V 3-phase"},
-    "76":  {"name": "Sub-Panel A", "voltage": "480V"},
-    "77":  {"name": "Sub-Panel B", "voltage": "208V"},
-    "250": {"name": "Water/Steam", "voltage": "—"},
+    "3":   {"name": "Roof Electric",       "voltage": "480V 3-phase"},
+    "76":  {"name": "480/277V Electric",    "voltage": "480V"},
+    "77":  {"name": "208/120V Electric",    "voltage": "208V"},
+    "250": {"name": "Condensate & Water",   "voltage": "—"},
 }
 
 # ── Column mappings — comprehensive ───────────────────
@@ -127,24 +126,20 @@ OUTPUT_FILE = OUTPUT_DIR / "building_data.json"
 
 # ── BMO Session ───────────────────────────────────────
 def create_session():
-    """Login to BMO, return authenticated session."""
+    """Login to BMO using HTTP Basic Auth."""
     session = requests.Session()
+    session.auth = (BMO_USERNAME, BMO_PASSWORD)
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Grimes Energy Dashboard)"
     })
 
     print("  Logging into BMO...")
-    login_data = {
-        "USERNAME": BMO_USERNAME,
-        "PASSWORD": BMO_PASSWORD,
-        "submit": "Login",
-    }
-    resp = session.post(BMO_LOGIN_URL, data=login_data, allow_redirects=True)
+    resp = session.get(BMO_BASE + "/members/", timeout=30)
 
-    if resp.status_code != 200 or "login" in resp.url.lower() and "index" not in resp.url.lower():
-        raise Exception(f"Login failed (status {resp.status_code}). Check credentials in .env")
+    if resp.status_code == 401:
+        raise Exception(f"Login failed (status 401). Check credentials in .env")
 
-    print("  ✓ Login successful")
+    print(f"  ✓ Login successful (status {resp.status_code})")
     return session
 
 
