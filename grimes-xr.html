@@ -211,7 +211,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v33 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v34 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -238,7 +238,7 @@ const SYSTEM_INFO = [
   { id:'sprinkler',  label:'Fire Protection',   color:'#fb923c', hex:0xfb923c },
   { id:'conduit',    label:'Electrical',        color:'#f59e0b', hex:0xf59e0b },
   { id:'diffuser',   label:'Diffusers / Grilles', color:'#80f2cc', hex:0x80f2cc },
-  { id:'pump',       label:'Pumps / Valves',    color:'#67d9f2', hex:0x67d9f2 },
+  { id:'pump',       label:'Pumps / Valves',    color:'#e879f9', hex:0xe879f9 },
   { id:'spiral',     label:'Spiral Ductwork',   color:'#4de6cc', hex:0x4de6cc },
 ];
 
@@ -345,6 +345,16 @@ const ghostMat = new THREE.MeshBasicMaterial({
   depthWrite: false,
 });
 
+const solidMat = new THREE.MeshBasicMaterial({
+  color: 0x667788,
+  transparent: true,
+  opacity: 0.55,
+  side: THREE.DoubleSide,
+  depthWrite: true,
+});
+
+let buildingMode = 0; // 0=off, 1=ghost, 2=solid
+
 bldgToggle.addEventListener('click', () => {
   if (buildingLoading) return;
 
@@ -363,60 +373,40 @@ bldgToggle.addEventListener('click', () => {
       buildingModel.updateMatrixWorld(true);
 
       // Step 2: Building is Z-up (Z=20m height), need Y-up
-      // Rotate -90° around X, but around the model's own center
       const preBox = new THREE.Box3().setFromObject(buildingModel);
       const preCenter = preBox.getCenter(new THREE.Vector3());
-      
-      // Move to origin, rotate, move back
       buildingModel.position.sub(preCenter);
       buildingModel.rotation.x = -Math.PI / 2;
       buildingModel.updateMatrixWorld(true);
-      
-      // After rotation, recompute center and shift back
       const postBox = new THREE.Box3().setFromObject(buildingModel);
       const postCenter = postBox.getCenter(new THREE.Vector3());
-      buildingModel.position.sub(postCenter); // now centered at origin
+      buildingModel.position.sub(postCenter);
       buildingModel.updateMatrixWorld(true);
 
-      // Step 3: Compute MEP bounding box
+      // Step 3: Align to MEP
       const mepBox = new THREE.Box3();
       allMeshes.forEach(m => { m.updateWorldMatrix(true, false); mepBox.expandByObject(m); });
       const mepCenter = mepBox.getCenter(new THREE.Vector3());
-      const mepSize = mepBox.getSize(new THREE.Vector3());
-
       const bldgBox = new THREE.Box3().setFromObject(buildingModel);
-      const bldgSize = bldgBox.getSize(new THREE.Vector3());
       const bldgCenter = bldgBox.getCenter(new THREE.Vector3());
-
-      console.log('MEP size:', mepSize);
-      console.log('Bldg size (rotated):', bldgSize);
-
-      // Step 4: Align center to MEP center
       buildingModel.position.x += (mepCenter.x - bldgCenter.x);
       buildingModel.position.y += (mepCenter.y - bldgCenter.y);
       buildingModel.position.z += (mepCenter.z - bldgCenter.z);
-
-      // Step 5: Align bottoms
       buildingModel.updateMatrixWorld(true);
       const finalBox = new THREE.Box3().setFromObject(buildingModel);
       buildingModel.position.y += (mepBox.min.y - finalBox.min.y);
 
-      console.log('Building aligned. MEP Y range:', mepBox.min.y.toFixed(1), '→', mepBox.max.y.toFixed(1));
-      console.log('Bldg Y range:', new THREE.Box3().setFromObject(buildingModel).min.y.toFixed(1), '→', new THREE.Box3().setFromObject(buildingModel).max.y.toFixed(1));
-
-      // Make ALL meshes ghostly transparent
+      // Start in ghost mode
       buildingModel.traverse(child => {
-        if (child.isMesh) {
-          child.material = ghostMat;
-          child.renderOrder = -1;
-        }
+        if (child.isMesh) { child.material = ghostMat; child.renderOrder = -1; }
       });
 
       scene.add(buildingModel);
       buildingLoaded = true;
+      buildingMode = 1;
       buildingVisible = true;
       buildingLoading = false;
-      bldgToggle.textContent = '🏢 Building ✓';
+      bldgToggle.textContent = '🏢 Ghost';
       bldgToggle.classList.add('active');
       bldgToggle.style.opacity = '1';
 
@@ -431,11 +421,30 @@ bldgToggle.addEventListener('click', () => {
     });
 
   } else {
-    // Toggle visibility
-    buildingVisible = !buildingVisible;
-    buildingModel.visible = buildingVisible;
-    bldgToggle.classList.toggle('active', buildingVisible);
-    bldgToggle.textContent = buildingVisible ? '🏢 Building ✓' : '🏢 Building';
+    // Cycle: ghost → solid → off → ghost
+    buildingMode = (buildingMode + 1) % 3;
+    if (buildingMode === 0) {
+      buildingModel.visible = false;
+      buildingVisible = false;
+      bldgToggle.textContent = '🏢 Off';
+      bldgToggle.classList.remove('active');
+    } else if (buildingMode === 1) {
+      buildingModel.visible = true;
+      buildingVisible = true;
+      buildingModel.traverse(child => {
+        if (child.isMesh) { child.material = ghostMat; child.renderOrder = -1; }
+      });
+      bldgToggle.textContent = '🏢 Ghost';
+      bldgToggle.classList.add('active');
+    } else {
+      buildingModel.visible = true;
+      buildingVisible = true;
+      buildingModel.traverse(child => {
+        if (child.isMesh) { child.material = solidMat; child.renderOrder = -1; }
+      });
+      bldgToggle.textContent = '🏢 Solid';
+      bldgToggle.classList.add('active');
+    }
   }
 });
 
@@ -1018,7 +1027,7 @@ renderer.domElement.addEventListener('click', e => {
 
     // Check if this is an electrical or pipe system with LIVE BMO data
     const isElectrical = (sysId === 'conduit' || sysId === 'elec');
-    const isPipe = (sysId === 'pipe');
+    const isPipe = (sysId === 'pipe' || sysId === 'pump');
     const hasLive = (isElectrical || isPipe) && liveData;
 
     if (isElectrical && liveData) {
