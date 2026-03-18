@@ -54,17 +54,22 @@
   .stat-val.warn { color:#fb923c; } .stat-val.ok { color:var(--cyan); } .stat-val.crit { color:#f87171; }
 
   /* ── Click Detail Panel ── */
-  #detailPanel { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--panel);padding:16px 24px;border-radius:14px;backdrop-filter:blur(12px);border:1px solid var(--border);z-index:55;display:none;min-width:360px;max-width:480px; }
+  #detailPanel { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--panel);padding:14px 18px;border-radius:12px;backdrop-filter:blur(12px);border:1px solid var(--border);z-index:55;display:none;min-width:320px;max-width:420px; }
   .dp-header { display:flex;align-items:center;gap:10px;margin-bottom:10px; }
-  .dp-tag { padding:4px 12px;border-radius:6px;font-weight:700;font-size:12px;color:#000; }
-  .dp-title { font-size:14px;font-weight:600; }
-  .dp-floor { font-size:11px;color:#64748b; }
-  .dp-grid { display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px; }
-  .dp-sensor { background:rgba(255,255,255,.03);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.05); }
-  .dp-sensor-label { font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.5px; }
-  .dp-sensor-val { font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px; }
-  .dp-sensor-unit { font-size:10px;color:#64748b;font-weight:400; }
+  .dp-tag { padding:4px 10px;border-radius:6px;font-weight:600;font-size:11px;color:#000; }
+  .dp-title { font-size:14px;font-weight:600;font-family:var(--mono); }
+  .dp-floor { font-size:10px;color:#64748b; }
+  .dp-grid { display:flex;flex-wrap:wrap;gap:4px; }
+  .dp-card { background:rgba(255,255,255,.04);border-radius:6px;padding:8px 10px;flex:1;min-width:90px; }
+  .dp-card-label { font-size:8px;color:#475569;font-weight:600;letter-spacing:.3px; }
+  .dp-card-val { font-size:15px;font-weight:600;font-family:var(--mono);margin-top:2px; }
+  .dp-card-unit { font-size:9px;color:#64748b;font-weight:400; }
+  .dp-maint { display:flex;gap:4px;margin-top:4px; }
+  .dp-maint-pill { flex:1;background:rgba(255,255,255,.04);border-radius:6px;padding:6px;text-align:center; }
+  .dp-maint-val { font-size:11px;font-weight:600;font-family:var(--mono); }
+  .dp-maint-label { font-size:8px;color:#475569; }
   .dp-close { position:absolute;top:8px;right:12px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px; }
+  .dp-sim { margin-top:6px;font-size:8px;color:#334155;text-align:center; }
 
   /* ── Heatmap Legend ── */
   #heatLegend { position:fixed;bottom:90px;right:14px;z-index:50;background:var(--panel);padding:10px 12px;border-radius:10px;border:1px solid var(--border);display:none;font-size:10px; }
@@ -174,7 +179,8 @@
     <div><div class="dp-title" id="dpTitle">—</div><div class="dp-floor" id="dpFloor">—</div></div>
   </div>
   <div class="dp-grid" id="dpSensors"></div>
-  <div style="margin-top:8px;font-size:8px;color:#334155;text-align:center">SIM — values vary by location</div>
+  <div class="dp-maint" id="dpMaint"></div>
+  <div class="dp-sim">SIM — values vary by location</div>
 </div>
 
 <!-- Heatmap Legend -->
@@ -197,7 +203,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v26 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v27 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -829,18 +835,22 @@ renderer.domElement.addEventListener('click', e => {
     const sensorsEl = document.getElementById('dpSensors');
     sensorsEl.innerHTML = '';
 
-    // Sensor readings
+    // Sensor readings as cards
     sensors.forEach(s => {
-      const colors = { ok:'var(--cyan)', warn:'#fb923c', crit:'#f87171' };
+      const colors = { ok:'#2dd4bf', warn:'#fb923c', crit:'#f87171' };
       const valDisplay = typeof s.val === 'number' ? s.val.toFixed(1) : s.val;
-      sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">${s.label}</div><div class="dp-sensor-val" style="color:${colors[s.status]||'#e2e8f0'}">${valDisplay} <span class="dp-sensor-unit">${s.unit}</span></div></div>`;
+      const valColor = colors[s.status] || '#e2e8f0';
+      sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${s.label}</div><div class="dp-card-val" style="color:${valColor}">${valDisplay} <span class="dp-card-unit">${s.unit}</span></div></div>`;
     });
 
-    // Maintenance info
-    const condColor = maint.condition === 'Good' ? 'var(--cyan)' : maint.condition === 'Fair' ? '#f59e0b' : '#f87171';
-    sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">Condition</div><div class="dp-sensor-val" style="color:${condColor}">${maint.condition}</div></div>`;
-    sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">Last Inspected</div><div class="dp-sensor-val" style="font-size:13px">${maint.lastInspection}</div></div>`;
-    sensorsEl.innerHTML += `<div class="dp-sensor"><div class="dp-sensor-label">Next Service</div><div class="dp-sensor-val" style="font-size:13px">${maint.nextService}</div></div>`;
+    // Maintenance as separate pill row
+    const maintEl = document.getElementById('dpMaint');
+    const condColor = maint.condition === 'Good' ? '#2dd4bf' : maint.condition === 'Fair' ? '#f59e0b' : '#f87171';
+    maintEl.innerHTML = `
+      <div class="dp-maint-pill"><div class="dp-maint-val" style="color:${condColor}">${maint.condition}</div><div class="dp-maint-label">Condition</div></div>
+      <div class="dp-maint-pill"><div class="dp-maint-val">${maint.lastInspection}</div><div class="dp-maint-label">Last inspected</div></div>
+      <div class="dp-maint-pill"><div class="dp-maint-val">${maint.nextService}</div><div class="dp-maint-label">Next service</div></div>
+    `;
 
     detailPanel.style.display = 'block';
   } else {
