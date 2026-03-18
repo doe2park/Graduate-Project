@@ -32,7 +32,22 @@
   .sys-name { flex:1;font-size:11px; } .sys-count { color:#475569;font-size:10px; }
 
   /* ── Dashboard ── */
-  #dashboard { position:fixed;top:52px;right:14px;z-index:50;background:var(--panel);padding:12px 14px;border-radius:10px;backdrop-filter:blur(10px);border:1px solid var(--border);width:210px;max-height:calc(100vh - 70px);overflow-y:auto; }
+  #dashboard { position:fixed;top:52px;right:14px;z-index:50;background:var(--panel);padding:12px 14px;border-radius:10px;backdrop-filter:blur(10px);border:1px solid var(--border);width:220px;max-height:calc(100vh - 70px);overflow-y:auto; }
+  .db-sec { font-size:9px;color:#475569;margin:10px 0 4px;font-weight:600;letter-spacing:.3px; }
+  .db-legend-row { display:flex;align-items:center;gap:5px;padding:2px 0;color:#94a3b8; }
+  .db-legend-val { margin-left:auto;font-family:var(--mono);font-weight:600;font-size:11px;color:#e2e8f0; }
+  .db-dot-s { width:7px;height:7px;border-radius:2px;flex-shrink:0; }
+  .db-chart-hdr { display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px; }
+  .db-chart-hdr>span:first-child { font-size:10px;font-weight:600;color:#94a3b8; }
+  .db-chart-val { font-size:11px;font-family:var(--mono);font-weight:600; }
+  .db-chart-box { position:relative;margin:4px 0 8px; }
+  .db-chart-y { position:absolute;left:0;top:0;bottom:16px;display:flex;flex-direction:column;justify-content:space-between;font-size:8px;color:#475569;font-family:var(--mono);font-weight:600;text-align:right;width:30px; }
+  .db-chart-canvas { margin-left:34px;height:48px;border-left:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06); }
+  .db-chart-canvas canvas { width:100%;height:100%; }
+  .db-chart-x { display:flex;justify-content:space-between;font-size:8px;color:#475569;font-family:var(--mono);font-weight:600;margin-left:34px; }
+  .db-pill { flex:1;background:rgba(255,255,255,.04);border-radius:6px;padding:6px 4px;text-align:center; }
+  .db-pill-val { font-size:13px;font-weight:600;font-family:var(--mono);color:#e2e8f0; }
+  .db-pill-label { font-size:8px;color:#475569;margin-top:1px; }
   #dashboard h3 { font-size:12px;color:var(--cyan);margin-bottom:8px; }
   .stat-row { display:flex;justify-content:space-between;padding:3px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.04); }
   .stat-label { color:#64748b; } .stat-val { font-weight:600;font-variant-numeric:tabular-nums; }
@@ -88,38 +103,67 @@
 
 <!-- Dashboard -->
 <div id="dashboard">
-  <h3>⚡ Building Power</h3>
-  <div style="font-size:9px;margin-bottom:8px" id="dLiveStatus">connecting...</div>
-  
-  <div style="text-align:center;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px">
-    <div style="font-size:28px;font-weight:700;font-family:var(--mono)" id="dTotal">—</div>
-    <div style="font-size:9px;color:var(--muted)">Total Building Load</div>
-    <canvas id="chartKw" width="180" height="50" style="margin-top:6px;width:100%;height:50px;border-radius:6px;background:rgba(45,212,191,0.03)"></canvas>
-    <div style="display:flex;justify-content:space-between;font-size:8px;color:#334155"><span id="chartMin">—</span><span>24hr</span><span id="chartMax">—</span></div>
+  <h3 style="font-size:13px;color:var(--cyan)">Building power</h3>
+  <div style="font-size:10px;margin-bottom:8px;display:flex;align-items:center;gap:5px" id="dLiveStatus">connecting...</div>
+
+  <div style="text-align:center;padding:8px 0 6px;border-bottom:1px solid var(--border);margin-bottom:8px">
+    <div style="font-size:26px;font-weight:700;font-family:var(--mono)" id="dTotal">—</div>
+    <div style="font-size:9px;color:#475569">total building load</div>
   </div>
 
-  <div style="font-size:9px;color:#475569;margin-bottom:4px">DISTRIBUTION</div>
-  <div class="stat-row"><span class="stat-label">HVAC / Lighting</span><span class="stat-val" id="dSubA">—</span></div>
-  <div class="stat-row"><span class="stat-label">Outlets / IT</span><span class="stat-val" id="dSubB">—</span></div>
-  <div class="stat-row"><span class="stat-label">Roof Equipment</span><span class="stat-val" id="dMain">—</span></div>
+  <div class="db-sec">Power distribution</div>
+  <div style="display:flex;align-items:center;gap:10px;margin:4px 0 8px">
+    <canvas id="donutChart" width="64" height="64" style="width:64px;height:64px;flex-shrink:0"></canvas>
+    <div style="font-size:10px;flex:1">
+      <div class="db-legend-row"><span class="db-dot-s" style="background:#38bdf8"></span>HVAC / lighting<span class="db-legend-val" id="dSubA">—</span></div>
+      <div class="db-legend-row"><span class="db-dot-s" style="background:#2dd4bf"></span>Roof equip.<span class="db-legend-val" id="dMain">—</span></div>
+      <div class="db-legend-row"><span class="db-dot-s" style="background:#a78bfa"></span>Outlets / IT<span class="db-legend-val" id="dSubB">—</span></div>
+    </div>
+  </div>
 
-  <div style="font-size:9px;color:#475569;margin:8px 0 4px">GRID QUALITY</div>
-  <div class="stat-row"><span class="stat-label">Voltage</span><span class="stat-val" id="dVolt">—</span></div>
-  <div class="stat-row"><span class="stat-label">Power Factor</span><span class="stat-val" id="dPF">—</span></div>
-  <div class="stat-row"><span class="stat-label">Frequency</span><span class="stat-val" id="dFreq">—</span></div>
-  <div class="stat-row"><span class="stat-label">Phase Balance</span><span class="stat-val" id="dBalance">—</span></div>
+  <div class="db-sec">24-hour trends</div>
 
-  <div style="font-size:9px;color:#475569;margin:8px 0 4px">DEMAND</div>
-  <div class="stat-row"><span class="stat-label">Current Load</span><span class="stat-val" id="dCurrent">—</span></div>
-  <div class="stat-row"><span class="stat-label">Peak Today</span><span class="stat-val" id="dPeak">—</span></div>
-  <div class="stat-row"><span class="stat-label">Energy Used</span><span class="stat-val ok" id="dKwh">—</span></div>
-  <div class="stat-row"><span class="stat-label">Est. Cost</span><span class="stat-val" id="dCost">—</span></div>
+  <div class="db-chart-hdr"><span>Power</span><span class="db-chart-val" id="dChartPow" style="color:#2dd4bf">—</span></div>
+  <div class="db-chart-box">
+    <div class="db-chart-y"><span>120</span><span>60</span><span>0 kW</span></div>
+    <div class="db-chart-canvas"><canvas id="c1"></canvas></div>
+  </div>
 
-  <div style="font-size:9px;color:#475569;margin:8px 0 4px">WATER &amp; STEAM</div>
-  <div class="stat-row"><span class="stat-label">Domestic Water</span><span class="stat-val" id="dWater">—</span></div>
-  <div class="stat-row"><span class="stat-label">Steam Condensate</span><span class="stat-val" id="dSteam">—</span></div>
+  <div class="db-chart-hdr"><span>Water</span><span class="db-chart-val" id="dChartWat" style="color:#38bdf8">—</span></div>
+  <div class="db-chart-box">
+    <div class="db-chart-y"><span>3.0</span><span>1.5</span><span>0 cf/m</span></div>
+    <div class="db-chart-canvas"><canvas id="c2"></canvas></div>
+  </div>
 
-  <div class="stat-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span class="stat-label">Last Update</span><span class="stat-val" id="dUpdated" style="font-size:9px;color:var(--muted)">—</span></div>
+  <div class="db-chart-hdr"><span>Current</span><span class="db-chart-val" id="dChartAmp" style="color:#fb923c">—</span></div>
+  <div class="db-chart-box">
+    <div class="db-chart-y"><span>150</span><span>75</span><span>0 A</span></div>
+    <div class="db-chart-canvas"><canvas id="c3"></canvas></div>
+    <div class="db-chart-x"><span>12AM</span><span>6AM</span><span>12PM</span><span>6PM</span><span>Now</span></div>
+  </div>
+
+  <div class="db-sec">Grid status</div>
+  <div style="display:flex;gap:4px;margin:4px 0">
+    <div class="db-pill"><div class="db-pill-val" id="dVolt">—</div><div class="db-pill-label">Voltage (V)</div></div>
+    <div class="db-pill"><div class="db-pill-val" id="dPF">—</div><div class="db-pill-label">Power factor</div></div>
+    <div class="db-pill"><div class="db-pill-val" id="dFreq">—</div><div class="db-pill-label">Freq (Hz)</div></div>
+  </div>
+
+  <div class="db-sec">Cumulative totals</div>
+  <div style="display:flex;gap:4px;margin:4px 0">
+    <div class="db-pill"><div class="db-pill-val" id="dKwh">—</div><div class="db-pill-label">Energy (kWh)</div></div>
+    <div class="db-pill"><div class="db-pill-val" id="dWater">—</div><div class="db-pill-label">Water (cf)</div></div>
+    <div class="db-pill"><div class="db-pill-val" id="dSteam">—</div><div class="db-pill-label">Steam (gal)</div></div>
+  </div>
+
+  <div class="db-sec">Demand & cost</div>
+  <div class="stat-row"><span class="stat-label">Peak today</span><span class="stat-val warn" id="dPeak">—</span></div>
+  <div class="stat-row"><span class="stat-label">Est. daily cost</span><span class="stat-val" id="dCost">—</span></div>
+
+  <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:9px;color:#475569">
+    <span id="dUpdated">—</span>
+    <span style="color:var(--cyan)">BMO live</span>
+  </div>
 </div>
 
 <!-- Detail Panel -->
@@ -153,7 +197,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v25 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v26 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -481,200 +525,137 @@ function updateDashboard() {
   const m = liveData.meters;
   const w = liveData.water?.latest;
   const sum = liveData.summary;
-
   const m3 = m['3']?.latest || {};
   const m76 = m['76']?.latest || {};
   const m77 = m['77']?.latest || {};
 
-  // ── Total Power (big number) ──
+  // Total
   const totalKw = (sum?.total_kw_now && sum.total_kw_now > 0) ? sum.total_kw_now : ((m3.kw||0) + (m76.kw||0) + (m77.kw||0));
   const totalEl = document.getElementById('dTotal');
-  totalEl.textContent = totalKw ? `${totalKw.toFixed(1)} kW` : '—';
+  totalEl.textContent = totalKw ? `${totalKw.toFixed(1)} kW` : '\u2014';
   totalEl.style.color = totalKw > 200 ? '#f87171' : totalKw > 120 ? '#fb923c' : 'var(--cyan)';
 
-  // ── Distribution ──
-  // 480/277V = HVAC, lighting, large equipment
-  document.getElementById('dSubA').textContent = m76.kw ? `${m76.kw.toFixed(1)} kW` : '—';
-  document.getElementById('dSubA').className = 'stat-val ' + (m76.kw > 80 ? 'warn' : '');
-  // 208/120V = outlets, computers, IT
-  document.getElementById('dSubB').textContent = m77.kw ? `${m77.kw.toFixed(1)} kW` : '—';
-  // Roof = rooftop equipment (AHUs, exhaust fans)
-  document.getElementById('dMain').textContent = m3.kw ? `${m3.kw.toFixed(1)} kW` : '—';
+  // Distribution
+  document.getElementById('dSubA').textContent = m76.kw ? `${m76.kw.toFixed(1)}` : '\u2014';
+  document.getElementById('dMain').textContent = m3.kw ? `${m3.kw.toFixed(1)}` : '\u2014';
+  document.getElementById('dSubB').textContent = m77.kw ? `${m77.kw.toFixed(1)}` : '\u2014';
 
-  // ── Grid Quality ──
+  // Chart current values
+  document.getElementById('dChartPow').textContent = totalKw ? `${totalKw.toFixed(1)} kW` : '\u2014';
+  document.getElementById('dChartWat').textContent = w?.water1_rate_cfm != null ? `${w.water1_rate_cfm.toFixed(2)} cf/m` : '\u2014';
+  document.getElementById('dChartAmp').textContent = m3.current_avg ? `${m3.current_avg.toFixed(0)} A` : '\u2014';
+
+  // Grid status pills
   const volt = m3.voltage_ll;
-  const voltEl = document.getElementById('dVolt');
-  if (volt) {
-    const voltStatus = (volt >= 475 && volt <= 495) ? 'ok' : 'warn';
-    voltEl.textContent = `${volt.toFixed(0)} V`;
-    voltEl.className = 'stat-val ' + voltStatus;
-  }
-
+  if (volt) { const el = document.getElementById('dVolt'); el.textContent = volt.toFixed(0); el.style.color = (volt >= 475 && volt <= 495) ? '#2dd4bf' : '#fb923c'; }
   const pf = m3.power_factor;
-  const pfEl = document.getElementById('dPF');
-  if (pf != null) {
-    const pfVal = pf > 1 ? pf / 100 : pf; // normalize if stored as percentage
-    pfEl.textContent = pfVal.toFixed(3);
-    pfEl.className = 'stat-val ' + (pfVal < 0.85 ? 'crit' : pfVal < 0.92 ? 'warn' : 'ok');
-  }
+  if (pf != null) { const pfVal = pf > 1 ? pf/100 : pf; const el = document.getElementById('dPF'); el.textContent = pfVal.toFixed(3); el.style.color = pfVal < 0.85 ? '#f87171' : pfVal < 0.92 ? '#fb923c' : '#2dd4bf'; }
+  if (m3.frequency) { const el = document.getElementById('dFreq'); el.textContent = m3.frequency.toFixed(2); el.style.color = Math.abs(m3.frequency - 60) > 0.05 ? '#fb923c' : '#2dd4bf'; }
 
-  const freq = m3.frequency;
-  if (freq) {
-    const freqEl = document.getElementById('dFreq');
-    freqEl.textContent = `${freq.toFixed(2)} Hz`;
-    freqEl.className = 'stat-val ' + (Math.abs(freq - 60) > 0.05 ? 'warn' : 'ok');
-  }
+  // Cumulative totals
+  if (m3.kwh_delivered) document.getElementById('dKwh').textContent = m3.kwh_delivered > 1000 ? `${(m3.kwh_delivered/1000).toFixed(0)}K` : m3.kwh_delivered.toFixed(0);
+  if (w?.water1_total_cf) document.getElementById('dWater').textContent = w.water1_total_cf > 1000 ? `${(w.water1_total_cf/1000).toFixed(0)}K` : w.water1_total_cf.toFixed(0);
+  if (w?.steam_total_gal) document.getElementById('dSteam').textContent = w.steam_total_gal > 1e6 ? `${(w.steam_total_gal/1e6).toFixed(1)}M` : `${(w.steam_total_gal/1000).toFixed(0)}K`;
 
-  // Phase balance: check if currents are within 10% of each other
-  const balanceEl = document.getElementById('dBalance');
-  if (m3.current_a && m3.current_b && m3.current_c) {
-    const phases = [m3.current_a, m3.current_b, m3.current_c];
-    const avg = phases.reduce((a,b) => a+b, 0) / 3;
-    const maxDev = Math.max(...phases.map(p => Math.abs(p - avg) / avg * 100));
-    if (maxDev < 10) {
-      balanceEl.textContent = `OK (${maxDev.toFixed(0)}%)`;
-      balanceEl.className = 'stat-val ok';
-    } else {
-      balanceEl.textContent = `${maxDev.toFixed(0)}% imbalance`;
-      balanceEl.className = 'stat-val warn';
-    }
-  }
+  // Demand & cost
+  if (m3.peak_demand_kw) { document.getElementById('dPeak').textContent = `${m3.peak_demand_kw.toFixed(0)} kW`; }
+  if (totalKw > 0) { document.getElementById('dCost').textContent = `~$${Math.round(totalKw * 24 * 0.15)}/day`; }
 
-  // ── Demand ──
-  document.getElementById('dCurrent').textContent = m3.current_avg ? `${m3.current_avg.toFixed(0)} A` : '—';
-  
-  const peak = m3.peak_demand_kw;
-  if (peak) {
-    document.getElementById('dPeak').textContent = `${peak.toFixed(0)} kW`;
-    document.getElementById('dPeak').className = 'stat-val warn';
-  }
-
-  const kwh = m3.kwh_delivered;
-  if (kwh) {
-    document.getElementById('dKwh').textContent = `${Math.round(kwh).toLocaleString()} kWh`;
-  }
-
-  // Estimated cost: UC Berkeley rate ~$0.15/kWh
-  if (totalKw > 0) {
-    const dailyKwh = totalKw * 24; // rough estimate
-    const dailyCost = dailyKwh * 0.15;
-    document.getElementById('dCost').textContent = `~$${dailyCost.toFixed(0)}/day`;
-    document.getElementById('dCost').className = 'stat-val ' + (dailyCost > 500 ? 'warn' : '');
-  }
-
-  // ── Water & Steam ──
-  if (w?.water1_rate_cfm != null) {
-    const rate = w.water1_rate_cfm;
-    document.getElementById('dWater').textContent = rate > 0 ? `${rate.toFixed(2)} cf/min` : 'Idle';
-    document.getElementById('dWater').className = 'stat-val ' + (rate > 5 ? 'warn' : rate > 0 ? '' : 'ok');
-  }
-  if (w?.steam_rate_gpm != null) {
-    const steam = w.steam_rate_gpm;
-    document.getElementById('dSteam').textContent = steam > 0 ? `${steam.toFixed(1)} gpm` : 'Off';
-    document.getElementById('dSteam').className = 'stat-val ' + (steam > 10 ? 'warn' : 'ok');
-  }
-
-  // ── Timestamp + Live status ──
+  // Timestamp + status
   const ts = liveData.generated_at;
-  if (ts) {
-    const timePart = ts.split(' ')[1];
-    document.getElementById('dUpdated').textContent = timePart;
-  }
+  if (ts) document.getElementById('dUpdated').textContent = ts.split(' ')[1];
   const online = liveData.summary?.meters_online || 0;
-  document.getElementById('dLiveStatus').innerHTML = online > 0 
-    ? `<span style="color:var(--cyan)">🟢 LIVE</span> · ${online}/3 meters · 15min refresh`
-    : `<span style="color:#f87171">🔴 OFFLINE</span> · check BMO connection`;
+  document.getElementById('dLiveStatus').innerHTML = online > 0
+    ? `<span style="width:7px;height:7px;border-radius:50%;background:#2dd4bf;display:inline-block"></span> <span style="color:#2dd4bf">Live</span> <span style="color:#475569">\u00b7 ${online}/3 meters \u00b7 15min</span>`
+    : `<span style="width:7px;height:7px;border-radius:50%;background:#f87171;display:inline-block"></span> <span style="color:#f87171">Offline</span>`;
 
-  // ── 24hr Power Chart ──
-  drawPowerChart();
+  // Draw charts + donut
+  drawCharts();
+  drawDonut(m3.kw||0, m76.kw||0, m77.kw||0, totalKw);
 
-  // ── Feed real data into SIM_DATA for click panels ──
+  // Feed real data into SIM_DATA
   if (m3.kw) {
-    SIM_DATA.conduit.energy.val = m3.kw;
-    SIM_DATA.conduit.energy.label = 'ROOF ELEC';
-    SIM_DATA.conduit.temp.val = m3.current_avg || 0;
-    SIM_DATA.conduit.temp.label = 'CURRENT';
-    SIM_DATA.conduit.temp.unit = 'A';
-    SIM_DATA.conduit.flow.val = m3.voltage_ll || 0;
-    SIM_DATA.conduit.flow.label = 'VOLTAGE';
-    SIM_DATA.conduit.flow.unit = 'V';
-    SIM_DATA.conduit.pressure.val = m3.power_factor || 0;
-    SIM_DATA.conduit.pressure.label = 'POWER FACTOR';
-    SIM_DATA.conduit.pressure.unit = '';
+    SIM_DATA.conduit.energy.val = m3.kw; SIM_DATA.conduit.energy.label = 'ROOF ELEC';
+    SIM_DATA.conduit.temp.val = m3.current_avg||0; SIM_DATA.conduit.temp.label = 'CURRENT'; SIM_DATA.conduit.temp.unit = 'A';
+    SIM_DATA.conduit.flow.val = m3.voltage_ll||0; SIM_DATA.conduit.flow.label = 'VOLTAGE'; SIM_DATA.conduit.flow.unit = 'V';
+    SIM_DATA.conduit.pressure.val = m3.power_factor||0; SIM_DATA.conduit.pressure.label = 'POWER FACTOR'; SIM_DATA.conduit.pressure.unit = '';
   }
   if (m76.kw) {
-    SIM_DATA.elec.energy.val = m76.kw;
-    SIM_DATA.elec.energy.label = '480/277V';
-    SIM_DATA.elec.temp.val = m76.current_avg || 0;
-    SIM_DATA.elec.temp.label = 'CURRENT';
-    SIM_DATA.elec.temp.unit = 'A';
-    SIM_DATA.elec.flow.val = m76.voltage_ln || 0;
-    SIM_DATA.elec.flow.label = 'VOLTAGE';
-    SIM_DATA.elec.flow.unit = 'V';
-    SIM_DATA.elec.pressure.val = m77.kw || 0;
-    SIM_DATA.elec.pressure.label = '208/120V kW';
-    SIM_DATA.elec.pressure.unit = 'kW';
+    SIM_DATA.elec.energy.val = m76.kw; SIM_DATA.elec.energy.label = '480/277V';
+    SIM_DATA.elec.temp.val = m76.current_avg||0; SIM_DATA.elec.temp.label = 'CURRENT'; SIM_DATA.elec.temp.unit = 'A';
+    SIM_DATA.elec.flow.val = m76.voltage_ln||0; SIM_DATA.elec.flow.label = 'VOLTAGE'; SIM_DATA.elec.flow.unit = 'V';
+    SIM_DATA.elec.pressure.val = m77.kw||0; SIM_DATA.elec.pressure.label = '208/120V kW'; SIM_DATA.elec.pressure.unit = 'kW';
   }
 }
 
-/* ══════════════════════════════════════════ 24HR POWER CHART ══════════════════════════════════════════ */
-function drawPowerChart() {
-  if (!liveData) return;
-  const ts = liveData.meters?.['3']?.timeseries_kw;
-  if (!ts || ts.length < 2) return;
-
-  const canvas = document.getElementById('chartKw');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width = canvas.offsetWidth * 2;
-  const H = canvas.height = 100;
+/* ══════════════════════════════════════════ CHARTS ══════════════════════════════════════════ */
+function drawLineChart(id, data, maxY, color, gridSteps) {
+  const c = document.getElementById(id);
+  if (!c || !c.parentElement) return;
+  const W = c.width = c.parentElement.offsetWidth * 2;
+  const H = c.height = c.parentElement.offsetHeight * 2;
+  const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, W, H);
-
-  const values = ts.map(p => p.v);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-
-  // Fill gradient
-  const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, 'rgba(45,212,191,0.3)');
-  grad.addColorStop(1, 'rgba(45,212,191,0)');
-
+  const gc = 'rgba(255,255,255,0.05)';
+  gridSteps.forEach(v => { const y = H-(v/maxY)*H; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.strokeStyle=gc; ctx.lineWidth=1; ctx.stroke(); });
+  ctx.beginPath(); ctx.moveTo(0,H);
+  data.forEach((v,i) => ctx.lineTo((i/(data.length-1))*W, H-(v/maxY)*H));
+  ctx.lineTo(W,H); ctx.closePath();
+  const g = ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,color+'40'); g.addColorStop(1,'transparent');
+  ctx.fillStyle = g; ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(0, H);
-  values.forEach((v, i) => {
-    const x = (i / (values.length - 1)) * W;
-    const y = H - ((v - min) / range) * (H - 8) - 4;
-    if (i === 0) ctx.lineTo(x, y);
-    else ctx.lineTo(x, y);
+  data.forEach((v,i) => { const x=(i/(data.length-1))*W,y=H-(v/maxY)*H; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+  const lx=W-2, ly=H-(data[data.length-1]/maxY)*H;
+  ctx.beginPath(); ctx.arc(lx,ly,5,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+}
+
+function drawDonut(roof, hvac, outlets, total) {
+  const c = document.getElementById('donutChart');
+  if (!c) return;
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  const cx=64, cy=64, r=52, inner=34;
+  const slices = [{val:hvac,color:'#38bdf8'},{val:roof,color:'#2dd4bf'},{val:outlets,color:'#a78bfa'}];
+  const sum = slices.reduce((s,d) => s+d.val, 0) || 1;
+  let sa = -Math.PI/2;
+  slices.forEach(s => {
+    const sw = (s.val/sum)*Math.PI*2;
+    ctx.beginPath(); ctx.arc(cx,cy,r,sa,sa+sw); ctx.arc(cx,cy,inner,sa+sw,sa,true);
+    ctx.closePath(); ctx.fillStyle=s.color; ctx.fill(); sa+=sw;
   });
-  ctx.lineTo(W, H);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,inner-1,0,Math.PI*2);
+  ctx.fillStyle='#0d1117'; ctx.fill();
+  ctx.font='600 13px monospace'; ctx.fillStyle='#e2e8f0'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(total.toFixed(1), cx, cy-5);
+  ctx.font='400 8px sans-serif'; ctx.fillStyle='#64748b';
+  ctx.fillText('kW', cx, cy+8);
+}
 
-  // Line
-  ctx.beginPath();
-  values.forEach((v, i) => {
-    const x = (i / (values.length - 1)) * W;
-    const y = H - ((v - min) / range) * (H - 8) - 4;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.strokeStyle = '#2dd4bf';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Current value dot
-  const lastX = W;
-  const lastY = H - ((values[values.length-1] - min) / range) * (H - 8) - 4;
-  ctx.beginPath();
-  ctx.arc(lastX - 2, lastY, 3, 0, Math.PI * 2);
-  ctx.fillStyle = '#2dd4bf';
-  ctx.fill();
-
-  // Labels
-  document.getElementById('chartMin').textContent = min.toFixed(0) + ' kW';
-  document.getElementById('chartMax').textContent = max.toFixed(0) + ' kW';
+function drawCharts() {
+  if (!liveData) return;
+  // Power chart from timeseries
+  const tsKw = liveData.meters?.['3']?.timeseries_kw;
+  if (tsKw && tsKw.length > 1) {
+    const vals = tsKw.map(p => p.v);
+    const maxKw = Math.max(...vals, 10);
+    const gridMax = Math.ceil(maxKw / 20) * 20;
+    drawLineChart('c1', vals, gridMax, '#2dd4bf', [gridMax/2, gridMax]);
+  }
+  // Water chart
+  const tsW = liveData.water?.timeseries_water;
+  if (tsW && tsW.length > 1) {
+    drawLineChart('c2', tsW.map(p => p.v), 3, '#38bdf8', [1.5, 3]);
+  }
+  // Current chart — derive from power timeseries (P = V * I * PF → I ≈ P*1000 / (V*PF*1.732))
+  if (tsKw && tsKw.length > 1) {
+    const volt = liveData.meters?.['3']?.latest?.voltage_ll || 480;
+    const pf = liveData.meters?.['3']?.latest?.power_factor || 0.9;
+    const amps = tsKw.map(p => (p.v * 1000) / (volt * (pf > 1 ? pf/100 : pf) * 1.732));
+    const maxA = Math.max(...amps, 10);
+    const gridMaxA = Math.ceil(maxA / 25) * 25;
+    drawLineChart('c3', amps, gridMaxA, '#fb923c', [gridMaxA/2, gridMaxA]);
+  }
 }
 
 /* ══════════════════════════════════════════ FLOOR ENERGY HEATMAP ══════════════════════════════════════════ */
