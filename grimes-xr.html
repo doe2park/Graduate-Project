@@ -42,7 +42,7 @@
   .db-chart-val { font-size:11px;font-family:var(--mono);font-weight:600; }
   .db-chart-box { position:relative;margin:4px 0 8px; }
   .db-chart-y { position:absolute;left:0;top:0;bottom:16px;display:flex;flex-direction:column;justify-content:space-between;font-size:8px;color:#475569;font-family:var(--mono);font-weight:600;text-align:right;width:30px; }
-  .db-chart-canvas { margin-left:34px;height:48px;border-left:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06); }
+  .db-chart-canvas { margin-left:34px;height:48px;border-left:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);cursor:crosshair; }
   .db-chart-canvas canvas { width:100%;height:100%; }
   .db-chart-x { display:flex;justify-content:space-between;font-size:8px;color:#475569;font-family:var(--mono);font-weight:600;margin-left:34px; }
   .db-pill { flex:1;background:rgba(255,255,255,.04);border-radius:6px;padding:6px 4px;text-align:center; }
@@ -207,7 +207,7 @@
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v28 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
+<div id="ctrlHint">v30 · LIVE DATA · WASD move · QE up/down · Click MEP to inspect · ESC orbit mode</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -599,7 +599,9 @@ function updateDashboard() {
 }
 
 /* ══════════════════════════════════════════ CHARTS ══════════════════════════════════════════ */
-function drawLineChart(id, data, maxY, color, gridSteps) {
+const chartDataStore = {}; // Store data for hover lookup
+
+function drawLineChart(id, data, maxY, color, gridSteps, timestamps) {
   const c = document.getElementById(id);
   if (!c || !c.parentElement) return;
   const W = c.width = c.parentElement.offsetWidth * 2;
@@ -618,6 +620,80 @@ function drawLineChart(id, data, maxY, color, gridSteps) {
   ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
   const lx=W-2, ly=H-(data[data.length-1]/maxY)*H;
   ctx.beginPath(); ctx.arc(lx,ly,5,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+
+  // Store for hover
+  chartDataStore[id] = { data, maxY, color, timestamps, W, H };
+}
+
+function drawChartTooltip(id, clientX) {
+  const c = document.getElementById(id);
+  if (!c) return;
+  const store = chartDataStore[id];
+  if (!store || !store.data.length) return;
+
+  const rect = c.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const pct = Math.max(0, Math.min(1, x / rect.width));
+  const idx = Math.round(pct * (store.data.length - 1));
+  const val = store.data[idx];
+  if (val == null) return;
+
+  // Get timestamp if available
+  let timeStr = '';
+  if (store.timestamps && store.timestamps[idx]) {
+    const ts = store.timestamps[idx];
+    const timePart = ts.includes(' ') ? ts.split(' ')[1] : ts;
+    timeStr = timePart.substring(0, 5);
+  }
+
+  // Draw tooltip on canvas
+  const W = store.W, H = store.H;
+  const ctx = c.getContext('2d');
+
+  // Redraw chart first
+  drawLineChart(id, store.data, store.maxY, store.color, [], store.timestamps);
+
+  // Draw crosshair
+  const cx = pct * W;
+  const cy = H - (val / store.maxY) * H;
+  ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H);
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Draw dot
+  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI*2);
+  ctx.fillStyle = store.color; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+
+  // Draw label
+  const label = val < 10 ? val.toFixed(2) : val.toFixed(1);
+  const fullLabel = timeStr ? `${timeStr}  ${label}` : label;
+  ctx.font = '600 18px monospace';
+  const tw = ctx.measureText(fullLabel).width;
+  const lx = Math.min(cx + 8, W - tw - 8);
+  const ly = Math.max(20, cy - 10);
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(lx - 4, ly - 14, tw + 8, 20);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(fullLabel, lx, ly);
+}
+
+// Attach hover/touch to chart canvases
+function setupChartInteraction(id) {
+  const c = document.getElementById(id);
+  if (!c) return;
+  const parent = c.parentElement;
+
+  const handleMove = (clientX) => drawChartTooltip(id, clientX);
+  const handleLeave = () => {
+    const store = chartDataStore[id];
+    if (store) drawLineChart(id, store.data, store.maxY, store.color, [], store.timestamps);
+  };
+
+  parent.addEventListener('mousemove', e => handleMove(e.clientX));
+  parent.addEventListener('mouseleave', handleLeave);
+  parent.addEventListener('touchmove', e => { e.preventDefault(); handleMove(e.touches[0].clientX); }, {passive:false});
+  parent.addEventListener('touchend', handleLeave);
 }
 
 function drawDonut(roof, hvac, outlets, total) {
@@ -642,29 +718,39 @@ function drawDonut(roof, hvac, outlets, total) {
   ctx.fillText('kW', cx, cy+8);
 }
 
+let chartsInitialized = false;
+
 function drawCharts() {
   if (!liveData) return;
-  // Power chart from timeseries
   const tsKw = liveData.meters?.['3']?.timeseries_kw;
   if (tsKw && tsKw.length > 1) {
     const vals = tsKw.map(p => p.v);
+    const times = tsKw.map(p => p.t);
     const maxKw = Math.max(...vals, 10);
     const gridMax = Math.ceil(maxKw / 20) * 20;
-    drawLineChart('c1', vals, gridMax, '#2dd4bf', [gridMax/2, gridMax]);
+    drawLineChart('c1', vals, gridMax, '#2dd4bf', [gridMax/2, gridMax], times);
   }
-  // Water chart
   const tsW = liveData.water?.timeseries_water;
   if (tsW && tsW.length > 1) {
-    drawLineChart('c2', tsW.map(p => p.v), 3, '#38bdf8', [1.5, 3]);
+    const times = tsW.map(p => p.t);
+    drawLineChart('c2', tsW.map(p => p.v), 3, '#38bdf8', [1.5, 3], times);
   }
-  // Current chart — derive from power timeseries (P = V * I * PF → I ≈ P*1000 / (V*PF*1.732))
   if (tsKw && tsKw.length > 1) {
     const volt = liveData.meters?.['3']?.latest?.voltage_ll || 480;
     const pf = liveData.meters?.['3']?.latest?.power_factor || 0.9;
-    const amps = tsKw.map(p => (p.v * 1000) / (volt * (pf > 1 ? pf/100 : pf) * 1.732));
+    const pfNorm = pf > 1 ? pf/100 : pf;
+    const amps = tsKw.map(p => (p.v * 1000) / (volt * pfNorm * 1.732));
+    const times = tsKw.map(p => p.t);
     const maxA = Math.max(...amps, 10);
     const gridMaxA = Math.ceil(maxA / 25) * 25;
-    drawLineChart('c3', amps, gridMaxA, '#fb923c', [gridMaxA/2, gridMaxA]);
+    drawLineChart('c3', amps, gridMaxA, '#fb923c', [gridMaxA/2, gridMaxA], times);
+  }
+
+  if (!chartsInitialized) {
+    setupChartInteraction('c1');
+    setupChartInteraction('c2');
+    setupChartInteraction('c3');
+    chartsInitialized = true;
   }
 }
 
@@ -845,13 +931,41 @@ renderer.domElement.addEventListener('click', e => {
     const sensorsEl = document.getElementById('dpSensors');
     sensorsEl.innerHTML = '';
 
-    // Sensor readings as cards
-    sensors.forEach(s => {
-      const colors = { ok:'#2dd4bf', warn:'#fb923c', crit:'#f87171' };
-      const valDisplay = typeof s.val === 'number' ? s.val.toFixed(1) : s.val;
-      const valColor = colors[s.status] || '#e2e8f0';
-      sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${s.label}</div><div class="dp-card-val" style="color:${valColor}">${valDisplay} <span class="dp-card-unit">${s.unit}</span></div></div>`;
-    });
+    // Check if this is an electrical system with LIVE BMO data
+    const isElectrical = (sysId === 'conduit' || sysId === 'elec');
+    const hasLive = isElectrical && liveData;
+
+    if (hasLive) {
+      // Show REAL BMO data for electrical systems
+      const m3 = liveData.meters?.['3']?.latest || {};
+      const m76 = liveData.meters?.['76']?.latest || {};
+      const m77 = liveData.meters?.['77']?.latest || {};
+      const totalKw = (m3.kw||0) + (m76.kw||0) + (m77.kw||0);
+
+      const liveReadings = [
+        { label:'TOTAL LOAD', val:totalKw, unit:'kW', color:'#fb923c' },
+        { label:'ROOF ELEC', val:m3.kw, unit:'kW', color:'#2dd4bf' },
+        { label:'480/277V', val:m76.kw, unit:'kW', color:'#38bdf8' },
+        { label:'208/120V', val:m77.kw, unit:'kW', color:'#a78bfa' },
+        { label:'VOLTAGE', val:m3.voltage_ll, unit:'V', color:'#2dd4bf' },
+        { label:'CURRENT', val:m3.current_avg, unit:'A', color:'#e2e8f0' },
+        { label:'POWER FACTOR', val:m3.power_factor, unit:'', color: (m3.power_factor && (m3.power_factor > 1 ? m3.power_factor/100 : m3.power_factor) < 0.92) ? '#fb923c' : '#2dd4bf' },
+        { label:'FREQUENCY', val:m3.frequency, unit:'Hz', color:'#2dd4bf' },
+      ];
+      liveReadings.forEach(r => {
+        if (r.val == null) return;
+        const v = typeof r.val === 'number' ? (r.unit === '' && r.val < 2 ? r.val.toFixed(3) : r.val.toFixed(1)) : r.val;
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${r.label} <span style="color:#2dd4bf;font-size:7px">LIVE</span></div><div class="dp-card-val" style="color:${r.color}">${v} <span class="dp-card-unit">${r.unit}</span></div></div>`;
+      });
+    } else {
+      // SIM data for non-electrical systems
+      sensors.forEach(s => {
+        const colors = { ok:'#2dd4bf', warn:'#fb923c', crit:'#f87171' };
+        const valDisplay = typeof s.val === 'number' ? s.val.toFixed(1) : s.val;
+        const valColor = colors[s.status] || '#e2e8f0';
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${s.label}</div><div class="dp-card-val" style="color:${valColor}">${valDisplay} <span class="dp-card-unit">${s.unit}</span></div></div>`;
+      });
+    }
 
     // Maintenance as separate pill row
     const maintEl = document.getElementById('dpMaint');
@@ -861,6 +975,11 @@ renderer.domElement.addEventListener('click', e => {
       <div class="dp-maint-pill"><div class="dp-maint-val">${maint.lastInspection}</div><div class="dp-maint-label">Last inspected</div></div>
       <div class="dp-maint-pill"><div class="dp-maint-val">${maint.nextService}</div><div class="dp-maint-label">Next service</div></div>
     `;
+
+    // Update SIM label
+    document.querySelector('.dp-sim').innerHTML = hasLive
+      ? '<span style="color:#2dd4bf">LIVE</span> — BMO Campus Metering System'
+      : 'SIM — simulated values (BAS access needed for real data)';
 
     detailPanel.style.display = 'block';
   } else {
