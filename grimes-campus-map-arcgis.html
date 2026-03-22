@@ -136,6 +136,18 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .bp{padding:5px 12px;border-radius:16px;background:var(--panel);backdrop-filter:blur(10px);border:1px solid var(--border);font-size:9.5px;color:var(--dim)}
 .bp b{color:var(--text);font-weight:600}
 
+@keyframes gPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.8}100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}
+@keyframes gGlow{0%,100%{box-shadow:0 0 12px 4px rgba(253,181,21,.4)}50%{box-shadow:0 0 24px 8px rgba(253,181,21,.7)}}
+#grimes-pulse{position:absolute;pointer-events:none;z-index:5;width:40px;height:40px;border-radius:50%;border:3px solid #FDB515;animation:gGlow 2s ease-in-out infinite}
+#grimes-pulse::before,#grimes-pulse::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid #FDB515;animation:gPulse 2.5s ease-out infinite}
+#grimes-pulse::after{animation-delay:1.25s}
+#grimes-label{position:absolute;pointer-events:auto;cursor:pointer;z-index:6;background:rgba(253,181,21,.95);color:#003262;font:700 10px/1 system-ui;padding:4px 10px 4px 8px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);transform:translate(18px,-50%)}
+#grimes-label::before{content:'';position:absolute;left:-5px;top:50%;transform:translateY(-50%);border:5px solid transparent;border-right-color:rgba(253,181,21,.95)}
+
+#mobileExplore{display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:20;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);padding:10px 20px;border-radius:20px;color:var(--text);font:600 12px/1 system-ui;cursor:pointer;gap:6px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+#mobileExplore .me-count{color:var(--gold);font-weight:700}
+@media(max-width:768px){#mobileExplore{display:flex}}
+
 .esri-popup{display:none!important}
 .esri-ui-corner .esri-component{border-radius:9px!important}
 @media(max-width:768px){#sb{position:absolute;width:290px;min-width:290px;transform:translateX(-100%);transition:transform .3s}#sb.show{transform:translateX(0)}#sb.hide{transform:translateX(-100%)}#tb{left:8px!important;z-index:20}#pop{width:calc(100vw - 24px);right:12px!important;left:12px!important;max-height:70vh;overflow-y:auto}}
@@ -155,7 +167,10 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 <div id="ma">
   <button id="tb">☰</button>
   <div id="viewDiv"></div>
+  <div id="grimes-pulse"></div>
+  <div id="grimes-label" onclick="document.querySelector('[data-idx=\\'0\\']')?.click()">◆ Grimes Digital Twin →</div>
   <div id="pop"></div>
+  <button id="mobileExplore" onclick="document.getElementById('sb').classList.toggle('show')"><span class="me-count">57</span> Buildings · Explore ↑</button>
   <div class="bb"><div class="bp">Powered by <b>ArcGIS JS 4.29</b></div><div class="bp">🛰️ Satellite</div></div>
 </div>
 </div>
@@ -240,17 +255,61 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
   D.forEach((b,i)=>{
     const cc=C[b.c],isG=b.id==='grimes';
-    gL.add(new Graphic({
-      geometry:new Point({longitude:b.lng,latitude:b.lat}),
-      symbol:{type:'simple-marker',color:[...cc.r,200],size:9,
-        outline:{color:isG?[253,181,21]:[...cc.r.map(v=>Math.min(255,v+70)),160],width:isG?2:1}},
-      attributes:{idx:i}
-    }));
+    if(isG){
+      // Outer glow ring
+      gL.add(new Graphic({
+        geometry:new Point({longitude:b.lng,latitude:b.lat}),
+        symbol:{type:'simple-marker',color:[253,181,21,30],size:48,
+          outline:{color:[253,181,21,60],width:2}}
+      }));
+      // Mid ring
+      gL.add(new Graphic({
+        geometry:new Point({longitude:b.lng,latitude:b.lat}),
+        symbol:{type:'simple-marker',color:[253,181,21,60],size:30,
+          outline:{color:[253,181,21,140],width:2}}
+      }));
+      // Diamond marker
+      gL.add(new Graphic({
+        geometry:new Point({longitude:b.lng,latitude:b.lat}),
+        symbol:{type:'simple-marker',style:'diamond',color:[253,181,21,255],size:18,
+          outline:{color:[255,255,255],width:2.5}},
+        attributes:{idx:i}
+      }));
+    } else {
+      gL.add(new Graphic({
+        geometry:new Point({longitude:b.lng,latitude:b.lat}),
+        symbol:{type:'simple-marker',color:[...cc.r,200],size:9,
+          outline:{color:[...cc.r.map(v=>Math.min(255,v+70)),160],width:1}},
+        attributes:{idx:i}
+      }));
+    }
     gfx[i]=true;
   });
 
   view.ui.add(new Locate({view}),'top-right');
   view.ui.add(new BasemapToggle({view,nextBasemap:'hybrid'}),'bottom-left');
+
+  // Pulse ring + label follows Grimes on map
+  const gPt=new Point({longitude:D[0].lng,latitude:D[0].lat});
+  const pulseEl=document.getElementById('grimes-pulse');
+  const labelEl=document.getElementById('grimes-label');
+  function updPulse(){
+    var sp=view.toScreen(gPt);
+    if(sp){
+      pulseEl.style.left=sp.x+'px';pulseEl.style.top=sp.y+'px';pulseEl.style.display='block';
+      labelEl.style.left=sp.x+'px';labelEl.style.top=sp.y+'px';labelEl.style.display='block';
+    } else {
+      pulseEl.style.display='none';labelEl.style.display='none';
+    }
+  }
+  view.watch('extent',updPulse);
+  view.watch('zoom',updPulse);
+  view.when(updPulse);
+  // Click label → open Grimes popup
+  labelEl.addEventListener('click',function(){
+    sel=0;renderList();
+    view.goTo({target:gPt,zoom:18},{duration:1000,easing:'ease-in-out'}).then(function(){showPop(D[0])});
+  });
 
   // ═══ POPUP ═══
   const pop=document.getElementById('pop');
@@ -295,11 +354,12 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     }
 
     // ── Building Info (ALL buildings) ──
-    var age=b.yr?(2026-b.yr):0;
+    var status=b.bim?'BIM + Live':(b.kw?'Live Data':(b.nrg?'Metered':'Standard'));
+    var stColor=b.bim?'var(--cyan)':(b.kw?'var(--green)':(b.nrg?'var(--amber)':'var(--dim)'));
     h+=`<div class="gs" style="margin-top:8px">
       <div class="gs-item"><div class="gs-val" style="color:var(--cyan)">${b.yr||'—'}</div><div class="gs-lbl">Built</div></div>
       <div class="gs-item"><div class="gs-val" style="color:var(--text)">${b.floors||'—'}</div><div class="gs-lbl">Floors</div></div>
-      <div class="gs-item"><div class="gs-val" style="color:var(--amber)">${age?age+'yr':'—'}</div><div class="gs-lbl">Age</div></div>
+      <div class="gs-item"><div class="gs-val" style="color:${stColor};font-size:11px">${status}</div><div class="gs-lbl">Data</div></div>
     </div>`;
 
     if(b.a){h+=`<div class="ip" style="margin-top:6px"><div class="ip-item">\uD83C\uDFEB <strong>${b.a}</strong></div></div>`}
@@ -417,6 +477,9 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       const onlineCount = Object.values(bldgs).filter(b => b.kw !== null).length;
       const totalKw = data.total_kw || 0;
       document.getElementById('xe').textContent = onlineCount;
+      // Update mobile explore button
+      var meBtn=document.getElementById('mobileExplore');
+      if(meBtn)meBtn.innerHTML='<span class="me-count">⚡'+totalKw+'kW</span> · '+D.length+' Buildings · Explore ↑';
       
       // Add campus total badge if not exists
       let totalEl = document.getElementById('campus-total');
