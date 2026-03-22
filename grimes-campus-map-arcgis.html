@@ -240,19 +240,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   const gfx={};
 
   D.forEach((b,i)=>{
-    const cc=C[b.c],isG=b.id==='grimes',sz=isG?14:(b.nrg?9:7);
+    const cc=C[b.c],isG=b.id==='grimes';
     gL.add(new Graphic({
       geometry:new Point({longitude:b.lng,latitude:b.lat}),
-      symbol:{type:'simple-marker',color:[...cc.r,isG?255:190],size:sz,
-        outline:{color:isG?[253,181,21]:[...cc.r.map(v=>Math.min(255,v+70)),160],width:isG?2.5:1}},
+      symbol:{type:'simple-marker',color:[...cc.r,200],size:9,
+        outline:{color:isG?[253,181,21]:[...cc.r.map(v=>Math.min(255,v+70)),160],width:isG?2:1}},
       attributes:{idx:i}
     }));
     gfx[i]=true;
-    if(b.kw)gL.add(new Graphic({
-      geometry:new Point({longitude:b.lng+0.00028,latitude:b.lat+0.00016}),
-      symbol:{type:'text',text:`⚡${b.kw}kW`,color:[253,181,21],haloColor:[0,0,0,.85],haloSize:2,
-        font:{size:8.5,weight:'bold',family:'JetBrains Mono,monospace'}}
-    }));
   });
 
   view.ui.add(new Locate({view}),'top-right');
@@ -393,7 +388,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
   // ═══ LIVE DATA FROM BMO ═══
   const ENERGY_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
-  const kwLabels = {}; // id -> graphic for kW text labels
 
   async function fetchLiveData() {
     try {
@@ -410,24 +404,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           b.nrg = 1;
           b.liveTs = live.timestamp;
           updated++;
-
-          // Add or update kW label on map
-          if (kwLabels[b.id]) {
-            gL.remove(kwLabels[b.id]);
-          }
-          const label = new Graphic({
-            geometry: new Point({longitude: b.lng + 0.00025, latitude: b.lat + 0.00018}),
-            symbol: {
-              type: 'text',
-              text: '\u26A1' + b.kw + 'kW',
-              color: [253, 181, 21],
-              haloColor: [0, 0, 0, 0.85],
-              haloSize: 2,
-              font: {size: 8.5, weight: 'bold', family: 'JetBrains Mono, monospace'}
-            }
-          });
-          gL.add(label);
-          kwLabels[b.id] = label;
         }
       });
 
