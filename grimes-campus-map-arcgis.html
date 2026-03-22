@@ -294,79 +294,54 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       <div class="p-badge" style="background:${cc.h}15;color:${cc.h}">${b.c}</div></div><div class="p-b">`;
 
     if(b.xr){
-      // ── BIG CTA: Enter Digital Twin ──
       h+=`<a class="p-cta" href="${b.xr}" target="_blank">
-        <div class="p-cta-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
+        <div class="p-cta-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+        <div class="p-cta-text"><div class="p-cta-title">Enter 3D Digital Twin</div><div class="p-cta-sub">Walk through MEP systems in WebXR</div></div>
+        <div class="p-cta-arrow">\u2192</div></a>`;
+    }
+
+    if(b.kw){
+      h+=`<div class="pw">
+        <div class="pw-top"><div class="pw-lbl">Building power</div><div class="pw-live">Live \u00B7 BMO \u00B7 15min</div></div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px">
+          <div style="font:700 28px/1 'JetBrains Mono',mono;color:var(--gold)">${b.kw}</div>
+          <div style="font-size:14px;color:var(--gold-dim)">kW</div>
         </div>
-        <div class="p-cta-text">
-          <div class="p-cta-title">Enter 3D Digital Twin</div>
-          <div class="p-cta-sub">Walk through MEP systems in WebXR</div>
+        <div class="sp-row" style="margin-top:10px;background:transparent;padding:0">
+          <div class="sp-chart">${mkSpark(spark(36,b.kw*0.8,b.kw*0.4),'var(--cyan)',24)}</div>
         </div>
-        <div class="p-cta-arrow">→</div>
-      </a>`;
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <span style="font-size:9px;color:var(--faint)">24hr trend</span>
+          <span style="font-size:9px;color:var(--faint)">${b.liveTs||''}</span>
+        </div>
+      </div>`;
+      var cost=Math.round(b.kw*0.15*24);
+      h+=`<div class="gs" style="margin-top:8px">
+        <div class="gs-item"><div class="gs-val" style="color:var(--green);font-size:13px">${b.kw} kW</div><div class="gs-lbl">Current</div></div>
+        <div class="gs-item"><div class="gs-val" style="color:var(--amber);font-size:13px">~$${cost}</div><div class="gs-lbl">Est. $/day</div></div>
+        <div class="gs-item"><div class="gs-val" style="color:var(--cyan);font-size:13px">${Math.round(b.kw*24)}</div><div class="gs-lbl">kWh/day</div></div>
+      </div>`;
+    } else if(b.nrg){
+      h+=`<div class="pw" style="border-color:var(--border)">
+        <div class="pw-top"><div class="pw-lbl">Building power</div><div style="font-size:9px;color:var(--dim)">Offline</div></div>
+        <div style="font:700 28px/1 'JetBrains Mono',mono;color:var(--faint);margin-top:6px">\u2014</div>
+        <div style="font-size:10px;color:var(--faint);margin-top:6px">BMO metered \u00B7 data temporarily unavailable</div>
+      </div>`;
     }
 
     if(b.bim){
-      // ── Building quick stats grid ──
-      h+=`<div class="gs" style="margin-top:10px">
+      h+=`<div class="gs" style="margin-top:8px">
         <div class="gs-item"><div class="gs-val" style="color:var(--cyan)">${b.floors}</div><div class="gs-lbl">Floors</div></div>
         <div class="gs-item"><div class="gs-val" style="color:var(--text);font-size:13px">${b.sqft}</div><div class="gs-lbl">Sq. ft.</div></div>
         <div class="gs-item"><div class="gs-val" style="color:var(--amber)">${b.mep}</div><div class="gs-lbl">MEP Systems</div></div>
       </div>`;
-
-      // ── MEP systems visual ──
-      const meps=[
-        {name:'HVAC Duct',color:'#22d3ee'},{name:'Hot Water',color:'#f87171'},
-        {name:'Cold Water',color:'#60a5fa'},{name:'Electrical',color:'#fbbf24'},
-        {name:'Fire Protection',color:'#f97316'},{name:'Sanitary',color:'#a78bfa'},
-        {name:'Storm Drain',color:'#34d399'},{name:'Plumbing Vent',color:'#e879f9'}
-      ];
-      h+=`<div class="mep-grid">`;
-      meps.forEach(m=>{
-        h+=`<div class="mep-chip"><span class="mep-dot" style="background:${m.color}"></span>${m.name}</div>`;
-      });
-      h+=`</div>`;
-
-      // Year
-      h+=`<div class="ip" style="margin-top:8px">
-        <div class="ip-item">🏛️ <strong>${b.year}</strong></div>
-        <div class="ip-item">📡 <strong>${b.sensors}</strong> sensor points</div>
-      </div>`;
+      var meps=[{name:'HVAC Duct',color:'#22d3ee'},{name:'Hot Water',color:'#f87171'},{name:'Cold Water',color:'#60a5fa'},{name:'Electrical',color:'#fbbf24'},{name:'Fire Protection',color:'#f97316'},{name:'Sanitary',color:'#a78bfa'},{name:'Storm Drain',color:'#34d399'},{name:'Plumbing Vent',color:'#e879f9'}];
+      h+=`<div class="mep-grid">`;meps.forEach(function(m){h+=`<div class="mep-chip"><span class="mep-dot" style="background:${m.color}"></span>${m.name}</div>`});h+=`</div>`;
+      h+=`<div class="ip" style="margin-top:8px"><div class="ip-item">\uD83C\uDFDB\uFE0F <strong>${b.year}</strong></div><div class="ip-item">\uD83D\uDCE1 <strong>${b.sensors}</strong> sensor points</div></div>`;
     }
 
-    if(b.kw){
-      // ── Compact energy bar (not full dashboard) ──
-      h+=`<div class="nrg-bar">
-        <div class="nrg-bar-left">
-          <div class="nrg-bar-dot"></div>
-          <span>BMO Live</span>
-        </div>
-        <div class="nrg-bar-val">${b.kw} kW</div>
-      </div>`;
-    } else if(b.nrg){
-      h+=`<div class="nrg-bar">
-        <div class="nrg-bar-left">
-          <div class="nrg-bar-dot" style="background:var(--dim);animation:none"></div>
-          <span>BMO Metered</span>
-        </div>
-        <div class="nrg-bar-val" style="color:var(--dim)">—</div>
-      </div>`;
-    }
-
-    if(!b.bim && !b.xr){
-      // Simple building
-      h+=`<div class="ip">`;
-      if(b.nrg) h+=`<div class="ip-item">⚡ <strong>BMO Metered</strong></div>`;
-      h+=`<div class="ip-item" style="font-family:'JetBrains Mono',mono;font-size:9px">${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}</div>`;
-      h+=`</div>`;
-    }
-
-    h+='</div>';
-    pop.innerHTML=h;pop.classList.add('vis');
+    h+=`<div style="margin-top:8px;font:400 9px 'JetBrains Mono',mono;color:var(--faint)">\uD83D\uDCCD ${b.lat.toFixed(5)}, ${b.lng.toFixed(5)}</div>`;
+    h+='</div>';pop.innerHTML=h;pop.classList.add('vis');
   }
 
   window.closePop=()=>pop.classList.remove('vis');
@@ -415,6 +390,74 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     g.visible=(af==='All'||b.c===af)&&(!sq||b.n.toLowerCase().includes(sq)||(b.a&&b.a.toLowerCase().includes(sq)))}})}
   document.getElementById('tb').onclick=()=>document.getElementById('sb').classList.toggle('hide');
   renderList();
+
+  // ═══ LIVE DATA FROM BMO ═══
+  const ENERGY_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
+  const kwLabels = {}; // id -> graphic for kW text labels
+
+  async function fetchLiveData() {
+    try {
+      const r = await fetch(ENERGY_URL + '?t=' + Date.now());
+      if (!r.ok) return;
+      const data = await r.json();
+      const bldgs = data.buildings || {};
+      let updated = 0;
+
+      D.forEach((b, i) => {
+        const live = bldgs[b.id];
+        if (live && live.kw !== null && live.kw !== undefined) {
+          b.kw = live.kw;
+          b.nrg = 1;
+          b.liveTs = live.timestamp;
+          updated++;
+
+          // Add or update kW label on map
+          if (kwLabels[b.id]) {
+            gL.remove(kwLabels[b.id]);
+          }
+          const label = new Graphic({
+            geometry: new Point({longitude: b.lng + 0.00025, latitude: b.lat + 0.00018}),
+            symbol: {
+              type: 'text',
+              text: '\u26A1' + b.kw + 'kW',
+              color: [253, 181, 21],
+              haloColor: [0, 0, 0, 0.85],
+              haloSize: 2,
+              font: {size: 8.5, weight: 'bold', family: 'JetBrains Mono, monospace'}
+            }
+          });
+          gL.add(label);
+          kwLabels[b.id] = label;
+        }
+      });
+
+      // Update stats
+      const onlineCount = Object.values(bldgs).filter(b => b.kw !== null).length;
+      const totalKw = data.total_kw || 0;
+      document.getElementById('xe').textContent = onlineCount;
+      
+      // Add campus total badge if not exists
+      let totalEl = document.getElementById('campus-total');
+      if (!totalEl) {
+        totalEl = document.createElement('div');
+        totalEl.id = 'campus-total';
+        totalEl.className = 'sh-s';
+        totalEl.style.background = 'rgba(253,181,21,0.12)';
+        totalEl.style.border = '1px solid rgba(253,181,21,0.2)';
+        document.querySelector('.sh-stats').appendChild(totalEl);
+      }
+      totalEl.innerHTML = '<b style="color:var(--gold)">' + totalKw + '</b><small>Total kW</small>';
+
+      renderList();
+      console.log('[BMO] Updated ' + updated + ' buildings, total: ' + totalKw + ' kW');
+    } catch (e) {
+      console.warn('[BMO] Fetch failed:', e.message);
+    }
+  }
+
+  // Fetch immediately, then every 60 seconds
+  fetchLiveData();
+  setInterval(fetchLiveData, 60000);
 });
 </script>
 </body>
