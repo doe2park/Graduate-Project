@@ -95,8 +95,9 @@
 
 <!-- Top Bar -->
 <div id="topbar">
-  <a href="grimes-campus-map.html" style="text-decoration:none;color:var(--muted);font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap">← Campus</a>
+  <a href="grimes-campus-map-arcgis.html" style="text-decoration:none;color:var(--muted);font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap">← Campus</a>
   <h1>🏢 Grimes Building · Digital Twin</h1>
+  <a id="liveKwBadge" href="grimes-campus-map-arcgis.html" style="margin-left:auto;padding:4px 10px;border-radius:6px;background:rgba(253,181,21,.12);border:1px solid rgba(253,181,21,.25);color:#FDB515;font-size:10px;font-weight:600;white-space:nowrap;text-decoration:none">⚡ Campus: loading...</a>
   <button class="view-btn active" data-mode="system">System</button>
   <button class="view-btn" data-mode="temp">🌡️ Temp</button>
   <button class="view-btn" data-mode="flow">💧 Flow</button>
@@ -1324,6 +1325,13 @@ renderer.setAnimationLoop(()=>{
   renderer.render(scene,camera);
 });
 window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+</script>
+<script>
+fetch("https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t="+Date.now())
+.then(r=>r.json()).then(d=>{
+  var el=document.getElementById("liveKwBadge");
+  if(el)el.innerHTML="⚡ Campus: "+d.total_kw+" kW · "+d.buildings_online+" buildings";
+}).catch(()=>{});
 </script>
 </body>
 </html>
