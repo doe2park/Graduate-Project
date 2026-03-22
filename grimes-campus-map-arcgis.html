@@ -138,7 +138,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 
 .esri-popup{display:none!important}
 .esri-ui-corner .esri-component{border-radius:9px!important}
-@media(max-width:768px){#sb{position:absolute;width:290px;min-width:290px}#sb.hide{transform:translateX(-100%)}#pop{width:calc(100vw - 24px);right:12px!important}}
+@media(max-width:768px){#sb{position:absolute;width:290px;min-width:290px;transform:translateX(-100%);transition:transform .3s}#sb.show{transform:translateX(0)}#sb.hide{transform:translateX(-100%)}#tb{left:8px!important;z-index:20}#pop{width:calc(100vw - 24px);right:12px!important;left:12px!important;max-height:70vh;overflow-y:auto}}
 </style>
 </head>
 <body>
@@ -378,13 +378,18 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       if(b.kw)tags+=`<span class="bt bt-k">⚡${b.kw}kW</span>`;
       card.innerHTML=`<div class="bc-d" style="background:${cc.h}"></div><div class="bc-i"><div class="bc-n">${b.n}</div><div class="bc-m">${b.a||b.c}</div><div class="bc-t">${tags}</div></div>`;
       card.onclick=()=>{sel=b.idx;renderList();
+        if(window.innerWidth<=768)document.getElementById('sb').classList.remove('show');
         view.goTo({target:new Point({longitude:b.lng,latitude:b.lat}),zoom:18},{duration:1000,easing:'ease-in-out'}).then(()=>showPop(b))};
       el.appendChild(card);
     });
   }
   function updVis(){gL.graphics.forEach(g=>{if(g.attributes?.idx!==undefined){const b=D[g.attributes.idx];
     g.visible=(af==='All'||b.c===af)&&(!sq||b.n.toLowerCase().includes(sq)||(b.a&&b.a.toLowerCase().includes(sq)))}})}
-  document.getElementById('tb').onclick=()=>document.getElementById('sb').classList.toggle('hide');
+  document.getElementById('tb').onclick=()=>{
+    const sb=document.getElementById('sb');
+    if(window.innerWidth<=768){sb.classList.toggle('show')}
+    else{sb.classList.toggle('hide')}
+  };
   renderList();
 
   // ═══ LIVE DATA FROM BMO ═══
