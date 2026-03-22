@@ -2,14 +2,19 @@ name: BMO Campus Energy Fetch
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Every 15 minutes
-  workflow_dispatch:  # Manual trigger
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 jobs:
   fetch:
     runs-on: ubuntu-latest
+    concurrency:
+      group: bmo-energy
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -30,5 +35,5 @@ jobs:
           git config user.email "bmo@github-actions.bot"
           git add data/campus_energy.json
           git diff --staged --quiet || git commit -m "🔋 Update campus energy $(date +'%H:%M')"
-          git pull --rebase || true
+          git pull --rebase origin main || true
           git push
