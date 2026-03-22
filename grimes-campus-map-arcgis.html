@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UC Berkeley · Campus Digital Twin</title>
+<link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/dark/main.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#003262;--gold:#FDB515;--bg:#060a12;--panel:rgba(10,16,30,.94);--card:rgba(20,30,52,.65);--text:#e0e7f1;--dim:#6b7fa0;--faint:#3a4a66;--green:#34d399;--cyan:#22d3ee;--blue:#60a5fa;--red:#f87171;--purple:#a78bfa;--amber:#fbbf24;--border:rgba(255,255,255,.05)}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+#app{display:flex;height:100%}
+
+/* SIDEBAR */
+#sb{width:330px;min-width:330px;height:100%;background:var(--panel);backdrop-filter:blur(20px);display:flex;flex-direction:column;border-right:1px solid var(--border);z-index:10;transition:transform .3s cubic-bezier(.4,0,.2,1)}
+#sb.hide{transform:translateX(-100%)}
+.sh{padding:18px 18px 14px;background:linear-gradient(155deg,var(--navy) 0%,#001030 100%);position:relative}
+.sh::after{content:'';position:absolute;top:-30px;right:-30px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle,rgba(253,181,21,.1),transparent 65%)}
+.sh-brand{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.sh-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--gold),#d4950a);display:flex;align-items:center;justify-content:center;font:700 12px/1 'JetBrains Mono',mono;color:var(--navy);box-shadow:0 2px 10px rgba(253,181,21,.3)}
+.sh h1{font-size:13px;font-weight:600;color:#fff;letter-spacing:-.2px}
+.sh-sub{font-size:10px;color:rgba(255,255,255,.35);letter-spacing:.4px}
+.sh-stats{display:flex;gap:5px;margin-top:12px;position:relative;z-index:1}
+.sh-s{flex:1;padding:7px 4px;border-radius:7px;background:rgba(255,255,255,.05);text-align:center}
+.sh-s b{display:block;font:700 18px/1 'JetBrains Mono',mono;color:#fff}
+.sh-s small{font-size:8px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.7px}
+
+.sf{padding:10px 14px;border-bottom:1px solid var(--border)}
+.sf input{width:100%;padding:8px 10px 8px 32px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);font:13px 'DM Sans';outline:none;transition:border .2s}
+.sf input:focus{border-color:rgba(253,181,21,.4)}
+.sf input::placeholder{color:var(--faint)}
+.sf-w{position:relative}.sf-w::before{content:'🔍';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px}
+
+.sfl{padding:7px 14px 8px;display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--border)}
+.sfl button{padding:3px 9px;border-radius:14px;border:1px solid var(--border);background:0;color:var(--dim);font:11px 'DM Sans';cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:3px}
+.sfl button:hover{border-color:rgba(255,255,255,.12);color:var(--text)}
+.sfl button.on{background:var(--gold);color:var(--navy);border-color:var(--gold);font-weight:600}
+.sfl button .d{width:5px;height:5px;border-radius:50%}
+
+.sl{flex:1;overflow-y:auto;padding:4px 6px}
+.sl::-webkit-scrollbar{width:2px}.sl::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
+.bc{padding:9px 10px;margin-bottom:1px;border-radius:8px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:9px;border:1px solid transparent}
+.bc:hover{background:var(--card);border-color:var(--border)}
+.bc.on{background:rgba(253,181,21,.06);border-color:rgba(253,181,21,.15)}
+.bc-d{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.bc-i{flex:1;min-width:0}
+.bc-n{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bc-m{font-size:9.5px;color:var(--dim);margin-top:1px}
+.bc-t{display:flex;gap:3px;margin-top:3px}
+.bt{font-size:8px;padding:1.5px 5px;border-radius:3px;background:rgba(255,255,255,.04);color:var(--dim);text-transform:uppercase;letter-spacing:.3px;font-weight:500}
+.bt-b{background:rgba(96,165,250,.1);color:var(--blue)}
+.bt-e{background:rgba(52,211,153,.1);color:var(--green)}
+.bt-k{background:rgba(253,181,21,.12);color:var(--gold);font-family:'JetBrains Mono',mono;font-weight:600}
+
+/* MAP */
+#ma{flex:1;position:relative}
+#viewDiv{width:100%;height:100%}
+#tb{position:absolute;top:12px;left:12px;z-index:20;width:36px;height:36px;border-radius:9px;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+#tb:hover{border-color:var(--gold);color:var(--gold)}
+
+/* POPUP */
+#pop{position:absolute;z-index:50;width:360px;background:var(--panel);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.07);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden;opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .2s,transform .2s;top:12px;right:12px}
+#pop.vis{opacity:1;pointer-events:auto;transform:translateY(0)}
+.p-h{padding:14px 16px 12px;background:linear-gradient(135deg,var(--navy),#001238);position:relative}
+.p-x{position:absolute;top:10px;right:12px;width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.08);border:0;color:rgba(255,255,255,.5);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.p-x:hover{background:rgba(255,255,255,.15);color:#fff}
+.p-t{font-size:15px;font-weight:600;color:#fff;padding-right:32px;line-height:1.25}
+.p-a{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px}
+.p-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:9px;font-weight:600;margin-top:7px;letter-spacing:.2px}
+.p-b{padding:12px 16px 14px;overflow-y:auto;max-height:420px}
+
+/* Power card with donut */
+.pw{background:var(--card);border:1px solid rgba(253,181,21,.1);border-radius:11px;padding:12px 14px;margin-bottom:10px}
+.pw-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.pw-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.7px}
+.pw-live{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--green);font-weight:500}
+.pw-live::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.pw-main{display:flex;align-items:center;gap:14px}
+.pw-donut{position:relative;width:72px;height:72px;flex-shrink:0}
+.pw-donut svg{transform:rotate(-90deg)}
+.pw-donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.pw-donut-val{font:700 14px/1 'JetBrains Mono',mono;color:var(--gold)}
+.pw-donut-unit{font-size:8px;color:var(--dim)}
+.pw-legend{flex:1;display:flex;flex-direction:column;gap:5px}
+.pw-leg{display:flex;align-items:center;gap:6px;font-size:11px}
+.pw-leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.pw-leg-name{flex:1;color:var(--dim);font-size:10px}
+.pw-leg-val{font:600 11px/1 'JetBrains Mono',mono;color:var(--text)}
+
+/* Sparkline row */
+.sp-row{background:var(--card);border-radius:9px;padding:10px 12px;margin-bottom:6px}
+.sp-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.sp-label{font-size:10px;color:var(--dim);font-weight:500}
+.sp-val{font:600 12px/1 'JetBrains Mono',mono}
+.sp-chart{height:28px;display:flex;align-items:flex-end;gap:1px}
+.sp-bar{flex:1;border-radius:1.5px 1.5px 0 0;min-height:1px;transition:height .3s}
+
+/* Grid status */
+.gs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px}
+.gs-item{background:var(--card);border-radius:8px;padding:8px 6px;text-align:center}
+.gs-val{font:600 15px/1 'JetBrains Mono',mono;color:var(--text)}
+.gs-lbl{font-size:8px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+
+/* Info pills */
+.ip{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.ip-item{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;background:var(--card);font-size:10px;color:var(--dim)}
+.ip-item strong{color:var(--text);font-weight:600}
+
+/* Action */
+.p-act{display:block;width:100%;margin-top:8px;padding:10px;border-radius:9px;background:linear-gradient(135deg,var(--navy),#001848);border:1px solid rgba(253,181,21,.15);color:var(--gold);text-decoration:none;font:600 12px 'DM Sans';text-align:center;transition:all .2s}
+.p-act:hover{border-color:var(--gold);box-shadow:0 3px 16px rgba(253,181,21,.12);transform:translateY(-1px)}
+
+/* Big CTA */
+.p-cta{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:linear-gradient(135deg,#001848,var(--navy));border:1px solid rgba(253,181,21,.2);text-decoration:none;transition:all .25s;cursor:pointer;margin-bottom:10px}
+.p-cta:hover{border-color:var(--gold);box-shadow:0 4px 24px rgba(253,181,21,.18);transform:translateY(-2px)}
+.p-cta-icon{width:48px;height:48px;border-radius:11px;background:rgba(253,181,21,.1);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
+.p-cta-title{font:600 14px 'DM Sans';color:#fff}
+.p-cta-sub{font-size:10.5px;color:var(--dim);margin-top:2px}
+.p-cta-arrow{font-size:20px;color:var(--gold);margin-left:auto;font-weight:300}
+
+/* MEP chips */
+.mep-grid{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.mep-chip{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;background:var(--card);font-size:9.5px;color:var(--dim)}
+.mep-dot{width:6px;height:6px;border-radius:2px;flex-shrink:0}
+
+/* Energy bar */
+.nrg-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:var(--card);margin-top:8px}
+.nrg-bar-left{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--dim)}
+.nrg-bar-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite}
+.nrg-bar-val{font:600 14px/1 'JetBrains Mono',mono;color:var(--gold)}
+
+/* Bottom */
+.bb{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:15;display:flex;gap:6px}
+.bp{padding:5px 12px;border-radius:16px;background:var(--panel);backdrop-filter:blur(10px);border:1px solid var(--border);font-size:9.5px;color:var(--dim)}
+.bp b{color:var(--text);font-weight:600}
+
+.esri-popup{display:none!important}
+.esri-ui-corner .esri-component{border-radius:9px!important}
+@media(max-width:768px){#sb{position:absolute;width:290px;min-width:290px}#sb.hide{transform:translateX(-100%)}#pop{width:calc(100vw - 24px);right:12px!important}}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="sb">
+  <div class="sh">
+    <div class="sh-brand"><div class="sh-logo">DT</div><div><h1>UC Berkeley · Campus Digital Twin</h1><div class="sh-sub">ArcGIS Edition</div></div></div>
+    <div class="sh-stats"><div class="sh-s"><b id="xb">0</b><small>Buildings</small></div><div class="sh-s"><b id="xm">0</b><small>BIM</small></div><div class="sh-s"><b id="xe">0</b><small>Energy</small></div></div>
+  </div>
+  <div class="sf"><div class="sf-w"><input id="qi" placeholder="Search buildings..."></div></div>
+  <div class="sfl" id="fl"></div>
+  <div class="sl" id="bl"></div>
+</div>
+<div id="ma">
+  <button id="tb">☰</button>
+  <div id="viewDiv"></div>
+  <div id="pop"></div>
+  <div class="bb"><div class="bp">Powered by <b>ArcGIS JS 4.29</b></div><div class="bp">🛰️ Satellite</div></div>
+</div>
+</div>
+<script src="https://js.arcgis.com/4.29/"></script>
+<script>
+const D=[
+  {id:'grimes',n:'Grimes Engineering Center',a:'Bechtel Center',lat:37.87410,lng:-122.25815,c:'Engineering',bim:1,nrg:1,kw:37.3,
+   floors:4,sqft:'83,460',year:'1980 / 2025 renovation',mep:8,sensors:30,
+   xr:'https://doe2park.github.io/Graduate-Project/grimes-xr.html',
+   campus:'https://doe2park.github.io/Graduate-Project/grimes-campus-map.html'},
+  {id:'cory',n:'Cory Hall',a:'Electrical Engineering (EECS)',lat:37.87530,lng:-122.25725,c:'Engineering',nrg:1},
+  {id:'soda',n:'Soda Hall',a:'Computer Science (EECS)',lat:37.87583,lng:-122.25862,c:'Engineering',nrg:1},
+  {id:'davis',n:'Davis Hall',a:'Civil & Environmental Eng.',lat:37.87454,lng:-122.25830,c:'Engineering',nrg:1},
+  {id:'etch',n:'Etcheverry Hall',a:'Mechanical / Nuclear Eng.',lat:37.87595,lng:-122.25935,c:'Engineering',nrg:1},
+  {id:'hmm',n:'Hearst Memorial Mining',a:'Materials Science & Eng.',lat:37.87460,lng:-122.25720,c:'Engineering',nrg:1},
+  {id:'hesse',n:'Hesse Hall',a:'Mechanical Eng. Lab',lat:37.87415,lng:-122.25925,c:'Engineering'},
+  {id:'obrien',n:"O'Brien Hall",a:'Environmental Eng. Lab',lat:37.87470,lng:-122.25900,c:'Engineering'},
+  {id:'jacobs',n:'Jacobs Hall',a:'CITRIS / Design',lat:37.87568,lng:-122.25923,c:'Engineering'},
+  {id:'sutardja',n:'Sutardja Dai Hall',a:'CITRIS / Nanofab',lat:37.87498,lng:-122.25850,c:'Engineering'},
+  {id:'mclaughlin',n:'McLaughlin Hall',lat:37.87475,lng:-122.25780,c:'Engineering'},
+  {id:'blum',n:'Blum Hall',lat:37.87555,lng:-122.25988,c:'Engineering'},
+  {id:'stanley',n:'Stanley Hall',a:'Bioengineering / QB3',lat:37.87430,lng:-122.25622,c:'Science',nrg:1},
+  {id:'tan',n:'Tan Hall',a:'Chemistry / ChemE',lat:37.87332,lng:-122.25640,c:'Science',nrg:1},
+  {id:'latimer',n:'Latimer Hall',a:'Chemistry',lat:37.87355,lng:-122.25702,c:'Science',nrg:1},
+  {id:'lewis',n:'Lewis Hall',a:'Chemistry',lat:37.87383,lng:-122.25653,c:'Science'},
+  {id:'pimentel',n:'Pimentel Hall',lat:37.87340,lng:-122.25740,c:'Science'},
+  {id:'evans',n:'Evans Hall',a:'Mathematics',lat:37.87370,lng:-122.25810,c:'Science',nrg:1},
+  {id:'campbell',n:'Campbell Hall',a:'Physics / Astronomy',lat:37.87245,lng:-122.25790,c:'Science'},
+  {id:'birge',n:'Birge Hall',a:'Physics',lat:37.87275,lng:-122.25730,c:'Science'},
+  {id:'leconte',n:'LeConte Hall',a:'Physics',lat:37.87280,lng:-122.25770,c:'Science'},
+  {id:'vlsb',n:'Valley Life Sciences',lat:37.87140,lng:-122.26175,c:'Science',nrg:1},
+  {id:'lksc',n:'Li Ka Shing Center',lat:37.87440,lng:-122.25570,c:'Science'},
+  {id:'hilde',n:'Hildebrand Hall',a:'Chemistry',lat:37.87358,lng:-122.25590,c:'Science'},
+  {id:'wheeler',n:'Wheeler Hall',lat:37.87115,lng:-122.25895,c:'Humanities',nrg:1},
+  {id:'dwinelle',n:'Dwinelle Hall',lat:37.87060,lng:-122.26065,c:'Humanities',nrg:1},
+  {id:'moses',n:'Moses Hall',lat:37.87110,lng:-122.25770,c:'Humanities'},
+  {id:'durant',n:'Durant Hall',lat:37.87140,lng:-122.25820,c:'Humanities'},
+  {id:'south',n:'South Hall',lat:37.87155,lng:-122.25870,c:'Humanities'},
+  {id:'barrows',n:'Barrows Hall',lat:37.86960,lng:-122.25830,c:'Humanities',nrg:1},
+  {id:'stephens',n:'Stephens Hall',lat:37.87075,lng:-122.25765,c:'Humanities'},
+  {id:'haas',n:'Haas School of Business',lat:37.87175,lng:-122.25360,c:'Professional',nrg:1},
+  {id:'boalt',n:'Boalt Hall',a:'School of Law',lat:37.86965,lng:-122.25330,c:'Professional'},
+  {id:'wurster',n:'Wurster Hall',a:'Architecture / CED',lat:37.87075,lng:-122.25500,c:'Professional',nrg:1},
+  {id:'kroeber',n:'Kroeber Hall',a:'Anthropology',lat:37.86940,lng:-122.26135,c:'Professional'},
+  {id:'tolman',n:'Tolman Hall',a:'Psychology',lat:37.87395,lng:-122.26375,c:'Professional'},
+  {id:'morgan',n:'Morgan Hall',a:'Natural Resources',lat:37.87310,lng:-122.26425,c:'Professional'},
+  {id:'giannini',n:'Giannini Hall',a:'Ag. Economics',lat:37.87345,lng:-122.26350,c:'Professional'},
+  {id:'california',n:'California Hall',lat:37.87155,lng:-122.26000,c:'Professional',nrg:1},
+  {id:'mlk',n:'MLK Student Union',lat:37.86905,lng:-122.26010,c:'Student Life'},
+  {id:'rsf',n:'Recreational Sports Facility',a:'RSF',lat:37.86855,lng:-122.26270,c:'Student Life',nrg:1},
+  {id:'chavez',n:'Cesar Chavez Student Center',lat:37.86930,lng:-122.26090,c:'Student Life'},
+  {id:'anthony',n:'Anthony Hall',lat:37.86890,lng:-122.25940,c:'Student Life'},
+  {id:'unit1',n:'Unit 1 Residence Hall',lat:37.86720,lng:-122.25595,c:'Student Life'},
+  {id:'unit2',n:'Unit 2 Residence Hall',lat:37.86790,lng:-122.25480,c:'Student Life'},
+  {id:'unit3',n:'Unit 3 Residence Hall',lat:37.86760,lng:-122.26150,c:'Student Life'},
+  {id:'stadium',n:'Memorial Stadium',lat:37.87070,lng:-122.25058,c:'Student Life',nrg:1},
+  {id:'doe',n:'Doe Memorial Library',lat:37.87230,lng:-122.25960,c:'Libraries',nrg:1},
+  {id:'moffitt',n:'Moffitt Library',lat:37.87265,lng:-122.26070,c:'Libraries',nrg:1},
+  {id:'stacks',n:'Main Stacks',lat:37.87245,lng:-122.26000,c:'Libraries'},
+  {id:'bancroft',n:'Bancroft Library',lat:37.87200,lng:-122.25880,c:'Libraries'},
+  {id:'music',n:'Music Library',lat:37.87065,lng:-122.25660,c:'Libraries'},
+  {id:'campanile',n:'Sather Tower',a:'The Campanile',lat:37.87215,lng:-122.25780,c:'Other'},
+  {id:'sproul',n:'Sproul Hall',lat:37.86960,lng:-122.25870,c:'Other',nrg:1},
+  {id:'uhall',n:'University Hall',lat:37.87175,lng:-122.26460,c:'Other'},
+  {id:'sgate',n:'Sather Gate',lat:37.87030,lng:-122.25960,c:'Other'},
+  {id:'zeller',n:'Zellerbach Hall',lat:37.86930,lng:-122.26190,c:'Other',nrg:1},
+];
+
+const C={Engineering:{r:[0,50,98],h:'#FDB515'},Science:{r:[16,120,60],h:'#34d399'},Humanities:{r:[100,40,160],h:'#a78bfa'},Professional:{r:[30,80,200],h:'#60a5fa'},'Student Life':{r:[180,40,40],h:'#f87171'},Libraries:{r:[180,120,10],h:'#fbbf24'},Other:{r:[80,100,130],h:'#94a3b8'}};
+const CATS=[...new Set(D.map(b=>b.c))];
+
+// Generate fake sparkline data
+function spark(n,base,amp){const r=[];for(let i=0;i<n;i++)r.push(base+Math.sin(i*.4)*amp*(0.5+Math.random()*.5)+Math.random()*amp*.3);return r}
+
+require(["esri/Map","esri/views/MapView","esri/Graphic","esri/layers/GraphicsLayer","esri/widgets/Locate","esri/widgets/BasemapToggle","esri/geometry/Point"],
+function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
+  const map=new EMap({basemap:'satellite'});
+  const view=new MapView({container:'viewDiv',map,center:[-122.2590,37.8715],zoom:16,
+    constraints:{minZoom:14,maxZoom:20,snapToZoom:false,rotationEnabled:false},
+    ui:{components:['zoom','compass']},popup:{autoOpenEnabled:false}});
+  const gL=new GraphicsLayer();map.add(gL);
+  const gfx={};
+
+  D.forEach((b,i)=>{
+    const cc=C[b.c],isG=b.id==='grimes',sz=isG?14:(b.nrg?9:7);
+    gL.add(new Graphic({
+      geometry:new Point({longitude:b.lng,latitude:b.lat}),
+      symbol:{type:'simple-marker',color:[...cc.r,isG?255:190],size:sz,
+        outline:{color:isG?[253,181,21]:[...cc.r.map(v=>Math.min(255,v+70)),160],width:isG?2.5:1}},
+      attributes:{idx:i}
+    }));
+    gfx[i]=true;
+    if(b.kw)gL.add(new Graphic({
+      geometry:new Point({longitude:b.lng+0.00028,latitude:b.lat+0.00016}),
+      symbol:{type:'text',text:`⚡${b.kw}kW`,color:[253,181,21],haloColor:[0,0,0,.85],haloSize:2,
+        font:{size:8.5,weight:'bold',family:'JetBrains Mono,monospace'}}
+    }));
+  });
+
+  view.ui.add(new Locate({view}),'top-right');
+  view.ui.add(new BasemapToggle({view,nextBasemap:'hybrid'}),'bottom-left');
+
+  // ═══ POPUP ═══
+  const pop=document.getElementById('pop');
+
+  function mkDonut(total,slices,size){
+    const r=size/2,stroke=7,ir=r-stroke;
+    let cumAngle=0;
+    const paths=slices.map(s=>{
+      const frac=s.val/total;
+      const startA=cumAngle*2*Math.PI;
+      cumAngle+=frac;
+      const endA=cumAngle*2*Math.PI;
+      const x1=r+ir*Math.cos(startA),y1=r+ir*Math.sin(startA);
+      const x2=r+ir*Math.cos(endA),y2=r+ir*Math.sin(endA);
+      const large=frac>0.5?1:0;
+      return `<path d="M${r},${r} L${x1},${y1} A${ir},${ir} 0 ${large},1 ${x2},${y2} Z" fill="${s.color}" opacity="0.85"/>`;
+    }).join('');
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}<circle cx="${r}" cy="${r}" r="${ir-10}" fill="rgba(10,16,30,.95)"/></svg>`;
+  }
+
+  function mkSpark(data,color,h){
+    const max=Math.max(...data),min=Math.min(...data);
+    const range=max-min||1;
+    return data.map((v,i)=>{
+      const pct=((v-min)/range)*100;
+      const ht=Math.max(2,pct/100*h);
+      return `<div class="sp-bar" style="height:${ht}px;background:${color};opacity:${0.4+pct/100*0.6}"></div>`;
+    }).join('');
+  }
+
+  function showPop(b){
+    const cc=C[b.c];
+    let h=`<div class="p-h"><button class="p-x" onclick="closePop()">✕</button>
+      <div class="p-t">${b.n}</div>${b.a?`<div class="p-a">${b.a}</div>`:''}
+      <div class="p-badge" style="background:${cc.h}15;color:${cc.h}">${b.c}</div></div><div class="p-b">`;
+
+    if(b.xr){
+      // ── BIG CTA: Enter Digital Twin ──
+      h+=`<a class="p-cta" href="${b.xr}" target="_blank">
+        <div class="p-cta-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+        </div>
+        <div class="p-cta-text">
+          <div class="p-cta-title">Enter 3D Digital Twin</div>
+          <div class="p-cta-sub">Walk through MEP systems in WebXR</div>
+        </div>
+        <div class="p-cta-arrow">→</div>
+      </a>`;
+    }
+
+    if(b.bim){
+      // ── Building quick stats grid ──
+      h+=`<div class="gs" style="margin-top:10px">
+        <div class="gs-item"><div class="gs-val" style="color:var(--cyan)">${b.floors}</div><div class="gs-lbl">Floors</div></div>
+        <div class="gs-item"><div class="gs-val" style="color:var(--text);font-size:13px">${b.sqft}</div><div class="gs-lbl">Sq. ft.</div></div>
+        <div class="gs-item"><div class="gs-val" style="color:var(--amber)">${b.mep}</div><div class="gs-lbl">MEP Systems</div></div>
+      </div>`;
+
+      // ── MEP systems visual ──
+      const meps=[
+        {name:'HVAC Duct',color:'#22d3ee'},{name:'Hot Water',color:'#f87171'},
+        {name:'Cold Water',color:'#60a5fa'},{name:'Electrical',color:'#fbbf24'},
+        {name:'Fire Protection',color:'#f97316'},{name:'Sanitary',color:'#a78bfa'},
+        {name:'Storm Drain',color:'#34d399'},{name:'Plumbing Vent',color:'#e879f9'}
+      ];
+      h+=`<div class="mep-grid">`;
+      meps.forEach(m=>{
+        h+=`<div class="mep-chip"><span class="mep-dot" style="background:${m.color}"></span>${m.name}</div>`;
+      });
+      h+=`</div>`;
+
+      // Year
+      h+=`<div class="ip" style="margin-top:8px">
+        <div class="ip-item">🏛️ <strong>${b.year}</strong></div>
+        <div class="ip-item">📡 <strong>${b.sensors}</strong> sensor points</div>
+      </div>`;
+    }
+
+    if(b.kw){
+      // ── Compact energy bar (not full dashboard) ──
+      h+=`<div class="nrg-bar">
+        <div class="nrg-bar-left">
+          <div class="nrg-bar-dot"></div>
+          <span>BMO Live</span>
+        </div>
+        <div class="nrg-bar-val">${b.kw} kW</div>
+      </div>`;
+    } else if(b.nrg){
+      h+=`<div class="nrg-bar">
+        <div class="nrg-bar-left">
+          <div class="nrg-bar-dot" style="background:var(--dim);animation:none"></div>
+          <span>BMO Metered</span>
+        </div>
+        <div class="nrg-bar-val" style="color:var(--dim)">—</div>
+      </div>`;
+    }
+
+    if(!b.bim && !b.xr){
+      // Simple building
+      h+=`<div class="ip">`;
+      if(b.nrg) h+=`<div class="ip-item">⚡ <strong>BMO Metered</strong></div>`;
+      h+=`<div class="ip-item" style="font-family:'JetBrains Mono',mono;font-size:9px">${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}</div>`;
+      h+=`</div>`;
+    }
+
+    h+='</div>';
+    pop.innerHTML=h;pop.classList.add('vis');
+  }
+
+  window.closePop=()=>pop.classList.remove('vis');
+
+  view.on('click',evt=>view.hitTest(evt).then(res=>{
+    const hit=res.results.find(r=>r.graphic?.attributes?.idx!==undefined);
+    if(hit){const b=D[hit.graphic.attributes.idx];sel=hit.graphic.attributes.idx;renderList();showPop(b)}
+    else closePop();
+  }));
+
+  let af='All',sq='',sel=-1;
+  document.getElementById('xb').textContent=D.length;
+  document.getElementById('xm').textContent=D.filter(b=>b.bim).length;
+  document.getElementById('xe').textContent=D.filter(b=>b.nrg).length;
+
+  const fl=document.getElementById('fl');
+  ['All',...CATS].forEach(cat=>{
+    const btn=document.createElement('button');
+    btn.className=cat==='All'?'on':'';
+    if(cat!=='All'){const d=document.createElement('span');d.className='d';d.style.background=C[cat].h;btn.appendChild(d)}
+    btn.appendChild(document.createTextNode(cat));
+    btn.onclick=()=>{af=cat;fl.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderList();updVis()};
+    fl.appendChild(btn);
+  });
+
+  document.getElementById('qi').addEventListener('input',e=>{sq=e.target.value.toLowerCase();renderList();updVis()});
+
+  function renderList(){
+    const el=document.getElementById('bl');el.innerHTML='';
+    D.map((b,i)=>({...b,idx:i})).filter(b=>{
+      return(af==='All'||b.c===af)&&(!sq||b.n.toLowerCase().includes(sq)||(b.a&&b.a.toLowerCase().includes(sq)));
+    }).forEach(b=>{
+      const cc=C[b.c],card=document.createElement('div');
+      card.className='bc'+(b.idx===sel?' on':'');
+      let tags=`<span class="bt">${b.c}</span>`;
+      if(b.bim)tags+=`<span class="bt bt-b">BIM</span>`;
+      if(b.nrg)tags+=`<span class="bt bt-e">Energy</span>`;
+      if(b.kw)tags+=`<span class="bt bt-k">⚡${b.kw}kW</span>`;
+      card.innerHTML=`<div class="bc-d" style="background:${cc.h}"></div><div class="bc-i"><div class="bc-n">${b.n}</div><div class="bc-m">${b.a||b.c}</div><div class="bc-t">${tags}</div></div>`;
+      card.onclick=()=>{sel=b.idx;renderList();
+        view.goTo({target:new Point({longitude:b.lng,latitude:b.lat}),zoom:18},{duration:1000,easing:'ease-in-out'}).then(()=>showPop(b))};
+      el.appendChild(card);
+    });
+  }
+  function updVis(){gL.graphics.forEach(g=>{if(g.attributes?.idx!==undefined){const b=D[g.attributes.idx];
+    g.visible=(af==='All'||b.c===af)&&(!sq||b.n.toLowerCase().includes(sq)||(b.a&&b.a.toLowerCase().includes(sq)))}})}
+  document.getElementById('tb').onclick=()=>document.getElementById('sb').classList.toggle('hide');
+  renderList();
+});
+</script>
+</body>
+</html>
