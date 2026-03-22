@@ -70,7 +70,23 @@
   .dp-maint-label { font-size:8px;color:#475569; }
   .dp-close { position:absolute;top:8px;right:12px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px; }
   .dp-sim { margin-top:6px;font-size:8px;color:#334155;text-align:center; }
-  #dbMobileBtn { display:none;position:fixed;top:48px;right:10px;z-index:101;padding:6px 12px;border-radius:8px;background:var(--panel);border:1px solid var(--border);color:var(--cyan);font-size:12px;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);font-family:var(--font); }
+  #dbMobileBtn { display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:101;padding:12px 24px;border-radius:16px;background:rgba(253,181,21,.15);border:2px solid rgba(253,181,21,.5);color:#FDB515;font-size:14px;font-weight:700;cursor:pointer;backdrop-filter:blur(12px);font-family:var(--font);box-shadow:0 4px 20px rgba(253,181,21,.2);animation:dbPulse 2s ease-in-out infinite }
+  @keyframes dbPulse{0%,100%{box-shadow:0 4px 20px rgba(253,181,21,.2)}50%{box-shadow:0 4px 30px rgba(253,181,21,.5)}}
+
+  /* Welcome overlay on mobile */
+  #mobileWelcome{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center}
+  @media(max-width:768px){#mobileWelcome.show{display:flex}}
+  .mw-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;width:90%;max-width:340px;text-align:center}
+  .mw-title{font-size:16px;font-weight:700;color:var(--cyan);margin-bottom:4px}
+  .mw-sub{font-size:11px;color:#64748b;margin-bottom:16px}
+  .mw-stats{display:flex;gap:8px;margin-bottom:16px}
+  .mw-stat{flex:1;background:rgba(255,255,255,.04);border-radius:10px;padding:10px 6px}
+  .mw-stat-val{font-size:22px;font-weight:700;font-family:monospace}
+  .mw-stat-lbl{font-size:9px;color:#475569;margin-top:2px}
+  .mw-btn{display:block;width:100%;padding:12px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px}
+  .mw-btn-gold{background:#FDB515;color:#003262}
+  .mw-btn-cyan{background:var(--cyan);color:#000}
+  .mw-btn-ghost{background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid var(--border)}
 
   /* ── Heatmap Legend ── */
   #heatLegend { position:fixed;bottom:90px;right:14px;z-index:50;background:var(--panel);padding:10px 12px;border-radius:10px;border:1px solid var(--border);display:none;font-size:10px; }
@@ -93,6 +109,21 @@
 <body>
 <div id="loading"><div class="spinner"></div><div id="loadText">Loading MEP...</div></div>
 
+<!-- Mobile Welcome Overlay -->
+<div id="mobileWelcome">
+  <div class="mw-card">
+    <div class="mw-title">🏗 Grimes Engineering Center</div>
+    <div class="mw-sub">Live Digital Twin · 8 MEP Systems · 30 Sensors</div>
+    <div class="mw-stats">
+      <div class="mw-stat"><div class="mw-stat-val" style="color:var(--cyan)" id="mwKw">--</div><div class="mw-stat-lbl">kW now</div></div>
+      <div class="mw-stat"><div class="mw-stat-val" style="color:#fbbf24">8</div><div class="mw-stat-lbl">MEP systems</div></div>
+      <div class="mw-stat"><div class="mw-stat-val" style="color:#f87171">4</div><div class="mw-stat-lbl">floors</div></div>
+    </div>
+    <button class="mw-btn mw-btn-gold" onclick="document.getElementById('mobileWelcome').classList.remove('show');document.getElementById('dbMobileBtn').click()">📊 View Live Energy Data</button>
+    <button class="mw-btn mw-btn-ghost" onclick="document.getElementById('mobileWelcome').classList.remove('show')">🏗 Explore 3D Model</button>
+  </div>
+</div>
+
 <!-- Top Bar -->
 <div id="topbar">
   <a href="grimes-campus-map-arcgis.html" style="text-decoration:none;color:var(--muted);font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap">← Campus</a>
@@ -109,7 +140,7 @@
 <!-- Legend -->
 <div id="legend"><h3>MEP Systems</h3><div id="systemList"></div></div>
 
-<button id="dbMobileBtn">⚡ Live Data</button>
+<button id="dbMobileBtn">⚡ Live Data · -- kW</button>
 
 <!-- Dashboard -->
 <div id="dashboard">
@@ -328,6 +359,8 @@ gltfLoader.load('grimes-mep-only.glb', (gltf) => {
   buildLegend();
   startSimulation();
   setupXR();
+  // Show mobile welcome after brief delay
+  if(window.innerWidth<=768){setTimeout(function(){document.getElementById('mobileWelcome').classList.add('show')},1500)}
 }, p => { loadingEl.textContent = `Loading MEP... ${(p.loaded/1024/1024).toFixed(1)} MB`; },
 () => { loadingEl.textContent = 'Error'; loadingEl.style.color = '#f87171'; });
 
@@ -578,6 +611,13 @@ function updateDashboard() {
   const totalEl = document.getElementById('dTotal');
   totalEl.textContent = totalKw ? `${totalKw.toFixed(1)} kW` : '\u2014';
   totalEl.style.color = totalKw > 200 ? '#f87171' : totalKw > 120 ? '#fb923c' : 'var(--cyan)';
+  // Update mobile button + welcome with real kW
+  if(totalKw){
+    window._liveKw=totalKw.toFixed(1);
+    var mwK=document.getElementById('mwKw');if(mwK)mwK.textContent=totalKw.toFixed(1);
+    var mbtn=document.getElementById('dbMobileBtn');
+    if(mbtn&&!mbtn.textContent.includes('Close'))mbtn.textContent='\u26A1 Live Data \u00B7 '+totalKw.toFixed(1)+' kW';
+  }
 
   // Distribution
   document.getElementById('dSubA').textContent = m76.kw ? `${m76.kw.toFixed(1)}` : '\u2014';
@@ -997,7 +1037,7 @@ document.getElementById('dbMobileBtn').addEventListener('click', () => {
   const db = document.getElementById('dashboard');
   db.classList.toggle('show');
   const isOpen = db.classList.contains('show');
-  document.getElementById('dbMobileBtn').textContent = isOpen ? '✕ Close' : '⚡ Live Data';
+  document.getElementById('dbMobileBtn').textContent = isOpen ? '✕ Close Data' : '⚡ Live Data · ' + (window._liveKw || '--') + ' kW';
   if (isOpen && liveData) setTimeout(() => { drawCharts(); updateDashboard(); }, 50);
 });
 
@@ -1328,10 +1368,21 @@ window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.inn
 </script>
 <script>
 fetch("https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t="+Date.now())
-.then(r=>r.json()).then(d=>{
+.then(function(r){return r.json()}).then(function(d){
+  // Update campus badge
   var el=document.getElementById("liveKwBadge");
-  if(el)el.innerHTML="⚡ Campus: "+d.total_kw+" kW · "+d.buildings_online+" buildings";
-}).catch(()=>{});
+  if(el)el.innerHTML="⚡ Campus: "+d.total_kw+" kW · "+d.buildings_online+" bldgs";
+  // Update welcome card kW
+  var g=d.buildings&&d.buildings.grimes;
+  if(g&&g.kw){
+    window._liveKw=g.kw;
+    var mwKw=document.getElementById("mwKw");
+    if(mwKw)mwKw.textContent=g.kw;
+    // Update mobile btn
+    var btn=document.getElementById("dbMobileBtn");
+    if(btn&&!btn.textContent.includes("Close"))btn.textContent="⚡ Live Data · "+g.kw+" kW";
+  }
+}).catch(function(){});
 </script>
 </body>
 </html>
