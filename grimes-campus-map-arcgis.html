@@ -367,19 +367,22 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
     // ── Energy (if live kW available) ──
     if(b.kw){
+      var slices=[{val:b.kw,color:'var(--gold)'},{val:Math.max(10,500-b.kw),color:'rgba(255,255,255,.06)'}];
+      var donutSvg=mkDonut(Math.max(b.kw+10,500),slices,72);
       h+=`<div class="pw" style="margin-top:8px">
         <div class="pw-top"><div class="pw-lbl">Building power</div><div class="pw-live">Live \u00B7 BMO</div></div>
-        <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px">
-          <div style="font:700 24px/1 'JetBrains Mono',mono;color:var(--gold)">${b.kw}</div>
-          <div style="font-size:12px;color:var(--gold-dim)">kW</div>
-          <div style="margin-left:auto;font:500 11px 'JetBrains Mono',mono;color:var(--faint)">~$${Math.round(b.kw*0.15*24)}/day</div>
-        </div>
-        <div class="sp-row" style="margin-top:8px;background:transparent;padding:0">
-          <div class="sp-chart">${mkSpark(spark(36,b.kw*0.8,b.kw*0.4),'var(--cyan)',22)}</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px">
-          <span style="font-size:8px;color:var(--faint)">24hr trend (simulated)</span>
-          <span style="font-size:8px;color:var(--faint)">${b.liveTs||''}</span>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:6px">
+          <div class="pw-donut">${donutSvg}<div class="pw-donut-center"><div class="pw-donut-val">${b.kw}</div><div class="pw-donut-unit">kW</div></div></div>
+          <div style="flex:1">
+            <div style="font:600 11px system-ui;color:var(--text);margin-bottom:4px">~$${Math.round(b.kw*0.15*24)}/day \u00B7 ${Math.round(b.kw*24*0.21)}kg CO\u2082</div>
+            <div class="sp-row" style="background:transparent;padding:0;margin-top:4px">
+              <div class="sp-chart">${mkSpark(spark(36,b.kw*0.8,b.kw*0.4),'var(--cyan)',20)}</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:2px">
+              <span style="font-size:8px;color:var(--faint)">24hr trend</span>
+              <span style="font-size:8px;color:var(--faint)">${b.liveTs||''}</span>
+            </div>
+          </div>
         </div>
       </div>`;
     } else if(b.nrg){
