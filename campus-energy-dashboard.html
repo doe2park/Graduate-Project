@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Campus Energy Dashboard · UC Berkeley Digital Twin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a1020;--panel:rgba(15,23,42,.92);--border:rgba(253,181,21,.12);--gold:#FDB515;--cyan:#2dd4bf;--text:#e2e8f0;--dim:#64748b;--faint:#334155;--red:#f87171;--green:#34d399;--navy:#003262;--mono:'JetBrains Mono',ui-monospace,monospace}
+:root{--bg:#0a1020;--panel:rgba(15,23,42,.92);--border:rgba(253,181,21,.12);--gold:#FDB515;--cyan:#2dd4bf;--text:#e2e8f0;--dim:#64748b;--faint:#334155;--red:#f87171;--green:#34d399;--mono:'JetBrains Mono',monospace}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;min-height:100vh}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
 a{color:var(--cyan);text-decoration:none}
-
-/* Header */
 .hdr{background:var(--panel);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)}
 .hdr-back{padding:6px 14px;border-radius:8px;border:1px solid var(--border);color:var(--dim);font-size:12px;font-weight:600}
 .hdr-back:hover{border-color:var(--gold);color:var(--gold)}
@@ -19,216 +19,176 @@ a{color:var(--cyan);text-decoration:none}
 .hdr-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .hdr-ts{font-size:10px;color:var(--dim);font-family:var(--mono)}
-
-/* Grid */
 .wrap{max-width:1200px;margin:0 auto;padding:16px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
-.stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
-.stat-lbl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-.stat-val{font:700 28px/1 var(--mono);color:var(--cyan)}
-.stat-val.gold{color:var(--gold)}
-.stat-val.red{color:var(--red)}
-.stat-val.green{color:var(--green)}
-.stat-sub{font-size:10px;color:var(--dim);margin-top:4px}
-
-/* Section */
-.sec{margin-bottom:20px}
-.sec-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.sec-title span{font-size:10px;color:var(--dim);font-weight:400}
-
-/* Building table */
-.tbl{width:100%;border-collapse:separate;border-spacing:0}
-.tbl th{text-align:left;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;border-bottom:1px solid var(--faint)}
-.tbl td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px;vertical-align:middle}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+.stat-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.stat-val{font:700 26px/1 var(--mono)}
+.stat-sub{font-size:9px;color:var(--dim);margin-top:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:768px){.grid2,.grid3{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.hdr h1{font-size:13px}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative}
+.card-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title span{font-size:9px;color:var(--dim);font-weight:400;margin-left:auto}
+.chart-box{position:relative;height:200px}
+.chart-box-sm{position:relative;height:160px}
+.sec-title{font-size:13px;font-weight:700;color:var(--text);margin:16px 0 10px;display:flex;align-items:center;gap:8px}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:11px}
+.tbl th{text-align:left;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-bottom:1px solid var(--faint)}
+.tbl td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
 .tbl tr:hover td{background:rgba(253,181,21,.03)}
-.tbl .name{font-weight:600;color:var(--text)}
-.tbl .kw{font-family:var(--mono);font-weight:700;font-size:14px}
-.tbl .off{color:var(--dim);font-style:italic}
-.spark{display:flex;align-items:end;gap:1px;height:24px}
-.spark-bar{width:3px;border-radius:1px;background:var(--cyan);opacity:.7;min-height:1px}
-.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;font-family:var(--mono)}
+.badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;font-family:var(--mono)}
 .badge-on{background:rgba(52,211,153,.15);color:var(--green)}
 .badge-off{background:rgba(100,116,139,.15);color:var(--dim)}
 .badge-warn{background:rgba(248,113,113,.15);color:var(--red)}
-.cost{font-family:var(--mono);color:var(--gold);font-size:11px}
-.co2{font-family:var(--mono);color:var(--green);font-size:11px}
-
-/* Anomaly */
-.anom{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
-.anom-icon{font-size:18px}
-.anom-text{font-size:12px;color:var(--text)}
-.anom-text b{color:var(--red)}
-.no-anom{text-align:center;padding:20px;color:var(--dim);font-size:12px}
-
-/* Chart area */
-.chart-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
-.chart-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
-.chart-title{font-size:12px;font-weight:600;color:var(--text)}
-.chart-val{font:700 18px var(--mono);color:var(--cyan)}
-.campus-spark{display:flex;align-items:end;gap:2px;height:60px;padding-top:4px}
-.campus-spark-bar{flex:1;border-radius:2px 2px 0 0;background:var(--cyan);opacity:.6;min-height:1px;position:relative;cursor:pointer;transition:opacity .2s}
-.campus-spark-bar:hover{opacity:1}
-.campus-spark-bar .tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:9px;white-space:nowrap;color:var(--text);font-family:var(--mono);z-index:5}
-.campus-spark-bar:hover .tip{display:block}
-
-/* Responsive */
-@media(max-width:768px){
-  .stats{grid-template-columns:repeat(2,1fr)}
-  .stat-val{font-size:22px}
-  .tbl{display:block;overflow-x:auto}
-  .hdr h1{font-size:13px}
-}
-@media(max-width:480px){
-  .stats{grid-template-columns:1fr 1fr}
-  .wrap{padding:10px}
-}
-
-/* Loading */
+.spark{display:flex;align-items:end;gap:1px;height:20px}
+.spark-bar{width:3px;border-radius:1px;background:var(--cyan);opacity:.7;min-height:1px}
+.anom{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;font-size:11px}
+.no-anom{text-align:center;padding:16px;color:var(--dim);font-size:11px}
 #loading{display:flex;align-items:center;justify-content:center;height:60vh;color:var(--dim);font-size:14px;gap:10px}
 .spin{width:20px;height:20px;border:2px solid var(--faint);border-top-color:var(--cyan);border-radius:50%;animation:sp .6s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 </style>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-
 <div class="hdr">
-  <a href="grimes-campus-map-arcgis.html" class="hdr-back">← Campus Map</a>
+  <a href="grimes-campus-map-arcgis.html" class="hdr-back">← Map</a>
   <h1>⚡ Campus Energy Dashboard</h1>
   <div class="hdr-live"><div class="hdr-dot"></div>Live</div>
   <div class="hdr-ts" id="ts">--</div>
 </div>
-
-<div class="wrap" id="app">
-  <div id="loading"><div class="spin"></div>Loading energy data...</div>
-</div>
+<div class="wrap" id="app"><div id="loading"><div class="spin"></div>Loading energy data...</div></div>
 
 <script>
-const DATA_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
-const HIST_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json';
+const DATA_URL='https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
+const HIST_URL='https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json';
 
-async function init() {
-  const [dataRes, histRes] = await Promise.all([
-    fetch(DATA_URL + '?t=' + Date.now()),
-    fetch(HIST_URL + '?t=' + Date.now()).catch(() => null)
-  ]);
-  const data = await dataRes.json();
-  let history = {};
-  try { if (histRes && histRes.ok) history = await histRes.json(); } catch(e) {}
+Chart.defaults.color='#64748b';
+Chart.defaults.borderColor='rgba(255,255,255,.06)';
+Chart.defaults.font.family="'JetBrains Mono',monospace";
+Chart.defaults.font.size=10;
 
-  document.getElementById('ts').textContent = data.generated_at || '';
-  const app = document.getElementById('app');
+let charts={};
 
-  const blds = Object.entries(data.buildings).sort((a,b) => (b[1].kw||0) - (a[1].kw||0));
-  const online = blds.filter(([,b]) => b.kw !== null);
-  const offline = blds.filter(([,b]) => b.kw === null);
-  const totalKw = data.total_kw || 0;
-  const anomalies = data.anomalies || {};
-  const anomKeys = Object.keys(anomalies);
+async function init(){
+  const [dR,hR]=await Promise.all([fetch(DATA_URL+'?t='+Date.now()),fetch(HIST_URL+'?t='+Date.now()).catch(()=>null)]);
+  const data=await dR.json();
+  let hist={};try{if(hR&&hR.ok)hist=await hR.json()}catch(e){}
+  document.getElementById('ts').textContent=data.generated_at||'';
+  const app=document.getElementById('app');
+  const blds=Object.entries(data.buildings).sort((a,b)=>(b[1].kw||0)-(a[1].kw||0));
+  const online=blds.filter(([,b])=>b.kw!==null);
+  const offline=blds.filter(([,b])=>b.kw===null);
+  const totalKw=data.total_kw||0;
+  const anomalies=data.anomalies||{};
+  const anomKeys=Object.keys(anomalies);
 
-  // Top 5 consumers
-  const top5 = online.slice(0, 5);
-  const topPct = top5.reduce((s,[,b]) => s + b.kw, 0) / totalKw * 100;
+  // Category totals
+  const cats={};
+  const catColors={'Engineering':'#FDB515','Science':'#34d399','Humanities':'#a78bfa','Professional':'#60a5fa','Student Life':'#f87171','Libraries':'#fbbf24','Other':'#94a3b8'};
+  const catMap={grimes:'Engineering',cory:'Engineering',soda:'Engineering',davis:'Engineering',etch:'Engineering',hmm:'Engineering',hesse:'Engineering',sutardja:'Engineering',mclaughlin:'Engineering',stanley:'Science',tan:'Science',latimer:'Science',birge:'Science',hilde:'Science',lksc:'Science',koshland:'Science',wheeler:'Humanities',dwinelle:'Humanities',barrows:'Humanities',moses:'Humanities',stephens:'Humanities',wurster:'Professional',giannini:'Professional',tolman:'Professional',morgan:'Professional',boalt:'Professional',mlk:'Student Life',rsf:'Student Life',chavez:'Student Life',anthony:'Student Life',sproul:'Other',doe:'Libraries',moffitt:'Libraries',uhall:'Other',northgate:'Other',donner:'Other',bww:'Other',mulford:'Other'};
+  for(const [id,b] of blds){
+    const cat=catMap[id]||'Other';
+    if(!cats[cat])cats[cat]=0;
+    if(b.kw)cats[cat]+=b.kw;
+  }
 
-  app.innerHTML = `
+  app.innerHTML=`
     <div class="stats">
-      <div class="stat"><div class="stat-lbl">Total Campus Load</div><div class="stat-val gold">${totalKw.toLocaleString()}</div><div class="stat-sub">kW · ${data.buildings_online}/${data.buildings_total} buildings</div></div>
-      <div class="stat"><div class="stat-lbl">Est. Daily Cost</div><div class="stat-val">$${(data.total_daily_cost||0).toLocaleString()}</div><div class="stat-sub">@ $0.15/kWh</div></div>
-      <div class="stat"><div class="stat-lbl">Daily CO₂</div><div class="stat-val green">${((data.total_daily_co2_kg||0)/1000).toFixed(1)}</div><div class="stat-sub">metric tons</div></div>
-      <div class="stat"><div class="stat-lbl">Anomalies</div><div class="stat-val ${anomKeys.length ? 'red' : ''}">${anomKeys.length}</div><div class="stat-sub">${anomKeys.length ? anomKeys.join(', ') : 'All normal'}</div></div>
+      <div class="stat"><div class="stat-lbl">Campus Load</div><div class="stat-val" style="color:var(--gold)">${totalKw.toLocaleString()}<span style="font-size:14px"> kW</span></div><div class="stat-sub">${data.buildings_online}/${data.buildings_total} buildings online</div></div>
+      <div class="stat"><div class="stat-lbl">Est. Daily Cost</div><div class="stat-val" style="color:var(--text)">$${(data.total_daily_cost||0).toLocaleString()}</div><div class="stat-sub">@ $0.15/kWh</div></div>
+      <div class="stat"><div class="stat-lbl">Daily CO₂</div><div class="stat-val" style="color:var(--green)">${((data.total_daily_co2_kg||0)/1000).toFixed(1)}<span style="font-size:14px"> t</span></div><div class="stat-sub">${Math.round((data.total_daily_co2_kg||0)/21.7)} trees to offset</div></div>
+      <div class="stat"><div class="stat-lbl">Daily Energy</div><div class="stat-val" style="color:var(--cyan)">${((data.total_daily_kwh||0)/1000).toFixed(1)}<span style="font-size:14px"> MWh</span></div><div class="stat-sub">${Math.round((data.total_daily_kwh||0)/30)} avg homes equivalent</div></div>
     </div>
 
-    ${buildCampusChart(history, online)}
-
-    <div class="sec">
-      <div class="sec-title">⚠️ Anomaly Alerts <span>${anomKeys.length} active</span></div>
-      ${anomKeys.length ? anomKeys.map(k => {
-        const a = anomalies[k];
-        const b = data.buildings[k];
-        return `<div class="anom"><div class="anom-icon">🔴</div><div class="anom-text"><b>${b?.name || k}</b> — ${a.current} kW (${a.type === 'high' ? '↑' : '↓'} ${Math.round((a.ratio-1)*100)}% vs avg ${a.avg} kW)</div></div>`;
-      }).join('') : '<div class="no-anom">✅ No anomalies detected — all buildings within normal range</div>'}
-    </div>
-
-    <div class="sec">
-      <div class="sec-title">🏢 Building Rankings <span>${online.length} online · ${offline.length} offline</span></div>
-      <div style="overflow-x:auto">
-      <table class="tbl">
-        <tr><th>#</th><th>Building</th><th>Status</th><th>kW</th><th>24hr Trend</th><th>$/day</th><th>CO₂/day</th><th>Predicted</th></tr>
-        ${blds.map(([id, b], i) => {
-          const spark = (b.sparkline || []);
-          const maxS = Math.max(...spark, 1);
-          return `<tr>
-            <td style="color:var(--dim)">${i+1}</td>
-            <td class="name">${b.name}</td>
-            <td>${b.kw !== null ? '<span class="badge badge-on">LIVE</span>' : '<span class="badge badge-off">OFF</span>'}${anomalies[id] ? ' <span class="badge badge-warn">⚠️</span>' : ''}</td>
-            <td class="${b.kw !== null ? 'kw' : 'off'}" style="color:${b.kw > 200 ? 'var(--red)' : b.kw > 100 ? 'var(--gold)' : 'var(--cyan)'}">${b.kw !== null ? b.kw + ' kW' : '—'}</td>
-            <td><div class="spark">${spark.length ? spark.map(v => `<div class="spark-bar" style="height:${Math.max(2, v/maxS*24)}px"></div>`).join('') : '<span class="off">—</span>'}</div></td>
-            <td class="cost">${b.est_daily_cost ? '$' + b.est_daily_cost.toLocaleString() : '—'}</td>
-            <td class="co2">${b.est_daily_co2_kg ? b.est_daily_co2_kg + ' kg' : '—'}</td>
-            <td style="font-family:var(--mono);font-size:11px;color:var(--dim)">${b.predicted_kw ? '~' + b.predicted_kw + ' kW' : '—'}</td>
-          </tr>`;
-        }).join('')}
-      </table>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">🏛 Energy by Category <span>kW distribution</span></div>
+        <div class="chart-box"><canvas id="catDonut"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Top 10 Buildings <span>by current kW</span></div>
+        <div class="chart-box"><canvas id="topBar"></canvas></div>
       </div>
     </div>
 
-    <div class="sec">
-      <div class="sec-title">📊 Top 5 Energy Consumers <span>${topPct.toFixed(0)}% of total</span></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${top5.map(([id, b]) => {
-          const pct = (b.kw / totalKw * 100).toFixed(1);
-          return `<div style="flex:1;min-width:140px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px">
-            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px">${b.name}</div>
-            <div style="font:700 20px var(--mono);color:var(--gold)">${b.kw} kW</div>
-            <div style="margin-top:6px;height:6px;background:var(--faint);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--gold);border-radius:3px"></div></div>
-            <div style="font-size:9px;color:var(--dim);margin-top:4px">${pct}% of campus · ~$${b.est_daily_cost}/day</div>
-          </div>`;
-        }).join('')}
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">⚡ Campus Load History <span>last ${Object.keys(hist).length ? '24hr' : '—'}</span></div>
+        <div class="chart-box"><canvas id="histLine"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">💰 Cost per Building <span>est. $/day</span></div>
+        <div class="chart-box"><canvas id="costBar"></canvas></div>
       </div>
     </div>
 
-    <div style="text-align:center;padding:20px;font-size:10px;color:var(--faint)">
-      Data from BMO Campus Metering System · Auto-updated every 15 minutes · <a href="grimes-campus-map-arcgis.html">Back to Map</a>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">🌿 Carbon Footprint <span>kg CO₂/day per building</span></div>
+      <div class="chart-box-sm"><canvas id="co2Bar"></canvas></div>
+    </div>
+
+    <div class="sec-title">⚠️ Anomaly Alerts <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:8px">${anomKeys.length} active</span></div>
+    ${anomKeys.length?anomKeys.map(k=>{const a=anomalies[k];const b=data.buildings[k];return `<div class="anom">🔴 <b style="color:var(--red)">${b?.name||k}</b> — ${a.current} kW (${a.type==='high'?'↑':'↓'}${Math.round((a.ratio-1)*100)}% vs avg ${a.avg} kW)</div>`}).join(''):'<div class="no-anom">✅ All buildings within normal range</div>'}
+
+    <div class="sec-title">🏢 All Buildings <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:8px">${online.length} live · ${offline.length} offline</span></div>
+    <div class="card" style="overflow-x:auto;padding:8px">
+    <table class="tbl">
+      <tr><th>#</th><th>Building</th><th>Status</th><th>kW</th><th>Trend</th><th>$/day</th><th>CO₂</th><th>Predicted</th></tr>
+      ${blds.map(([id,b],i)=>{const sp=b.sparkline||[];const mx=Math.max(...sp,1);return `<tr>
+        <td style="color:var(--dim)">${i+1}</td>
+        <td style="font-weight:600">${b.name}</td>
+        <td>${b.kw!==null?'<span class="badge badge-on">LIVE</span>':'<span class="badge badge-off">OFF</span>'}${anomalies[id]?' <span class="badge badge-warn">⚠</span>':''}</td>
+        <td style="font-family:var(--mono);font-weight:700;color:${b.kw>200?'var(--red)':b.kw>100?'var(--gold)':'var(--cyan)'}">${b.kw!==null?b.kw+' kW':'—'}</td>
+        <td><div class="spark">${sp.length?sp.map(v=>`<div class="spark-bar" style="height:${Math.max(1,v/mx*20)}px"></div>`).join(''):'—'}</div></td>
+        <td style="font-family:var(--mono);color:var(--gold);font-size:10px">${b.est_daily_cost?'$'+b.est_daily_cost:''}</td>
+        <td style="font-family:var(--mono);color:var(--green);font-size:10px">${b.est_daily_co2_kg?b.est_daily_co2_kg+'kg':''}</td>
+        <td style="font-family:var(--mono);color:var(--dim);font-size:10px">${b.predicted_kw?'~'+b.predicted_kw:''}</td>
+      </tr>`}).join('')}
+    </table>
+    </div>
+
+    <div style="text-align:center;padding:20px;font-size:9px;color:var(--faint)">
+      BMO Campus Metering · Auto-updated every 15 min · <a href="grimes-campus-map-arcgis.html">Back to Map</a> · <a href="grimes-xr.html">3D Viewer</a>
     </div>
   `;
-}
 
-function buildCampusChart(history, online) {
-  // Build campus-wide sparkline from history
-  const allTimes = new Set();
-  for (const [id] of online) {
-    const pts = history[id] || [];
-    pts.forEach(p => allTimes.add(p.t));
+  // ── CHARTS ──
+  Object.values(charts).forEach(c=>c.destroy());charts={};
+
+  // 1. Category Donut
+  const catLabels=Object.keys(cats).filter(c=>cats[c]>0);
+  const catData=catLabels.map(c=>Math.round(cats[c]));
+  const catClrs=catLabels.map(c=>catColors[c]||'#94a3b8');
+  charts.donut=new Chart(document.getElementById('catDonut'),{type:'doughnut',data:{labels:catLabels,datasets:[{data:catData,backgroundColor:catClrs,borderWidth:0,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:10,padding:8,font:{size:10}}}}}});
+
+  // 2. Top 10 Bar
+  const top10=online.slice(0,10);
+  charts.topBar=new Chart(document.getElementById('topBar'),{type:'bar',data:{labels:top10.map(([,b])=>b.name.replace('Engineering','Eng').replace('Memorial','Mem').replace('& Pimentel','')),datasets:[{data:top10.map(([,b])=>b.kw),backgroundColor:top10.map(([,b])=>b.kw>200?'#f87171':b.kw>100?'#FDB515':'#2dd4bf'),borderRadius:4,barThickness:16}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>v+'kW'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  // 3. History Line
+  const allTimes=new Set();
+  for(const [id] of online){(hist[id]||[]).forEach(p=>allTimes.add(p.t))}
+  const times=[...allTimes].sort().slice(-48);
+  if(times.length>1){
+    const totals=times.map(t=>{let sum=0;for(const [id] of online){const pt=(hist[id]||[]).find(p=>p.t===t);if(pt)sum+=pt.kw}return Math.round(sum)});
+    charts.hist=new Chart(document.getElementById('histLine'),{type:'line',data:{labels:times,datasets:[{label:'Campus kW',data:totals,borderColor:'#FDB515',backgroundColor:'rgba(253,181,21,.1)',fill:true,tension:.3,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxTicksLimit:8,font:{size:8}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>v+'kW'}}}}});
+  } else {
+    document.getElementById('histLine').parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--dim);font-size:12px">History building up... check back in a few hours</div>';
   }
-  const times = [...allTimes].sort().slice(-48);
-  if (times.length < 2) return '';
 
-  const totals = times.map(t => {
-    let sum = 0;
-    for (const [id] of online) {
-      const pts = history[id] || [];
-      const pt = pts.find(p => p.t === t);
-      if (pt) sum += pt.kw;
-    }
-    return { t, kw: Math.round(sum) };
-  });
-  const maxKw = Math.max(...totals.map(t => t.kw), 1);
+  // 4. Cost Bar
+  const costTop=online.slice(0,8);
+  charts.cost=new Chart(document.getElementById('costBar'),{type:'bar',data:{labels:costTop.map(([,b])=>b.name.split(' ')[0]),datasets:[{label:'$/day',data:costTop.map(([,b])=>b.est_daily_cost),backgroundColor:'rgba(253,181,21,.6)',borderRadius:4,barThickness:20}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>'$'+v}}}}});
 
-  return `<div class="chart-wrap">
-    <div class="chart-header"><div class="chart-title">Campus Total Load (last ${times.length} readings)</div><div class="chart-val">${totals[totals.length-1]?.kw || '--'} kW</div></div>
-    <div class="campus-spark">
-      ${totals.map(t => `<div class="campus-spark-bar" style="height:${Math.max(3, t.kw/maxKw*56)}px"><div class="tip">${t.t} · ${t.kw} kW</div></div>`).join('')}
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--dim);font-family:var(--mono)"><span>${times[0]}</span><span>${times[times.length-1]}</span></div>
-  </div>`;
+  // 5. CO2 Bar
+  const co2Top=online.slice(0,12);
+  charts.co2=new Chart(document.getElementById('co2Bar'),{type:'bar',data:{labels:co2Top.map(([,b])=>b.name.split(' ')[0]),datasets:[{label:'kg CO₂/day',data:co2Top.map(([,b])=>b.est_daily_co2_kg),backgroundColor:'rgba(52,211,153,.5)',borderRadius:3,barThickness:14}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:8}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:v=>v+'kg'}}}}});
 }
 
-init().catch(e => {
-  document.getElementById('app').innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">Failed to load data: ' + e.message + '</div>';
-});
-
-// Auto-refresh every 60 seconds
-setInterval(() => init().catch(()=>{}), 60000);
+init().catch(e=>{document.getElementById('app').innerHTML='<div style="text-align:center;padding:40px;color:var(--red)">Error: '+e.message+'</div>'});
+setInterval(()=>init().catch(()=>{}),60000);
 </script>
 </body>
 </html>
