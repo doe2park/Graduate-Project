@@ -369,22 +369,29 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     if(b.kw){
       var slices=[{val:b.kw,color:'var(--gold)'},{val:Math.max(10,500-b.kw),color:'rgba(255,255,255,.06)'}];
       var donutSvg=mkDonut(Math.max(b.kw+10,500),slices,72);
+      var spData=(b.sparkline&&b.sparkline.length>2)?b.sparkline:spark(24,b.kw*0.8,b.kw*0.4);
+      var isReal=b.sparkline&&b.sparkline.length>2;
       h+=`<div class="pw" style="margin-top:8px">
         <div class="pw-top"><div class="pw-lbl">Building power</div><div class="pw-live">Live \u00B7 BMO</div></div>
         <div style="display:flex;align-items:center;gap:14px;margin-top:6px">
           <div class="pw-donut">${donutSvg}<div class="pw-donut-center"><div class="pw-donut-val">${b.kw}</div><div class="pw-donut-unit">kW</div></div></div>
           <div style="flex:1">
-            <div style="font:600 11px system-ui;color:var(--text);margin-bottom:4px">~$${Math.round(b.kw*0.15*24)}/day \u00B7 ${Math.round(b.kw*24*0.21)}kg CO\u2082</div>
+            <div style="font:600 11px system-ui;color:var(--text);margin-bottom:4px">~$${b.dailyCost||Math.round(b.kw*0.15*24)}/day \u00B7 ${b.dailyCo2||Math.round(b.kw*24*0.21)}kg CO\u2082</div>
             <div class="sp-row" style="background:transparent;padding:0;margin-top:4px">
-              <div class="sp-chart">${mkSpark(spark(36,b.kw*0.8,b.kw*0.4),'var(--cyan)',20)}</div>
+              <div class="sp-chart">${mkSpark(spData,'var(--cyan)',20)}</div>
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:2px">
-              <span style="font-size:8px;color:var(--faint)">24hr trend</span>
+              <span style="font-size:8px;color:var(--faint)">${isReal?'Real 24hr data':'Collecting data...'}</span>
               <span style="font-size:8px;color:var(--faint)">${b.liveTs||''}</span>
             </div>
           </div>
-        </div>
-      </div>`;
+        </div>`;
+      // Prediction + Anomaly row
+      var extras=[];
+      if(b.predicted)extras.push('<span style="color:var(--cyan)">Predicted: ~'+b.predicted+' kW</span>');
+      if(b.anomaly)extras.push('<span style="color:var(--red)">\u26A0 '+b.anomaly.type+' ('+Math.round((b.anomaly.ratio-1)*100)+'% vs avg)</span>');
+      if(extras.length)h+='<div style="margin-top:6px;font-size:9px;display:flex;gap:8px;justify-content:space-between">'+extras.join('')+'</div>';
+      h+=`</div>`;
     } else if(b.nrg){
       h+=`<div class="pw" style="margin-top:8px;border-color:var(--border)">
         <div class="pw-top"><div class="pw-lbl">Building power</div><div style="font-size:9px;color:var(--dim)">\u25CB Offline</div></div>
@@ -399,6 +406,8 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       meps.forEach(function(m){h+=`<div class="mep-chip"><span class="mep-dot" style="background:${m.color}"></span>${m.name}</div>`});
       h+=`</div>`;
     }
+
+    if(b.kw){h+=`<a href="campus-energy-dashboard.html" style="display:block;margin-top:8px;padding:6px;border-radius:6px;background:rgba(253,181,21,.08);border:1px solid rgba(253,181,21,.15);text-align:center;text-decoration:none;font-size:10px;font-weight:600;color:var(--gold)">\uD83D\uDCCA Full Campus Analytics \u2192</a>`}
 
     h+=`<div style="margin-top:8px;font:400 9px 'JetBrains Mono',mono;color:var(--faint)">\uD83D\uDCCD ${b.lat.toFixed(5)}, ${b.lng.toFixed(5)}</div>`;
     h+='</div>';pop.innerHTML=h;pop.classList.add('vis');
@@ -473,6 +482,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           b.kw = live.kw;
           b.nrg = 1;
           b.liveTs = live.timestamp;
+          b.sparkline = live.sparkline || [];
+          b.predicted = live.predicted_kw;
+          b.anomaly = live.anomaly;
+          b.dailyCost = live.est_daily_cost;
+          b.dailyCo2 = live.est_daily_co2_kg;
           updated++;
         }
       });
