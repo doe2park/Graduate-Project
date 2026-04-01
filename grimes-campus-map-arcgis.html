@@ -136,11 +136,11 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .bp{padding:5px 12px;border-radius:16px;background:var(--panel);backdrop-filter:blur(10px);border:1px solid var(--border);font-size:9.5px;color:var(--dim)}
 .bp b{color:var(--text);font-weight:600}
 
-@keyframes gPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.8}100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}
-@keyframes gGlow{0%,100%{box-shadow:0 0 12px 4px rgba(253,181,21,.4)}50%{box-shadow:0 0 24px 8px rgba(253,181,21,.7)}}
-#grimes-pulse{position:absolute;pointer-events:none;z-index:5;width:40px;height:40px;border-radius:50%;border:3px solid #FDB515;animation:gGlow 2s ease-in-out infinite}
-#grimes-pulse::before,#grimes-pulse::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid #FDB515;animation:gPulse 2.5s ease-out infinite}
-#grimes-pulse::after{animation-delay:1.25s}
+@keyframes gPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.6}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}
+@keyframes gGlow{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px 2px rgba(253,181,21,.3)}}
+#grimes-pulse{position:absolute;pointer-events:none;z-index:5;width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(253,181,21,.6);animation:gGlow 3s ease-in-out infinite}
+#grimes-pulse::before,#grimes-pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(253,181,21,.4);animation:gPulse 3s ease-out infinite}
+#grimes-pulse::after{animation-delay:1.5s}
 #grimes-label{position:absolute;pointer-events:auto;cursor:pointer;z-index:6;background:rgba(253,181,21,.95);color:#003262;font:700 10px/1 system-ui;padding:4px 10px 4px 8px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);transform:translate(18px,-50%)}
 #grimes-label::before{content:'';position:absolute;left:-5px;top:50%;transform:translateY(-50%);border:5px solid transparent;border-right-color:rgba(253,181,21,.95)}
 
@@ -257,23 +257,17 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   D.forEach((b,i)=>{
     const cc=C[b.c],isG=b.id==='grimes';
     if(isG){
-      // Outer glow ring
+      // Thin ring (outline only, no fill)
       gL.add(new Graphic({
         geometry:new Point({longitude:b.lng,latitude:b.lat}),
-        symbol:{type:'simple-marker',color:[253,181,21,30],size:48,
-          outline:{color:[253,181,21,60],width:2}}
+        symbol:{type:'simple-marker',color:[0,0,0,0],size:28,
+          outline:{color:[253,181,21,200],width:1.5}}
       }));
-      // Mid ring
+      // Diamond center
       gL.add(new Graphic({
         geometry:new Point({longitude:b.lng,latitude:b.lat}),
-        symbol:{type:'simple-marker',color:[253,181,21,60],size:30,
-          outline:{color:[253,181,21,140],width:2}}
-      }));
-      // Diamond marker
-      gL.add(new Graphic({
-        geometry:new Point({longitude:b.lng,latitude:b.lat}),
-        symbol:{type:'simple-marker',style:'diamond',color:[253,181,21,255],size:18,
-          outline:{color:[255,255,255],width:2.5}},
+        symbol:{type:'simple-marker',style:'diamond',color:[253,181,21,255],size:12,
+          outline:{color:[255,255,255],width:2}},
         attributes:{idx:i}
       }));
     } else {
