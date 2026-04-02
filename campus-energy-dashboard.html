@@ -287,7 +287,8 @@ async function init(){
     return {x:e.yr,y:e.kw,name:e.name,fl:e.fl,eff:e.kwPerFloor};
   });
   var scatterColors=scatterData.map(function(e){return e.y>200?'rgba(248,113,113,.8)':e.y>100?'rgba(253,181,21,.8)':'rgba(52,211,153,.8)'});
-  var scatterSizes=scatterData.map(function(e){return Math.max(4,Math.min(14,4+(e.y/maxKw)*10))});
+  var scMaxKw=Math.max.apply(null,scatterData.map(function(e){return e.y}))||500;
+  var scatterSizes=scatterData.map(function(e){return Math.max(4,Math.min(14,4+(e.y/scMaxKw)*10))});
   charts.age=new Chart(document.getElementById('ageScatter'),{type:'scatter',data:{
     datasets:[{
       data:scatterData,
