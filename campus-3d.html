@@ -207,29 +207,40 @@ function renderEnergy(energyData) {
     if (vals.length) maxKw = Math.max(...vals);
   }
 
+  // Short name helper
+  function sn(n){
+    var m={'Grimes Engineering Center':'Grimes','Berkeley Way West':'BWW','Hearst Memorial Mining':'Hearst Mining',
+      'Rec Sports Facility':'RSF','Sutardja Dai Hall':'Sutardja','McLaughlin Hall':'McLaughlin',
+      'Hildebrand Hall':'Hildebrand','North Gate Hall':'North Gate','MLK Student Union':'MLK',
+      'Doe Library':'Doe Library','Moffitt Library':'Moffitt','University Hall':'Univ Hall',
+      'Donner Laboratory':'Donner Lab',"O'Brien Hall":"O'Brien",'Latimer Hall':'Latimer',
+      'Etcheverry Hall':'Etcheverry','Zellerbach Hall':'Zellerbach'};
+    return m[n]||n.replace(' Hall','').replace(' Center','');
+  }
+
   buildings.forEach(function(b) {
     var live = energyData && energyData[b.id];
     var kw = (live && live.kw !== null) ? live.kw : null;
     var col = kwColor(kw, maxKw);
-    var sz = kw ? Math.max(6, Math.min(18, 6 + (kw / maxKw) * 12)) : 4;
+    var name = sn(b.n);
 
     viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(b.lng, b.lat, kw ? 30 + (kw / maxKw) * 50 : 20),
-      point: { pixelSize: sz, color: col, outlineColor: Cesium.Color.WHITE.withAlpha(0.7), outlineWidth: 1.5, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      position: Cesium.Cartesian3.fromDegrees(b.lng, b.lat, (b.floors||3)*4 + 5),
       label: {
-        text: kw ? b.n.split(' ')[0] + '\n' + kw + 'kW' : b.n.split(' ')[0],
-        font: kw ? 'bold 11px sans-serif' : '9px sans-serif',
-        fillColor: kw ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#94a3b8'),
+        text: kw ? name + '  ⚡' + kw + 'kW' : name,
+        font: kw ? 'bold 11px system-ui' : '10px system-ui',
+        fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -sz - 4),
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        showBackground: kw ? true : false,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(10,16,32,0.7)'),
-        backgroundPadding: new Cesium.Cartesian2(4, 3),
-        scaleByDistance: new Cesium.NearFarScalar(100, 1.2, 2000, 0.5),
+        showBackground: true,
+        backgroundColor: kw ? col.withAlpha(0.75) : Cesium.Color.fromCssColorString('rgba(30,40,60,0.6)'),
+        backgroundPadding: new Cesium.Cartesian2(6, 4),
+        scaleByDistance: new Cesium.NearFarScalar(200, 1.0, 3000, 0.4),
+        translucencyByDistance: new Cesium.NearFarScalar(200, 1.0, 4000, 0.3),
       },
       properties: { bid: b.id, name: b.n, dept: b.a, kw: kw, yr: b.yr, floors: b.floors, category: b.c }
     });
