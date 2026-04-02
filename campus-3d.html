@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>3D Campus Energy View · UC Berkeley Digital Twin</title>
-<script src="https://ajax.googleapis.com/ajax/libs/cesiumjs/1.125/Build/Cesium/Cesium.js"></script>
-<link href="https://ajax.googleapis.com/ajax/libs/cesiumjs/1.125/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#cesiumContainer{width:100%;height:100%;overflow:hidden}
@@ -170,20 +170,16 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
 
 // Add Google Photorealistic 3D Tiles
 try {
-  const tileset = viewer.scene.primitives.add(
-    await Cesium.Cesium3DTileset.fromIonAssetId(2275207)
-  );
+  var resource = await Cesium.IonResource.fromAssetId(2275207);
+  var tileset = viewer.scene.primitives.add(new Cesium.Cesium3DTileset({ url: resource }));
   console.log('3D Tiles loaded');
 } catch (error) {
-  console.log('3D Tiles failed, using satellite:', error.message);
-  try {
-    viewer.imageryLayers.addImageryProvider(
-      await Cesium.IonImageryProvider.fromAssetId(2)
-    );
-  } catch(e2) {
-    console.log('Satellite also failed:', e2.message);
-  }
+  console.log('3D Tiles failed:', error.message);
+  try { viewer.imageryLayers.addImageryProvider(new Cesium.IonImageryProvider({ assetId: 3 })); }
+  catch(e2) { viewer.imageryLayers.addImageryProvider(new Cesium.OpenStreetMapImageryProvider({url:'https://a.tile.openstreetmap.org/'})); }
 }
+// Always add terrain
+try { viewer.scene.terrainProvider = await Cesium.createWorldTerrainAsync(); } catch(e) {}
 
 // Set camera to UC Berkeley
 viewer.camera.flyTo({
@@ -315,7 +311,7 @@ function togglePlay() {
     var v = parseInt(slider.value) + 1;
     if (v > parseInt(slider.max)) { clearInterval(playInt); playInt = null; btn.textContent = '▶'; slider.value = slider.max; onTimeChange(slider.max); return; }
     slider.value = v; onTimeChange(v);
-  }, 300);
+  }, 800);
 }
 </script>
 </body>
