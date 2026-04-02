@@ -240,9 +240,9 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
   <span class="cb-hint">Ask about energy</span>
 </button>
 <div id="chatPanel">
-  <div class="chat-hdr"><h3>🤖 Campus Energy Assistant</h3><button class="chat-close" onclick="toggleChat()">✕</button></div>
+  <div class="chat-hdr"><h3>⚡ Campus Energy AI</h3><button class="chat-close" onclick="toggleChat()">✕</button></div>
   <div class="chat-msgs" id="chatMsgs">
-    <div class="chat-msg bot">Hi! I can answer questions about UC Berkeley campus buildings and energy data. Try asking me something!</div>
+    <div class="chat-msg bot">Hi! Ask me anything about UC Berkeley campus buildings and energy — I can answer in English or Korean.<br><br>Try: <i>"Which building uses the most energy?"</i> or <i>"Tell me about Davis Hall"</i></div>
   </div>
   <div class="chat-quick" id="chatQuick">
     <div class="chat-q" onclick="askChat(this.textContent)">Top energy users?</div>
@@ -712,15 +712,58 @@ function toggleViewMode(){
 }
 </script>
 <script>
-// ═══ SMART CAMPUS CHATBOT v2 — Fuzzy NLP ═══
+// ═══ SMART CAMPUS CHATBOT v3 — AI + Local Fallback ═══
+// Set your Cloudflare Worker URL here after deploying
+var AI_PROXY = 'https://campus-chatbot.ucb-dt.workers.dev';
+
 var chatOpen=false;
 function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('open',chatOpen);if(chatOpen)document.getElementById('chatIn').focus()}
 var chatData=null;
 fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatData=d}).catch(function(){});
 
-function addMsg(t,type){var m=document.getElementById('chatMsgs');var d=document.createElement('div');d.className='chat-msg '+type;d.innerHTML=t;m.appendChild(d);m.scrollTop=m.scrollHeight}
+function addMsg(t,type){var m=document.getElementById('chatMsgs');var d=document.createElement('div');d.className='chat-msg '+type;d.innerHTML=t;m.appendChild(d);m.scrollTop=m.scrollHeight;return d}
 function askChat(q){document.getElementById('chatIn').value=q;sendChat()}
-function sendChat(){var input=document.getElementById('chatIn');var q=input.value.trim();if(!q)return;input.value='';addMsg(q,'user');setTimeout(function(){addMsg(processQuery(q),'bot')},200)}
+
+function buildContext(){
+  var src=window.currentEnergyData||chatData&&chatData.buildings||{};
+  var lines=['UC Berkeley Campus Energy Data:'];
+  var totalKw=0,onCount=0;
+  Object.entries(src).forEach(function(e){
+    var b=e[1];
+    if(b.kw){totalKw+=b.kw;onCount++;lines.push((b.name||e[0])+': '+b.kw+' kW')}
+    else lines.push((b.name||e[0])+': offline');
+  });
+  lines.unshift('Total: '+Math.round(totalKw)+' kW, '+onCount+' online');
+  if(window._sliderTime&&window._sliderTime!=='Live')lines.unshift('Viewing historical time: '+window._sliderTime);
+  // Add building details
+  lines.push('\nBuilding details:');
+  D.forEach(function(b){lines.push(b.n+(b.a?' ('+b.a+')':'')+': '+b.c+', '+b.yr+', '+b.floors+'fl')});
+  return lines.join('\n');
+}
+
+async function sendChat(){
+  var input=document.getElementById('chatIn');
+  var q=input.value.trim();if(!q)return;
+  input.value='';addMsg(q,'user');
+
+  // Try AI proxy first
+  if(AI_PROXY){
+    var loading=addMsg('Thinking...','bot loading');
+    try{
+      var res=await fetch(AI_PROXY,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({question:q,context:buildContext()})
+      });
+      var data=await res.json();
+      if(data.answer){loading.innerHTML=data.answer;loading.classList.remove('loading');return}
+    }catch(e){console.log('AI proxy failed, using local:',e.message)}
+    loading.remove();
+  }
+
+  // Local fallback
+  setTimeout(function(){addMsg(processQuery(q),'bot')},150);
+}
 
 function sim(a,b){a=a.toLowerCase();b=b.toLowerCase();if(a===b)return 1;if(b.length>2&&a.includes(b))return 0.85;if(a.length>2&&b.includes(a))return 0.8;var m=0,l=Math.max(a.length,b.length);for(var i=0;i<Math.min(a.length,b.length);i++){if(a[i]===b[i])m++}return m/l}
 
