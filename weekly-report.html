@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Weekly Energy Report · UC Berkeley Digital Twin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a1020;--panel:rgba(15,23,42,.92);--border:rgba(253,181,21,.12);--gold:#FDB515;--cyan:#2dd4bf;--text:#e2e8f0;--dim:#64748b;--faint:#334155;--red:#f87171;--green:#34d399;--mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
+a{color:var(--cyan);text-decoration:none}
+.hdr{background:var(--panel);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px);flex-wrap:wrap}
+.hdr-back{padding:6px 14px;border-radius:8px;border:1px solid var(--border);color:var(--dim);font-size:12px;font-weight:600}
+.hdr-back:hover{border-color:var(--gold);color:var(--gold)}
+.hdr h1{font-size:16px;color:var(--gold);font-weight:700}
+.hdr-period{margin-left:auto;font-size:10px;color:var(--dim);font-family:var(--mono)}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+.stat-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.stat-val{font:700 24px/1 var(--mono)}
+.stat-sub{font-size:9px;color:var(--dim);margin-top:4px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
+.card-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title span{font-size:9px;color:var(--dim);font-weight:400;margin-left:auto}
+.chart-box{position:relative;height:220px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:768px){.grid2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.hdr h1{font-size:13px}}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:11px}
+.tbl th{text-align:left;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-bottom:1px solid var(--faint)}
+.tbl td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
+.tbl tr:hover td{background:rgba(253,181,21,.03)}
+.day-card{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.day-item{flex:1;min-width:120px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center}
+.day-name{font-size:10px;color:var(--dim);margin-bottom:2px}
+.day-date{font-size:8px;color:var(--faint);margin-bottom:6px;font-family:var(--mono)}
+.day-kw{font:700 18px var(--mono);color:var(--gold)}
+.day-sub{font-size:8px;color:var(--dim);margin-top:2px}
+#loading{display:flex;align-items:center;justify-content:center;height:60vh;color:var(--dim);font-size:14px;gap:10px}
+.spin{width:20px;height:20px;border:2px solid var(--faint);border-top-color:var(--cyan);border-radius:50%;animation:sp .6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:40px;color:var(--dim);font-size:13px}
+.nav{display:flex;gap:8px;margin-bottom:16px}
+.nav a{padding:6px 14px;border-radius:8px;border:1px solid var(--border);color:var(--dim);font-size:11px;font-weight:600}
+.nav a:hover,.nav a.active{border-color:var(--gold);color:var(--gold);background:rgba(253,181,21,.08)}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <a href="grimes-campus-map-arcgis.html" class="hdr-back">← Map</a>
+  <a href="campus-energy-dashboard.html" class="hdr-back">📊 Dashboard</a>
+  <h1>📋 Weekly Energy Report</h1>
+  <div class="hdr-period" id="period">--</div>
+</div>
+<div class="wrap" id="app"><div id="loading"><div class="spin"></div>Loading report...</div></div>
+
+<script>
+const REPORT_URL='https://doe2park.github.io/Graduate-Project/data/weekly_report.json';
+const NAMES_URL='https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
+
+Chart.defaults.color='#64748b';
+Chart.defaults.borderColor='rgba(255,255,255,.06)';
+Chart.defaults.font.family="'JetBrains Mono',monospace";
+Chart.defaults.font.size=10;
+
+var tooltipOpts={backgroundColor:'rgba(10,16,32,.95)',borderColor:'rgba(253,181,21,.3)',borderWidth:1,titleFont:{size:11,weight:'bold'},bodyFont:{size:12,family:"'JetBrains Mono',monospace"},padding:10,cornerRadius:8};
+
+async function init(){
+  var app=document.getElementById('app');
+  try{
+    var [rRes,nRes]=await Promise.all([fetch(REPORT_URL+'?t='+Date.now()),fetch(NAMES_URL+'?t='+Date.now())]);
+    if(!rRes.ok){app.innerHTML='<div class="empty">No weekly report yet. Data needs to accumulate for at least 1 day.<br><br><a href="campus-energy-dashboard.html">View live dashboard instead →</a></div>';return}
+    var report=await rRes.json();
+    var names={};try{var nd=await nRes.json();for(var k in nd.buildings)names[k]=nd.buildings[k].name}catch(e){}
+  }catch(e){app.innerHTML='<div class="empty">Report not available yet. <a href="campus-energy-dashboard.html">View live dashboard →</a></div>';return}
+
+  var p=report.period||{};
+  var s=report.campus_summary||{};
+  var days=report.daily_breakdown||[];
+  var bldgs=report.building_rankings||{};
+  document.getElementById('period').textContent=p.start+' → '+p.end+' ('+p.days+' days)';
+
+  app.innerHTML=
+    '<div class="stats">'+
+      '<div class="stat"><div class="stat-lbl">Week Avg Load</div><div class="stat-val" style="color:var(--gold)">'+s.avg_kw+'<span style="font-size:12px"> kW</span></div><div class="stat-sub">Peak: '+s.peak_kw+' kW</div></div>'+
+      '<div class="stat"><div class="stat-lbl">Total Energy</div><div class="stat-val" style="color:var(--cyan)">'+(s.total_kwh/1000).toFixed(1)+'<span style="font-size:12px"> MWh</span></div><div class="stat-sub">'+p.days+' days tracked</div></div>'+
+      '<div class="stat"><div class="stat-lbl">Week Cost</div><div class="stat-val" style="color:var(--text)">$'+s.total_cost.toLocaleString()+'</div><div class="stat-sub">@ $0.15/kWh</div></div>'+
+      '<div class="stat"><div class="stat-lbl">Week CO₂</div><div class="stat-val" style="color:var(--green)">'+s.total_co2_tons+'<span style="font-size:12px"> t</span></div><div class="stat-sub">'+s.trees_equivalent+' trees to offset</div></div>'+
+    '</div>'+
+
+    '<div class="card"><div class="card-title">📅 Daily Breakdown <span>hover for details</span></div>'+
+      '<div class="day-card">'+days.map(function(d){
+        return '<div class="day-item"><div class="day-name">'+d.day.slice(0,3)+'</div><div class="day-date">'+d.date+'</div><div class="day-kw">'+d.avg_kw+'</div><div class="day-sub">avg kW · peak '+d.peak_kw+'</div><div class="day-sub" style="color:var(--gold)">$'+d.est_cost+'</div></div>'
+      }).join('')+'</div>'+
+    '</div>'+
+
+    '<div class="grid2">'+
+      '<div class="card"><div class="card-title">⚡ Daily Average Load <span>kW per day</span></div><div class="chart-box"><canvas id="dailyBar"></canvas></div></div>'+
+      '<div class="card"><div class="card-title">📈 Peak vs Average <span>kW</span></div><div class="chart-box"><canvas id="peakLine"></canvas></div></div>'+
+    '</div>'+
+
+    '<div class="grid2">'+
+      '<div class="card"><div class="card-title">💰 Daily Cost Trend <span>$/day</span></div><div class="chart-box"><canvas id="costLine"></canvas></div></div>'+
+      '<div class="card"><div class="card-title">🌿 Daily CO₂ Trend <span>kg/day</span></div><div class="chart-box"><canvas id="co2Line"></canvas></div></div>'+
+    '</div>'+
+
+    '<div class="card"><div class="card-title">🏢 Building Weekly Rankings <span>by average kW</span></div>'+
+      '<div style="overflow-x:auto"><table class="tbl">'+
+        '<tr><th>#</th><th>Building</th><th>Avg kW</th><th>Peak kW</th><th>Min kW</th><th>Weekly kWh</th><th>Weekly $</th><th>CO₂ kg</th></tr>'+
+        Object.entries(bldgs).map(function(e,i){var id=e[0],b=e[1];return '<tr>'+
+          '<td style="color:var(--dim)">'+(i+1)+'</td>'+
+          '<td style="font-weight:600">'+(names[id]||id)+'</td>'+
+          '<td style="font-family:var(--mono);font-weight:700;color:'+(b.avg_kw>200?'var(--red)':b.avg_kw>100?'var(--gold)':'var(--cyan)')+'">'+b.avg_kw+'</td>'+
+          '<td style="font-family:var(--mono);color:var(--dim)">'+b.peak_kw+'</td>'+
+          '<td style="font-family:var(--mono);color:var(--dim)">'+b.min_kw+'</td>'+
+          '<td style="font-family:var(--mono)">'+b.est_weekly_kwh.toLocaleString()+'</td>'+
+          '<td style="font-family:var(--mono);color:var(--gold)">$'+b.est_weekly_cost.toLocaleString()+'</td>'+
+          '<td style="font-family:var(--mono);color:var(--green)">'+b.est_weekly_co2_kg+'</td>'+
+        '</tr>'}).join('')+
+      '</table></div>'+
+    '</div>'+
+
+    '<div style="text-align:center;padding:20px;font-size:9px;color:var(--faint)">'+
+      'Auto-generated weekly from BMO daily snapshots · <a href="grimes-campus-map-arcgis.html">Map</a> · <a href="campus-energy-dashboard.html">Dashboard</a> · <a href="grimes-xr.html">3D Viewer</a>'+
+    '</div>';
+
+  // Charts
+  var labels=days.map(function(d){return d.day.slice(0,3)});
+
+  new Chart(document.getElementById('dailyBar'),{type:'bar',data:{labels:labels,datasets:[{data:days.map(function(d){return d.avg_kw}),backgroundColor:'rgba(253,181,21,.6)',borderRadius:6,barThickness:28}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var d=days[ctx.dataIndex];return d.day+' '+d.date+': '+d.avg_kw+' kW avg (peak '+d.peak_kw+')'}}})},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+'kW'}}}}}});
+
+  new Chart(document.getElementById('peakLine'),{type:'line',data:{labels:labels,datasets:[{label:'Peak',data:days.map(function(d){return d.peak_kw}),borderColor:'#f87171',backgroundColor:'rgba(248,113,113,.1)',fill:true,tension:.3,pointRadius:4,borderWidth:2},{label:'Average',data:days.map(function(d){return d.avg_kw}),borderColor:'#FDB515',backgroundColor:'rgba(253,181,21,.1)',fill:true,tension:.3,pointRadius:4,borderWidth:2},{label:'Min',data:days.map(function(d){return d.min_kw}),borderColor:'#34d399',borderDash:[4,4],tension:.3,pointRadius:3,borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{boxWidth:8,font:{size:9}}},tooltip:tooltipOpts},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+'kW'}}}}}});
+
+  new Chart(document.getElementById('costLine'),{type:'line',data:{labels:labels,datasets:[{data:days.map(function(d){return d.est_cost}),borderColor:'#FDB515',backgroundColor:'rgba(253,181,21,.1)',fill:true,tension:.3,pointRadius:4,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){return '$'+ctx.raw+'/day'}}})},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return '$'+v}}}}}});
+
+  new Chart(document.getElementById('co2Line'),{type:'line',data:{labels:labels,datasets:[{data:days.map(function(d){return d.est_co2_kg}),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.1)',fill:true,tension:.3,pointRadius:4,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){return ctx.raw+' kg CO₂'}}})},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+'kg'}}}}}});
+}
+init();
+</script>
+</body>
+</html>

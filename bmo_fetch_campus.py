@@ -245,6 +245,32 @@ def run():
     with open(HISTORY_FILE, "w") as f:
         json.dump(history, f)
 
+    # ── Save daily snapshot (append to today's file) ──
+    daily_dir = OUTPUT_DIR / "daily"
+    daily_dir.mkdir(parents=True, exist_ok=True)
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    daily_file = daily_dir / f"{today_str}.json"
+    try:
+        with open(daily_file) as f:
+            daily = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        daily = {"date": today_str, "readings": []}
+
+    daily["readings"].append({
+        "time": datetime.now().strftime("%H:%M"),
+        "total_kw": total_kw,
+        "online": online,
+        "buildings": {bid: r["kw"] for bid, r in results.items() if r["kw"] is not None}
+    })
+    with open(daily_file, "w") as f:
+        json.dump(daily, f)
+
+    # ── Update daily index ──
+    daily_files = sorted(daily_dir.glob("*.json"))
+    index = [f.stem for f in daily_files if f.stem != "index"]
+    with open(daily_dir / "index.json", "w") as f:
+        json.dump({"days": index, "updated": now_str}, f)
+
     print(f"\n  ✓ {online}/{len(results)} online | {total_kw} kW")
     print(f"  ✓ ~${output['total_daily_cost']}/day | ~{output['total_daily_co2_kg']} kg CO2/day")
     if anomalies:
