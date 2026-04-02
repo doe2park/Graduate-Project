@@ -178,16 +178,23 @@ try {
   console.log('3D Buildings failed:', e.message);
 }
 
-// Try Google Photorealistic as upgrade (may fail)
+// Try Google Photorealistic as upgrade
 try {
   var gTiles = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
+  gTiles.maximumScreenSpaceError = 4; // Higher quality (default 16)
+  gTiles.preloadWhenHidden = true;
   viewer.scene.primitives.add(gTiles);
-  // If Google tiles loaded, hide OSM buildings
   if(buildings3d) buildings3d.show = false;
-  console.log('Google 3D Tiles loaded - using photorealistic');
+  console.log('Google 3D Tiles loaded - photorealistic');
 } catch(e) {
-  console.log('Google 3D Tiles unavailable, using OSM buildings');
+  console.log('Google 3D Tiles unavailable, using OSM');
 }
+
+// Quality settings
+viewer.scene.globe.maximumScreenSpaceError = 1.5;
+viewer.scene.fxaa = true;
+viewer.scene.postProcessStages.fxaa.enabled = true;
+viewer.resolutionScale = window.devicePixelRatio || 1.0;
 
 // Set camera to UC Berkeley
 viewer.camera.flyTo({
@@ -273,6 +280,18 @@ handler.setInputAction(function(click) {
 }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
 // ══════ LIVE DATA ══════
+function updateStats(energyData, timeLabel) {
+  var totalKw = 0, onlineCount = 0, total = Object.keys(energyData).length;
+  Object.values(energyData).forEach(function(b) { if (b.kw) { totalKw += b.kw; onlineCount++; } });
+  totalKw = Math.round(totalKw * 10) / 10;
+  document.getElementById('spKw').textContent = totalKw + ' kW';
+  document.getElementById('spBldg').textContent = onlineCount + '/' + total;
+  document.getElementById('spCost').textContent = '$' + Math.round(totalKw * 24 * 0.15);
+  document.getElementById('spCo2').textContent = (totalKw * 24 * 0.21 / 1000).toFixed(1) + 't';
+  if (timeLabel) document.getElementById('tsLabel').textContent = timeLabel;
+}
+window._updateStats = updateStats;
+
 async function fetchLive() {
   try {
     var r = await fetch(DATA_URL + '?t=' + Date.now());
@@ -280,11 +299,7 @@ async function fetchLive() {
     liveData = data;
     window._liveData = data;
     renderEnergy(data.buildings);
-    document.getElementById('tsLabel').textContent = data.generated_at || '';
-    document.getElementById('spKw').textContent = data.total_kw + ' kW';
-    document.getElementById('spBldg').textContent = data.buildings_online + '/' + data.buildings_total;
-    document.getElementById('spCost').textContent = '$' + data.total_daily_cost;
-    document.getElementById('spCo2').textContent = (data.total_daily_co2_kg / 1000).toFixed(1) + 't';
+    updateStats(data.buildings, data.generated_at || '');
   } catch (e) { console.warn('Fetch error:', e); }
 }
 // Expose for global access
@@ -313,13 +328,20 @@ function onTimeChange(val) {
   if (!histData || !histTimes.length) return;
   var isLive = val >= histTimes.length - 1;
   document.getElementById('timeVal').textContent = isLive ? 'Live' : histTimes[val] || '--';
-  if (isLive) { if (window._liveData) window._renderEnergy(window._liveData.buildings); return; }
+  if (isLive) {
+    if (window._liveData) {
+      window._renderEnergy(window._liveData.buildings);
+      window._updateStats(window._liveData.buildings, window._liveData.generated_at);
+    }
+    return;
+  }
   var t = histTimes[val], snap = {};
   for (var bid in histData) {
     var pts = histData[bid] || [];
     for (var i = 0; i < pts.length; i++) { if (pts[i].t === t) { snap[bid] = { kw: pts[i].kw }; break; } }
   }
   if (window._renderEnergy) window._renderEnergy(snap);
+  if (window._updateStats) window._updateStats(snap, 'Historical · ' + t + ' PT');
 }
 
 function togglePlay() {
