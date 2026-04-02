@@ -343,75 +343,65 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   const gL=new GraphicsLayer();map.add(gL);
   const gfx={};
 
-  // Energy color gradient
   function kwColor(kw,maxKw){
-    if(!kw||kw===null)return [100,100,100];
+    if(!kw||kw===null)return [120,120,120];
     var r=Math.min(kw/(maxKw||500),1);
-    if(r<0.2)return [52,211,153];
-    if(r<0.4)return [45,180,120];
-    if(r<0.6)return [253,181,21];
-    if(r<0.8)return [240,120,50];
-    return [248,80,80];
+    if(r<0.25)return [52,211,153];
+    if(r<0.5)return [45,180,140];
+    if(r<0.7)return [253,181,21];
+    return [248,113,113];
   }
 
-  var viewMode='energy';
+  var viewMode='category';
 
   function renderMarkers(energyData){
     gL.removeAll();
     var maxKw=500;
-    if(energyData){var vals=Object.values(energyData).map(function(b){return b.kw}).filter(function(v){return v});if(vals.length)maxKw=Math.max.apply(null,vals)}
+    if(energyData){
+      var vals=Object.values(energyData).map(function(b){return b.kw}).filter(function(v){return v});
+      if(vals.length)maxKw=Math.max.apply(null,vals);
+      viewMode='energy';
+    }
 
     D.forEach(function(b,i){
       var cc=C[b.c],isG=b.id==='grimes';
       var live=energyData&&energyData[b.id];
       var kw=(live&&live.kw!==null)?live.kw:(b.kw||null);
-      var col=viewMode==='energy'?kwColor(kw,maxKw):cc.r;
+      var col,sz;
 
-      // Ground dot
-      gL.add(new Graphic({
-        geometry:new Point({longitude:b.lng,latitude:b.lat,z:0}),
-        symbol:{type:'point-3d',symbolLayers:[{
-          type:'icon',resource:{primitive:'circle'},
-          size:isG?14:(kw?Math.max(6,Math.min(13,6+kw/maxKw*7)):5),
-          material:{color:[col[0],col[1],col[2],kw?180:60]},
-          outline:{color:[255,255,255,kw?140:30],size:kw?0.8:0.3}
-        }]},
-        attributes:{idx:i}
-      }));
-
-      // Energy pillar
-      if(kw&&kw>0&&viewMode==='energy'){
-        var pH=Math.max(10,kw/maxKw*130);
-        gL.add(new Graphic({
-          geometry:new Point({longitude:b.lng,latitude:b.lat,z:0}),
-          symbol:{type:'point-3d',symbolLayers:[{
-            type:'object',resource:{primitive:'cylinder'},
-            height:pH,width:3.5,depth:3.5,
-            material:{color:[col[0],col[1],col[2],170]},
-            anchor:'bottom'
-          }]}
-        }));
-        // Sphere cap
-        gL.add(new Graphic({
-          geometry:new Point({longitude:b.lng,latitude:b.lat,z:pH}),
-          symbol:{type:'point-3d',symbolLayers:[{
-            type:'object',resource:{primitive:'sphere'},
-            height:4.5,width:4.5,depth:4.5,
-            material:{color:[col[0],col[1],col[2],220]}
-          }]}
-        }));
+      if(viewMode==='energy'&&kw){
+        col=kwColor(kw,maxKw);
+        sz=Math.max(8,Math.min(22,8+(kw/maxKw)*14));
+      } else {
+        col=cc.r;
+        sz=9;
       }
 
-      // Grimes diamond
       if(isG){
-        var gz=kw?Math.max(10,kw/maxKw*130)+10:25;
         gL.add(new Graphic({
-          geometry:new Point({longitude:b.lng,latitude:b.lat,z:gz}),
-          symbol:{type:'point-3d',symbolLayers:[{
-            type:'object',resource:{primitive:'diamond'},
-            height:8,width:6,depth:6,
-            material:{color:[253,181,21,255]}
-          }]}
+          geometry:new Point({longitude:b.lng,latitude:b.lat}),
+          symbol:{type:'simple-marker',color:[0,0,0,0],size:30,
+            outline:{color:[253,181,21,180],width:1.5}}
+        }));
+        gL.add(new Graphic({
+          geometry:new Point({longitude:b.lng,latitude:b.lat}),
+          symbol:{type:'simple-marker',style:'diamond',color:[253,181,21,255],size:14,
+            outline:{color:[255,255,255],width:2}},
+          attributes:{idx:i}
+        }));
+      } else {
+        if(kw&&kw>150){
+          gL.add(new Graphic({
+            geometry:new Point({longitude:b.lng,latitude:b.lat}),
+            symbol:{type:'simple-marker',color:[col[0],col[1],col[2],30],size:sz+14,
+              outline:{color:[col[0],col[1],col[2],50],width:1}}
+          }));
+        }
+        gL.add(new Graphic({
+          geometry:new Point({longitude:b.lng,latitude:b.lat}),
+          symbol:{type:'simple-marker',color:[col[0],col[1],col[2],kw?200:160],size:sz,
+            outline:{color:[255,255,255,kw?180:80],width:kw?1.5:0.8}},
+          attributes:{idx:i}
         }));
       }
     });
