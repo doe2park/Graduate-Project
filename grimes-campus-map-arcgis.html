@@ -344,15 +344,12 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   const gfx={};
 
   function kwColor(kw,maxKw){
-    if(!kw||kw===null)return [120,120,120];
+    if(!kw||kw===null)return null;
     var r=Math.min(kw/(maxKw||500),1);
-    if(r<0.25)return [52,211,153];
-    if(r<0.5)return [45,180,140];
-    if(r<0.7)return [253,181,21];
+    if(r<0.3)return [52,211,153];
+    if(r<0.6)return [253,181,21];
     return [248,113,113];
   }
-
-  var viewMode='category';
 
   function renderMarkers(energyData){
     gL.removeAll();
@@ -360,47 +357,33 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     if(energyData){
       var vals=Object.values(energyData).map(function(b){return b.kw}).filter(function(v){return v});
       if(vals.length)maxKw=Math.max.apply(null,vals);
-      viewMode='energy';
     }
 
     D.forEach(function(b,i){
       var cc=C[b.c],isG=b.id==='grimes';
       var live=energyData&&energyData[b.id];
       var kw=(live&&live.kw!==null)?live.kw:(b.kw||null);
-      var col,sz;
-
-      if(viewMode==='energy'&&kw){
-        col=kwColor(kw,maxKw);
-        sz=Math.max(8,Math.min(22,8+(kw/maxKw)*14));
-      } else {
-        col=cc.r;
-        sz=9;
-      }
+      var eCol=kwColor(kw,maxKw);
 
       if(isG){
+        // Grimes: thin ring + diamond
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'simple-marker',color:[0,0,0,0],size:30,
-            outline:{color:[253,181,21,180],width:1.5}}
+          symbol:{type:'simple-marker',color:[0,0,0,0],size:22,
+            outline:{color:[253,181,21,160],width:1.5}}
         }));
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'simple-marker',style:'diamond',color:[253,181,21,255],size:14,
-            outline:{color:[255,255,255],width:2}},
+          symbol:{type:'simple-marker',style:'diamond',color:[253,181,21,255],size:10,
+            outline:{color:[255,255,255],width:1.5}},
           attributes:{idx:i}
         }));
       } else {
-        if(kw&&kw>150){
-          gL.add(new Graphic({
-            geometry:new Point({longitude:b.lng,latitude:b.lat}),
-            symbol:{type:'simple-marker',color:[col[0],col[1],col[2],30],size:sz+14,
-              outline:{color:[col[0],col[1],col[2],50],width:1}}
-          }));
-        }
+        // Category dot (always shown, small)
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'simple-marker',color:[col[0],col[1],col[2],kw?200:160],size:sz,
-            outline:{color:[255,255,255,kw?180:80],width:kw?1.5:0.8}},
+          symbol:{type:'simple-marker',color:[...cc.r,kw?220:140],size:7,
+            outline:{color:eCol?[...eCol,200]:[255,255,255,60],width:eCol?2:0.5}},
           attributes:{idx:i}
         }));
       }
@@ -410,7 +393,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   renderMarkers(null);
   window.render3DFn=renderMarkers;
   window.currentEnergyData=null;
-  window.setViewMode=function(m){viewMode=m;renderMarkers(window.currentEnergyData);};
 
   view.ui.add(new Locate({view}),'top-right');
   view.ui.add(new BasemapToggle({view,nextBasemap:'hybrid'}),'bottom-left');
@@ -701,15 +683,7 @@ function togglePlayback(){
   },300);
 }
 
-function toggleViewMode(){
-  var btn=document.getElementById('viewToggle');
-  if(!window.setViewMode)return;
-  var cur=btn.textContent.includes('Energy')?'category':'energy';
-  window.setViewMode(cur);
-  btn.textContent=cur==='energy'?'⚡ Energy View':'🏛 Category View';
-  btn.style.borderColor=cur==='energy'?'rgba(253,181,21,.3)':'rgba(45,212,191,.3)';
-  btn.style.color=cur==='energy'?'#FDB515':'#2dd4bf';
-}
+function toggleViewMode(){}
 </script>
 <script>
 // ═══ SMART CAMPUS CHATBOT v3 — AI + Local Fallback ═══
