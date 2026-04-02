@@ -179,6 +179,20 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 
 .esri-popup{display:none!important}
 .esri-ui-corner .esri-component{border-radius:9px!important}
+
+/* Time Slider */
+#timeSlider{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);z-index:15;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:12px;padding:10px 16px;display:flex;align-items:center;gap:10px;min-width:340px;max-width:500px}
+@media(max-width:768px){#timeSlider{bottom:80px;left:10px;right:10px;transform:none;min-width:auto}}
+#timeSlider .ts-label{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+#timeSlider .ts-time{font:700 14px var(--mono);color:var(--gold);min-width:50px}
+#timeSlider input[type=range]{flex:1;-webkit-appearance:none;height:4px;background:var(--faint);border-radius:2px;outline:none;cursor:pointer}
+#timeSlider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--gold);cursor:pointer;box-shadow:0 0 6px rgba(253,181,21,.4)}
+#timeSlider .ts-play{background:none;border:1px solid var(--border);color:var(--gold);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+#timeSlider .ts-play:hover{background:rgba(253,181,21,.1)}
+.ts-legend{position:absolute;bottom:40px;right:20px;z-index:15;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:9px;color:var(--dim)}
+@media(max-width:768px){.ts-legend{bottom:130px;right:10px}}
+.ts-legend-row{display:flex;align-items:center;gap:6px;margin:2px 0}
+.ts-legend-bar{width:16px;height:8px;border-radius:2px}
 @media(max-width:768px){#sb{position:absolute;width:290px;min-width:290px;transform:translateX(-100%);transition:transform .3s}#sb.show{transform:translateX(0)}#sb.hide{transform:translateX(-100%)}#tb{left:8px!important;z-index:20}#pop{width:calc(100vw - 24px);right:12px!important;left:12px!important;max-height:70vh;overflow-y:auto}}
 </style>
 </head>
@@ -197,10 +211,25 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 </div>
 <div id="ma">
   <button id="tb">☰</button>
+  <a href="campus-3d.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(45,212,191,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--cyan);font-size:10px;font-weight:600;text-decoration:none">🏛 3D View</a>
   <div id="viewDiv"></div>
   <div id="grimes-pulse"></div>
   <div id="grimes-label" onclick="document.querySelector('[data-idx=\\'0\\']')?.click()">◆ Grimes Digital Twin →</div>
   <div id="pop"></div>
+  <!-- Time Slider -->
+  <div id="timeSlider">
+    <div class="ts-label">24hr</div>
+    <button class="ts-play" id="tsPlay" onclick="togglePlayback()">▶</button>
+    <input type="range" id="tsRange" min="0" max="95" value="95" oninput="onSliderMove(this.value)">
+    <div class="ts-time" id="tsTime">Live</div>
+  </div>
+  <div class="ts-legend">
+    <div style="font-weight:600;margin-bottom:4px">Energy Intensity</div>
+    <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#34d399"></div> Low (&lt;100kW)</div>
+    <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#FDB515"></div> Medium (100-300kW)</div>
+    <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#f87171"></div> High (&gt;300kW)</div>
+    <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#787878"></div> No data</div>
+  </div>
   <button id="mobileExplore" onclick="document.getElementById('sb').classList.toggle('show')"><span class="me-count">57</span> Buildings · Explore ↑</button>
   <div class="bb"><div class="bp">Powered by <b>ArcGIS JS 4.29</b></div><div class="bp">🛰️ Satellite</div></div>
 </div>
@@ -314,32 +343,84 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   const gL=new GraphicsLayer();map.add(gL);
   const gfx={};
 
-  D.forEach((b,i)=>{
-    const cc=C[b.c],isG=b.id==='grimes';
-    if(isG){
-      // Thin ring (outline only, no fill)
+  // Energy color gradient
+  function kwColor(kw,maxKw){
+    if(!kw||kw===null)return [100,100,100];
+    var r=Math.min(kw/(maxKw||500),1);
+    if(r<0.2)return [52,211,153];
+    if(r<0.4)return [45,180,120];
+    if(r<0.6)return [253,181,21];
+    if(r<0.8)return [240,120,50];
+    return [248,80,80];
+  }
+
+  var viewMode='energy';
+
+  function renderMarkers(energyData){
+    gL.removeAll();
+    var maxKw=500;
+    if(energyData){var vals=Object.values(energyData).map(function(b){return b.kw}).filter(function(v){return v});if(vals.length)maxKw=Math.max.apply(null,vals)}
+
+    D.forEach(function(b,i){
+      var cc=C[b.c],isG=b.id==='grimes';
+      var live=energyData&&energyData[b.id];
+      var kw=(live&&live.kw!==null)?live.kw:(b.kw||null);
+      var col=viewMode==='energy'?kwColor(kw,maxKw):cc.r;
+
+      // Ground dot
       gL.add(new Graphic({
-        geometry:new Point({longitude:b.lng,latitude:b.lat}),
-        symbol:{type:'simple-marker',color:[0,0,0,0],size:28,
-          outline:{color:[253,181,21,200],width:1.5}}
-      }));
-      // Diamond center
-      gL.add(new Graphic({
-        geometry:new Point({longitude:b.lng,latitude:b.lat}),
-        symbol:{type:'simple-marker',style:'diamond',color:[253,181,21,255],size:12,
-          outline:{color:[255,255,255],width:2}},
+        geometry:new Point({longitude:b.lng,latitude:b.lat,z:0}),
+        symbol:{type:'point-3d',symbolLayers:[{
+          type:'icon',resource:{primitive:'circle'},
+          size:isG?14:(kw?Math.max(6,Math.min(13,6+kw/maxKw*7)):5),
+          material:{color:[col[0],col[1],col[2],kw?180:60]},
+          outline:{color:[255,255,255,kw?140:30],size:kw?0.8:0.3}
+        }]},
         attributes:{idx:i}
       }));
-    } else {
-      gL.add(new Graphic({
-        geometry:new Point({longitude:b.lng,latitude:b.lat}),
-        symbol:{type:'simple-marker',color:[...cc.r,200],size:9,
-          outline:{color:[...cc.r.map(v=>Math.min(255,v+70)),160],width:1}},
-        attributes:{idx:i}
-      }));
-    }
-    gfx[i]=true;
-  });
+
+      // Energy pillar
+      if(kw&&kw>0&&viewMode==='energy'){
+        var pH=Math.max(10,kw/maxKw*130);
+        gL.add(new Graphic({
+          geometry:new Point({longitude:b.lng,latitude:b.lat,z:0}),
+          symbol:{type:'point-3d',symbolLayers:[{
+            type:'object',resource:{primitive:'cylinder'},
+            height:pH,width:3.5,depth:3.5,
+            material:{color:[col[0],col[1],col[2],170]},
+            anchor:'bottom'
+          }]}
+        }));
+        // Sphere cap
+        gL.add(new Graphic({
+          geometry:new Point({longitude:b.lng,latitude:b.lat,z:pH}),
+          symbol:{type:'point-3d',symbolLayers:[{
+            type:'object',resource:{primitive:'sphere'},
+            height:4.5,width:4.5,depth:4.5,
+            material:{color:[col[0],col[1],col[2],220]}
+          }]}
+        }));
+      }
+
+      // Grimes diamond
+      if(isG){
+        var gz=kw?Math.max(10,kw/maxKw*130)+10:25;
+        gL.add(new Graphic({
+          geometry:new Point({longitude:b.lng,latitude:b.lat,z:gz}),
+          symbol:{type:'point-3d',symbolLayers:[{
+            type:'object',resource:{primitive:'diamond'},
+            height:8,width:6,depth:6,
+            material:{color:[253,181,21,255]}
+          }]}
+        }));
+      }
+    });
+  }
+
+  renderMarkers(null);
+  window.render3DFn=renderMarkers;
+  window.currentEnergyData=null;
+  window.setViewMode=function(m){viewMode=m;renderMarkers(window.currentEnergyData);};
 
   view.ui.add(new Locate({view}),'top-right');
   view.ui.add(new BasemapToggle({view,nextBasemap:'hybrid'}),'bottom-left');
@@ -575,6 +656,8 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       totalEl.innerHTML = '<b style="color:var(--gold)">' + totalKw + '</b><small>Total kW</small>';
 
       renderList();
+      window.currentEnergyData=bldgs;
+      renderMarkers(bldgs);  // Re-render markers with live energy colors
       console.log('[BMO] Updated ' + updated + ' buildings, total: ' + totalKw + ' kW');
     } catch (e) {
       console.warn('[BMO] Fetch failed:', e.message);
@@ -585,6 +668,52 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   fetchLiveData();
   setInterval(fetchLiveData, 60000);
 });
+</script>
+<script>
+// ═══ TIME SLIDER ═══
+var histData=null,histTimes=[],playInterval=null;
+fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json?t='+Date.now())
+.then(function(r){return r.json()}).then(function(d){
+  histData=d;
+  var ts=new Set();
+  for(var bid in d)(d[bid]||[]).forEach(function(p){ts.add(p.t)});
+  histTimes=[].concat(Array.from(ts)).sort().slice(-96);
+  var slider=document.getElementById('tsRange');
+  if(slider){slider.max=Math.max(0,histTimes.length-1);slider.value=slider.max}
+  console.log('[TimeSlider] '+histTimes.length+' time points');
+}).catch(function(){});
+
+function onSliderMove(val){
+  val=parseInt(val);
+  if(!histData||!histTimes.length)return;
+  var isLive=(val>=histTimes.length-1);
+  document.getElementById('tsTime').textContent=isLive?'Live':histTimes[val]||'--';
+  if(isLive){if(window.render3DFn&&chatData)window.render3DFn(chatData.buildings);return}
+  var t=histTimes[val],snapshot={};
+  for(var bid in histData){var pts=histData[bid]||[];for(var i=0;i<pts.length;i++){if(pts[i].t===t){snapshot[bid]={kw:pts[i].kw,name:bid};break}}}
+  if(window.render3DFn)window.render3DFn(snapshot);
+}
+
+function togglePlayback(){
+  var btn=document.getElementById('tsPlay'),slider=document.getElementById('tsRange');
+  if(playInterval){clearInterval(playInterval);playInterval=null;btn.textContent='▶';return}
+  btn.textContent='⏸';slider.value=0;onSliderMove(0);
+  playInterval=setInterval(function(){
+    var v=parseInt(slider.value)+1;
+    if(v>parseInt(slider.max)){clearInterval(playInterval);playInterval=null;btn.textContent='▶';slider.value=slider.max;onSliderMove(slider.max);return}
+    slider.value=v;onSliderMove(v);
+  },300);
+}
+
+function toggleViewMode(){
+  var btn=document.getElementById('viewToggle');
+  if(!window.setViewMode)return;
+  var cur=btn.textContent.includes('Energy')?'category':'energy';
+  window.setViewMode(cur);
+  btn.textContent=cur==='energy'?'⚡ Energy View':'🏛 Category View';
+  btn.style.borderColor=cur==='energy'?'rgba(253,181,21,.3)':'rgba(45,212,191,.3)';
+  btn.style.color=cur==='energy'?'#FDB515':'#2dd4bf';
+}
 </script>
 <script>
 // ═══ SMART CAMPUS CHATBOT v2 — Fuzzy NLP ═══

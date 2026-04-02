@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>3D Campus Energy View · UC Berkeley Digital Twin</title>
+<script src="https://ajax.googleapis.com/ajax/libs/cesiumjs/1.125/Build/Cesium/Cesium.js"></script>
+<link href="https://ajax.googleapis.com/ajax/libs/cesiumjs/1.125/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#cesiumContainer{width:100%;height:100%;overflow:hidden}
+body{background:#000;font-family:system-ui,sans-serif}
+
+/* Top bar */
+.topbar{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(10,16,32,.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(253,181,21,.15)}
+.topbar a{padding:5px 12px;border-radius:6px;border:1px solid rgba(253,181,21,.2);color:#94a3b8;font-size:11px;font-weight:600;text-decoration:none}
+.topbar a:hover{border-color:#FDB515;color:#FDB515}
+.topbar h1{font-size:14px;color:#FDB515;font-weight:700}
+.topbar .live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:#34d399}
+.topbar .dot{width:6px;height:6px;border-radius:50%;background:#34d399;animation:p 2s infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar .ts{font-size:9px;color:#64748b;font-family:'Courier New',monospace}
+
+/* Legend */
+.legend{position:absolute;bottom:40px;left:16px;z-index:10;background:rgba(10,16,32,.9);backdrop-filter:blur(8px);border:1px solid rgba(253,181,21,.12);border-radius:10px;padding:10px 14px;font-size:10px;color:#94a3b8}
+.legend h4{color:#e2e8f0;font-size:11px;margin-bottom:6px}
+.legend-row{display:flex;align-items:center;gap:6px;margin:3px 0}
+.legend-dot{width:12px;height:12px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3)}
+
+/* Stats panel */
+.stats-panel{position:absolute;top:60px;right:16px;z-index:10;background:rgba(10,16,32,.9);backdrop-filter:blur(8px);border:1px solid rgba(253,181,21,.12);border-radius:10px;padding:12px;min-width:180px}
+.sp-row{display:flex;justify-content:space-between;align-items:baseline;margin:4px 0}
+.sp-label{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.5px}
+.sp-val{font:700 16px 'Courier New',monospace;color:#FDB515}
+.sp-val.cyan{color:#2dd4bf}
+.sp-val.green{color:#34d399}
+
+/* Time slider */
+.time-bar{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(10,16,32,.9);backdrop-filter:blur(8px);border:1px solid rgba(253,181,21,.12);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:10px;min-width:300px}
+.time-bar label{font-size:9px;color:#64748b;white-space:nowrap}
+.time-bar input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:#334155;border-radius:2px;outline:none}
+.time-bar input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#FDB515;cursor:pointer}
+.time-bar .tval{font:700 13px 'Courier New',monospace;color:#FDB515;min-width:40px}
+.time-bar button{background:none;border:1px solid rgba(253,181,21,.2);color:#FDB515;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:10px}
+
+/* Info popup */
+.info-popup{position:absolute;z-index:20;background:rgba(10,16,32,.95);backdrop-filter:blur(12px);border:1px solid rgba(253,181,21,.2);border-radius:10px;padding:12px 14px;min-width:220px;display:none;pointer-events:auto;font-size:11px;color:#e2e8f0;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.info-popup.show{display:block}
+.info-popup h3{font-size:13px;color:#FDB515;margin-bottom:4px}
+.info-popup .dept{font-size:10px;color:#94a3b8;margin-bottom:8px}
+.info-popup .kw{font:700 22px 'Courier New',monospace;color:#2dd4bf}
+.info-popup .meta{font-size:9px;color:#64748b;margin-top:6px}
+.info-popup .close{position:absolute;top:6px;right:10px;background:none;border:none;color:#64748b;cursor:pointer;font-size:14px}
+
+.cesium-credit-logoContainer{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="cesiumContainer"></div>
+
+<div class="topbar">
+  <a href="grimes-campus-map-arcgis.html">← 2D Map</a>
+  <a href="campus-energy-dashboard.html">📊 Dashboard</a>
+  <h1>🏛 3D Campus Energy View</h1>
+  <div class="live"><div class="dot"></div>Live</div>
+  <div class="ts" id="tsLabel">--</div>
+</div>
+
+<div class="stats-panel" id="statsPanel">
+  <div class="sp-row"><span class="sp-label">Campus Load</span><span class="sp-val" id="spKw">--</span></div>
+  <div class="sp-row"><span class="sp-label">Buildings</span><span class="sp-val cyan" id="spBldg">--</span></div>
+  <div class="sp-row"><span class="sp-label">Daily Cost</span><span class="sp-val" id="spCost">--</span></div>
+  <div class="sp-row"><span class="sp-label">CO₂/day</span><span class="sp-val green" id="spCo2">--</span></div>
+</div>
+
+<div class="legend">
+  <h4>Energy Intensity</h4>
+  <div class="legend-row"><div class="legend-dot" style="background:#34d399"></div> Low (&lt;50 kW)</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#FDB515"></div> Medium (50-200 kW)</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#f87171"></div> High (&gt;200 kW)</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#64748b"></div> Offline</div>
+</div>
+
+<div class="time-bar">
+  <label>24hr</label>
+  <button id="playBtn" onclick="togglePlay()">▶</button>
+  <input type="range" id="timeRange" min="0" max="95" value="95" oninput="onTimeChange(this.value)">
+  <div class="tval" id="timeVal">Live</div>
+</div>
+
+<div class="info-popup" id="infoPopup">
+  <button class="close" onclick="document.getElementById('infoPopup').classList.remove('show')">✕</button>
+  <h3 id="ipName">--</h3>
+  <div class="dept" id="ipDept">--</div>
+  <div class="kw" id="ipKw">--</div>
+  <div class="meta" id="ipMeta">--</div>
+</div>
+
+<script>
+// ══════ CONFIG ══════
+// Replace with your Cesium ion token (free at https://ion.cesium.com/signup)
+Cesium.Ion.defaultAccessToken = 'YOUR_CESIUM_ION_TOKEN';
+
+const DATA_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
+const HIST_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json';
+
+// Building data
+const buildings = [
+  {id:'grimes',n:'Grimes Engineering Center',a:'Bechtel Center',lat:37.87425,lng:-122.25807,c:'Engineering',yr:1980,floors:4},
+  {id:'cory',n:'Cory Hall',a:'EECS',lat:37.87505,lng:-122.25752,c:'Engineering',yr:1950,floors:5},
+  {id:'soda',n:'Soda Hall',a:'Computer Science',lat:37.87567,lng:-122.25871,c:'Science',yr:1994,floors:7},
+  {id:'davis',n:'Davis Hall',a:'Civil & Environmental Eng.',lat:37.87452,lng:-122.25829,c:'Engineering',yr:1968,floors:7},
+  {id:'etch',n:'Etcheverry Hall',a:'Mechanical Eng.',lat:37.87587,lng:-122.2593,c:'Engineering',yr:1964,floors:6},
+  {id:'hmm',n:'Hearst Memorial Mining',a:'Materials Science',lat:37.87446,lng:-122.25727,c:'Engineering',yr:1907,floors:3},
+  {id:'hesse',n:'Hesse Hall',a:'Mechanical Eng. Lab',lat:37.874167,lng:-122.259247,c:'Engineering',yr:1942,floors:2},
+  {id:'sutardja',n:'Sutardja Dai Hall',a:'CITRIS',lat:37.874822,lng:-122.258389,c:'Engineering',yr:2009,floors:4},
+  {id:'mclaughlin',n:'McLaughlin Hall',a:'Engineering Admin',lat:37.873829,lng:-122.259051,c:'Engineering',yr:1951,floors:4},
+  {id:'stanley',n:'Stanley Hall',a:'Bioengineering',lat:37.87404,lng:-122.25609,c:'Science',yr:2007,floors:6},
+  {id:'tan',n:'Tan Hall',a:'Chemistry',lat:37.8731,lng:-122.25642,c:'Science',yr:1997,floors:4},
+  {id:'latimer',n:'Latimer Hall',a:'Chemistry',lat:37.873215,lng:-122.255835,c:'Science',yr:1963,floors:5},
+  {id:'birge',n:'Birge Hall',a:'Physics',lat:37.87219,lng:-122.25724,c:'Science',yr:1964,floors:9},
+  {id:'hilde',n:'Hildebrand Hall',a:'Chemistry',lat:37.872895,lng:-122.255532,c:'Science',yr:1966,floors:4},
+  {id:'wheeler',n:'Wheeler Hall',a:'English / Rhetoric',lat:37.87129,lng:-122.25914,c:'Humanities',yr:1917,floors:4},
+  {id:'dwinelle',n:'Dwinelle Hall',a:'Languages / Humanities',lat:37.87058,lng:-122.26041,c:'Humanities',yr:1952,floors:6},
+  {id:'moses',n:'Moses Hall',a:'Economics',lat:37.8711,lng:-122.2577,c:'Humanities',yr:1931,floors:3},
+  {id:'stephens',n:'Stephens Hall',a:'International Studies',lat:37.87124,lng:-122.25761,c:'Humanities',yr:1923,floors:4},
+  {id:'wurster',n:'Wurster Hall',a:'Architecture',lat:37.8707,lng:-122.2549,c:'Professional',yr:1964,floors:10},
+  {id:'giannini',n:'Giannini Hall',a:'Agriculture & Resource Econ.',lat:37.87357,lng:-122.26234,c:'Professional',yr:1930,floors:4},
+  {id:'morgan',n:'Morgan Hall',a:'Natural Resources',lat:37.873164,lng:-122.264198,c:'Professional',yr:1962,floors:4},
+  {id:'mlk',n:'MLK Student Union',a:'Student Services',lat:37.869137,lng:-122.259614,c:'Student Life',yr:1961,floors:4},
+  {id:'rsf',n:'Rec Sports Facility',a:'Athletics',lat:37.868652,lng:-122.262897,c:'Student Life',yr:1984,floors:3},
+  {id:'chavez',n:'Chavez Center',a:'Student Center',lat:37.8698,lng:-122.26015,c:'Student Life',yr:1961,floors:3},
+  {id:'sproul',n:'Sproul Hall',a:'Administration',lat:37.8696,lng:-122.25878,c:'Other',yr:1941,floors:4},
+  {id:'doe',n:'Doe Library',a:'Main Library',lat:37.87244,lng:-122.25956,c:'Libraries',yr:1911,floors:4},
+  {id:'moffitt',n:'Moffitt Library',a:'Undergraduate Library',lat:37.87255,lng:-122.26081,c:'Libraries',yr:1970,floors:5},
+  {id:'uhall',n:'University Hall',a:'Administration',lat:37.87189,lng:-122.26635,c:'Other',yr:1959,floors:4},
+  {id:'northgate',n:'North Gate Hall',a:'Journalism',lat:37.874974,lng:-122.259826,c:'Other',yr:1906,floors:3},
+  {id:'donner',n:'Donner Laboratory',a:'Public Health',lat:37.87463,lng:-122.25649,c:'Other',yr:1942,floors:3},
+  {id:'bww',n:'Berkeley Way West',a:'Psychology',lat:37.8749,lng:-122.25912,c:'Other',yr:2020,floors:7},
+  {id:'mulford',n:'Mulford Hall',a:'Natural Resources',lat:37.87264,lng:-122.26449,c:'Professional',yr:1948,floors:4},
+];
+
+function kwColor(kw, maxKw) {
+  if (!kw || kw === null) return Cesium.Color.fromCssColorString('#64748b').withAlpha(0.6);
+  var r = Math.min(kw / (maxKw || 500), 1);
+  if (r < 0.15) return Cesium.Color.fromCssColorString('#34d399');
+  if (r < 0.35) return Cesium.Color.fromCssColorString('#2dd4bf');
+  if (r < 0.55) return Cesium.Color.fromCssColorString('#FDB515');
+  if (r < 0.75) return Cesium.Color.fromCssColorString('#f59e0b');
+  return Cesium.Color.fromCssColorString('#f87171');
+}
+
+// ══════ VIEWER ══════
+const viewer = new Cesium.Viewer('cesiumContainer', {
+  imageryProvider: false,
+  baseLayerPicker: false,
+  geocoder: false,
+  homeButton: false,
+  sceneModePicker: false,
+  selectionIndicator: false,
+  timeline: false,
+  animation: false,
+  fullscreenButton: false,
+  infoBox: false,
+  requestRenderMode: true,
+  maximumRenderTimeChange: Infinity,
+});
+
+// Add Google Photorealistic 3D Tiles
+try {
+  const tileset = viewer.scene.primitives.add(
+    await Cesium.Cesium3DTileset.fromIonAssetId(2275207)
+  );
+} catch (error) {
+  console.log('Using satellite fallback:', error.message);
+  viewer.imageryLayers.addImageryProvider(
+    await Cesium.IonImageryProvider.fromAssetId(2)
+  );
+}
+
+// Set camera to UC Berkeley
+viewer.camera.flyTo({
+  destination: Cesium.Cartesian3.fromDegrees(-122.2590, 37.8700, 500),
+  orientation: { heading: Cesium.Math.toRadians(350), pitch: Cesium.Math.toRadians(-45), roll: 0 },
+  duration: 0
+});
+
+// ══════ ENERGY MARKERS ══════
+var liveData = null;
+
+function renderEnergy(energyData) {
+  viewer.entities.removeAll();
+  var maxKw = 500;
+  if (energyData) {
+    var vals = Object.values(energyData).map(b => b.kw).filter(v => v);
+    if (vals.length) maxKw = Math.max(...vals);
+  }
+
+  buildings.forEach(function(b) {
+    var live = energyData && energyData[b.id];
+    var kw = (live && live.kw !== null) ? live.kw : null;
+    var col = kwColor(kw, maxKw);
+    var sz = kw ? Math.max(6, Math.min(18, 6 + (kw / maxKw) * 12)) : 4;
+
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(b.lng, b.lat, kw ? 30 + (kw / maxKw) * 50 : 20),
+      point: { pixelSize: sz, color: col, outlineColor: Cesium.Color.WHITE.withAlpha(0.7), outlineWidth: 1.5, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      label: {
+        text: kw ? b.n.split(' ')[0] + '\n' + kw + 'kW' : b.n.split(' ')[0],
+        font: kw ? 'bold 11px sans-serif' : '9px sans-serif',
+        fillColor: kw ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#94a3b8'),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -sz - 4),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        showBackground: kw ? true : false,
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(10,16,32,0.7)'),
+        backgroundPadding: new Cesium.Cartesian2(4, 3),
+        scaleByDistance: new Cesium.NearFarScalar(100, 1.2, 2000, 0.5),
+      },
+      properties: { bid: b.id, name: b.n, dept: b.a, kw: kw, yr: b.yr, floors: b.floors, category: b.c }
+    });
+  });
+
+  viewer.scene.requestRender();
+}
+
+// Click handler for building info
+var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+handler.setInputAction(function(click) {
+  var picked = viewer.scene.pick(click.position);
+  if (Cesium.defined(picked) && picked.id && picked.id.properties) {
+    var p = picked.id.properties;
+    var popup = document.getElementById('infoPopup');
+    document.getElementById('ipName').textContent = p.name.getValue();
+    document.getElementById('ipDept').textContent = p.dept.getValue() + ' · ' + p.category.getValue();
+    var kw = p.kw.getValue();
+    document.getElementById('ipKw').textContent = kw ? kw + ' kW' : 'Offline';
+    document.getElementById('ipKw').style.color = kw ? '#2dd4bf' : '#64748b';
+    var meta = 'Built ' + p.yr.getValue() + ' · ' + p.floors.getValue() + ' floors';
+    if (kw) meta += ' · ~$' + Math.round(kw * 0.15 * 24) + '/day · ' + Math.round(kw * 24 * 0.21) + 'kg CO₂/day';
+    document.getElementById('ipMeta').textContent = meta;
+    popup.style.left = click.position.x + 'px';
+    popup.style.top = click.position.y + 'px';
+    popup.classList.add('show');
+  } else {
+    document.getElementById('infoPopup').classList.remove('show');
+  }
+}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+// ══════ LIVE DATA ══════
+async function fetchLive() {
+  try {
+    var r = await fetch(DATA_URL + '?t=' + Date.now());
+    var data = await r.json();
+    liveData = data;
+    renderEnergy(data.buildings);
+    document.getElementById('tsLabel').textContent = data.generated_at || '';
+    document.getElementById('spKw').textContent = data.total_kw + ' kW';
+    document.getElementById('spBldg').textContent = data.buildings_online + '/' + data.buildings_total;
+    document.getElementById('spCost').textContent = '$' + data.total_daily_cost;
+    document.getElementById('spCo2').textContent = (data.total_daily_co2_kg / 1000).toFixed(1) + 't';
+  } catch (e) { console.warn('Fetch error:', e); }
+}
+fetchLive();
+setInterval(fetchLive, 60000);
+
+// ══════ TIME SLIDER ══════
+var histData = null, histTimes = [], playInt = null;
+fetch(HIST_URL + '?t=' + Date.now()).then(r => r.json()).then(d => {
+  histData = d;
+  var ts = new Set();
+  for (var bid in d) (d[bid] || []).forEach(p => ts.add(p.t));
+  histTimes = [...ts].sort().slice(-96);
+  document.getElementById('timeRange').max = Math.max(0, histTimes.length - 1);
+  document.getElementById('timeRange').value = histTimes.length - 1;
+}).catch(() => {});
+
+function onTimeChange(val) {
+  val = parseInt(val);
+  if (!histData || !histTimes.length) return;
+  var isLive = val >= histTimes.length - 1;
+  document.getElementById('timeVal').textContent = isLive ? 'Live' : histTimes[val] || '--';
+  if (isLive) { if (liveData) renderEnergy(liveData.buildings); return; }
+  var t = histTimes[val], snap = {};
+  for (var bid in histData) {
+    var pts = histData[bid] || [];
+    for (var i = 0; i < pts.length; i++) { if (pts[i].t === t) { snap[bid] = { kw: pts[i].kw }; break; } }
+  }
+  renderEnergy(snap);
+}
+
+function togglePlay() {
+  var btn = document.getElementById('playBtn'), slider = document.getElementById('timeRange');
+  if (playInt) { clearInterval(playInt); playInt = null; btn.textContent = '▶'; return; }
+  btn.textContent = '⏸'; slider.value = 0; onTimeChange(0);
+  playInt = setInterval(function() {
+    var v = parseInt(slider.value) + 1;
+    if (v > parseInt(slider.max)) { clearInterval(playInt); playInt = null; btn.textContent = '▶'; slider.value = slider.max; onTimeChange(slider.max); return; }
+    slider.value = v; onTimeChange(v);
+  }, 300);
+}
+</script>
+</body>
+</html>
