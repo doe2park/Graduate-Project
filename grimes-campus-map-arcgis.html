@@ -95,7 +95,8 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .sp-label{font-size:10px;color:var(--dim);font-weight:500}
 .sp-val{font:600 12px/1 'JetBrains Mono',mono}
 .sp-chart{height:28px;display:flex;align-items:flex-end;gap:1px}
-.sp-bar{flex:1;border-radius:1.5px 1.5px 0 0;min-height:1px;transition:height .3s}
+.sp-bar{flex:1;border-radius:1.5px 1.5px 0 0;min-height:1px;transition:all .15s;cursor:crosshair;position:relative}
+.sp-bar:hover::after{content:attr(data-kw);position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:rgba(10,14,26,.95);color:var(--gold);font:600 9px/1 'JetBrains Mono',mono;padding:3px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;border:1px solid rgba(253,181,21,.2)}
 
 /* Grid status */
 .gs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px}
@@ -138,7 +139,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 
 @keyframes gPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.6}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}
 @keyframes gGlow{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px 2px rgba(253,181,21,.3)}}
-#grimes-pulse{position:absolute;pointer-events:none;z-index:5;width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(253,181,21,.6);animation:gGlow 3s ease-in-out infinite}
+#grimes-pulse{position:absolute;pointer-events:none;z-index:5;width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(253,181,21,.6);animation:gGlow 3s ease-in-out infinite;margin-left:-14px;margin-top:-14px}
 #grimes-pulse::before,#grimes-pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(253,181,21,.4);animation:gPulse 3s ease-out infinite}
 #grimes-pulse::after{animation-delay:1.5s}
 #grimes-label{position:absolute;pointer-events:auto;cursor:pointer;z-index:6;background:rgba(253,181,21,.95);color:#003262;font:700 10px/1 system-ui;padding:4px 10px 4px 8px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);transform:translate(18px,-50%)}
@@ -198,9 +199,9 @@ const D=[
   {id:'lewis',n:'Lewis Hall',a:'Chemistry',lat:37.87383,lng:-122.25653,c:'Science',yr:1948,floors:4},
   {id:'pimentel',n:'Pimentel Hall',a:'Chemistry Lecture',lat:37.87340,lng:-122.25740,c:'Science',yr:1964,floors:2},
   {id:'evans',n:'Evans Hall',a:'Mathematics',lat:37.87370,lng:-122.25810,c:'Science',nrg:1,yr:1971,floors:10},
-  {id:'campbell',n:'Campbell Hall',a:'Physics / Astronomy',lat:37.87245,lng:-122.25790,c:'Science',yr:1959,floors:3},
-  {id:'birge',n:'Birge Hall',a:'Physics',lat:37.87275,lng:-122.25730,c:'Science',yr:1964,floors:9},
-  {id:'leconte',n:'LeConte Hall',a:'Physics',lat:37.87280,lng:-122.25770,c:'Science',yr:1924,floors:4},
+  {id:'campbell',n:'Campbell Hall',a:'Physics / Astronomy',lat:37.87260,lng:-122.25785,c:'Science',yr:1959,floors:3},
+  {id:'birge',n:'Birge Hall',a:'Physics',lat:37.87370,lng:-122.25760,c:'Science',yr:1964,floors:9},
+  {id:'leconte',n:'LeConte Hall',a:'Physics',lat:37.87310,lng:-122.25790,c:'Science',yr:1924,floors:4},
   {id:'vlsb',n:'Valley Life Sciences',a:'Biology / Paleontology',lat:37.87140,lng:-122.26175,c:'Science',nrg:1,yr:1930,floors:5},
   {id:'lksc',n:'Li Ka Shing Center',a:'Biosciences',lat:37.87440,lng:-122.25570,c:'Science',yr:2012,floors:4},
   {id:'hilde',n:'Hildebrand Hall',a:'Chemistry',lat:37.87358,lng:-122.25590,c:'Science',yr:1966,floors:4},
@@ -331,7 +332,8 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     return data.map((v,i)=>{
       const pct=((v-min)/range)*100;
       const ht=Math.max(2,pct/100*h);
-      return `<div class="sp-bar" style="height:${ht}px;background:${color};opacity:${0.4+pct/100*0.6}"></div>`;
+      const val=typeof v==='number'?v.toFixed(1)+'kW':'?';
+      return `<div class="sp-bar" style="height:${ht}px;background:${color};opacity:${0.4+pct/100*0.6}" data-kw="${val}" onmouseenter="this.style.opacity='1';this.style.background='#FDB515'" onmouseleave="this.style.opacity='${(0.4+pct/100*0.6).toFixed(2)}';this.style.background='${color}'"></div>`;
     }).join('');
   }
 
@@ -403,7 +405,10 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
     if(b.kw){h+=`<a href="campus-energy-dashboard.html" style="display:block;margin-top:8px;padding:6px;border-radius:6px;background:rgba(253,181,21,.08);border:1px solid rgba(253,181,21,.15);text-align:center;text-decoration:none;font-size:10px;font-weight:600;color:var(--gold)">\uD83D\uDCCA Full Campus Analytics \u2192</a>`}
 
-    h+=`<div style="margin-top:8px;font:400 9px 'JetBrains Mono',mono;color:var(--faint)">\uD83D\uDCCD ${b.lat.toFixed(5)}, ${b.lng.toFixed(5)}</div>`;
+    h+=`<div style="margin-top:8px;display:flex;gap:6px">
+      <a href="https://www.google.com/maps?q=${b.lat},${b.lng}" target="_blank" style="flex:1;padding:5px;border-radius:5px;background:rgba(255,255,255,.04);border:1px solid var(--border);text-align:center;text-decoration:none;font-size:9px;color:var(--dim)">📍 Google Maps</a>
+      ${b.xr?'<a href="'+b.xr+'" target="_blank" style="flex:1;padding:5px;border-radius:5px;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.15);text-align:center;text-decoration:none;font-size:9px;color:var(--cyan)">🏗 3D Viewer</a>':''}
+    </div>`;
     h+='</div>';pop.innerHTML=h;pop.classList.add('vis');
   }
 
