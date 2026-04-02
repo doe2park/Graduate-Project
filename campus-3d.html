@@ -100,7 +100,7 @@ body{background:#000;font-family:system-ui,sans-serif}
 <script>
 // ══════ CONFIG ══════
 // Replace with your Cesium ion token (free at https://ion.cesium.com/signup)
-Cesium.Ion.defaultAccessToken = 'YOUR_CESIUM_ION_TOKEN';
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmZmYyYTJhNS02ZGNjLTQxYWMtOGE2MS0wOTdjYzdlM2E1NTEiLCJpZCI6NDEyNzUyLCJpYXQiOjE3NzUxMTc5NDF9.giHh-YMFrX5HV9XxAqsy0HTdmVQQJ9WUexkViOswRGU';
 
 const DATA_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
 const HIST_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json';
@@ -152,6 +152,7 @@ function kwColor(kw, maxKw) {
 }
 
 // ══════ VIEWER ══════
+(async function(){
 const viewer = new Cesium.Viewer('cesiumContainer', {
   imageryProvider: false,
   baseLayerPicker: false,
@@ -172,11 +173,16 @@ try {
   const tileset = viewer.scene.primitives.add(
     await Cesium.Cesium3DTileset.fromIonAssetId(2275207)
   );
+  console.log('3D Tiles loaded');
 } catch (error) {
-  console.log('Using satellite fallback:', error.message);
-  viewer.imageryLayers.addImageryProvider(
-    await Cesium.IonImageryProvider.fromAssetId(2)
-  );
+  console.log('3D Tiles failed, using satellite:', error.message);
+  try {
+    viewer.imageryLayers.addImageryProvider(
+      await Cesium.IonImageryProvider.fromAssetId(2)
+    );
+  } catch(e2) {
+    console.log('Satellite also failed:', e2.message);
+  }
 }
 
 // Set camera to UC Berkeley
@@ -257,6 +263,7 @@ async function fetchLive() {
     var r = await fetch(DATA_URL + '?t=' + Date.now());
     var data = await r.json();
     liveData = data;
+    window._liveData = data;
     renderEnergy(data.buildings);
     document.getElementById('tsLabel').textContent = data.generated_at || '';
     document.getElementById('spKw').textContent = data.total_kw + ' kW';
@@ -265,10 +272,17 @@ async function fetchLive() {
     document.getElementById('spCo2').textContent = (data.total_daily_co2_kg / 1000).toFixed(1) + 't';
   } catch (e) { console.warn('Fetch error:', e); }
 }
+// Expose for global access
+window._viewer = viewer;
+window._renderEnergy = renderEnergy;
+window._liveData = null;
+
 fetchLive();
 setInterval(fetchLive, 60000);
 
-// ══════ TIME SLIDER ══════
+})(); // end async IIFE
+
+// ══════ TIME SLIDER (global) ══════
 var histData = null, histTimes = [], playInt = null;
 fetch(HIST_URL + '?t=' + Date.now()).then(r => r.json()).then(d => {
   histData = d;
@@ -284,13 +298,13 @@ function onTimeChange(val) {
   if (!histData || !histTimes.length) return;
   var isLive = val >= histTimes.length - 1;
   document.getElementById('timeVal').textContent = isLive ? 'Live' : histTimes[val] || '--';
-  if (isLive) { if (liveData) renderEnergy(liveData.buildings); return; }
+  if (isLive) { if (window._liveData) window._renderEnergy(window._liveData.buildings); return; }
   var t = histTimes[val], snap = {};
   for (var bid in histData) {
     var pts = histData[bid] || [];
     for (var i = 0; i < pts.length; i++) { if (pts[i].t === t) { snap[bid] = { kw: pts[i].kw }; break; } }
   }
-  renderEnergy(snap);
+  if (window._renderEnergy) window._renderEnergy(snap);
 }
 
 function togglePlay() {
