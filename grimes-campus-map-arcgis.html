@@ -150,9 +150,13 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 @media(max-width:768px){#mobileExplore{display:flex}}
 
 /* Chat */
-#chatBtn{position:fixed;bottom:20px;right:20px;z-index:30;width:48px;height:48px;border-radius:50%;background:var(--gold);color:#003262;border:none;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(253,181,21,.4);display:flex;align-items:center;justify-content:center;transition:transform .2s}
-#chatBtn:hover{transform:scale(1.1)}
-@media(max-width:768px){#chatBtn{bottom:70px}}
+@keyframes chatHint{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+#chatBtn{position:fixed;bottom:20px;right:20px;z-index:30;border:none;cursor:pointer;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+#chatBtn .cb-bubble{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#003262,#004a8f);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,50,98,.5);transition:transform .2s;animation:chatHint 3s ease-in-out infinite}
+#chatBtn:hover .cb-bubble{transform:scale(1.08);box-shadow:0 6px 24px rgba(253,181,21,.3)}
+#chatBtn .cb-icon{width:24px;height:24px}
+#chatBtn .cb-hint{font-size:9px;color:var(--gold);font-weight:600;background:rgba(0,0,0,.5);padding:2px 8px;border-radius:8px;white-space:nowrap;opacity:.8}
+@media(max-width:768px){#chatBtn{bottom:70px}#chatBtn .cb-hint{display:none}}
 #chatPanel{position:fixed;bottom:80px;right:20px;z-index:30;width:360px;max-height:480px;background:var(--panel);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4)}
 @media(max-width:768px){#chatPanel{bottom:0;right:0;left:0;width:100%;max-height:70vh;border-radius:14px 14px 0 0}}
 #chatPanel.open{display:flex}
@@ -202,17 +206,24 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 </div>
 
 <!-- Chat -->
-<button id="chatBtn" onclick="toggleChat()">💬</button>
+<button id="chatBtn" onclick="toggleChat()">
+  <div class="cb-bubble"><svg class="cb-icon" viewBox="0 0 24 24" fill="none" stroke="#FDB515" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" fill="rgba(253,181,21,.15)"/><path d="M8 10h.01M12 10h.01M16 10h.01" stroke-width="2.5" stroke-linecap="round"/></svg></div>
+  <span class="cb-hint">Ask about energy</span>
+</button>
 <div id="chatPanel">
   <div class="chat-hdr"><h3>🤖 Campus Energy Assistant</h3><button class="chat-close" onclick="toggleChat()">✕</button></div>
   <div class="chat-msgs" id="chatMsgs">
     <div class="chat-msg bot">Hi! I can answer questions about UC Berkeley campus buildings and energy data. Try asking me something!</div>
   </div>
   <div class="chat-quick" id="chatQuick">
-    <div class="chat-q" onclick="askChat(this.textContent)">Top energy consumers?</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Total campus kW?</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Daily cost estimate?</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Tell me about Davis Hall</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Top energy users?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Campus total kW?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Daily cost?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">CO₂ footprint?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Oldest building?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">About Davis Hall</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Offline buildings?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Compare Engineering vs Science</div>
   </div>
   <div class="chat-input"><input id="chatIn" placeholder="Ask about buildings, energy..." onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Ask</button></div>
 </div>
@@ -571,81 +582,128 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 });
 </script>
 <script>
-// ═══ CHAT ═══
+// ═══ SMART CAMPUS CHATBOT v2 — Fuzzy NLP ═══
 var chatOpen=false;
-function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('open',chatOpen)}
-
+function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('open',chatOpen);if(chatOpen)document.getElementById('chatIn').focus()}
 var chatData=null;
-fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t='+Date.now())
-.then(function(r){return r.json()}).then(function(d){chatData=d}).catch(function(){});
+fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatData=d}).catch(function(){});
 
-function addMsg(text,type){
-  var msgs=document.getElementById('chatMsgs');
-  var div=document.createElement('div');
-  div.className='chat-msg '+type;
-  div.textContent=text;
-  msgs.appendChild(div);
-  msgs.scrollTop=msgs.scrollHeight;
-  return div;
+function addMsg(t,type){var m=document.getElementById('chatMsgs');var d=document.createElement('div');d.className='chat-msg '+type;d.innerHTML=t;m.appendChild(d);m.scrollTop=m.scrollHeight}
+function askChat(q){document.getElementById('chatIn').value=q;sendChat()}
+function sendChat(){var input=document.getElementById('chatIn');var q=input.value.trim();if(!q)return;input.value='';addMsg(q,'user');setTimeout(function(){addMsg(processQuery(q),'bot')},200)}
+
+function sim(a,b){a=a.toLowerCase();b=b.toLowerCase();if(a===b)return 1;if(b.length>2&&a.includes(b))return 0.85;if(a.length>2&&b.includes(a))return 0.8;var m=0,l=Math.max(a.length,b.length);for(var i=0;i<Math.min(a.length,b.length);i++){if(a[i]===b[i])m++}return m/l}
+
+function findBuilding(q){
+  var ql=q.toLowerCase();var best=null,bs=0;
+  D.forEach(function(b){
+    var names=[b.n,b.id,b.a||''];b.n.split(' ').forEach(function(w){if(w.length>3)names.push(w)});
+    var aliases={hmm:['hearst mining','mining'],rsf:['rsf','gym','rec'],mlk:['mlk','student union'],doe:['doe','main library'],grimes:['grimes','bechtel'],bww:['bww','berkeley way'],lksc:['li ka shing','lksc'],etch:['etcheverry','etch'],vlsb:['vlsb','life sciences','valley']};
+    if(aliases[b.id])names=names.concat(aliases[b.id]);
+    names.forEach(function(n){if(!n||n.length<2)return;var s=sim(ql,n);if(ql.includes(n.toLowerCase())&&n.length>3)s=Math.max(s,0.9);if(s>bs&&s>0.4){bs=s;best=b}});
+  });
+  return best;
 }
 
-function askChat(q){document.getElementById('chatIn').value=q;sendChat()}
+function intent(q){
+  var ql=q.toLowerCase();
+  var map={
+    summary:/total|campus.*(kw|power|energy|load)|overall|summary|overview|how much.*(power|energy|electricity)|what.*campus|전체|얼마/,
+    top:/top|most|highest|biggest|rank|consumer|hungry|많이|순위|who uses|which.*most/,
+    bottom:/low|least|efficient|small|min|little|적게/,
+    cost:/cost|money|dollar|expens|price|budget|spend|bill|요금|비용|얼마|pay|cheap/,
+    co2:/co2|carbon|emission|environ|green|sustain|tree|footprint|climate|탄소|나무/,
+    offline:/offline|down|unavail|not work|disconn|broken|오프라인/,
+    anomaly:/anomal|alert|warn|unusual|abnorm|spike|strange|weird|이상|경고/,
+    compare:/compare|vs|versus|categor|differ|비교|breakdown/,
+    old:/oldest|ancient|historic|first built|earliest|오래된|역사/,
+    newest:/newest|recent|modern|latest|최신|새로운/,
+    tall:/tall|floor|stories|height|highest building|층|높/,
+    eng:/engineering building|engineering dept/,
+    sci:/science building|science dept/,
+    grimes:/grimes|bechtel|digital twin|3d view|mep view/,
+    predict:/predict|forecast|expect|tomorrow|next reading|예측/,
+    dashboard:/dashboard|chart|graph|analytics|대시보드/,
+    report:/report|weekly|주간|리포트/,
+    howwork:/how.*(work|built|made)|pipeline|automat|system|architecture|explain.*system|어떻게.*작동/,
+    help:/^help$|what can you|what do you|how to use|도움|할 수 있/,
+    hi:/^(hi|hello|hey|yo|sup)$|안녕|하이/,
+    thanks:/thank|고마|감사/,
+    count:/how many|count|number of|몇 개|갯수/,
+  };
+  for(var k in map){if(map[k].test(ql))return k}
+  return null;
+}
 
-async function sendChat(){
-  var input=document.getElementById('chatIn');
-  var q=input.value.trim();
-  if(!q)return;
-  input.value='';
-  addMsg(q,'user');
-  document.getElementById('chatQuick').style.display='none';
-  var loading=addMsg('Thinking...','bot loading');
+function on(){return chatData?Object.entries(chatData.buildings).filter(function(e){return e[1].kw!==null}).sort(function(a,b){return b[1].kw-a[1].kw}):[]}
+function off(){return chatData?Object.entries(chatData.buildings).filter(function(e){return e[1].kw===null}):[]}
 
-  // Build context from live data
-  var context='UC Berkeley Campus Energy Data (live from BMO metering):\n';
-  if(chatData){
-    context+='Generated: '+chatData.generated_at+'\n';
-    context+='Total campus load: '+chatData.total_kw+' kW\n';
-    context+='Buildings online: '+chatData.buildings_online+'/'+chatData.buildings_total+'\n';
-    context+='Est daily cost: $'+chatData.total_daily_cost+'\n';
-    context+='Est daily CO2: '+chatData.total_daily_co2_kg+' kg\n\n';
-    context+='Building data:\n';
-    var blds=Object.entries(chatData.buildings).sort(function(a,b){return(b[1].kw||0)-(a[1].kw||0)});
-    blds.forEach(function(e){
-      var b=e[1];
-      context+=b.name+': '+(b.kw!==null?b.kw+' kW':'offline');
-      if(b.est_daily_cost)context+=' ($'+b.est_daily_cost+'/day)';
-      if(b.est_daily_co2_kg)context+=' ('+b.est_daily_co2_kg+'kg CO2/day)';
-      if(b.predicted_kw)context+=' (predicted: '+b.predicted_kw+' kW)';
-      context+='\n';
-    });
+function bInfo(b){
+  var l=chatData&&chatData.buildings[b.id];
+  var r="🏢 <b>"+b.n+"</b>"+(b.a?" — "+b.a:"")+"<br>📍 "+b.c+" · Built "+(b.yr||"?")+(b.yr?" ("+(2026-b.yr)+"yr)":"")+" · "+(b.floors||"?")+" floors";
+  if(l&&l.kw!==null){r+="<br>⚡ <b>"+l.kw+" kW</b> right now<br>💰 ~$"+(l.est_daily_cost||0)+"/day · 🌿 "+(l.est_daily_co2_kg||0)+"kg CO₂/day";if(l.predicted_kw)r+="<br>🔮 Predicted: ~"+l.predicted_kw+" kW";if(l.anomaly)r+="<br>⚠️ <span style=\'color:var(--red)\'>Anomaly detected!</span>"}
+  else if(l)r+="<br>📡 BMO metered — currently <b>offline</b>";
+  else r+="<br>📡 No energy metering";
+  if(b.xr)r+="<br><br>🏗 <a href=\'"+b.xr+"\' target=\'_blank\' style=\'color:var(--cyan)\'>Open 3D Viewer →</a>";
+  return r;
+}
+
+function processQuery(q){
+  var i=intent(q),o=on(),f=off();
+  var bld=findBuilding(q);
+  if(bld&&(!i||i==='help'||q.split(' ').length<=4))return bInfo(bld);
+  if(!chatData&&!['help','hi','howwork','thanks'].includes(i))return "⏳ Loading energy data... try again in a moment.";
+  var T=chatData?chatData.total_kw:0;
+
+  switch(i){
+  case 'summary':return "⚡ <b>Campus: "+T+" kW</b> ("+chatData.buildings_online+"/"+chatData.buildings_total+" online)<br>💰 ~$"+chatData.total_daily_cost+"/day<br>🌿 "+chatData.total_daily_co2_kg+"kg CO₂/day<br>📊 "+chatData.total_daily_kwh.toLocaleString()+" kWh/day ≈ "+Math.round(chatData.total_daily_kwh/30)+" homes<br>🕐 "+chatData.generated_at;
+
+  case 'top':var t=o.slice(0,5);return "🏆 <b>Top 5:</b><br>"+t.map(function(e,j){return"<b>"+(j+1)+".</b> "+e[1].name+" — <b>"+e[1].kw+"kW</b> ("+Math.round(e[1].kw/T*100)+"%)"}).join("<br>")+"<br><br>Top 5 = <b>"+Math.round(t.reduce(function(s,e){return s+e[1].kw},0)/T*100)+"%</b> of campus.";
+
+  case 'bottom':var b=o.slice(-5).reverse();return "🌱 <b>Lowest:</b><br>"+b.map(function(e,j){return(j+1)+". "+e[1].name+" — <b>"+e[1].kw+"kW</b> (~$"+(e[1].est_daily_cost||0)+"/day)"}).join("<br>");
+
+  case 'cost':return "💰 <b>Daily: ~$"+chatData.total_daily_cost+"</b><br>📅 Weekly: ~$"+Math.round(chatData.total_daily_cost*7).toLocaleString()+" · Monthly: ~$"+Math.round(chatData.total_daily_cost*30).toLocaleString()+"<br><br>Most expensive:<br>"+o.slice(0,5).map(function(e,j){return(j+1)+". "+e[1].name+" — <b>$"+(e[1].est_daily_cost||0)+"/day</b>"}).join("<br>");
+
+  case 'co2':var t2=(chatData.total_daily_co2_kg/1000).toFixed(2);return "🌿 <b>Daily: "+chatData.total_daily_co2_kg+"kg</b> ("+t2+" tons)<br>🌳 <b>"+Math.round(chatData.total_daily_co2_kg/21.7)+" trees</b> to offset<br>📅 Annual: ~"+(chatData.total_daily_co2_kg*365/1000).toFixed(0)+" tons<br><br>CA grid: 0.21 kg CO₂/kWh";
+
+  case 'offline':return "🔴 <b>"+f.length+" offline:</b><br>"+f.map(function(e){return "• "+e[1].name}).join("<br>")+"<br><br>BMO meters may be disconnected.";
+
+  case 'anomaly':var a=chatData.anomalies||{},k=Object.keys(a);if(!k.length)return "✅ All clear! No anomalies.";return "⚠️ <b>"+k.length+" anomalies:</b><br>"+k.map(function(k2){var x=a[k2];return "🔴 "+(chatData.buildings[k2]?chatData.buildings[k2].name:k2)+": "+x.current+"kW ("+(x.type==='high'?'↑':'↓')+Math.round((x.ratio-1)*100)+"%)"}).join("<br>");
+
+  case 'compare':var c={};var cm={grimes:'Eng',cory:'Eng',soda:'Eng',davis:'Eng',etch:'Eng',hmm:'Eng',hesse:'Eng',sutardja:'Eng',mclaughlin:'Eng',stanley:'Sci',tan:'Sci',latimer:'Sci',birge:'Sci',hilde:'Sci',wheeler:'Hum',dwinelle:'Hum',barrows:'Hum',moses:'Hum',stephens:'Hum',wurster:'Prof',giannini:'Prof',tolman:'Prof',morgan:'Prof',boalt:'Prof',mlk:'Life',rsf:'Life',chavez:'Life',anthony:'Life',sproul:'Other',doe:'Lib',moffitt:'Lib',uhall:'Other',northgate:'Other',donner:'Other',bww:'Other',mulford:'Other'};Object.entries(chatData.buildings).forEach(function(e){var cat=cm[e[0]]||'Other';if(!c[cat])c[cat]={kw:0,n:0};if(e[1].kw){c[cat].kw+=e[1].kw;c[cat].n++}});return "🏛 <b>By category:</b><br>"+Object.entries(c).sort(function(a,b){return b[1].kw-a[1].kw}).map(function(e){return "• <b>"+e[0]+":</b> "+Math.round(e[1].kw)+"kW ("+e[1].n+" bldgs, "+Math.round(e[1].kw/T*100)+"%)"}).join("<br>");
+
+  case 'old':return "🏛 <b>Oldest:</b><br>"+D.filter(function(b){return b.yr}).sort(function(a,b){return a.yr-b.yr}).slice(0,5).map(function(b,j){return(j+1)+". "+b.n+" — <b>"+b.yr+"</b> ("+(2026-b.yr)+"yr)"}).join("<br>");
+
+  case 'newest':return "🏗 <b>Newest:</b><br>"+D.filter(function(b){return b.yr}).sort(function(a,b){return b.yr-a.yr}).slice(0,5).map(function(b,j){return(j+1)+". "+b.n+" — <b>"+b.yr+"</b>"}).join("<br>");
+
+  case 'tall':return "🏢 <b>Tallest:</b><br>"+D.filter(function(b){return b.floors}).sort(function(a,b){return b.floors-a.floors}).slice(0,5).map(function(b,j){return(j+1)+". "+b.n+" — <b>"+b.floors+" floors</b>"}).join("<br>");
+
+  case 'count':return "📊 <b>"+D.length+" buildings</b> total on the map.<br>"+chatData.buildings_online+" with live energy data, "+f.length+" offline, "+(D.length-Object.keys(chatData.buildings).length)+" unmetered.";
+
+  case 'eng':var eg=D.filter(function(b){return b.c==='Engineering'});return "🔧 <b>Engineering ("+eg.length+"):</b><br>"+eg.map(function(b){var l=chatData&&chatData.buildings[b.id];return "• "+b.n+(l&&l.kw?" — <b>"+l.kw+"kW</b>":"")}).join("<br>");
+
+  case 'sci':var sc=D.filter(function(b){return b.c==='Science'});return "🔬 <b>Science ("+sc.length+"):</b><br>"+sc.map(function(b){var l=chatData&&chatData.buildings[b.id];return "• "+b.n+(l&&l.kw?" — <b>"+l.kw+"kW</b>":"")}).join("<br>");
+
+  case 'grimes':var g=D[0],gl=chatData&&chatData.buildings.grimes;return "🏗 <b>Grimes Engineering Center</b><br>Only building with full BIM digital twin!<br>1980 (renovated 2025) · 4 floors · 83,460 sqft · 8 MEP<br>"+(gl&&gl.kw?"⚡ <b>"+gl.kw+"kW</b> | $"+(gl.est_daily_cost||0)+"/day":"")+"<br><br>🥽 <a href='"+g.xr+"' target='_blank' style='color:var(--cyan)'>Enter 3D Viewer →</a>";
+
+  case 'predict':var pr=o.filter(function(e){return e[1].predicted_kw}).slice(0,5);if(!pr.length)return "🔮 Need more data for predictions. Check back in a few hours.";return "🔮 <b>Predictions:</b><br>"+pr.map(function(e){return "• "+e[1].name+": "+e[1].kw+"kW → <b>~"+e[1].predicted_kw+"kW</b>"}).join("<br>");
+
+  case 'dashboard':return "📊 <a href='campus-energy-dashboard.html' style='color:var(--gold)'>📊 Live Dashboard →</a> — Charts, rankings, trends<br><a href='weekly-report.html' style='color:var(--green)'>📋 Weekly Report →</a> — 7-day analysis";
+
+  case 'report':return "📋 <a href='weekly-report.html' style='color:var(--green)'>Open Weekly Report →</a><br>Daily trends, costs, CO₂ for the past 7 days.";
+
+  case 'howwork':return "⚙️ <b>System:</b><br>1️⃣ BMO meters → kW every 15min<br>2️⃣ GitHub Actions → Python fetch<br>3️⃣ JSON → GitHub Pages (free)<br>4️⃣ Map + Dashboard fetch live<br>💵 Cost: <b>$0/month</b><br><br>Built by Yoonsung Chung · UC Berkeley CEE";
+
+  case 'hi':return "👋 Hi! I know about "+D.length+" UC Berkeley buildings — energy, costs, CO₂, history. What would you like to know?";
+  case 'thanks':return "😊 You're welcome! Ask anytime.";
+
+  case 'help':return "💡 <b>Ask me anything like:</b><br>🔍 <i>\"How much power does campus use?\"</i><br>🏆 <i>\"Which building uses most energy?\"</i><br>💰 <i>\"What's the daily cost?\"</i><br>🌿 <i>\"Carbon footprint?\"</i><br>🏢 <i>\"Tell me about Wheeler Hall\"</i><br>📊 <i>\"Compare categories\"</i><br>🏛 <i>\"Oldest building?\"</i><br>🔢 <i>\"How many buildings?\"</i><br>⚠️ <i>\"Any anomalies?\"</i><br>🔮 <i>\"Predictions?\"</i><br><br>Or just type a building name!";
   }
 
-  // Also include building info from D array
-  context+='\nBuilding details:\n';
-  D.forEach(function(b){
-    context+=b.n+(b.a?' ('+b.a+')':'')+': '+b.c+', built '+(b.yr||'?')+', '+(b.floors||'?')+' floors\n';
-  });
-
-  try{
-    var res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:500,
-        system:'You are a helpful campus energy assistant for UC Berkeley. Answer questions about buildings, energy usage, costs, and sustainability using the live data provided. Keep answers concise (2-4 sentences). Use specific numbers from the data. If asked about a building, mention its kW, cost, department, and year built if available.',
-        messages:[{role:'user',content:context+'\n\nUser question: '+q}]
-      })
-    });
-    var data=await res.json();
-    var answer=data.content&&data.content[0]?data.content[0].text:'Sorry, I could not process that.';
-    loading.textContent=answer;
-    loading.classList.remove('loading');
-  }catch(e){
-    loading.textContent='Connection error. Try again.';
-    loading.classList.remove('loading');
-  }
+  if(bld)return bInfo(bld);
+  return "🤔 Hmm, I didn't catch that. Try a building name or type <b>help</b> to see what I can do!";
 }
 </script>
+
 </body>
 </html>
