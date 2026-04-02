@@ -149,6 +149,30 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 #mobileExplore .me-count{color:var(--gold);font-weight:700}
 @media(max-width:768px){#mobileExplore{display:flex}}
 
+/* Chat */
+#chatBtn{position:fixed;bottom:20px;right:20px;z-index:30;width:48px;height:48px;border-radius:50%;background:var(--gold);color:#003262;border:none;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(253,181,21,.4);display:flex;align-items:center;justify-content:center;transition:transform .2s}
+#chatBtn:hover{transform:scale(1.1)}
+@media(max-width:768px){#chatBtn{bottom:70px}}
+#chatPanel{position:fixed;bottom:80px;right:20px;z-index:30;width:360px;max-height:480px;background:var(--panel);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+@media(max-width:768px){#chatPanel{bottom:0;right:0;left:0;width:100%;max-height:70vh;border-radius:14px 14px 0 0}}
+#chatPanel.open{display:flex}
+.chat-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.chat-hdr h3{font-size:13px;color:var(--gold);flex:1}
+.chat-close{background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px}
+.chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:200px}
+.chat-msg{max-width:85%;padding:8px 12px;border-radius:10px;font-size:12px;line-height:1.5}
+.chat-msg.bot{background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.1);color:var(--text);align-self:flex-start}
+.chat-msg.user{background:rgba(253,181,21,.12);border:1px solid rgba(253,181,21,.15);color:var(--gold);align-self:flex-end}
+.chat-msg.loading{color:var(--dim);font-style:italic}
+.chat-input{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border)}
+.chat-input input{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:12px;outline:none}
+.chat-input input::placeholder{color:var(--dim)}
+.chat-input input:focus{border-color:var(--gold)}
+.chat-input button{background:var(--gold);color:#003262;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer}
+.chat-quick{display:flex;gap:4px;flex-wrap:wrap;padding:0 12px 8px}
+.chat-q{padding:4px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--dim);font-size:10px;cursor:pointer;white-space:nowrap}
+.chat-q:hover{border-color:var(--gold);color:var(--gold)}
+
 .esri-popup{display:none!important}
 .esri-ui-corner .esri-component{border-radius:9px!important}
 @media(max-width:768px){#sb{position:absolute;width:290px;min-width:290px;transform:translateX(-100%);transition:transform .3s}#sb.show{transform:translateX(0)}#sb.hide{transform:translateX(-100%)}#tb{left:8px!important;z-index:20}#pop{width:calc(100vw - 24px);right:12px!important;left:12px!important;max-height:70vh;overflow-y:auto}}
@@ -175,6 +199,22 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
   <div id="pop"></div>
   <button id="mobileExplore" onclick="document.getElementById('sb').classList.toggle('show')"><span class="me-count">57</span> Buildings · Explore ↑</button>
   <div class="bb"><div class="bp">Powered by <b>ArcGIS JS 4.29</b></div><div class="bp">🛰️ Satellite</div></div>
+</div>
+
+<!-- Chat -->
+<button id="chatBtn" onclick="toggleChat()">💬</button>
+<div id="chatPanel">
+  <div class="chat-hdr"><h3>🤖 Campus Energy Assistant</h3><button class="chat-close" onclick="toggleChat()">✕</button></div>
+  <div class="chat-msgs" id="chatMsgs">
+    <div class="chat-msg bot">Hi! I can answer questions about UC Berkeley campus buildings and energy data. Try asking me something!</div>
+  </div>
+  <div class="chat-quick" id="chatQuick">
+    <div class="chat-q" onclick="askChat(this.textContent)">Top energy consumers?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Total campus kW?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Daily cost estimate?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Tell me about Davis Hall</div>
+  </div>
+  <div class="chat-input"><input id="chatIn" placeholder="Ask about buildings, energy..." onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Ask</button></div>
 </div>
 </div>
 <script src="https://js.arcgis.com/4.29/"></script>
@@ -529,6 +569,83 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   fetchLiveData();
   setInterval(fetchLiveData, 60000);
 });
+</script>
+<script>
+// ═══ CHAT ═══
+var chatOpen=false;
+function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('open',chatOpen)}
+
+var chatData=null;
+fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t='+Date.now())
+.then(function(r){return r.json()}).then(function(d){chatData=d}).catch(function(){});
+
+function addMsg(text,type){
+  var msgs=document.getElementById('chatMsgs');
+  var div=document.createElement('div');
+  div.className='chat-msg '+type;
+  div.textContent=text;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  return div;
+}
+
+function askChat(q){document.getElementById('chatIn').value=q;sendChat()}
+
+async function sendChat(){
+  var input=document.getElementById('chatIn');
+  var q=input.value.trim();
+  if(!q)return;
+  input.value='';
+  addMsg(q,'user');
+  document.getElementById('chatQuick').style.display='none';
+  var loading=addMsg('Thinking...','bot loading');
+
+  // Build context from live data
+  var context='UC Berkeley Campus Energy Data (live from BMO metering):\n';
+  if(chatData){
+    context+='Generated: '+chatData.generated_at+'\n';
+    context+='Total campus load: '+chatData.total_kw+' kW\n';
+    context+='Buildings online: '+chatData.buildings_online+'/'+chatData.buildings_total+'\n';
+    context+='Est daily cost: $'+chatData.total_daily_cost+'\n';
+    context+='Est daily CO2: '+chatData.total_daily_co2_kg+' kg\n\n';
+    context+='Building data:\n';
+    var blds=Object.entries(chatData.buildings).sort(function(a,b){return(b[1].kw||0)-(a[1].kw||0)});
+    blds.forEach(function(e){
+      var b=e[1];
+      context+=b.name+': '+(b.kw!==null?b.kw+' kW':'offline');
+      if(b.est_daily_cost)context+=' ($'+b.est_daily_cost+'/day)';
+      if(b.est_daily_co2_kg)context+=' ('+b.est_daily_co2_kg+'kg CO2/day)';
+      if(b.predicted_kw)context+=' (predicted: '+b.predicted_kw+' kW)';
+      context+='\n';
+    });
+  }
+
+  // Also include building info from D array
+  context+='\nBuilding details:\n';
+  D.forEach(function(b){
+    context+=b.n+(b.a?' ('+b.a+')':'')+': '+b.c+', built '+(b.yr||'?')+', '+(b.floors||'?')+' floors\n';
+  });
+
+  try{
+    var res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:500,
+        system:'You are a helpful campus energy assistant for UC Berkeley. Answer questions about buildings, energy usage, costs, and sustainability using the live data provided. Keep answers concise (2-4 sentences). Use specific numbers from the data. If asked about a building, mention its kW, cost, department, and year built if available.',
+        messages:[{role:'user',content:context+'\n\nUser question: '+q}]
+      })
+    });
+    var data=await res.json();
+    var answer=data.content&&data.content[0]?data.content[0].text:'Sorry, I could not process that.';
+    loading.textContent=answer;
+    loading.classList.remove('loading');
+  }catch(e){
+    loading.textContent='Connection error. Try again.';
+    loading.classList.remove('loading');
+  }
+}
 </script>
 </body>
 </html>
