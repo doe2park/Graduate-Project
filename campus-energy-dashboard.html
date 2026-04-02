@@ -151,6 +151,18 @@ async function init(){
   const catMap={grimes:'Engineering',cory:'Engineering',soda:'Engineering',davis:'Engineering',etch:'Engineering',hmm:'Engineering',hesse:'Engineering',sutardja:'Engineering',mclaughlin:'Engineering',stanley:'Science',tan:'Science',latimer:'Science',birge:'Science',hilde:'Science',lksc:'Science',koshland:'Science',wheeler:'Humanities',dwinelle:'Humanities',barrows:'Humanities',moses:'Humanities',stephens:'Humanities',wurster:'Professional',giannini:'Professional',tolman:'Professional',morgan:'Professional',boalt:'Professional',mlk:'Student Life',rsf:'Student Life',chavez:'Student Life',anthony:'Student Life',sproul:'Other',doe:'Libraries',moffitt:'Libraries',uhall:'Other',northgate:'Other',donner:'Other',bww:'Other',mulford:'Other'};
   for(const [id,b] of blds){const cat=catMap[id]||'Other';if(!cats[cat])cats[cat]=0;if(b.kw)cats[cat]+=b.kw}
 
+  // Building metadata for analytics
+  var bMeta={grimes:{fl:4,yr:1980},cory:{fl:5,yr:1950},soda:{fl:7,yr:1994},davis:{fl:7,yr:1968},etch:{fl:6,yr:1964},hmm:{fl:3,yr:1907},hesse:{fl:2,yr:1942},sutardja:{fl:4,yr:2009},mclaughlin:{fl:4,yr:1951},stanley:{fl:6,yr:2007},tan:{fl:4,yr:1997},latimer:{fl:5,yr:1963},birge:{fl:9,yr:1964},hilde:{fl:4,yr:1966},wheeler:{fl:4,yr:1917},dwinelle:{fl:6,yr:1952},moses:{fl:3,yr:1931},stephens:{fl:4,yr:1923},wurster:{fl:10,yr:1964},giannini:{fl:4,yr:1930},morgan:{fl:4,yr:1962},mlk:{fl:4,yr:1961},rsf:{fl:3,yr:1984},chavez:{fl:3,yr:1961},sproul:{fl:4,yr:1941},doe:{fl:4,yr:1911},moffitt:{fl:5,yr:1970},uhall:{fl:4,yr:1959},northgate:{fl:3,yr:1906},donner:{fl:3,yr:1942},bww:{fl:7,yr:2020},mulford:{fl:4,yr:1948},anthony:{fl:3,yr:1969},boalt:{fl:4,yr:1951},tolman:{fl:5,yr:1962}};
+
+  // Compute efficiency data
+  var effData=online.map(function(e){
+    var m=bMeta[e[0]];
+    var fl=m?m.fl:3;
+    return {id:e[0],name:e[1].name,kw:e[1].kw,fl:fl,kwPerFloor:Math.round(e[1].kw/fl*10)/10,yr:m?m.yr:null};
+  }).sort(function(a,b){return b.kwPerFloor-a.kwPerFloor});
+
+  var avgEff=effData.length?Math.round(effData.reduce(function(s,e){return s+e.kwPerFloor},0)/effData.length*10)/10:0;
+
   // Peak / min from history
   let peakKw=totalKw,peakTime='now',minKw=totalKw,minTime='now';
 
@@ -158,7 +170,7 @@ async function init(){
     <div class="stats">
       <div class="stat"><div class="stat-lbl">Campus Load</div><div class="stat-val" style="color:var(--gold)">${totalKw.toLocaleString()}<span style="font-size:14px"> kW</span></div><div class="stat-sub">${data.buildings_online}/${data.buildings_total} buildings online</div></div>
       <div class="stat"><div class="stat-lbl">Est. Daily Cost</div><div class="stat-val" style="color:var(--text)">$${(data.total_daily_cost||0).toLocaleString()}</div><div class="stat-sub">@ $0.15/kWh · Pacific Gas & Electric</div></div>
-      <div class="stat"><div class="stat-lbl">Daily CO₂</div><div class="stat-val" style="color:var(--green)">${((data.total_daily_co2_kg||0)/1000).toFixed(1)}<span style="font-size:14px"> t</span></div><div class="stat-sub">${Math.round((data.total_daily_co2_kg||0)/21.7)} trees needed to offset</div></div>
+      <div class="stat"><div class="stat-lbl">Avg kW/Floor</div><div class="stat-val" style="color:var(--green)">${avgEff}<span style="font-size:14px"> kW</span></div><div class="stat-sub">Energy efficiency index</div></div>
       <div class="stat"><div class="stat-lbl">Daily Energy</div><div class="stat-val" style="color:var(--cyan)">${((data.total_daily_kwh||0)/1000).toFixed(1)}<span style="font-size:14px"> MWh</span></div><div class="stat-sub">≈ ${Math.round((data.total_daily_kwh||0)/30)} avg US homes</div></div>
     </div>
 
@@ -180,12 +192,19 @@ async function init(){
 
     <div class="grid2">
       <div class="card">
-        <div class="card-title">💰 Cost per Building <span>est. $/day · hover for details</span></div>
-        <div class="chart-box"><canvas id="costBar"></canvas></div>
+        <div class="card-title">📐 Energy Efficiency <span>kW per floor · lower = more efficient</span></div>
+        <div class="chart-box"><canvas id="effBar"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">🏛 Building Age vs Energy <span>year built vs kW · hover for details</span></div>
+        <div class="chart-box"><canvas id="ageScatter"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title">🌿 Carbon Footprint <span>kg CO₂/day · hover for details</span></div>
-        <div class="chart-box"><canvas id="co2Bar"></canvas></div>
+        <div class="card-title">💰 Cost per Building <span>est. $/day · hover for details</span></div>
+        <div class="chart-box"><canvas id="costBar"></canvas></div>
       </div>
     </div>
 
@@ -252,9 +271,31 @@ async function init(){
   var costTop=online.slice(0,10);
   charts.cost=new Chart(document.getElementById('costBar'),{type:'bar',data:{labels:costTop.map(function(e){return shortName(e[1].name)}),datasets:[{label:'$/day',data:costTop.map(function(e){return e[1].est_daily_cost}),backgroundColor:'rgba(253,181,21,.6)',borderRadius:4,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var b=costTop[ctx.dataIndex][1];return b.name+': $'+b.est_daily_cost+'/day ('+b.kw+' kW)'}}})},scales:{x:{grid:{display:false},ticks:{font:{size:8}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return '$'+v}}}}}});
 
-  // 5. CO2 Bar
-  var co2Top=online.slice(0,10);
-  charts.co2=new Chart(document.getElementById('co2Bar'),{type:'bar',data:{labels:co2Top.map(function(e){return shortName(e[1].name)}),datasets:[{label:'kg CO₂/day',data:co2Top.map(function(e){return e[1].est_daily_co2_kg}),backgroundColor:'rgba(52,211,153,.5)',borderRadius:3,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var b=co2Top[ctx.dataIndex][1];return b.name+': '+b.est_daily_co2_kg+' kg CO₂/day'}}})},scales:{x:{grid:{display:false},ticks:{font:{size:8}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+'kg'}}}}}});
+  // 5. Efficiency Bar (kW per floor)
+  var effTop=effData.slice(0,10);
+  charts.eff=new Chart(document.getElementById('effBar'),{type:'bar',data:{
+    labels:effTop.map(function(e){return shortName(e.name)}),
+    datasets:[{
+      data:effTop.map(function(e){return e.kwPerFloor}),
+      backgroundColor:effTop.map(function(e){return e.kwPerFloor>50?'#f87171':e.kwPerFloor>20?'#FDB515':'#34d399'}),
+      borderRadius:4,barThickness:16
+    }]
+  },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var e=effTop[ctx.dataIndex];return e.name+': '+e.kwPerFloor+' kW/floor ('+e.kw+'kW ÷ '+e.fl+' floors)'}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+' kW/fl'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  // 6. Age vs Energy Scatter
+  var scatterData=effData.filter(function(e){return e.yr}).map(function(e){
+    return {x:e.yr,y:e.kw,name:e.name,fl:e.fl,eff:e.kwPerFloor};
+  });
+  var scatterColors=scatterData.map(function(e){return e.y>200?'rgba(248,113,113,.8)':e.y>100?'rgba(253,181,21,.8)':'rgba(52,211,153,.8)'});
+  var scatterSizes=scatterData.map(function(e){return Math.max(4,Math.min(14,4+(e.y/maxKw)*10))});
+  charts.age=new Chart(document.getElementById('ageScatter'),{type:'scatter',data:{
+    datasets:[{
+      data:scatterData,
+      backgroundColor:scatterColors,
+      pointRadius:scatterSizes,
+      pointHoverRadius:scatterSizes.map(function(s){return s+3}),
+    }]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var d=scatterData[ctx.dataIndex];return d.name+' ('+d.x+') — '+d.y+' kW · '+d.fl+'fl · '+d.eff+' kW/fl'}}})},scales:{x:{title:{display:true,text:'Year Built',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:8}}},y:{title:{display:true,text:'Current kW',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v+'kW'}}}}}});
 }
 
 init().catch(function(e){document.getElementById('app').innerHTML='<div style="text-align:center;padding:40px;color:var(--red)">Error: '+e.message+'</div>'});
