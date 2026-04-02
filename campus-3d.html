@@ -76,10 +76,11 @@ body{background:#000;font-family:system-ui,sans-serif}
 
 <div class="legend">
   <h4>Energy Intensity</h4>
-  <div class="legend-row"><div class="legend-dot" style="background:#34d399"></div> Low (&lt;50 kW)</div>
-  <div class="legend-row"><div class="legend-dot" style="background:#FDB515"></div> Medium (50-200 kW)</div>
-  <div class="legend-row"><div class="legend-dot" style="background:#f87171"></div> High (&gt;200 kW)</div>
-  <div class="legend-row"><div class="legend-dot" style="background:#64748b"></div> Offline</div>
+  <div class="legend-row"><div class="legend-dot" style="background:rgba(52,211,153,.35);border-color:#34d399"></div> Low (&lt;50 kW)</div>
+  <div class="legend-row"><div class="legend-dot" style="background:rgba(253,181,21,.35);border-color:#FDB515"></div> Medium (50-200 kW)</div>
+  <div class="legend-row"><div class="legend-dot" style="background:rgba(248,113,113,.35);border-color:#f87171"></div> High (&gt;200 kW)</div>
+  <div class="legend-row"><div class="legend-dot" style="background:rgba(100,116,139,.15);border-color:#64748b"></div> No data</div>
+  <div style="margin-top:6px;font-size:8px;color:#64748b">Circle size = kW · Zoom in for labels</div>
 </div>
 
 <div class="time-bar">
@@ -203,8 +204,18 @@ viewer.camera.flyTo({
   duration: 0
 });
 
-// ══════ ENERGY MARKERS ══════
+// ══════ ENERGY VISUALIZATION ══════
 var liveData = null;
+
+function sn(n){
+  var m={'Grimes Engineering Center':'Grimes','Berkeley Way West':'BWW','Hearst Memorial Mining':'Hearst Mining',
+    'Rec Sports Facility':'RSF','Sutardja Dai Hall':'Sutardja','McLaughlin Hall':'McLaughlin',
+    'Hildebrand Hall':'Hildebrand','North Gate Hall':'North Gate','MLK Student Union':'MLK',
+    'Doe Library':'Doe Library','Moffitt Library':'Moffitt','University Hall':'Univ Hall',
+    'Donner Laboratory':'Donner Lab',"O'Brien Hall":"O'Brien",'Latimer Hall':'Latimer',
+    'Etcheverry Hall':'Etcheverry','Zellerbach Hall':'Zellerbach'};
+  return m[n]||n.replace(' Hall','').replace(' Center','');
+}
 
 function renderEnergy(energyData) {
   viewer.entities.removeAll();
@@ -214,42 +225,81 @@ function renderEnergy(energyData) {
     if (vals.length) maxKw = Math.max(...vals);
   }
 
-  // Short name helper
-  function sn(n){
-    var m={'Grimes Engineering Center':'Grimes','Berkeley Way West':'BWW','Hearst Memorial Mining':'Hearst Mining',
-      'Rec Sports Facility':'RSF','Sutardja Dai Hall':'Sutardja','McLaughlin Hall':'McLaughlin',
-      'Hildebrand Hall':'Hildebrand','North Gate Hall':'North Gate','MLK Student Union':'MLK',
-      'Doe Library':'Doe Library','Moffitt Library':'Moffitt','University Hall':'Univ Hall',
-      'Donner Laboratory':'Donner Lab',"O'Brien Hall":"O'Brien",'Latimer Hall':'Latimer',
-      'Etcheverry Hall':'Etcheverry','Zellerbach Hall':'Zellerbach'};
-    return m[n]||n.replace(' Hall','').replace(' Center','');
-  }
-
   buildings.forEach(function(b) {
     var live = energyData && energyData[b.id];
     var kw = (live && live.kw !== null) ? live.kw : null;
     var col = kwColor(kw, maxKw);
     var name = sn(b.n);
+    var isG = b.id === 'grimes';
 
+    // Ground circle — always visible, color = energy intensity
+    var circleRadius = kw ? Math.max(12, Math.min(30, 12 + (kw/maxKw)*18)) : 8;
     viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(b.lng, b.lat, (b.floors||3)*4 + 5),
-      label: {
-        text: kw ? name + '  ⚡' + kw + 'kW' : name,
-        font: kw ? 'bold 11px system-ui' : '10px system-ui',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        showBackground: true,
-        backgroundColor: kw ? col.withAlpha(0.75) : Cesium.Color.fromCssColorString('rgba(30,40,60,0.6)'),
-        backgroundPadding: new Cesium.Cartesian2(6, 4),
-        scaleByDistance: new Cesium.NearFarScalar(200, 1.0, 3000, 0.4),
-        translucencyByDistance: new Cesium.NearFarScalar(200, 1.0, 4000, 0.3),
+      position: Cesium.Cartesian3.fromDegrees(b.lng, b.lat),
+      ellipse: {
+        semiMinorAxis: circleRadius,
+        semiMajorAxis: circleRadius,
+        material: kw ? col.withAlpha(0.35) : Cesium.Color.fromCssColorString('#64748b').withAlpha(0.15),
+        outline: true,
+        outlineColor: kw ? col.withAlpha(0.7) : Cesium.Color.fromCssColorString('#64748b').withAlpha(0.25),
+        outlineWidth: isG ? 2 : 1,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
       },
-      properties: { bid: b.id, name: b.n, dept: b.a, kw: kw, yr: b.yr, floors: b.floors, category: b.c }
+    });
+
+    // Grimes: extra gold ring
+    if (isG) {
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(b.lng, b.lat),
+        ellipse: {
+          semiMinorAxis: 35,
+          semiMajorAxis: 35,
+          material: Cesium.Color.TRANSPARENT,
+          outline: true,
+          outlineColor: Cesium.Color.fromCssColorString('#FDB515').withAlpha(0.5),
+          outlineWidth: 2,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        },
+      });
+    }
+
+    // Floating label — only for buildings with kW data
+    if (kw) {
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(b.lng, b.lat, (b.floors||3) * 4 + 8),
+        label: {
+          text: name + '\n' + kw + ' kW',
+          font: 'bold 11px system-ui',
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          showBackground: true,
+          backgroundColor: col.withAlpha(0.8),
+          backgroundPadding: new Cesium.Cartesian2(6, 4),
+          scaleByDistance: new Cesium.NearFarScalar(150, 1.0, 1500, 0.0),
+          translucencyByDistance: new Cesium.NearFarScalar(150, 1.0, 1500, 0.0),
+        },
+        // Clickable
+        properties: { bid: b.id, name: b.n, dept: b.a, kw: kw, yr: b.yr, floors: b.floors, category: b.c },
+      });
+    }
+
+    // Small dot always visible (for click target + far zoom)
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(b.lng, b.lat, 2),
+      point: {
+        pixelSize: isG ? 8 : 5,
+        color: kw ? col : Cesium.Color.fromCssColorString('#64748b').withAlpha(0.5),
+        outlineColor: Cesium.Color.WHITE.withAlpha(kw ? 0.8 : 0.2),
+        outlineWidth: 1,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(200, 1.0, 5000, 0.6),
+      },
+      properties: { bid: b.id, name: b.n, dept: b.a, kw: kw, yr: b.yr, floors: b.floors, category: b.c },
     });
   });
 
