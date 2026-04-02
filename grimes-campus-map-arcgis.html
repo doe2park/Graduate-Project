@@ -396,6 +396,10 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     }).join('');
   }
 
+  // Berkeley.edu building page URLs
+  const bSlugs={grimes:'grimes-engineering-center',cory:'cory-hall',soda:'soda-hall',davis:'davis-hall',etch:'etcheverry-hall',hmm:'hearst-memorial-mining-building',hesse:'hesse-hall',obrien:'obrien-hall',jacobs:'jacobs-hall',sutardja:'sutardja-dai-hall',mclaughlin:'mclaughlin-hall',blum:'blum-hall',stanley:'stanley-hall',tan:'tan-hall',latimer:'latimer-hall',lewis:'lewis-hall',pimentel:'pimentel-hall',evans:'evans-hall',campbell:'campbell-hall',birge:'birge-hall',leconte:'leconte-hall',vlsb:'valley-life-sciences-building',hilde:'hildebrand-hall',lksc:'li-ka-shing-center',wheeler:'wheeler-hall',dwinelle:'dwinelle-hall',moses:'moses-hall',durant:'durant-hall',south:'south-hall',barrows:'barrows-hall',stephens:'stephens-hall',haas:'haas-school-of-business',boalt:'boalt-hall',wurster:'wurster-hall',kroeber:'kroeber-hall',tolman:'tolman-hall',morgan:'morgan-hall',giannini:'giannini-hall',california:'california-hall',mlk:'martin-luther-king-jr-student-union',rsf:'recreational-sports-facility',chavez:'cesar-e-chavez-student-center',anthony:'anthony-hall',sproul:'sproul-hall',doe:'doe-memorial-library',moffitt:'moffitt-library',uhall:'university-hall',campanile:'sather-tower',zeller:'zellerbach-hall',donner:'donner-laboratory',mulford:'mulford-hall',northgate:'north-gate-hall',bww:'berkeley-way-west',stadium:'california-memorial-stadium',sgate:'sather-gate'};
+  function getBerkeleyUrl(id){return 'https://www.berkeley.edu/map/'+(bSlugs[id]||id)+'/';}
+
   function showPop(b){
     const cc=C[b.c];
     let h=`<div class="p-h"><button class="p-x" onclick="closePop()">✕</button>
@@ -464,9 +468,10 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
     if(b.kw){h+=`<a href="campus-energy-dashboard.html" style="display:block;margin-top:8px;padding:6px;border-radius:6px;background:rgba(253,181,21,.08);border:1px solid rgba(253,181,21,.15);text-align:center;text-decoration:none;font-size:10px;font-weight:600;color:var(--gold)">\uD83D\uDCCA Full Campus Analytics \u2192</a>`}
 
+    var bUrl=getBerkeleyUrl(b.id);
     h+=`<div style="margin-top:8px;display:flex;gap:6px">
-      <a href="https://www.google.com/maps?q=${b.lat},${b.lng}" target="_blank" style="flex:1;padding:5px;border-radius:5px;background:rgba(255,255,255,.04);border:1px solid var(--border);text-align:center;text-decoration:none;font-size:9px;color:var(--dim)">📍 Google Maps</a>
-      ${b.xr?'<a href="'+b.xr+'" target="_blank" style="flex:1;padding:5px;border-radius:5px;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.15);text-align:center;text-decoration:none;font-size:9px;color:var(--cyan)">🏗 3D Viewer</a>':''}
+      <a href="${bUrl}" target="_blank" style="flex:1;padding:5px;border-radius:5px;background:rgba(255,255,255,.04);border:1px solid var(--border);text-align:center;text-decoration:none;font-size:9px;color:var(--dim)">\uD83C\uDFDB\uFE0F Building Info</a>
+      ${b.xr?'<a href="'+b.xr+'" target="_blank" style="flex:1;padding:5px;border-radius:5px;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.15);text-align:center;text-decoration:none;font-size:9px;color:var(--cyan)">\uD83C\uDFD7\uFE0F 3D Viewer</a>':''}
     </div>`;
     h+='</div>';pop.innerHTML=h;pop.classList.add('vis');
   }
@@ -640,11 +645,14 @@ function off(){return chatData?Object.entries(chatData.buildings).filter(functio
 
 function bInfo(b){
   var l=chatData&&chatData.buildings[b.id];
+  var slugs={grimes:'grimes-engineering-center',cory:'cory-hall',soda:'soda-hall',davis:'davis-hall',etch:'etcheverry-hall',hmm:'hearst-memorial-mining-building',hesse:'hesse-hall',jacobs:'jacobs-hall',sutardja:'sutardja-dai-hall',mclaughlin:'mclaughlin-hall',stanley:'stanley-hall',tan:'tan-hall',latimer:'latimer-hall',evans:'evans-hall',birge:'birge-hall',hilde:'hildebrand-hall',wheeler:'wheeler-hall',dwinelle:'dwinelle-hall',moses:'moses-hall',south:'south-hall',barrows:'barrows-hall',stephens:'stephens-hall',wurster:'wurster-hall',giannini:'giannini-hall',california:'california-hall',mlk:'martin-luther-king-jr-student-union',rsf:'recreational-sports-facility',chavez:'cesar-e-chavez-student-center',sproul:'sproul-hall',doe:'doe-memorial-library',moffitt:'moffitt-library',uhall:'university-hall',zeller:'zellerbach-hall',donner:'donner-laboratory',mulford:'mulford-hall',northgate:'north-gate-hall',haas:'haas-school-of-business',morgan:'morgan-hall'};
+  var bUrl='https://www.berkeley.edu/map/'+(slugs[b.id]||b.id)+'/';
   var r="🏢 <b>"+b.n+"</b>"+(b.a?" — "+b.a:"")+"<br>📍 "+b.c+" · Built "+(b.yr||"?")+(b.yr?" ("+(2026-b.yr)+"yr)":"")+" · "+(b.floors||"?")+" floors";
   if(l&&l.kw!==null){r+="<br>⚡ <b>"+l.kw+" kW</b> right now<br>💰 ~$"+(l.est_daily_cost||0)+"/day · 🌿 "+(l.est_daily_co2_kg||0)+"kg CO₂/day";if(l.predicted_kw)r+="<br>🔮 Predicted: ~"+l.predicted_kw+" kW";if(l.anomaly)r+="<br>⚠️ <span style=\'color:var(--red)\'>Anomaly detected!</span>"}
   else if(l)r+="<br>📡 BMO metered — currently <b>offline</b>";
   else r+="<br>📡 No energy metering";
-  if(b.xr)r+="<br><br>🏗 <a href=\'"+b.xr+"\' target=\'_blank\' style=\'color:var(--cyan)\'>Open 3D Viewer →</a>";
+  r+="<br><br><a href='"+bUrl+"' target='_blank' style='color:var(--dim);font-size:11px'>🏛️ View on berkeley.edu →</a>";
+  if(b.xr)r+=" · <a href='"+b.xr+"' target='_blank' style='color:var(--cyan);font-size:11px'>🏗 3D Viewer →</a>";
   return r;
 }
 
