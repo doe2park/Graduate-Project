@@ -257,7 +257,6 @@ const SIM_DATA = {
   pipe:       { temp:{ val:48, unit:'°F', label:'Water Temp' },    flow:{ val:150, unit:'GPM', label:'Flow Rate' },  energy:{ val:8.2, unit:'kW', label:'Pump Power' },   pressure:{ val:65, unit:'PSI', label:'Pressure' } },
   sprinkler:  { temp:{ val:70, unit:'°F', label:'Ambient' },       flow:{ val:0, unit:'GPM', label:'Flow (idle)' },  energy:{ val:0, unit:'kW', label:'Standby' },        pressure:{ val:120, unit:'PSI', label:'Line P' } },
   conduit:    { temp:{ val:78, unit:'°F', label:'Cable Temp' },    flow:{ val:0, unit:'', label:'—' },               energy:{ val:87, unit:'kW', label:'Total Load' },     current:{ val:240, unit:'A', label:'Current' } },
-  elec:       { temp:{ val:0, unit:'A', label:'Current' },        flow:{ val:0, unit:'V', label:'Voltage' },        energy:{ val:0, unit:'kW', label:'480/277V' },        pressure:{ val:0, unit:'kW', label:'208/120V' } },
   diffuser:   { temp:{ val:55, unit:'°F', label:'Discharge' },     flow:{ val:350, unit:'CFM', label:'Airflow' },    energy:{ val:0, unit:'', label:'—' },                 co2:{ val:620, unit:'ppm', label:'CO₂ Level' } },
   pump:       { temp:{ val:52, unit:'°F', label:'Fluid Temp' },    flow:{ val:280, unit:'GPM', label:'Flow' },       energy:{ val:15.5, unit:'kW', label:'Motor kW' },     speed:{ val:1760, unit:'RPM', label:'Speed' } },
   spiral:     { temp:{ val:55, unit:'°F', label:'Supply Air' },    flow:{ val:1800, unit:'CFM', label:'Airflow' },   energy:{ val:5.2, unit:'kW', label:'Fan Power' },     pressure:{ val:0.8, unit:'inWC', label:'Static P' } },
@@ -315,123 +314,29 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const gltfLoader = new GLTFLoader(); gltfLoader.setDRACOLoader(dracoLoader);
 
-gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
-  // Auto-center and scale the model
-  const box = new THREE.Box3().setFromObject(gltf.scene);
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  console.log('Model bounds:', box.min, box.max, 'Size:', size);
-
-  // Center model at origin
-  gltf.scene.position.sub(center);
-
-  // Scale to fit our scene (target: ~60m wide)
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const scale = 60 / maxDim;
-  gltf.scene.scale.setScalar(scale);
-
-  // Shift up so bottom is at y=0
-  const scaledBox = new THREE.Box3().setFromObject(gltf.scene);
-  gltf.scene.position.y -= scaledBox.min.y;
-
+gltfLoader.load('grimes-mep-only.glb', (gltf) => {
   scene.add(gltf.scene);
-
-  // Filter: hide architecture/structure (gray/white), keep MEP (colored)
-  let hidden = 0, shown = 0;
+  let meshIdx = 0;
   gltf.scene.traverse(child => {
     if (!child.isMesh) return;
-
-    const c = child.material?.color;
-    if (!c) { child.visible = false; hidden++; return; }
-
-    const r = c.r, g = c.g, b = c.b;
-    const saturation = Math.max(r, g, b) - Math.min(r, g, b);
-    const brightness = (r + g + b) / 3;
-
-    // Hide: very gray/white (low saturation + high brightness = architecture/structure)
-    // Hide: very dark (black = grids/text outlines)
-    // Keep: colored elements (MEP systems have distinct hues)
-    if ((saturation < 0.08 && brightness > 0.5) || brightness < 0.05 || brightness > 0.92) {
-      child.visible = false;
-      hidden++;
-      return;
-    }
-
     allMeshes.push(child);
-
-    // Classify MEP system by color
-    let sysIdx = 1; // default: HVAC Equipment
-    if (r > 0.7 && g > 0.5 && b < 0.3) sysIdx = 4;           // Yellow/Orange → Electrical
-    else if (r > 0.6 && g < 0.3 && b < 0.3) sysIdx = 3;       // Red → Fire Protection
-    else if (r < 0.3 && g < 0.3 && b > 0.5) sysIdx = 2;       // Blue → Plumbing
-    else if (r < 0.3 && g > 0.4 && b > 0.4) sysIdx = 0;       // Cyan/Teal → HVAC Duct
-    else if (r < 0.4 && g > 0.5 && b < 0.4) sysIdx = 5;       // Green → Diffusers
-    else if (r > 0.5 && g < 0.4 && b > 0.4) sysIdx = 6;       // Purple → Pumps
-    else if (r > 0.3 && g > 0.5 && b > 0.5) sysIdx = 7;       // Light cyan → Spiral
-    else if (saturation < 0.15) sysIdx = 1;                     // Low saturation = Equipment
-
+    const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length-1);
     const sys = SYSTEM_INFO[sysIdx];
-    const mat = new THREE.MeshStandardMaterial({
-      color: sys.hex,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.8,
-      roughness: 0.5,
-      metalness: 0.15,
-    });
+    const mat = new THREE.MeshBasicMaterial({ color:sys.hex, side:THREE.DoubleSide, transparent:true, opacity:0.85 });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
     child.userData.sysId = sys.id;
     child.userData.sysLabel = sys.label;
     originalMaterials.set(child.uuid, mat);
-    systemMeshes.push({ mesh: child, sysIndex: sysIdx });
-    shown++;
+    systemMeshes.push({ mesh:child, sysIndex:sysIdx });
+    meshIdx++;
   });
-
-  console.log(`Total: ${shown + hidden} meshes | MEP shown: ${shown} | Arch hidden: ${hidden}`);
-
-  // Reset camera to look at model
-  const finalBox = new THREE.Box3().setFromObject(gltf.scene);
-  const fc = finalBox.getCenter(new THREE.Vector3());
-  camera.position.set(fc.x + 30, fc.y + 20, fc.z + 30);
-  orbitControls.target.copy(fc);
-  orbitControls.update();
-
   document.getElementById('loading').style.display = 'none';
   buildLegend();
   startSimulation();
   setupXR();
-}, p => {
-  const mb = (p.loaded / 1024 / 1024).toFixed(1);
-  const pct = p.total ? Math.round(p.loaded / p.total * 100) : '';
-  loadingEl.textContent = `Loading MEP model... ${mb} MB${pct ? ' (' + pct + '%)' : ''}`;
-},
-() => {
-  // Fallback to smaller file
-  loadingEl.textContent = 'Loading fallback...';
-  gltfLoader.load('grimes-mep-only.glb', (gltf) => {
-    scene.add(gltf.scene);
-    let meshIdx = 0;
-    gltf.scene.traverse(child => {
-      if (!child.isMesh) return;
-      allMeshes.push(child);
-      const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
-      const sys = SYSTEM_INFO[sysIdx];
-      const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
-      child.material = mat;
-      child.userData.sysIndex = sysIdx;
-      child.userData.sysId = sys.id;
-      child.userData.sysLabel = sys.label;
-      originalMaterials.set(child.uuid, mat);
-      systemMeshes.push({ mesh: child, sysIndex: sysIdx });
-      meshIdx++;
-    });
-    document.getElementById('loading').style.display = 'none';
-    buildLegend();
-    startSimulation();
-    setupXR();
-  });
-});
+}, p => { loadingEl.textContent = `Loading MEP... ${(p.loaded/1024/1024).toFixed(1)} MB`; },
+() => { loadingEl.textContent = 'Error'; loadingEl.style.color = '#f87171'; });
 
 /* ══════════════════════════════════════════ BUILDING MODEL (transparent overlay) ══════════════════════════════════════════ */
 let buildingModel = null;
@@ -730,33 +635,31 @@ function updateDashboard() {
     for (const [fl, d] of Object.entries(floors)) {
       const pct = totalKw > 0 ? Math.round(d.kw / totalKw * 100) : 0;
       const barColor = d.kw > 40 ? '#f87171' : d.kw > 20 ? '#FDB515' : '#2dd4bf';
-      html += `<div style="display:flex;align-items:center;gap:6px;margin:3px 0" title="${d.breakdown} · ${d.panels} panels">
+      html += `<div style="display:flex;align-items:center;gap:6px;margin:3px 0">
         <span style="font-size:9px;font-weight:700;color:#e2e8f0;width:24px">${fl}</span>
         <div style="flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">
           <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px"></div>
         </div>
         <span style="font-size:9px;font-family:var(--mono);color:${barColor};width:42px;text-align:right">${d.kw}kW</span>
-        <span style="font-size:7px;color:#475569;width:28px;text-align:right">${d.panels}pnl</span>
+        <span style="font-size:7px;color:#475569;width:24px;text-align:right">${pct}%</span>
       </div>`;
     }
     fbEl.innerHTML = html;
   }
 
   // Feed real data into SIM_DATA
-  try {
-    if (m3.kw && SIM_DATA.conduit) {
-      SIM_DATA.conduit.energy.val = m3.kw; SIM_DATA.conduit.energy.label = 'ROOF ELEC';
-      SIM_DATA.conduit.temp.val = m3.current_avg||0; SIM_DATA.conduit.temp.label = 'CURRENT'; SIM_DATA.conduit.temp.unit = 'A';
-      SIM_DATA.conduit.flow.val = m3.voltage_ll||0; SIM_DATA.conduit.flow.label = 'VOLTAGE'; SIM_DATA.conduit.flow.unit = 'V';
-      SIM_DATA.conduit.current.val = m3.power_factor||0; SIM_DATA.conduit.current.label = 'POWER FACTOR'; SIM_DATA.conduit.current.unit = '';
-    }
-    if (m76.kw && SIM_DATA.elec) {
-      SIM_DATA.elec.energy.val = m76.kw; SIM_DATA.elec.energy.label = '480/277V';
-      SIM_DATA.elec.temp.val = m76.current_avg||0; SIM_DATA.elec.temp.label = 'CURRENT'; SIM_DATA.elec.temp.unit = 'A';
-      SIM_DATA.elec.flow.val = m76.voltage_ln||0; SIM_DATA.elec.flow.label = 'VOLTAGE'; SIM_DATA.elec.flow.unit = 'V';
-      SIM_DATA.elec.pressure.val = m77?.kw||0; SIM_DATA.elec.pressure.label = '208/120V kW'; SIM_DATA.elec.pressure.unit = 'kW';
-    }
-  } catch(e) { console.log('SIM_DATA update:', e.message); }
+  if (m3.kw) {
+    SIM_DATA.conduit.energy.val = m3.kw; SIM_DATA.conduit.energy.label = 'ROOF ELEC';
+    SIM_DATA.conduit.temp.val = m3.current_avg||0; SIM_DATA.conduit.temp.label = 'CURRENT'; SIM_DATA.conduit.temp.unit = 'A';
+    SIM_DATA.conduit.flow.val = m3.voltage_ll||0; SIM_DATA.conduit.flow.label = 'VOLTAGE'; SIM_DATA.conduit.flow.unit = 'V';
+    SIM_DATA.conduit.pressure.val = m3.power_factor||0; SIM_DATA.conduit.pressure.label = 'POWER FACTOR'; SIM_DATA.conduit.pressure.unit = '';
+  }
+  if (m76.kw) {
+    SIM_DATA.elec.energy.val = m76.kw; SIM_DATA.elec.energy.label = '480/277V';
+    SIM_DATA.elec.temp.val = m76.current_avg||0; SIM_DATA.elec.temp.label = 'CURRENT'; SIM_DATA.elec.temp.unit = 'A';
+    SIM_DATA.elec.flow.val = m76.voltage_ln||0; SIM_DATA.elec.flow.label = 'VOLTAGE'; SIM_DATA.elec.flow.unit = 'V';
+    SIM_DATA.elec.pressure.val = m77.kw||0; SIM_DATA.elec.pressure.label = '208/120V kW'; SIM_DATA.elec.pressure.unit = 'kW';
+  }
 }
 
 /* ══════════════════════════════════════════ CHARTS ══════════════════════════════════════════ */
@@ -993,39 +896,36 @@ function drawCharts() {
 // Meter #76 (480/277V)      → L2 (45%), L3 (55%) — HVAC, lighting, high voltage loads
 // Meter #77 (208/120V)      → B1 (55%), L1 (45%) — outlets, computers, IT, workshops
 //
-// ═══ BIM-VALIDATED panel distribution (from Revit model tree) ═══
-// Extracted from grimes_bim_tree.txt — 741,796 BIM elements analyzed
-//
-// Meter #3  (Roof Electric)  → SRV only (rooftop AHUs, exhaust fans)
-// Meter #76 (480/277V HVAC)  → B1: 17 panels (55%) | L1: 14 panels (45%)
-//                              L2, L3: 0 panels — no 480V panelboards
-// Meter #77 (208/120V Plugs) → B1: 10 (16%) | L1: 19 (31%) | L2: 22 (35%) | L3: 11 (18%)
-//
-// MSB-1 & MSB-2 main switchboards on Ground Floor (Level 00 = B1)
-// Total: 93 panelboards + 2 switchboards across 4 floors + roof AHU
+// Ratios based on typical engineering building load distribution:
+//   B1 (basement): mechanical room, workshop, server closet → higher 208V load
+//   L1 (ground):   lobby, classrooms, offices → moderate outlet load
+//   L2 (mid):      offices, smaller labs → moderate HVAC
+//   L3 (upper):    large labs, more exterior exposure → higher HVAC
+//   SRV (roof):    AHUs, exhaust fans, cooling → dedicated meter
 
 const FLOOR_RATIOS = {
-  SRV: { meters: [{ id:'3', ratio:1.0 }],                                    desc: 'Rooftop AHUs, exhaust fans (Meter #3)', panels: 0 },
-  L3:  { meters: [{ id:'77', ratio:0.18 }],                                  desc: '11× 208V panels — outlets, IT', panels: 11 },
-  L2:  { meters: [{ id:'77', ratio:0.35 }],                                  desc: '22× 208V panels — outlets, IT', panels: 22 },
-  L1:  { meters: [{ id:'76', ratio:0.45 }, { id:'77', ratio:0.31 }],         desc: '14× 480V + 19× 208V — HVAC, lighting, outlets', panels: 33 },
-  B1:  { meters: [{ id:'76', ratio:0.55 }, { id:'77', ratio:0.16 }],         desc: '17× 480V + 10× 208V — MSB, mechanical, workshop', panels: 27 },
+  SRV: { meter: '3',  ratio: 1.0,  desc: 'Rooftop AHUs, exhaust fans, cooling' },
+  L3:  { meter: '76', ratio: 0.55, desc: 'Labs, HVAC, lighting (480/277V)' },
+  L2:  { meter: '76', ratio: 0.45, desc: 'Offices, HVAC, lighting (480/277V)' },
+  L1:  { meter: '77', ratio: 0.45, desc: 'Classrooms, outlets, IT (208/120V)' },
+  B1:  { meter: '77', ratio: 0.55, desc: 'Mechanical, workshop, servers (208/120V)' },
 };
 
 function getFloorEnergy(yPos) {
   if (!liveData) return null;
   const m = liveData.meters;
   if (!m) return null;
+
   let floor;
   if (yPos > 15) floor = 'SRV';
   else if (yPos > 10) floor = 'L3';
   else if (yPos > 6) floor = 'L2';
   else if (yPos > 3) floor = 'L1';
   else floor = 'B1';
+
   const info = FLOOR_RATIOS[floor];
-  let totalKw = 0;
-  for (const mt of info.meters) { totalKw += (m[mt.id]?.latest?.kw || 0) * mt.ratio; }
-  return Math.round(totalKw * 10) / 10;
+  const meterKw = m[info.meter]?.latest?.kw || 0;
+  return Math.round(meterKw * info.ratio * 10) / 10;
 }
 
 function getAllFloorKw() {
@@ -1033,14 +933,14 @@ function getAllFloorKw() {
   const m = liveData.meters;
   const result = {};
   for (const [fl, info] of Object.entries(FLOOR_RATIOS)) {
-    let kw = 0;
-    const sources = [];
-    for (const mt of info.meters) {
-      const contrib = Math.round((m[mt.id]?.latest?.kw || 0) * mt.ratio * 10) / 10;
-      kw += contrib;
-      sources.push('M#' + mt.id + '×' + Math.round(mt.ratio*100) + '%=' + contrib + 'kW');
-    }
-    result[fl] = { kw: Math.round(kw*10)/10, desc: info.desc, panels: info.panels, breakdown: sources.join(' + ') };
+    const meterKw = m[info.meter]?.latest?.kw || 0;
+    result[fl] = {
+      kw: Math.round(meterKw * info.ratio * 10) / 10,
+      meter: info.meter,
+      desc: info.desc,
+      ratio: info.ratio,
+      meterTotal: meterKw,
+    };
   }
   return result;
 }
@@ -1218,13 +1118,13 @@ renderer.domElement.addEventListener('click', e => {
     document.getElementById('dpTag').textContent = sys.label;
     document.getElementById('dpTag').style.background = sys.color;
     document.getElementById('dpTitle').textContent = tag;
-    // Show floor kW from BIM-validated meter split
+    // Show floor kW from meter split
     const floorKw = getFloorEnergy(point.y);
     const floorName = point.y > 15 ? 'SRV' : point.y > 10 ? 'L3' : point.y > 6 ? 'L2' : point.y > 3 ? 'L1' : 'B1';
     const floorInfo = FLOOR_RATIOS[floorName];
     const floorKwText = floorKw !== null && floorKw > 0 ? ` · ${floorKw} kW` : '';
-    const panelText = floorInfo ? ` · ${floorInfo.panels} panels` : '';
-    document.getElementById('dpFloor').textContent = `${floor} · ${zone}${floorKwText}${panelText}`;
+    const meterText = floorInfo ? ` (Meter #${floorInfo.meter} × ${Math.round(floorInfo.ratio*100)}%)` : '';
+    document.getElementById('dpFloor').textContent = `${floor} · ${zone}${floorKwText}${meterText}`;
 
     const sensorsEl = document.getElementById('dpSensors');
     sensorsEl.innerHTML = '';
