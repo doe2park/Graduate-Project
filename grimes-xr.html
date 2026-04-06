@@ -709,18 +709,20 @@ function updateDashboard() {
   }
 
   // Feed real data into SIM_DATA
-  if (m3.kw) {
-    SIM_DATA.conduit.energy.val = m3.kw; SIM_DATA.conduit.energy.label = 'ROOF ELEC';
-    SIM_DATA.conduit.temp.val = m3.current_avg||0; SIM_DATA.conduit.temp.label = 'CURRENT'; SIM_DATA.conduit.temp.unit = 'A';
-    SIM_DATA.conduit.flow.val = m3.voltage_ll||0; SIM_DATA.conduit.flow.label = 'VOLTAGE'; SIM_DATA.conduit.flow.unit = 'V';
-    SIM_DATA.conduit.pressure.val = m3.power_factor||0; SIM_DATA.conduit.pressure.label = 'POWER FACTOR'; SIM_DATA.conduit.pressure.unit = '';
-  }
-  if (m76.kw) {
-    SIM_DATA.elec.energy.val = m76.kw; SIM_DATA.elec.energy.label = '480/277V';
-    SIM_DATA.elec.temp.val = m76.current_avg||0; SIM_DATA.elec.temp.label = 'CURRENT'; SIM_DATA.elec.temp.unit = 'A';
-    SIM_DATA.elec.flow.val = m76.voltage_ln||0; SIM_DATA.elec.flow.label = 'VOLTAGE'; SIM_DATA.elec.flow.unit = 'V';
-    SIM_DATA.elec.pressure.val = m77.kw||0; SIM_DATA.elec.pressure.label = '208/120V kW'; SIM_DATA.elec.pressure.unit = 'kW';
-  }
+  try {
+    if (m3.kw && SIM_DATA.conduit) {
+      SIM_DATA.conduit.energy.val = m3.kw; SIM_DATA.conduit.energy.label = 'ROOF ELEC';
+      SIM_DATA.conduit.temp.val = m3.current_avg||0; SIM_DATA.conduit.temp.label = 'CURRENT'; SIM_DATA.conduit.temp.unit = 'A';
+      SIM_DATA.conduit.flow.val = m3.voltage_ll||0; SIM_DATA.conduit.flow.label = 'VOLTAGE'; SIM_DATA.conduit.flow.unit = 'V';
+      SIM_DATA.conduit.current.val = m3.power_factor||0; SIM_DATA.conduit.current.label = 'POWER FACTOR'; SIM_DATA.conduit.current.unit = '';
+    }
+    if (m76.kw && SIM_DATA.elec) {
+      SIM_DATA.elec.energy.val = m76.kw; SIM_DATA.elec.energy.label = '480/277V';
+      SIM_DATA.elec.temp.val = m76.current_avg||0; SIM_DATA.elec.temp.label = 'CURRENT'; SIM_DATA.elec.temp.unit = 'A';
+      SIM_DATA.elec.flow.val = m76.voltage_ln||0; SIM_DATA.elec.flow.label = 'VOLTAGE'; SIM_DATA.elec.flow.unit = 'V';
+      SIM_DATA.elec.pressure.val = m77?.kw||0; SIM_DATA.elec.pressure.label = '208/120V kW'; SIM_DATA.elec.pressure.unit = 'kW';
+    }
+  } catch(e) { console.log('SIM_DATA update:', e.message); }
 }
 
 /* ══════════════════════════════════════════ CHARTS ══════════════════════════════════════════ */
