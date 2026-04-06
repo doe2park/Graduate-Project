@@ -635,13 +635,13 @@ function updateDashboard() {
     for (const [fl, d] of Object.entries(floors)) {
       const pct = totalKw > 0 ? Math.round(d.kw / totalKw * 100) : 0;
       const barColor = d.kw > 40 ? '#f87171' : d.kw > 20 ? '#FDB515' : '#2dd4bf';
-      html += `<div style="display:flex;align-items:center;gap:6px;margin:3px 0">
+      html += `<div style="display:flex;align-items:center;gap:6px;margin:3px 0" title="${d.breakdown} · ${d.panels} panels">
         <span style="font-size:9px;font-weight:700;color:#e2e8f0;width:24px">${fl}</span>
         <div style="flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">
           <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px"></div>
         </div>
         <span style="font-size:9px;font-family:var(--mono);color:${barColor};width:42px;text-align:right">${d.kw}kW</span>
-        <span style="font-size:7px;color:#475569;width:24px;text-align:right">${pct}%</span>
+        <span style="font-size:7px;color:#475569;width:28px;text-align:right">${d.panels}pnl</span>
       </div>`;
     }
     fbEl.innerHTML = html;
@@ -896,36 +896,39 @@ function drawCharts() {
 // Meter #76 (480/277V)      → L2 (45%), L3 (55%) — HVAC, lighting, high voltage loads
 // Meter #77 (208/120V)      → B1 (55%), L1 (45%) — outlets, computers, IT, workshops
 //
-// Ratios based on typical engineering building load distribution:
-//   B1 (basement): mechanical room, workshop, server closet → higher 208V load
-//   L1 (ground):   lobby, classrooms, offices → moderate outlet load
-//   L2 (mid):      offices, smaller labs → moderate HVAC
-//   L3 (upper):    large labs, more exterior exposure → higher HVAC
-//   SRV (roof):    AHUs, exhaust fans, cooling → dedicated meter
+// ═══ BIM-VALIDATED panel distribution (from Revit model tree) ═══
+// Extracted from grimes_bim_tree.txt — 741,796 BIM elements analyzed
+//
+// Meter #3  (Roof Electric)  → SRV only (rooftop AHUs, exhaust fans)
+// Meter #76 (480/277V HVAC)  → B1: 17 panels (55%) | L1: 14 panels (45%)
+//                              L2, L3: 0 panels — no 480V panelboards
+// Meter #77 (208/120V Plugs) → B1: 10 (16%) | L1: 19 (31%) | L2: 22 (35%) | L3: 11 (18%)
+//
+// MSB-1 & MSB-2 main switchboards on Ground Floor (Level 00 = B1)
+// Total: 93 panelboards + 2 switchboards across 4 floors + roof AHU
 
 const FLOOR_RATIOS = {
-  SRV: { meter: '3',  ratio: 1.0,  desc: 'Rooftop AHUs, exhaust fans, cooling' },
-  L3:  { meter: '76', ratio: 0.55, desc: 'Labs, HVAC, lighting (480/277V)' },
-  L2:  { meter: '76', ratio: 0.45, desc: 'Offices, HVAC, lighting (480/277V)' },
-  L1:  { meter: '77', ratio: 0.45, desc: 'Classrooms, outlets, IT (208/120V)' },
-  B1:  { meter: '77', ratio: 0.55, desc: 'Mechanical, workshop, servers (208/120V)' },
+  SRV: { meters: [{ id:'3', ratio:1.0 }],                                    desc: 'Rooftop AHUs, exhaust fans (Meter #3)', panels: 0 },
+  L3:  { meters: [{ id:'77', ratio:0.18 }],                                  desc: '11× 208V panels — outlets, IT', panels: 11 },
+  L2:  { meters: [{ id:'77', ratio:0.35 }],                                  desc: '22× 208V panels — outlets, IT', panels: 22 },
+  L1:  { meters: [{ id:'76', ratio:0.45 }, { id:'77', ratio:0.31 }],         desc: '14× 480V + 19× 208V — HVAC, lighting, outlets', panels: 33 },
+  B1:  { meters: [{ id:'76', ratio:0.55 }, { id:'77', ratio:0.16 }],         desc: '17× 480V + 10× 208V — MSB, mechanical, workshop', panels: 27 },
 };
 
 function getFloorEnergy(yPos) {
   if (!liveData) return null;
   const m = liveData.meters;
   if (!m) return null;
-
   let floor;
   if (yPos > 15) floor = 'SRV';
   else if (yPos > 10) floor = 'L3';
   else if (yPos > 6) floor = 'L2';
   else if (yPos > 3) floor = 'L1';
   else floor = 'B1';
-
   const info = FLOOR_RATIOS[floor];
-  const meterKw = m[info.meter]?.latest?.kw || 0;
-  return Math.round(meterKw * info.ratio * 10) / 10;
+  let totalKw = 0;
+  for (const mt of info.meters) { totalKw += (m[mt.id]?.latest?.kw || 0) * mt.ratio; }
+  return Math.round(totalKw * 10) / 10;
 }
 
 function getAllFloorKw() {
@@ -933,14 +936,14 @@ function getAllFloorKw() {
   const m = liveData.meters;
   const result = {};
   for (const [fl, info] of Object.entries(FLOOR_RATIOS)) {
-    const meterKw = m[info.meter]?.latest?.kw || 0;
-    result[fl] = {
-      kw: Math.round(meterKw * info.ratio * 10) / 10,
-      meter: info.meter,
-      desc: info.desc,
-      ratio: info.ratio,
-      meterTotal: meterKw,
-    };
+    let kw = 0;
+    const sources = [];
+    for (const mt of info.meters) {
+      const contrib = Math.round((m[mt.id]?.latest?.kw || 0) * mt.ratio * 10) / 10;
+      kw += contrib;
+      sources.push('M#' + mt.id + '×' + Math.round(mt.ratio*100) + '%=' + contrib + 'kW');
+    }
+    result[fl] = { kw: Math.round(kw*10)/10, desc: info.desc, panels: info.panels, breakdown: sources.join(' + ') };
   }
   return result;
 }
@@ -1118,13 +1121,13 @@ renderer.domElement.addEventListener('click', e => {
     document.getElementById('dpTag').textContent = sys.label;
     document.getElementById('dpTag').style.background = sys.color;
     document.getElementById('dpTitle').textContent = tag;
-    // Show floor kW from meter split
+    // Show floor kW from BIM-validated meter split
     const floorKw = getFloorEnergy(point.y);
     const floorName = point.y > 15 ? 'SRV' : point.y > 10 ? 'L3' : point.y > 6 ? 'L2' : point.y > 3 ? 'L1' : 'B1';
     const floorInfo = FLOOR_RATIOS[floorName];
     const floorKwText = floorKw !== null && floorKw > 0 ? ` · ${floorKw} kW` : '';
-    const meterText = floorInfo ? ` (Meter #${floorInfo.meter} × ${Math.round(floorInfo.ratio*100)}%)` : '';
-    document.getElementById('dpFloor').textContent = `${floor} · ${zone}${floorKwText}${meterText}`;
+    const panelText = floorInfo ? ` · ${floorInfo.panels} panels` : '';
+    document.getElementById('dpFloor').textContent = `${floor} · ${zone}${floorKwText}${panelText}`;
 
     const sensorsEl = document.getElementById('dpSensors');
     sensorsEl.innerHTML = '';
