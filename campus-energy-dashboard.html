@@ -72,23 +72,36 @@ Chart.defaults.font.size=10;
 const crosshairPlugin={
   id:'crosshair',
   afterDraw:function(chart){
-    if(chart.tooltip&&chart.tooltip._active&&chart.tooltip._active.length){
-      var x=chart.tooltip._active[0].element.x;
-      var yAxis=chart.scales.y;
-      var ctx=chart.ctx;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(x,yAxis.top);
-      ctx.lineTo(x,yAxis.bottom);
-      ctx.lineWidth=1;
-      ctx.strokeStyle='rgba(253,181,21,0.4)';
-      ctx.setLineDash([4,4]);
-      ctx.stroke();
-      ctx.restore();
-    }
+    var tt=chart.tooltip;
+    if(!tt||!tt._active||!tt._active.length)return;
+    var activeEl=tt._active[0]&&tt._active[0].element;
+    if(!activeEl)return;
+    var x=activeEl.x;
+    var yAxis=chart.scales.y;
+    if(!yAxis)return;
+    var ctx=chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x,yAxis.top);
+    ctx.lineTo(x,yAxis.bottom);
+    ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(253,181,21,0.4)';
+    ctx.setLineDash([4,4]);
+    ctx.stroke();
+    ctx.restore();
   }
 };
 Chart.register(crosshairPlugin);
+
+// Destroy old charts before re-init
+function destroyCharts(){
+  for(var k in charts){
+    if(charts[k]&&typeof charts[k].destroy==='function'){
+      charts[k].destroy();
+    }
+  }
+  charts={};
+}
 
 // Short name helper - never just first word
 function shortName(n){
@@ -134,6 +147,7 @@ function shortName(n){
 let charts={};
 
 async function init(){
+  destroyCharts();
   const [dR,hR]=await Promise.all([fetch(DATA_URL+'?t='+Date.now()),fetch(HIST_URL+'?t='+Date.now()).catch(()=>null)]);
   const data=await dR.json();
   let hist={};try{if(hR&&hR.ok)hist=await hR.json()}catch(e){}
@@ -262,7 +276,7 @@ async function init(){
     var totals=times.map(function(t){var sum=0;for(var j=0;j<online.length;j++){var bid2=online[j][0];var pts2=hist[bid2]||[];var pt=null;for(var k=0;k<pts2.length;k++){if(pts2[k].t===t){pt=pts2[k];break}}if(pt)sum+=pt.kw}return Math.round(sum)});
     // Label every 3 hours (12 ticks for 96 points)
     var labelInterval=Math.max(1,Math.floor(times.length/8));
-    charts.hist=new Chart(document.getElementById('histLine'),{type:'line',data:{labels:times,datasets:[{label:'Campus kW',data:totals,borderColor:'#FDB515',backgroundColor:'rgba(253,181,21,.08)',fill:true,tension:.3,pointRadius:0,pointHoverRadius:6,pointHoverBackgroundColor:'#FDB515',pointHoverBorderColor:'#fff',pointHoverBorderWidth:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{title:function(items){return 'Time: '+items[0].label+' PT'},label:function(ctx){return 'Campus load: '+ctx.raw.toLocaleString()+' kW'}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxTicksLimit:8,font:{size:9},callback:function(val,idx){if(idx%labelInterval===0)return times[idx];return ''}}},y:{grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v.toLocaleString()+'kW'}}}}}});
+    charts.hist=new Chart(document.getElementById('histLine'),{type:'line',data:{labels:times,datasets:[{label:'Campus kW',data:totals,borderColor:'#FDB515',backgroundColor:'rgba(253,181,21,.08)',fill:true,tension:.3,pointRadius:0,pointHoverRadius:6,pointHoverBackgroundColor:'#FDB515',pointHoverBorderColor:'#fff',pointHoverBorderWidth:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false,axis:'x'},hover:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{mode:'index',intersect:false,callbacks:{title:function(items){return 'Time: '+items[0].label+' PT'},label:function(ctx){return 'Campus load: '+ctx.raw.toLocaleString()+' kW'}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxTicksLimit:8,font:{size:9},callback:function(val,idx){if(idx%labelInterval===0)return times[idx];return ''}}},y:{grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v.toLocaleString()+'kW'}}}}}});
   } else {
     document.getElementById('histLine').parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--dim);font-size:12px">History building up... check back in a few hours</div>';
   }
