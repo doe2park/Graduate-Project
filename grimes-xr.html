@@ -70,23 +70,7 @@
   .dp-maint-label { font-size:8px;color:#475569; }
   .dp-close { position:absolute;top:8px;right:12px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px; }
   .dp-sim { margin-top:6px;font-size:8px;color:#334155;text-align:center; }
-  #dbMobileBtn { display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:101;padding:12px 24px;border-radius:16px;background:rgba(253,181,21,.15);border:2px solid rgba(253,181,21,.5);color:#FDB515;font-size:14px;font-weight:700;cursor:pointer;backdrop-filter:blur(12px);font-family:var(--font);box-shadow:0 4px 20px rgba(253,181,21,.2);animation:dbPulse 2s ease-in-out infinite }
-  @keyframes dbPulse{0%,100%{box-shadow:0 4px 20px rgba(253,181,21,.2)}50%{box-shadow:0 4px 30px rgba(253,181,21,.5)}}
-
-  /* Welcome overlay on mobile */
-  #mobileWelcome{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center}
-  @media(max-width:768px){#mobileWelcome.show{display:flex}}
-  .mw-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;width:90%;max-width:340px;text-align:center}
-  .mw-title{font-size:16px;font-weight:700;color:var(--cyan);margin-bottom:4px}
-  .mw-sub{font-size:11px;color:#64748b;margin-bottom:16px}
-  .mw-stats{display:flex;gap:8px;margin-bottom:16px}
-  .mw-stat{flex:1;background:rgba(255,255,255,.04);border-radius:10px;padding:10px 6px}
-  .mw-stat-val{font-size:22px;font-weight:700;font-family:monospace}
-  .mw-stat-lbl{font-size:9px;color:#475569;margin-top:2px}
-  .mw-btn{display:block;width:100%;padding:12px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px}
-  .mw-btn-gold{background:#FDB515;color:#003262}
-  .mw-btn-cyan{background:var(--cyan);color:#000}
-  .mw-btn-ghost{background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid var(--border)}
+  #dbMobileBtn { display:none;position:fixed;top:48px;right:10px;z-index:101;padding:6px 12px;border-radius:8px;background:var(--panel);border:1px solid var(--border);color:var(--cyan);font-size:12px;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);font-family:var(--font); }
 
   /* ── Heatmap Legend ── */
   #heatLegend { position:fixed;bottom:90px;right:14px;z-index:50;background:var(--panel);padding:10px 12px;border-radius:10px;border:1px solid var(--border);display:none;font-size:10px; }
@@ -100,6 +84,8 @@
   .joystick-label { position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:1px; }
 
   #floorNav { position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:40;display:flex;flex-direction:column;gap:4px; }
+  .fl-btn { display:flex;flex-direction:column;align-items:center;gap:1px;min-width:44px; }
+  .fl-kw { font-size:7px;color:#2dd4bf;font-family:var(--mono);opacity:0.8; }
   .fl-btn { background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.15);color:#64748b;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;text-align:center; }
   .fl-btn.active { background:var(--cyan);color:#000;border-color:var(--cyan); }
 
@@ -108,21 +94,6 @@
 </head>
 <body>
 <div id="loading"><div class="spinner"></div><div id="loadText">Loading MEP...</div></div>
-
-<!-- Mobile Welcome Overlay -->
-<div id="mobileWelcome">
-  <div class="mw-card">
-    <div class="mw-title">🏗 Grimes Engineering Center</div>
-    <div class="mw-sub">Live Digital Twin · 8 MEP Systems · 30 Sensors</div>
-    <div class="mw-stats">
-      <div class="mw-stat"><div class="mw-stat-val" style="color:var(--cyan)" id="mwKw">--</div><div class="mw-stat-lbl">kW now</div></div>
-      <div class="mw-stat"><div class="mw-stat-val" style="color:#fbbf24">8</div><div class="mw-stat-lbl">MEP systems</div></div>
-      <div class="mw-stat"><div class="mw-stat-val" style="color:#f87171">4</div><div class="mw-stat-lbl">floors</div></div>
-    </div>
-    <button class="mw-btn mw-btn-gold" onclick="document.getElementById('mobileWelcome').classList.remove('show');document.getElementById('dbMobileBtn').click()">📊 View Live Energy Data</button>
-    <button class="mw-btn mw-btn-ghost" onclick="document.getElementById('mobileWelcome').classList.remove('show')">🏗 Explore 3D Model</button>
-  </div>
-</div>
 
 <!-- Top Bar -->
 <div id="topbar">
@@ -140,7 +111,7 @@
 <!-- Legend -->
 <div id="legend"><h3>MEP Systems</h3><div id="systemList"></div></div>
 
-<button id="dbMobileBtn">⚡ Live Data · -- kW</button>
+<button id="dbMobileBtn">⚡ Live Data</button>
 
 <!-- Dashboard -->
 <div id="dashboard">
@@ -160,6 +131,11 @@
       <div class="db-legend-row"><span class="db-dot-s" style="background:#2dd4bf"></span>Roof equip.<span class="db-legend-val" id="dMain">—</span></div>
       <div class="db-legend-row"><span class="db-dot-s" style="background:#a78bfa"></span>Outlets / IT<span class="db-legend-val" id="dSubB">—</span></div>
     </div>
+  </div>
+
+  <div class="db-sec">Floor breakdown <span style="font-size:7px;color:#2dd4bf;font-weight:400">LIVE</span></div>
+  <div id="floorBreakdown" style="margin:4px 0 8px">
+    <div style="font-size:9px;color:#475569">Loading...</div>
   </div>
 
   <div class="db-sec">24-hour trends</div>
@@ -232,11 +208,11 @@
 
 <!-- Floor Nav -->
 <div id="floorNav">
-  <button class="fl-btn" data-y="17">SRV</button>
-  <button class="fl-btn" data-y="13">L3</button>
-  <button class="fl-btn" data-y="9">L2</button>
-  <button class="fl-btn" data-y="5">L1</button>
-  <button class="fl-btn active" data-y="1.6">B1</button>
+  <button class="fl-btn" data-y="17"><span class="fl-name">SRV</span><span class="fl-kw" id="fkSRV"></span></button>
+  <button class="fl-btn" data-y="13"><span class="fl-name">L3</span><span class="fl-kw" id="fkL3"></span></button>
+  <button class="fl-btn" data-y="9"><span class="fl-name">L2</span><span class="fl-kw" id="fkL2"></span></button>
+  <button class="fl-btn" data-y="5"><span class="fl-name">L1</span><span class="fl-kw" id="fkL1"></span></button>
+  <button class="fl-btn active" data-y="1.6"><span class="fl-name">B1</span><span class="fl-kw" id="fkB1"></span></button>
 </div>
 
 <!-- Joysticks -->
@@ -359,8 +335,6 @@ gltfLoader.load('grimes-mep-only.glb', (gltf) => {
   buildLegend();
   startSimulation();
   setupXR();
-  // Show mobile welcome after brief delay
-  if(window.innerWidth<=768){setTimeout(function(){document.getElementById('mobileWelcome').classList.add('show')},1500)}
 }, p => { loadingEl.textContent = `Loading MEP... ${(p.loaded/1024/1024).toFixed(1)} MB`; },
 () => { loadingEl.textContent = 'Error'; loadingEl.style.color = '#f87171'; });
 
@@ -611,13 +585,6 @@ function updateDashboard() {
   const totalEl = document.getElementById('dTotal');
   totalEl.textContent = totalKw ? `${totalKw.toFixed(1)} kW` : '\u2014';
   totalEl.style.color = totalKw > 200 ? '#f87171' : totalKw > 120 ? '#fb923c' : 'var(--cyan)';
-  // Update mobile button + welcome with real kW
-  if(totalKw){
-    window._liveKw=totalKw.toFixed(1);
-    var mwK=document.getElementById('mwKw');if(mwK)mwK.textContent=totalKw.toFixed(1);
-    var mbtn=document.getElementById('dbMobileBtn');
-    if(mbtn&&!mbtn.textContent.includes('Close'))mbtn.textContent='\u26A1 Live Data \u00B7 '+totalKw.toFixed(1)+' kW';
-  }
 
   // Distribution
   document.getElementById('dSubA').textContent = m76.kw ? `${m76.kw.toFixed(1)}` : '\u2014';
@@ -656,6 +623,29 @@ function updateDashboard() {
   // Draw charts + donut
   drawCharts();
   drawDonut(m3.kw||0, m76.kw||0, m77.kw||0, totalKw);
+
+  // Update floor nav with kW
+  updateFloorNav();
+
+  // Update floor breakdown in dashboard
+  const floors = getAllFloorKw();
+  const fbEl = document.getElementById('floorBreakdown');
+  if (fbEl) {
+    let html = '';
+    for (const [fl, d] of Object.entries(floors)) {
+      const pct = totalKw > 0 ? Math.round(d.kw / totalKw * 100) : 0;
+      const barColor = d.kw > 40 ? '#f87171' : d.kw > 20 ? '#FDB515' : '#2dd4bf';
+      html += `<div style="display:flex;align-items:center;gap:6px;margin:3px 0">
+        <span style="font-size:9px;font-weight:700;color:#e2e8f0;width:24px">${fl}</span>
+        <div style="flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:3px"></div>
+        </div>
+        <span style="font-size:9px;font-family:var(--mono);color:${barColor};width:42px;text-align:right">${d.kw}kW</span>
+        <span style="font-size:7px;color:#475569;width:24px;text-align:right">${pct}%</span>
+      </div>`;
+    }
+    fbEl.innerHTML = html;
+  }
 
   // Feed real data into SIM_DATA
   if (m3.kw) {
@@ -902,18 +892,65 @@ function drawCharts() {
 
 /* ══════════════════════════════════════════ FLOOR ENERGY HEATMAP ══════════════════════════════════════════ */
 // Maps real meter data to floor zones for Energy view mode
-// Roof Electric (meter 3) → SRV floor (rooftop AHUs, exhaust fans)
-// 480/277V (meter 76) → L2, L3 (HVAC, lighting — high voltage loads)
-// 208/120V (meter 77) → B1, L1 (outlets, computers, IT — standard voltage)
+// Meter #3  (Roof Electric) → SRV floor (rooftop AHUs, exhaust fans, cooling towers)
+// Meter #76 (480/277V)      → L2 (45%), L3 (55%) — HVAC, lighting, high voltage loads
+// Meter #77 (208/120V)      → B1 (55%), L1 (45%) — outlets, computers, IT, workshops
+//
+// Ratios based on typical engineering building load distribution:
+//   B1 (basement): mechanical room, workshop, server closet → higher 208V load
+//   L1 (ground):   lobby, classrooms, offices → moderate outlet load
+//   L2 (mid):      offices, smaller labs → moderate HVAC
+//   L3 (upper):    large labs, more exterior exposure → higher HVAC
+//   SRV (roof):    AHUs, exhaust fans, cooling → dedicated meter
+
+const FLOOR_RATIOS = {
+  SRV: { meter: '3',  ratio: 1.0,  desc: 'Rooftop AHUs, exhaust fans, cooling' },
+  L3:  { meter: '76', ratio: 0.55, desc: 'Labs, HVAC, lighting (480/277V)' },
+  L2:  { meter: '76', ratio: 0.45, desc: 'Offices, HVAC, lighting (480/277V)' },
+  L1:  { meter: '77', ratio: 0.45, desc: 'Classrooms, outlets, IT (208/120V)' },
+  B1:  { meter: '77', ratio: 0.55, desc: 'Mechanical, workshop, servers (208/120V)' },
+};
+
 function getFloorEnergy(yPos) {
   if (!liveData) return null;
-  const m3 = liveData.meters?.['3']?.latest;
-  const m76 = liveData.meters?.['76']?.latest;
-  const m77 = liveData.meters?.['77']?.latest;
+  const m = liveData.meters;
+  if (!m) return null;
 
-  if (yPos > 15) return m3?.kw || 0;   // SRV → Roof Electric
-  if (yPos > 7)  return m76?.kw || 0;  // L2-L3 → 480/277V HVAC
-  return m77?.kw || 0;                  // B1-L1 → 208/120V Outlets
+  let floor;
+  if (yPos > 15) floor = 'SRV';
+  else if (yPos > 10) floor = 'L3';
+  else if (yPos > 6) floor = 'L2';
+  else if (yPos > 3) floor = 'L1';
+  else floor = 'B1';
+
+  const info = FLOOR_RATIOS[floor];
+  const meterKw = m[info.meter]?.latest?.kw || 0;
+  return Math.round(meterKw * info.ratio * 10) / 10;
+}
+
+function getAllFloorKw() {
+  if (!liveData?.meters) return {};
+  const m = liveData.meters;
+  const result = {};
+  for (const [fl, info] of Object.entries(FLOOR_RATIOS)) {
+    const meterKw = m[info.meter]?.latest?.kw || 0;
+    result[fl] = {
+      kw: Math.round(meterKw * info.ratio * 10) / 10,
+      meter: info.meter,
+      desc: info.desc,
+      ratio: info.ratio,
+      meterTotal: meterKw,
+    };
+  }
+  return result;
+}
+
+function updateFloorNav() {
+  const floors = getAllFloorKw();
+  for (const [fl, data] of Object.entries(floors)) {
+    const el = document.getElementById('fk' + fl);
+    if (el) el.textContent = data.kw > 0 ? data.kw + 'kW' : '';
+  }
 }
 
 function startSimulation() {
@@ -1037,7 +1074,7 @@ document.getElementById('dbMobileBtn').addEventListener('click', () => {
   const db = document.getElementById('dashboard');
   db.classList.toggle('show');
   const isOpen = db.classList.contains('show');
-  document.getElementById('dbMobileBtn').textContent = isOpen ? '✕ Close Data' : '⚡ Live Data · ' + (window._liveKw || '--') + ' kW';
+  document.getElementById('dbMobileBtn').textContent = isOpen ? '✕ Close' : '⚡ Live Data';
   if (isOpen && liveData) setTimeout(() => { drawCharts(); updateDashboard(); }, 50);
 });
 
@@ -1081,7 +1118,13 @@ renderer.domElement.addEventListener('click', e => {
     document.getElementById('dpTag').textContent = sys.label;
     document.getElementById('dpTag').style.background = sys.color;
     document.getElementById('dpTitle').textContent = tag;
-    document.getElementById('dpFloor').textContent = `${floor} · ${zone}`;
+    // Show floor kW from meter split
+    const floorKw = getFloorEnergy(point.y);
+    const floorName = point.y > 15 ? 'SRV' : point.y > 10 ? 'L3' : point.y > 6 ? 'L2' : point.y > 3 ? 'L1' : 'B1';
+    const floorInfo = FLOOR_RATIOS[floorName];
+    const floorKwText = floorKw !== null && floorKw > 0 ? ` · ${floorKw} kW` : '';
+    const meterText = floorInfo ? ` (Meter #${floorInfo.meter} × ${Math.round(floorInfo.ratio*100)}%)` : '';
+    document.getElementById('dpFloor').textContent = `${floor} · ${zone}${floorKwText}${meterText}`;
 
     const sensorsEl = document.getElementById('dpSensors');
     sensorsEl.innerHTML = '';
@@ -1368,21 +1411,10 @@ window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.inn
 </script>
 <script>
 fetch("https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t="+Date.now())
-.then(function(r){return r.json()}).then(function(d){
-  // Update campus badge
+.then(r=>r.json()).then(d=>{
   var el=document.getElementById("liveKwBadge");
-  if(el)el.innerHTML="⚡ Campus: "+d.total_kw+" kW · "+d.buildings_online+" bldgs";
-  // Update welcome card kW
-  var g=d.buildings&&d.buildings.grimes;
-  if(g&&g.kw){
-    window._liveKw=g.kw;
-    var mwKw=document.getElementById("mwKw");
-    if(mwKw)mwKw.textContent=g.kw;
-    // Update mobile btn
-    var btn=document.getElementById("dbMobileBtn");
-    if(btn&&!btn.textContent.includes("Close"))btn.textContent="⚡ Live Data · "+g.kw+" kW";
-  }
-}).catch(function(){});
+  if(el)el.innerHTML="⚡ Campus: "+d.total_kw+" kW · "+d.buildings_online+" buildings";
+}).catch(()=>{});
 </script>
 </body>
 </html>
