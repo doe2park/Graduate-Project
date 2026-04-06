@@ -314,29 +314,89 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const gltfLoader = new GLTFLoader(); gltfLoader.setDRACOLoader(dracoLoader);
 
-gltfLoader.load('grimes-mep-only.glb', (gltf) => {
+gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
   scene.add(gltf.scene);
-  let meshIdx = 0;
+
+  // Material-to-system mapping based on Revit export patterns
+  // Group 204 materials into 8 MEP systems by material color analysis
+  const matSystemMap = new Map(); // materialIndex → sysIndex
+
   gltf.scene.traverse(child => {
     if (!child.isMesh) return;
     allMeshes.push(child);
-    const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length-1);
+
+    // Determine system from original material color
+    let sysIdx = 7; // default: spiral ductwork
+    if (child.material) {
+      const c = child.material.color;
+      if (c) {
+        const r = c.r, g = c.g, b = c.b;
+        // Classify by color hue ranges (from Revit category colors)
+        if (r > 0.7 && g > 0.7 && b < 0.4) sysIdx = 4;        // Yellow/Orange → Electrical
+        else if (r > 0.7 && g < 0.4 && b < 0.4) sysIdx = 3;    // Red → Fire Protection
+        else if (r < 0.4 && g < 0.4 && b > 0.6) sysIdx = 2;    // Blue → Plumbing
+        else if (r < 0.3 && g > 0.5 && b > 0.5) sysIdx = 0;    // Cyan/Teal → HVAC Duct
+        else if (r > 0.4 && g > 0.4 && b > 0.4 && r < 0.7) sysIdx = 1; // Gray → HVAC Equipment
+        else if (r < 0.5 && g > 0.6 && b < 0.5) sysIdx = 5;    // Green → Diffusers
+        else if (r > 0.6 && g < 0.5 && b > 0.5) sysIdx = 6;    // Purple → Pumps
+        else if (r > 0.3 && g > 0.6 && b > 0.6) sysIdx = 7;    // Light cyan → Spiral
+      }
+    }
+
     const sys = SYSTEM_INFO[sysIdx];
-    const mat = new THREE.MeshBasicMaterial({ color:sys.hex, side:THREE.DoubleSide, transparent:true, opacity:0.85 });
+    // Create new material: system color + semi-transparent
+    const mat = new THREE.MeshStandardMaterial({
+      color: sys.hex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.75,
+      roughness: 0.6,
+      metalness: 0.2,
+    });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
     child.userData.sysId = sys.id;
     child.userData.sysLabel = sys.label;
     originalMaterials.set(child.uuid, mat);
-    systemMeshes.push({ mesh:child, sysIndex:sysIdx });
-    meshIdx++;
+    systemMeshes.push({ mesh: child, sysIndex: sysIdx });
   });
+
+  console.log(`Loaded ${allMeshes.length} meshes, ${systemMeshes.length} classified`);
   document.getElementById('loading').style.display = 'none';
   buildLegend();
   startSimulation();
   setupXR();
-}, p => { loadingEl.textContent = `Loading MEP... ${(p.loaded/1024/1024).toFixed(1)} MB`; },
-() => { loadingEl.textContent = 'Error'; loadingEl.style.color = '#f87171'; });
+}, p => {
+  const mb = (p.loaded / 1024 / 1024).toFixed(1);
+  const pct = p.total ? Math.round(p.loaded / p.total * 100) : '';
+  loadingEl.textContent = `Loading MEP model... ${mb} MB${pct ? ' (' + pct + '%)' : ''}`;
+},
+() => {
+  // Fallback to smaller file
+  loadingEl.textContent = 'Loading fallback...';
+  gltfLoader.load('grimes-mep-only.glb', (gltf) => {
+    scene.add(gltf.scene);
+    let meshIdx = 0;
+    gltf.scene.traverse(child => {
+      if (!child.isMesh) return;
+      allMeshes.push(child);
+      const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
+      const sys = SYSTEM_INFO[sysIdx];
+      const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+      child.material = mat;
+      child.userData.sysIndex = sysIdx;
+      child.userData.sysId = sys.id;
+      child.userData.sysLabel = sys.label;
+      originalMaterials.set(child.uuid, mat);
+      systemMeshes.push({ mesh: child, sysIndex: sysIdx });
+      meshIdx++;
+    });
+    document.getElementById('loading').style.display = 'none';
+    buildLegend();
+    startSimulation();
+    setupXR();
+  });
+});
 
 /* ══════════════════════════════════════════ BUILDING MODEL (transparent overlay) ══════════════════════════════════════════ */
 let buildingModel = null;
