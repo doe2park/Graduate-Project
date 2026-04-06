@@ -316,43 +316,68 @@ dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5
 const gltfLoader = new GLTFLoader(); gltfLoader.setDRACOLoader(dracoLoader);
 
 gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
+  // Auto-center and scale the model
+  const box = new THREE.Box3().setFromObject(gltf.scene);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  console.log('Model bounds:', box.min, box.max, 'Size:', size);
+
+  // Center model at origin
+  gltf.scene.position.sub(center);
+
+  // Scale to fit our scene (target: ~60m wide)
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = 60 / maxDim;
+  gltf.scene.scale.setScalar(scale);
+
+  // Shift up so bottom is at y=0
+  const scaledBox = new THREE.Box3().setFromObject(gltf.scene);
+  gltf.scene.position.y -= scaledBox.min.y;
+
   scene.add(gltf.scene);
 
-  // Material-to-system mapping based on Revit export patterns
-  // Group 204 materials into 8 MEP systems by material color analysis
-  const matSystemMap = new Map(); // materialIndex → sysIndex
-
+  // Filter: hide architecture/structure (gray/white), keep MEP (colored)
+  let hidden = 0, shown = 0;
   gltf.scene.traverse(child => {
     if (!child.isMesh) return;
-    allMeshes.push(child);
 
-    // Determine system from original material color
-    let sysIdx = 7; // default: spiral ductwork
-    if (child.material) {
-      const c = child.material.color;
-      if (c) {
-        const r = c.r, g = c.g, b = c.b;
-        // Classify by color hue ranges (from Revit category colors)
-        if (r > 0.7 && g > 0.7 && b < 0.4) sysIdx = 4;        // Yellow/Orange → Electrical
-        else if (r > 0.7 && g < 0.4 && b < 0.4) sysIdx = 3;    // Red → Fire Protection
-        else if (r < 0.4 && g < 0.4 && b > 0.6) sysIdx = 2;    // Blue → Plumbing
-        else if (r < 0.3 && g > 0.5 && b > 0.5) sysIdx = 0;    // Cyan/Teal → HVAC Duct
-        else if (r > 0.4 && g > 0.4 && b > 0.4 && r < 0.7) sysIdx = 1; // Gray → HVAC Equipment
-        else if (r < 0.5 && g > 0.6 && b < 0.5) sysIdx = 5;    // Green → Diffusers
-        else if (r > 0.6 && g < 0.5 && b > 0.5) sysIdx = 6;    // Purple → Pumps
-        else if (r > 0.3 && g > 0.6 && b > 0.6) sysIdx = 7;    // Light cyan → Spiral
-      }
+    const c = child.material?.color;
+    if (!c) { child.visible = false; hidden++; return; }
+
+    const r = c.r, g = c.g, b = c.b;
+    const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+    const brightness = (r + g + b) / 3;
+
+    // Hide: very gray/white (low saturation + high brightness = architecture/structure)
+    // Hide: very dark (black = grids/text outlines)
+    // Keep: colored elements (MEP systems have distinct hues)
+    if ((saturation < 0.08 && brightness > 0.5) || brightness < 0.05 || brightness > 0.92) {
+      child.visible = false;
+      hidden++;
+      return;
     }
 
+    allMeshes.push(child);
+
+    // Classify MEP system by color
+    let sysIdx = 1; // default: HVAC Equipment
+    if (r > 0.7 && g > 0.5 && b < 0.3) sysIdx = 4;           // Yellow/Orange → Electrical
+    else if (r > 0.6 && g < 0.3 && b < 0.3) sysIdx = 3;       // Red → Fire Protection
+    else if (r < 0.3 && g < 0.3 && b > 0.5) sysIdx = 2;       // Blue → Plumbing
+    else if (r < 0.3 && g > 0.4 && b > 0.4) sysIdx = 0;       // Cyan/Teal → HVAC Duct
+    else if (r < 0.4 && g > 0.5 && b < 0.4) sysIdx = 5;       // Green → Diffusers
+    else if (r > 0.5 && g < 0.4 && b > 0.4) sysIdx = 6;       // Purple → Pumps
+    else if (r > 0.3 && g > 0.5 && b > 0.5) sysIdx = 7;       // Light cyan → Spiral
+    else if (saturation < 0.15) sysIdx = 1;                     // Low saturation = Equipment
+
     const sys = SYSTEM_INFO[sysIdx];
-    // Create new material: system color + semi-transparent
     const mat = new THREE.MeshStandardMaterial({
       color: sys.hex,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.75,
-      roughness: 0.6,
-      metalness: 0.2,
+      opacity: 0.8,
+      roughness: 0.5,
+      metalness: 0.15,
     });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
@@ -360,9 +385,18 @@ gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
     child.userData.sysLabel = sys.label;
     originalMaterials.set(child.uuid, mat);
     systemMeshes.push({ mesh: child, sysIndex: sysIdx });
+    shown++;
   });
 
-  console.log(`Loaded ${allMeshes.length} meshes, ${systemMeshes.length} classified`);
+  console.log(`Total: ${shown + hidden} meshes | MEP shown: ${shown} | Arch hidden: ${hidden}`);
+
+  // Reset camera to look at model
+  const finalBox = new THREE.Box3().setFromObject(gltf.scene);
+  const fc = finalBox.getCenter(new THREE.Vector3());
+  camera.position.set(fc.x + 30, fc.y + 20, fc.z + 30);
+  orbitControls.target.copy(fc);
+  orbitControls.update();
+
   document.getElementById('loading').style.display = 'none';
   buildLegend();
   startSimulation();
