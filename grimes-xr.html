@@ -1464,7 +1464,7 @@ function updateEnergyPulse() {
   if (!pulseEnabled) return;
 
   // Advance phase
-  const speed = 0.012; // ~5 seconds per full cycle
+  const speed = 0.008; // ~7 seconds per full cycle (fade-in + hold + fade-out)
   pulseProgress += speed;
 
   if (pulseProgress >= 1) {
@@ -1493,15 +1493,14 @@ function updateEnergyPulse() {
     const baseColor = new THREE.Color(sys.hex);
 
     if (sm.sysIndex === pulseTarget) {
-      // Highlighted: bright glow based on live load
-      const loadBright = 0.8 + loadInfo.ratio * 0.7; // 0.8-1.5x
-      const brightness = 0.4 + glowIntensity * loadBright;
-      sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(brightness));
-      sm.mesh.material.opacity = 0.5 + glowIntensity * 0.45;
+      // Highlighted: vivid original color + load-based brightness
+      const loadBright = 1.0 + loadInfo.ratio * 0.5; // 1.0-1.5x
+      sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(loadBright));
+      sm.mesh.material.opacity = 0.3 + glowIntensity * 0.65;
     } else {
-      // Others: dim
-      sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(0.35));
-      sm.mesh.material.opacity = 0.3;
+      // Others: nearly invisible
+      sm.mesh.material.color.copy(baseColor);
+      sm.mesh.material.opacity = 0.06;
     }
   });
 
