@@ -354,123 +354,29 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const gltfLoader = new GLTFLoader(); gltfLoader.setDRACOLoader(dracoLoader);
 
-gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
-  // Auto-center and scale the model
-  const box = new THREE.Box3().setFromObject(gltf.scene);
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  console.log('Model bounds:', box.min, box.max, 'Size:', size);
-
-  // Center model at origin
-  gltf.scene.position.sub(center);
-
-  // Scale to fit our scene (target: ~60m wide)
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const scale = 60 / maxDim;
-  gltf.scene.scale.setScalar(scale);
-
-  // Shift up so bottom is at y=0
-  const scaledBox = new THREE.Box3().setFromObject(gltf.scene);
-  gltf.scene.position.y -= scaledBox.min.y;
-
+gltfLoader.load('grimes-mep-only.glb', (gltf) => {
   scene.add(gltf.scene);
-
-  // Filter: hide architecture/structure (gray/white), keep MEP (colored)
-  let hidden = 0, shown = 0;
+  let meshIdx = 0;
   gltf.scene.traverse(child => {
     if (!child.isMesh) return;
-
-    const c = child.material?.color;
-    if (!c) { child.visible = false; hidden++; return; }
-
-    const r = c.r, g = c.g, b = c.b;
-    const saturation = Math.max(r, g, b) - Math.min(r, g, b);
-    const brightness = (r + g + b) / 3;
-
-    // Hide: very gray/white (low saturation + high brightness = architecture/structure)
-    // Hide: very dark (black = grids/text outlines)
-    // Keep: colored elements (MEP systems have distinct hues)
-    if ((saturation < 0.08 && brightness > 0.5) || brightness < 0.05 || brightness > 0.92) {
-      child.visible = false;
-      hidden++;
-      return;
-    }
-
     allMeshes.push(child);
-
-    // Classify MEP system by color
-    let sysIdx = 1; // default: HVAC Equipment
-    if (r > 0.7 && g > 0.5 && b < 0.3) sysIdx = 4;           // Yellow/Orange → Electrical
-    else if (r > 0.6 && g < 0.3 && b < 0.3) sysIdx = 3;       // Red → Fire Protection
-    else if (r < 0.3 && g < 0.3 && b > 0.5) sysIdx = 2;       // Blue → Plumbing
-    else if (r < 0.3 && g > 0.4 && b > 0.4) sysIdx = 0;       // Cyan/Teal → HVAC Duct
-    else if (r < 0.4 && g > 0.5 && b < 0.4) sysIdx = 5;       // Green → Diffusers
-    else if (r > 0.5 && g < 0.4 && b > 0.4) sysIdx = 6;       // Purple → Pumps
-    else if (r > 0.3 && g > 0.5 && b > 0.5) sysIdx = 7;       // Light cyan → Spiral
-    else if (saturation < 0.15) sysIdx = 1;                     // Low saturation = Equipment
-
+    const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
     const sys = SYSTEM_INFO[sysIdx];
-    const mat = new THREE.MeshStandardMaterial({
-      color: sys.hex,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.8,
-      roughness: 0.5,
-      metalness: 0.15,
-    });
+    const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
     child.userData.sysId = sys.id;
     child.userData.sysLabel = sys.label;
     originalMaterials.set(child.uuid, mat);
     systemMeshes.push({ mesh: child, sysIndex: sysIdx });
-    shown++;
+    meshIdx++;
   });
-
-  console.log(`Total: ${shown + hidden} meshes | MEP shown: ${shown} | Arch hidden: ${hidden}`);
-
-  // Reset camera to look at model
-  const finalBox = new THREE.Box3().setFromObject(gltf.scene);
-  const fc = finalBox.getCenter(new THREE.Vector3());
-  camera.position.set(fc.x + 30, fc.y + 20, fc.z + 30);
-  orbitControls.target.copy(fc);
-  orbitControls.update();
-
   document.getElementById('loading').style.display = 'none';
   buildLegend();
   startSimulation();
   setupXR();
-}, p => {
-  const mb = (p.loaded / 1024 / 1024).toFixed(1);
-  const pct = p.total ? Math.round(p.loaded / p.total * 100) : '';
-  loadingEl.textContent = `Loading MEP model... ${mb} MB${pct ? ' (' + pct + '%)' : ''}`;
-},
-() => {
-  // Fallback to smaller file
-  loadingEl.textContent = 'Loading fallback...';
-  gltfLoader.load('grimes-mep-only.glb', (gltf) => {
-    scene.add(gltf.scene);
-    let meshIdx = 0;
-    gltf.scene.traverse(child => {
-      if (!child.isMesh) return;
-      allMeshes.push(child);
-      const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
-      const sys = SYSTEM_INFO[sysIdx];
-      const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
-      child.material = mat;
-      child.userData.sysIndex = sysIdx;
-      child.userData.sysId = sys.id;
-      child.userData.sysLabel = sys.label;
-      originalMaterials.set(child.uuid, mat);
-      systemMeshes.push({ mesh: child, sysIndex: sysIdx });
-      meshIdx++;
-    });
-    document.getElementById('loading').style.display = 'none';
-    buildLegend();
-    startSimulation();
-    setupXR();
-  });
-});
+}, p => { loadingEl.textContent = `Loading MEP... ${(p.loaded/1024/1024).toFixed(1)} MB`; },
+() => { loadingEl.textContent = 'Error loading model'; loadingEl.style.color = '#f87171'; });
 
 /* ══════════════════════════════════════════ BUILDING MODEL (transparent overlay) ══════════════════════════════════════════ */
 let buildingModel = null;
@@ -1234,13 +1140,11 @@ function initMepTimeSlider() {
 }
 // Call after data loads
 var _origFetchLive = fetchLiveData;
-var fetchLiveDataWrapped = async function() {
+fetchLiveData = async function() {
   await _origFetchLive();
   initMepTimeSlider();
+  checkAnomalies();
 };
-// Override the interval
-clearInterval(window._mepFetchInterval);
-window._mepFetchInterval = setInterval(fetchLiveDataWrapped, 60000);
 
 /* ══════════════════ A. FLOOR ISOLATION ══════════════════ */
 var isolatedFloor = null;
@@ -1563,14 +1467,7 @@ function toggleFlow() {
   if (btn) btn.style.background = flowEnabled ? 'rgba(45,212,191,.2)' : '';
 }
 
-/* ══════════════════ INTEGRATE INTO RENDER LOOP ══════════════════ */
-// Anomaly check every 60s with data refresh
-var _origFetchForAnom = fetchLiveData;
-fetchLiveData = async function() {
-  await _origFetchForAnom();
-  initMepTimeSlider();
-  checkAnomalies();
-};
+/* Anomaly + time slider integrated into fetchLiveData above */
 
 /* ══════════════════════════════════════════ LEGEND ══════════════════════════════════════════ */
 function buildLegend() {
