@@ -153,6 +153,9 @@
 <!-- Anomaly Alert -->
 <div id="anomalyAlert">⚠️ <span id="anomalyText">—</span></div>
 
+<!-- Pulse Label -->
+<div id="pulseLabel" style="display:none;position:fixed;bottom:110px;left:50%;transform:translateX(-50%);z-index:45;background:rgba(10,16,32,.9);backdrop-filter:blur(8px);border:1px solid rgba(45,212,191,.2);border-radius:8px;padding:6px 16px;font:600 12px 'Calibri',sans-serif;color:#e2e8f0;white-space:nowrap;pointer-events:none;transition:opacity 0.3s"></div>
+
 <!-- Legend -->
 <div id="legend"><h3>MEP Systems</h3><div id="systemList"></div></div>
 
@@ -1418,74 +1421,116 @@ function exitCompare() {
   });
 }
 
-/* ══════════════════ E. ENERGY PULSE — Live kW drives glow ══════════════════ */
+/* ══════════════════ E. ENERGY PULSE — Spotlight one system at a time ══════════════════ */
 var pulseEnabled = false;
-var pulseTime = 0;
+var pulseTarget = -1;      // current highlighted sysIndex
+var pulsePhase = 0;        // 0=fade-in, 1=hold, 2=fade-out
+var pulseProgress = 0;     // 0-1 within current phase
+var pulseCycleTimer = null;
 
-// Load thresholds: what's "normal" vs "high" for each system
-const LOAD_MAX = { elec: 100, hvac: 80, water: 2, fire: 0 };
+const LOAD_MAX = { elec: 100, hvac: 80, water: 2 };
 
 function getLiveLoad() {
   if (!liveData?.meters) return { elec: 0, hvac: 0, water: 0, total: 0 };
   const m3 = liveData.meters['3']?.latest?.kw || 0;
   const m76 = liveData.meters['76']?.latest?.kw || 0;
   const m77 = liveData.meters['77']?.latest?.kw || 0;
-  const waterFlow = liveData.water?.latest?.water1_rate_cfm || 0;
-  return {
-    elec: m77,           // 208V outlets/IT
-    hvac: m76 + m3,      // 480V HVAC + roof AHU
-    water: waterFlow,
-    total: m3 + m76 + m77
-  };
+  const wf = liveData.water?.latest?.water1_rate_cfm || 0;
+  return { elec: m77, hvac: m76 + m3, water: wf, total: m3 + m76 + m77 };
+}
+
+function getSystemLoad(sysId) {
+  const load = getLiveLoad();
+  if (sysId === 'conduit' || sysId === 'elec') return { ratio: Math.min(1, load.elec / LOAD_MAX.elec), kw: load.elec, label: 'Outlets/IT ' + load.elec.toFixed(0) + ' kW' };
+  if (sysId === 'hvac_duct' || sysId === 'hvac_equip' || sysId === 'spiral' || sysId === 'diffuser') return { ratio: Math.min(1, load.hvac / LOAD_MAX.hvac), kw: load.hvac, label: 'HVAC ' + load.hvac.toFixed(0) + ' kW' };
+  if (sysId === 'pipe' || sysId === 'pump') return { ratio: Math.min(1, load.water / LOAD_MAX.water), kw: load.water, label: 'Water ' + load.water.toFixed(2) + ' cf/m' };
+  if (sysId === 'sprinkler') return { ratio: 0.05, kw: 0, label: 'Standby' };
+  return { ratio: 0.3, kw: 0, label: '' };
+}
+
+function pickNextTarget() {
+  // Pick random system that exists in scene
+  const available = [...new Set(systemMeshes.map(sm => sm.sysIndex))];
+  if (available.length === 0) return;
+  // Don't pick same one twice in a row
+  let next;
+  do { next = available[Math.floor(Math.random() * available.length)]; } while (next === pulseTarget && available.length > 1);
+  pulseTarget = next;
+  pulsePhase = 0;
+  pulseProgress = 0;
 }
 
 function updateEnergyPulse() {
   if (!pulseEnabled) return;
-  pulseTime += 0.016; // ~60fps
 
-  const load = getLiveLoad();
+  // Advance phase
+  const speed = 0.012; // ~5 seconds per full cycle
+  pulseProgress += speed;
+
+  if (pulseProgress >= 1) {
+    pulseProgress = 0;
+    pulsePhase++;
+    if (pulsePhase > 2) {
+      pickNextTarget();
+    }
+  }
+
+  // Calculate glow intensity for highlighted system
+  let glowIntensity = 0;
+  if (pulsePhase === 0) glowIntensity = pulseProgress;           // fade in
+  else if (pulsePhase === 1) glowIntensity = 1.0;                // hold
+  else if (pulsePhase === 2) glowIntensity = 1.0 - pulseProgress; // fade out
+
+  // Ease
+  glowIntensity = glowIntensity * glowIntensity * (3 - 2 * glowIntensity); // smoothstep
+
+  const targetSys = SYSTEM_INFO[pulseTarget];
+  const loadInfo = targetSys ? getSystemLoad(targetSys.id) : { ratio: 0, label: '' };
 
   systemMeshes.forEach(sm => {
     const sys = SYSTEM_INFO[sm.sysIndex];
     if (!sys) return;
-    const sysId = sys.id;
     const baseColor = new THREE.Color(sys.hex);
 
-    // Determine load ratio (0-1) and pulse speed from LIVE data
-    let loadRatio = 0;
-    if (sysId === 'conduit' || sysId === 'elec') {
-      loadRatio = Math.min(1, load.elec / LOAD_MAX.elec);
-    } else if (sysId === 'hvac_duct' || sysId === 'hvac_equip' || sysId === 'spiral' || sysId === 'diffuser') {
-      loadRatio = Math.min(1, load.hvac / LOAD_MAX.hvac);
-    } else if (sysId === 'pipe' || sysId === 'pump') {
-      loadRatio = Math.min(1, load.water / LOAD_MAX.water);
-    } else if (sysId === 'sprinkler') {
-      loadRatio = 0.05; // fire: always standby
+    if (sm.sysIndex === pulseTarget) {
+      // Highlighted: bright glow based on live load
+      const loadBright = 0.8 + loadInfo.ratio * 0.7; // 0.8-1.5x
+      const brightness = 0.4 + glowIntensity * loadBright;
+      sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(brightness));
+      sm.mesh.material.opacity = 0.5 + glowIntensity * 0.45;
+    } else {
+      // Others: dim
+      sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(0.35));
+      sm.mesh.material.opacity = 0.3;
     }
-
-    // Pulse speed: idle=0.5Hz, full load=3Hz
-    const pulseSpeed = 0.5 + loadRatio * 2.5;
-    const wave = Math.sin(pulseTime * pulseSpeed * 6.28 + sm.sysIndex) * 0.5 + 0.5;
-
-    // Brightness: idle=dim(0.3), full load=bright(1.5)
-    // Wave amplitude: idle=small flicker, full load=strong pulse
-    const minBright = 0.3 + loadRatio * 0.2;
-    const maxBright = 0.6 + loadRatio * 0.9;
-    const brightness = minBright + wave * (maxBright - minBright);
-
-    sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(brightness));
-    sm.mesh.material.opacity = 0.4 + loadRatio * 0.3 + wave * 0.25;
   });
+
+  // Update pulse label
+  const labelEl = document.getElementById('pulseLabel');
+  if (labelEl && targetSys) {
+    if (glowIntensity > 0.1) {
+      labelEl.style.display = 'block';
+      labelEl.innerHTML = '<span style="color:' + targetSys.color + '">' + targetSys.label + '</span> — <span style="color:#2dd4bf">' + loadInfo.label + '</span>';
+      labelEl.style.opacity = glowIntensity;
+    } else {
+      labelEl.style.display = 'none';
+    }
+  }
 }
 
 function toggleFlow() {
   pulseEnabled = !pulseEnabled;
-  if (!pulseEnabled) {
+  if (pulseEnabled) {
+    pickNextTarget();
+  } else {
+    // Restore
     systemMeshes.forEach(sm => {
       const sys = SYSTEM_INFO[sm.sysIndex];
       sm.mesh.material.color.set(sys.hex);
       sm.mesh.material.opacity = 0.85;
     });
+    const labelEl = document.getElementById('pulseLabel');
+    if (labelEl) labelEl.style.display = 'none';
   }
   const btn = document.getElementById('flowBtn');
   if (btn) {
