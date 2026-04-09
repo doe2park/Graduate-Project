@@ -90,6 +90,23 @@
   .fl-btn.active { background:var(--cyan);color:#000;border-color:var(--cyan); }
 
   #ctrlHint { position:fixed;bottom:8px;left:12px;z-index:40;font-size:9px;color:#334155;line-height:1.4; }
+  #mepTimeBar { position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:45;background:var(--panel);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:10px;padding:6px 14px;display:flex;align-items:center;gap:10px;min-width:320px; }
+  #mepTimeBar label { font-size:8px;color:#64748b;white-space:nowrap; }
+  #mepTimeBar input[type=range] { flex:1;-webkit-appearance:none;height:3px;background:#334155;border-radius:2px;outline:none; }
+  #mepTimeBar input[type=range]::-webkit-slider-thumb { -webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#FDB515;cursor:pointer; }
+  #mepTimeBar .tval { font:700 12px 'JetBrains Mono',monospace;color:#FDB515;min-width:40px; }
+  #mepTimeBar button { background:none;border:1px solid rgba(45,212,191,.2);color:#2dd4bf;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:9px; }
+  /* Floor isolation */
+  .fl-btn.isolated { background:#FDB515;color:#000;border-color:#FDB515; }
+  /* Tour overlay */
+  #tourOverlay { position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;background:rgba(0,50,98,.92);backdrop-filter:blur(12px);border:1px solid rgba(253,181,21,.3);border-radius:14px;padding:20px 30px;text-align:center;display:none;max-width:360px; }
+  #tourOverlay h2 { color:#FDB515;font-size:18px;margin:0 0 6px; }
+  #tourOverlay p { color:#CBD5E1;font-size:12px;margin:0 0 4px; }
+  #tourOverlay .tour-kw { font:700 28px 'JetBrains Mono',monospace;color:#2dd4bf; }
+  /* Anomaly alert */
+  #anomalyAlert { position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:55;background:rgba(248,113,113,.15);border:1px solid #f87171;border-radius:10px;padding:8px 18px;display:none;color:#fca5a5;font-size:11px;backdrop-filter:blur(8px); }
+  @keyframes pulseRed { 0%,100%{opacity:0.4} 50%{opacity:1} }
+  .anomaly-flash { animation:pulseRed 1s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -106,7 +123,21 @@
   <button class="view-btn" data-mode="energy">⚡ Energy</button>
   <button class="view-btn" id="bldgToggle" style="margin-left:8px;border-color:rgba(148,163,184,0.3)">🏢 Building</button>
   <button class="view-btn" id="dbToggleBar" style="margin-left:4px;border-color:rgba(45,212,191,0.3);color:var(--cyan)">📊 Data</button>
+  <button class="view-btn" id="tourBtn" style="margin-left:4px;border-color:rgba(253,181,21,.3);color:#FDB515" onclick="startTour()">🎬 Tour</button>
+  <button class="view-btn" id="flowToggle" style="margin-left:4px;border-color:rgba(45,212,191,.2);color:#2dd4bf" onclick="toggleFlow()">✨ Flow</button>
 </div>
+
+<!-- Tour Overlay -->
+<div id="tourOverlay">
+  <h2 id="tourTitle">—</h2>
+  <div class="tour-kw" id="tourKw">—</div>
+  <p id="tourDesc">—</p>
+  <p id="tourDetail" style="color:#94A3B8;font-size:10px;margin-top:4px">—</p>
+  <button onclick="skipTour()" style="margin-top:10px;background:none;border:1px solid rgba(253,181,21,.3);color:#FDB515;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:10px">Skip →</button>
+</div>
+
+<!-- Anomaly Alert -->
+<div id="anomalyAlert">⚠️ <span id="anomalyText">—</span></div>
 
 <!-- Legend -->
 <div id="legend"><h3>MEP Systems</h3><div id="systemList"></div></div>
@@ -215,11 +246,19 @@
   <button class="fl-btn active" data-y="1.6"><span class="fl-name">B1</span><span class="fl-kw" id="fkB1"></span></button>
 </div>
 
+<!-- Time Slider -->
+<div id="mepTimeBar">
+  <label>24hr</label>
+  <button id="mepPlayBtn" onclick="mepTogglePlay()">▶</button>
+  <input type="range" id="mepTimeRange" min="0" max="95" value="95" oninput="mepOnTimeChange(this.value)">
+  <div class="tval" id="mepTimeVal">Live</div>
+</div>
+
 <!-- Joysticks -->
 <div class="joystick-zone" id="joystickMove"><div class="joystick-label">Move</div><div class="joystick-knob" id="moveKnob"></div></div>
 <div class="joystick-zone" id="joystickLook"><div class="joystick-label">Look</div><div class="joystick-knob" id="lookKnob"></div></div>
 
-<div id="ctrlHint">v38 · LIVE DATA · WASD move · QE up/down · Click MEP · Shift+Arrows nudge building · ESC orbit</div>
+<div id="ctrlHint">v39 · LIVE DATA · WASD move · QE up/down · Click MEP · Dbl-click floor: isolate · Dbl-click legend: compare · ESC orbit</div>
 <button id="enterXR">🥽 ENTER VR</button>
 
 <script type="importmap">
@@ -257,6 +296,7 @@ const SIM_DATA = {
   pipe:       { temp:{ val:48, unit:'°F', label:'Water Temp' },    flow:{ val:150, unit:'GPM', label:'Flow Rate' },  energy:{ val:8.2, unit:'kW', label:'Pump Power' },   pressure:{ val:65, unit:'PSI', label:'Pressure' } },
   sprinkler:  { temp:{ val:70, unit:'°F', label:'Ambient' },       flow:{ val:0, unit:'GPM', label:'Flow (idle)' },  energy:{ val:0, unit:'kW', label:'Standby' },        pressure:{ val:120, unit:'PSI', label:'Line P' } },
   conduit:    { temp:{ val:78, unit:'°F', label:'Cable Temp' },    flow:{ val:0, unit:'', label:'—' },               energy:{ val:87, unit:'kW', label:'Total Load' },     current:{ val:240, unit:'A', label:'Current' } },
+  elec:       { temp:{ val:0, unit:'A', label:'Current' },        flow:{ val:0, unit:'V', label:'Voltage' },        energy:{ val:0, unit:'kW', label:'480/277V' },        pressure:{ val:0, unit:'kW', label:'208/120V' } },
   diffuser:   { temp:{ val:55, unit:'°F', label:'Discharge' },     flow:{ val:350, unit:'CFM', label:'Airflow' },    energy:{ val:0, unit:'', label:'—' },                 co2:{ val:620, unit:'ppm', label:'CO₂ Level' } },
   pump:       { temp:{ val:52, unit:'°F', label:'Fluid Temp' },    flow:{ val:280, unit:'GPM', label:'Flow' },       energy:{ val:15.5, unit:'kW', label:'Motor kW' },     speed:{ val:1760, unit:'RPM', label:'Speed' } },
   spiral:     { temp:{ val:55, unit:'°F', label:'Supply Air' },    flow:{ val:1800, unit:'CFM', label:'Airflow' },   energy:{ val:5.2, unit:'kW', label:'Fan Power' },     pressure:{ val:0.8, unit:'inWC', label:'Static P' } },
@@ -266,7 +306,7 @@ const SIM_DATA = {
 const HEAT_RANGES = {
   temp:   { min:40, max:160, unit:'°F', label:'Temperature',  gradient:'linear-gradient(90deg, #38bdf8, #2dd4bf, #f59e0b, #fb923c, #f87171)' },
   flow:   { min:0,  max:2500, unit:'',   label:'Flow Rate',    gradient:'linear-gradient(90deg, #1e293b, #38bdf8, #2dd4bf, #22d3ee)' },
-  energy: { min:0,  max:100,  unit:'kW', label:'Energy Load (LIVE)',  gradient:'linear-gradient(90deg, #22c55e, #f59e0b, #f87171)' },
+  energy: { min:0,  max:50,  unit:'kW', label:'Floor Energy (BIM+LIVE)',  gradient:'linear-gradient(90deg, #22c55e, #f59e0b, #f87171)' },
 };
 
 let viewMode = 'system'; // 'system' | 'temp' | 'flow' | 'energy'
@@ -314,29 +354,123 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const gltfLoader = new GLTFLoader(); gltfLoader.setDRACOLoader(dracoLoader);
 
-gltfLoader.load('grimes-mep-only.glb', (gltf) => {
+gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
+  // Auto-center and scale the model
+  const box = new THREE.Box3().setFromObject(gltf.scene);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  console.log('Model bounds:', box.min, box.max, 'Size:', size);
+
+  // Center model at origin
+  gltf.scene.position.sub(center);
+
+  // Scale to fit our scene (target: ~60m wide)
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = 60 / maxDim;
+  gltf.scene.scale.setScalar(scale);
+
+  // Shift up so bottom is at y=0
+  const scaledBox = new THREE.Box3().setFromObject(gltf.scene);
+  gltf.scene.position.y -= scaledBox.min.y;
+
   scene.add(gltf.scene);
-  let meshIdx = 0;
+
+  // Filter: hide architecture/structure (gray/white), keep MEP (colored)
+  let hidden = 0, shown = 0;
   gltf.scene.traverse(child => {
     if (!child.isMesh) return;
+
+    const c = child.material?.color;
+    if (!c) { child.visible = false; hidden++; return; }
+
+    const r = c.r, g = c.g, b = c.b;
+    const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+    const brightness = (r + g + b) / 3;
+
+    // Hide: very gray/white (low saturation + high brightness = architecture/structure)
+    // Hide: very dark (black = grids/text outlines)
+    // Keep: colored elements (MEP systems have distinct hues)
+    if ((saturation < 0.08 && brightness > 0.5) || brightness < 0.05 || brightness > 0.92) {
+      child.visible = false;
+      hidden++;
+      return;
+    }
+
     allMeshes.push(child);
-    const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length-1);
+
+    // Classify MEP system by color
+    let sysIdx = 1; // default: HVAC Equipment
+    if (r > 0.7 && g > 0.5 && b < 0.3) sysIdx = 4;           // Yellow/Orange → Electrical
+    else if (r > 0.6 && g < 0.3 && b < 0.3) sysIdx = 3;       // Red → Fire Protection
+    else if (r < 0.3 && g < 0.3 && b > 0.5) sysIdx = 2;       // Blue → Plumbing
+    else if (r < 0.3 && g > 0.4 && b > 0.4) sysIdx = 0;       // Cyan/Teal → HVAC Duct
+    else if (r < 0.4 && g > 0.5 && b < 0.4) sysIdx = 5;       // Green → Diffusers
+    else if (r > 0.5 && g < 0.4 && b > 0.4) sysIdx = 6;       // Purple → Pumps
+    else if (r > 0.3 && g > 0.5 && b > 0.5) sysIdx = 7;       // Light cyan → Spiral
+    else if (saturation < 0.15) sysIdx = 1;                     // Low saturation = Equipment
+
     const sys = SYSTEM_INFO[sysIdx];
-    const mat = new THREE.MeshBasicMaterial({ color:sys.hex, side:THREE.DoubleSide, transparent:true, opacity:0.85 });
+    const mat = new THREE.MeshStandardMaterial({
+      color: sys.hex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8,
+      roughness: 0.5,
+      metalness: 0.15,
+    });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
     child.userData.sysId = sys.id;
     child.userData.sysLabel = sys.label;
     originalMaterials.set(child.uuid, mat);
-    systemMeshes.push({ mesh:child, sysIndex:sysIdx });
-    meshIdx++;
+    systemMeshes.push({ mesh: child, sysIndex: sysIdx });
+    shown++;
   });
+
+  console.log(`Total: ${shown + hidden} meshes | MEP shown: ${shown} | Arch hidden: ${hidden}`);
+
+  // Reset camera to look at model
+  const finalBox = new THREE.Box3().setFromObject(gltf.scene);
+  const fc = finalBox.getCenter(new THREE.Vector3());
+  camera.position.set(fc.x + 30, fc.y + 20, fc.z + 30);
+  orbitControls.target.copy(fc);
+  orbitControls.update();
+
   document.getElementById('loading').style.display = 'none';
   buildLegend();
   startSimulation();
   setupXR();
-}, p => { loadingEl.textContent = `Loading MEP... ${(p.loaded/1024/1024).toFixed(1)} MB`; },
-() => { loadingEl.textContent = 'Error'; loadingEl.style.color = '#f87171'; });
+}, p => {
+  const mb = (p.loaded / 1024 / 1024).toFixed(1);
+  const pct = p.total ? Math.round(p.loaded / p.total * 100) : '';
+  loadingEl.textContent = `Loading MEP model... ${mb} MB${pct ? ' (' + pct + '%)' : ''}`;
+},
+() => {
+  // Fallback to smaller file
+  loadingEl.textContent = 'Loading fallback...';
+  gltfLoader.load('grimes-mep-only.glb', (gltf) => {
+    scene.add(gltf.scene);
+    let meshIdx = 0;
+    gltf.scene.traverse(child => {
+      if (!child.isMesh) return;
+      allMeshes.push(child);
+      const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
+      const sys = SYSTEM_INFO[sysIdx];
+      const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+      child.material = mat;
+      child.userData.sysIndex = sysIdx;
+      child.userData.sysId = sys.id;
+      child.userData.sysLabel = sys.label;
+      originalMaterials.set(child.uuid, mat);
+      systemMeshes.push({ mesh: child, sysIndex: sysIdx });
+      meshIdx++;
+    });
+    document.getElementById('loading').style.display = 'none';
+    buildLegend();
+    startSimulation();
+    setupXR();
+  });
+});
 
 /* ══════════════════════════════════════════ BUILDING MODEL (transparent overlay) ══════════════════════════════════════════ */
 let buildingModel = null;
@@ -492,9 +626,11 @@ function flowToColor(f) {
 }
 
 function energyToColor(e) {
-  const n = Math.max(0, Math.min(1, e / 100));
-  if (n < 0.5) return new THREE.Color(0.13 + n, 0.77 - n * 0.3, 0.22);
-  return new THREE.Color(0.97, 0.62 - (n - 0.5) * 1.2, 0.04 + (n - 0.5) * 0.6);
+  // Scale: 0-50 kW per floor (BIM-validated range)
+  const n = Math.max(0, Math.min(1, e / 50));
+  if (n < 0.33) return new THREE.Color(0.13, 0.82, 0.60); // green (low)
+  if (n < 0.66) return new THREE.Color(0.99, 0.73, 0.08); // gold (medium)
+  return new THREE.Color(0.97, 0.45, 0.28); // red-orange (high)
 }
 
 function applyViewMode() {
@@ -648,18 +784,20 @@ function updateDashboard() {
   }
 
   // Feed real data into SIM_DATA
-  if (m3.kw) {
-    SIM_DATA.conduit.energy.val = m3.kw; SIM_DATA.conduit.energy.label = 'ROOF ELEC';
-    SIM_DATA.conduit.temp.val = m3.current_avg||0; SIM_DATA.conduit.temp.label = 'CURRENT'; SIM_DATA.conduit.temp.unit = 'A';
-    SIM_DATA.conduit.flow.val = m3.voltage_ll||0; SIM_DATA.conduit.flow.label = 'VOLTAGE'; SIM_DATA.conduit.flow.unit = 'V';
-    SIM_DATA.conduit.pressure.val = m3.power_factor||0; SIM_DATA.conduit.pressure.label = 'POWER FACTOR'; SIM_DATA.conduit.pressure.unit = '';
-  }
-  if (m76.kw) {
-    SIM_DATA.elec.energy.val = m76.kw; SIM_DATA.elec.energy.label = '480/277V';
-    SIM_DATA.elec.temp.val = m76.current_avg||0; SIM_DATA.elec.temp.label = 'CURRENT'; SIM_DATA.elec.temp.unit = 'A';
-    SIM_DATA.elec.flow.val = m76.voltage_ln||0; SIM_DATA.elec.flow.label = 'VOLTAGE'; SIM_DATA.elec.flow.unit = 'V';
-    SIM_DATA.elec.pressure.val = m77.kw||0; SIM_DATA.elec.pressure.label = '208/120V kW'; SIM_DATA.elec.pressure.unit = 'kW';
-  }
+  try {
+    if (m3.kw && SIM_DATA.conduit) {
+      SIM_DATA.conduit.energy.val = m3.kw; SIM_DATA.conduit.energy.label = 'ROOF ELEC';
+      SIM_DATA.conduit.temp.val = m3.current_avg||0; SIM_DATA.conduit.temp.label = 'CURRENT'; SIM_DATA.conduit.temp.unit = 'A';
+      SIM_DATA.conduit.flow.val = m3.voltage_ll||0; SIM_DATA.conduit.flow.label = 'VOLTAGE'; SIM_DATA.conduit.flow.unit = 'V';
+      SIM_DATA.conduit.current.val = m3.power_factor||0; SIM_DATA.conduit.current.label = 'POWER FACTOR'; SIM_DATA.conduit.current.unit = '';
+    }
+    if (m76.kw && SIM_DATA.elec) {
+      SIM_DATA.elec.energy.val = m76.kw; SIM_DATA.elec.energy.label = '480/277V';
+      SIM_DATA.elec.temp.val = m76.current_avg||0; SIM_DATA.elec.temp.label = 'CURRENT'; SIM_DATA.elec.temp.unit = 'A';
+      SIM_DATA.elec.flow.val = m76.voltage_ln||0; SIM_DATA.elec.flow.label = 'VOLTAGE'; SIM_DATA.elec.flow.unit = 'V';
+      SIM_DATA.elec.pressure.val = m77?.kw||0; SIM_DATA.elec.pressure.label = '208/120V kW'; SIM_DATA.elec.pressure.unit = 'kW';
+    }
+  } catch(e) { console.log('SIM_DATA update:', e.message); }
 }
 
 /* ══════════════════════════════════════════ CHARTS ══════════════════════════════════════════ */
@@ -964,7 +1102,7 @@ function startSimulation() {
   // Still fluctuate non-electrical SIM_DATA for other systems
   setInterval(() => {
     for (const [sysId, data] of Object.entries(SIM_DATA)) {
-      if (sysId === 'conduit' || sysId === 'elec') continue; // skip, using real data
+      if (sysId === 'conduit' || sysId === 'elec') continue;
       for (const [key, sensor] of Object.entries(data)) {
         if (typeof sensor.val === 'number' && sensor.val > 0) {
           sensor.val += (Math.random() - 0.5) * sensor.val * 0.02;
@@ -975,6 +1113,464 @@ function startSimulation() {
     if (viewMode !== 'system') applyViewMode();
   }, 2000);
 }
+
+/* ══════════════════ 24HR TIME SLIDER ══════════════════ */
+var mepHistoryCache = null;
+var mepPlayInterval = null;
+var mepIsLive = true;
+
+function mepGetTimeSeries() {
+  if (!liveData?.meters) return [];
+  const ts = liveData.meters['3']?.timeseries_kw;
+  return ts || [];
+}
+
+function mepOnTimeChange(val) {
+  val = parseInt(val);
+  const ts = mepGetTimeSeries();
+  if (!ts.length) return;
+  const slider = document.getElementById('mepTimeRange');
+  const isLive = val >= ts.length - 1;
+  mepIsLive = isLive;
+  document.getElementById('mepTimeVal').textContent = isLive ? 'Live' : (ts[val]?.t || '--');
+
+  if (isLive) {
+    // Restore live data
+    if (liveData) {
+      updateDashboard();
+      updateFloorNav();
+      if (viewMode === 'energy') applyViewMode();
+    }
+    return;
+  }
+
+  // Historical: find kW at this time point for each meter
+  const time = ts[val]?.t;
+  if (!time) return;
+
+  const m3kw = ts[val]?.kw || 0;
+  // Estimate 76/77 from total proportions (meters only have aggregate timeseries)
+  const m3Live = liveData.meters['3']?.latest?.kw || 1;
+  const m76Live = liveData.meters['76']?.latest?.kw || 1;
+  const m77Live = liveData.meters['77']?.latest?.kw || 1;
+  const liveTotal = m3Live + m76Live + m77Live;
+  const ratio76 = m76Live / liveTotal;
+  const ratio77 = m77Live / liveTotal;
+  const ratio3 = m3Live / liveTotal;
+
+  // Estimate historical total from meter#3 trend
+  const histTotal = m3kw / ratio3;
+  const histM76 = histTotal * ratio76;
+  const histM77 = histTotal * ratio77;
+
+  // Update dashboard totals
+  const totalEl = document.getElementById('dTotal');
+  if (totalEl) totalEl.textContent = histTotal.toFixed(1) + ' kW';
+  document.getElementById('dSubA').textContent = histM76.toFixed(1);
+  document.getElementById('dMain').textContent = m3kw.toFixed(1);
+  document.getElementById('dSubB').textContent = histM77.toFixed(1);
+
+  // Update floor breakdown with historical values
+  const tempMeters = { '3': { latest: { kw: m3kw } }, '76': { latest: { kw: histM76 } }, '77': { latest: { kw: histM77 } } };
+  const savedMeters = liveData.meters;
+  liveData.meters = tempMeters;
+  updateFloorNav();
+  if (viewMode === 'energy') applyViewMode();
+
+  // Update floor breakdown display
+  const floors = getAllFloorKw();
+  const fbEl = document.getElementById('floorBreakdown');
+  if (fbEl) {
+    let html = '';
+    for (const [fl, d] of Object.entries(floors)) {
+      const pct = histTotal > 0 ? Math.round(d.kw / histTotal * 100) : 0;
+      const barColor = d.kw > 40 ? '#f87171' : d.kw > 20 ? '#FDB515' : '#2dd4bf';
+      html += '<div style="display:flex;align-items:center;gap:6px;margin:3px 0" title="' + d.breakdown + '"><span style="font-size:9px;font-weight:700;color:#e2e8f0;width:24px">' + fl + '</span><div style="flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + barColor + ';border-radius:3px"></div></div><span style="font-size:9px;font-family:var(--mono);color:' + barColor + ';width:42px;text-align:right">' + d.kw + 'kW</span></div>';
+    }
+    fbEl.innerHTML = html;
+  }
+
+  liveData.meters = savedMeters; // restore
+}
+
+function mepTogglePlay() {
+  const btn = document.getElementById('mepPlayBtn');
+  const slider = document.getElementById('mepTimeRange');
+  if (mepPlayInterval) {
+    clearInterval(mepPlayInterval);
+    mepPlayInterval = null;
+    btn.textContent = '▶';
+    return;
+  }
+  const ts = mepGetTimeSeries();
+  if (!ts.length) return;
+  slider.max = ts.length - 1;
+  btn.textContent = '⏸';
+  slider.value = 0;
+  mepOnTimeChange(0);
+  mepPlayInterval = setInterval(function() {
+    var v = parseInt(slider.value) + 1;
+    if (v > parseInt(slider.max)) {
+      clearInterval(mepPlayInterval);
+      mepPlayInterval = null;
+      btn.textContent = '▶';
+      slider.value = slider.max;
+      mepOnTimeChange(slider.max);
+      return;
+    }
+    slider.value = v;
+    mepOnTimeChange(v);
+  }, 800);
+}
+
+// Initialize time slider when data arrives
+function initMepTimeSlider() {
+  const ts = mepGetTimeSeries();
+  if (ts.length) {
+    const slider = document.getElementById('mepTimeRange');
+    slider.max = ts.length - 1;
+    slider.value = ts.length - 1;
+  }
+}
+// Call after data loads
+var _origFetchLive = fetchLiveData;
+var fetchLiveDataWrapped = async function() {
+  await _origFetchLive();
+  initMepTimeSlider();
+};
+// Override the interval
+clearInterval(window._mepFetchInterval);
+window._mepFetchInterval = setInterval(fetchLiveDataWrapped, 60000);
+
+/* ══════════════════ A. FLOOR ISOLATION ══════════════════ */
+var isolatedFloor = null;
+var floorYRanges = { SRV:[15,22], L3:[10,15], L2:[6,10], L1:[3,6], B1:[-2,3] };
+
+document.querySelectorAll('.fl-btn').forEach(btn => {
+  btn.addEventListener('dblclick', function() {
+    const y = parseFloat(this.dataset.y);
+    const floorName = y > 15 ? 'SRV' : y > 10 ? 'L3' : y > 6 ? 'L2' : y > 3 ? 'L1' : 'B1';
+
+    if (isolatedFloor === floorName) {
+      // Un-isolate: show all
+      isolatedFloor = null;
+      document.querySelectorAll('.fl-btn').forEach(b => b.classList.remove('isolated'));
+      systemMeshes.forEach(sm => {
+        sm.mesh.material.opacity = 0.85;
+        sm.mesh.material.transparent = true;
+        sm.mesh.visible = true;
+      });
+      return;
+    }
+
+    isolatedFloor = floorName;
+    document.querySelectorAll('.fl-btn').forEach(b => b.classList.remove('isolated'));
+    this.classList.add('isolated');
+
+    const range = floorYRanges[floorName];
+    systemMeshes.forEach(sm => {
+      const bbox = new THREE.Box3().setFromObject(sm.mesh);
+      const meshY = (bbox.min.y + bbox.max.y) / 2;
+      if (meshY >= range[0] && meshY < range[1]) {
+        sm.mesh.material.opacity = 0.9;
+        sm.mesh.visible = true;
+      } else {
+        sm.mesh.material.opacity = 0.05;
+        sm.mesh.visible = true;
+      }
+      sm.mesh.material.transparent = true;
+    });
+  });
+});
+
+/* ══════════════════ B. GUIDED TOUR ══════════════════ */
+var tourSteps = [
+  { floor:'B1', y:2, title:'B1 — Basement / Mechanical', desc:'Main switchboards MSB-1 & MSB-2. Mechanical room, workshop, server closets.', detail:'17× 480V + 10× 208V = 27 panelboards' },
+  { floor:'L1', y:5, title:'L1 — Ground Floor', desc:'Lobby, classrooms, offices. Highest energy density — dual voltage distribution.', detail:'14× 480V + 19× 208V = 33 panelboards' },
+  { floor:'L2', y:9, title:'L2 — Second Floor', desc:'Offices, small labs. 208V only — outlets and IT equipment.', detail:'22× 208V panelboards, no 480V HVAC panels' },
+  { floor:'L3', y:13, title:'L3 — Third Floor', desc:'Upper labs, more exterior exposure. Smallest electrical footprint.', detail:'11× 208V panelboards, 18% of outlet load' },
+  { floor:'SRV', y:17, title:'SRV — Rooftop Service', desc:'Air handling units, exhaust fans, cooling equipment. Dedicated Meter #3.', detail:'Direct AHU feed — no panelboards, 100% of roof electric' },
+];
+var tourIdx = -1;
+var tourTimer = null;
+
+function startTour() {
+  tourIdx = 0;
+  document.getElementById('tourBtn').style.background = 'rgba(253,181,21,.2)';
+  showTourStep();
+}
+
+function showTourStep() {
+  if (tourIdx >= tourSteps.length) { endTour(); return; }
+  const step = tourSteps[tourIdx];
+  const overlay = document.getElementById('tourOverlay');
+  overlay.style.display = 'block';
+
+  // Get floor kW
+  const floors = getAllFloorKw();
+  const fData = floors[step.floor];
+  const kw = fData ? fData.kw : 0;
+
+  document.getElementById('tourTitle').textContent = step.title;
+  document.getElementById('tourKw').textContent = kw + ' kW';
+  document.getElementById('tourDesc').textContent = step.desc;
+  document.getElementById('tourDetail').textContent = step.detail;
+
+  // Animate camera
+  const targetY = step.y;
+  const startPos = camera.position.clone();
+  const endPos = new THREE.Vector3(25, targetY + 8, 25);
+  const startTarget = orbitControls.target.clone();
+  const endTarget = new THREE.Vector3(0, targetY, 0);
+  const dur = 1500;
+  const startTime = Date.now();
+
+  function animCam() {
+    const t = Math.min(1, (Date.now() - startTime) / dur);
+    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    camera.position.lerpVectors(startPos, endPos, ease);
+    orbitControls.target.lerpVectors(startTarget, endTarget, ease);
+    orbitControls.update();
+    if (t < 1) requestAnimationFrame(animCam);
+  }
+  animCam();
+
+  // Isolate floor visually
+  const range = floorYRanges[step.floor];
+  systemMeshes.forEach(sm => {
+    const bbox = new THREE.Box3().setFromObject(sm.mesh);
+    const meshY = (bbox.min.y + bbox.max.y) / 2;
+    sm.mesh.material.opacity = (meshY >= range[0] && meshY < range[1]) ? 0.9 : 0.06;
+    sm.mesh.material.transparent = true;
+  });
+
+  // Auto-advance after 5 seconds
+  tourTimer = setTimeout(() => { tourIdx++; showTourStep(); }, 5000);
+}
+
+function skipTour() {
+  if (tourTimer) clearTimeout(tourTimer);
+  tourIdx++;
+  if (tourIdx >= tourSteps.length) { endTour(); return; }
+  showTourStep();
+}
+
+function endTour() {
+  tourIdx = -1;
+  document.getElementById('tourOverlay').style.display = 'none';
+  document.getElementById('tourBtn').style.background = '';
+  // Restore all meshes
+  systemMeshes.forEach(sm => {
+    sm.mesh.material.opacity = 0.85;
+    sm.mesh.material.transparent = true;
+  });
+  if (tourTimer) clearTimeout(tourTimer);
+}
+
+/* ══════════════════ C. ANOMALY DETECTION ══════════════════ */
+var anomalyHistory = { SRV:[], L3:[], L2:[], L1:[], B1:[] };
+var anomalyThreshold = 1.5; // 150% of rolling avg
+
+function checkAnomalies() {
+  const floors = getAllFloorKw();
+  var anomalies = [];
+
+  for (const [fl, data] of Object.entries(floors)) {
+    var hist = anomalyHistory[fl];
+    if (!hist) continue;
+    hist.push(data.kw);
+    if (hist.length > 8) hist.shift(); // keep last 8 readings (~2 hours)
+
+    if (hist.length >= 4) {
+      const avg = hist.slice(0, -1).reduce((a,b) => a+b, 0) / (hist.length - 1);
+      if (avg > 0 && data.kw > avg * anomalyThreshold) {
+        anomalies.push({ floor: fl, kw: data.kw, avg: Math.round(avg*10)/10, pct: Math.round(data.kw/avg*100) });
+      }
+    }
+  }
+
+  const alertEl = document.getElementById('anomalyAlert');
+  if (anomalies.length > 0) {
+    const a = anomalies[0];
+    document.getElementById('anomalyText').textContent = a.floor + ' floor: ' + a.kw + ' kW (' + a.pct + '% of avg ' + a.avg + ' kW)';
+    alertEl.style.display = 'block';
+
+    // Flash the anomalous floor meshes
+    const range = floorYRanges[a.floor];
+    systemMeshes.forEach(sm => {
+      const bbox = new THREE.Box3().setFromObject(sm.mesh);
+      const meshY = (bbox.min.y + bbox.max.y) / 2;
+      if (meshY >= range[0] && meshY < range[1]) {
+        sm.mesh.material.color.set(0xf87171);
+        sm.mesh.material.emissive = new THREE.Color(0x330000);
+        setTimeout(() => {
+          if (viewMode === 'system') {
+            const sys = SYSTEM_INFO[sm.sysIndex];
+            sm.mesh.material.color.set(sys.hex);
+          }
+          sm.mesh.material.emissive = new THREE.Color(0x000000);
+        }, 2000);
+      }
+    });
+
+    setTimeout(() => { alertEl.style.display = 'none'; }, 8000);
+  }
+}
+
+/* ══════════════════ D. SYSTEM COMPARISON ══════════════════ */
+var compareMode = false;
+var compareSystemA = null;
+
+// Double-click legend item to enter compare mode
+function toggleCompare(sysIdx) {
+  if (!compareMode) {
+    compareMode = true;
+    compareSystemA = sysIdx;
+    // Show only this system
+    systemMeshes.forEach(sm => {
+      if (sm.sysIndex === sysIdx) {
+        sm.mesh.visible = true;
+        sm.mesh.material.opacity = 0.9;
+      } else {
+        sm.mesh.visible = false;
+      }
+      sm.mesh.material.transparent = true;
+    });
+  } else if (compareSystemA === sysIdx) {
+    // Exit compare
+    exitCompare();
+  } else {
+    // Show A + B side by side
+    systemMeshes.forEach(sm => {
+      if (sm.sysIndex === compareSystemA || sm.sysIndex === sysIdx) {
+        sm.mesh.visible = true;
+        sm.mesh.material.opacity = 0.85;
+      } else {
+        sm.mesh.visible = false;
+      }
+      sm.mesh.material.transparent = true;
+    });
+  }
+}
+
+function exitCompare() {
+  compareMode = false;
+  compareSystemA = null;
+  systemMeshes.forEach(sm => {
+    sm.mesh.visible = true;
+    sm.mesh.material.opacity = 0.85;
+    sm.mesh.material.transparent = true;
+  });
+}
+
+/* ══════════════════ E. ENERGY FLOW PARTICLES ══════════════════ */
+var flowParticles = null;
+var flowEnabled = false;
+var flowPositions = [];
+var flowVelocities = [];
+const PARTICLE_COUNT = 600;
+
+function initFlowParticles() {
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(PARTICLE_COUNT * 3);
+  const colors = new Float32Array(PARTICLE_COUNT * 3);
+  flowPositions = [];
+  flowVelocities = [];
+
+  // Sample positions from visible meshes
+  const candidates = [];
+  systemMeshes.forEach(sm => {
+    if (!sm.mesh.visible) return;
+    const bbox = new THREE.Box3().setFromObject(sm.mesh);
+    const center = bbox.getCenter(new THREE.Vector3());
+    const size = bbox.getSize(new THREE.Vector3());
+    candidates.push({ center, size, sysIdx: sm.sysIndex });
+  });
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const c = candidates[Math.floor(Math.random() * candidates.length)];
+    if (!c) continue;
+    const x = c.center.x + (Math.random() - 0.5) * c.size.x * 1.2;
+    const y = c.center.y + (Math.random() - 0.5) * c.size.y * 0.3;
+    const z = c.center.z + (Math.random() - 0.5) * c.size.z * 1.2;
+    positions[i*3] = x;
+    positions[i*3+1] = y;
+    positions[i*3+2] = z;
+    flowPositions.push(new THREE.Vector3(x, y, z));
+
+    // Velocity: upward for HVAC, downward for plumbing, horizontal for electrical
+    const vx = (Math.random()-0.5) * 0.02;
+    const vy = c.sysIdx <= 1 ? 0.03 : c.sysIdx === 2 ? -0.02 : 0.01;
+    const vz = (Math.random()-0.5) * 0.02;
+    flowVelocities.push(new THREE.Vector3(vx, vy, vz));
+
+    // Colors: system-based
+    const sys = SYSTEM_INFO[c.sysIdx];
+    const col = new THREE.Color(sys.hex);
+    colors[i*3] = col.r;
+    colors[i*3+1] = col.g;
+    colors[i*3+2] = col.b;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.15,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.7,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+
+  flowParticles = new THREE.Points(geo, mat);
+  scene.add(flowParticles);
+}
+
+function updateFlowParticles() {
+  if (!flowParticles || !flowEnabled) return;
+  const pos = flowParticles.geometry.attributes.position.array;
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const fp = flowPositions[i];
+    const fv = flowVelocities[i];
+    if (!fp || !fv) continue;
+
+    fp.add(fv);
+    pos[i*3] = fp.x;
+    pos[i*3+1] = fp.y;
+    pos[i*3+2] = fp.z;
+
+    // Reset particles that go too far
+    if (fp.y > 22 || fp.y < -3 || Math.abs(fp.x) > 40 || Math.abs(fp.z) > 40) {
+      const c = systemMeshes[Math.floor(Math.random() * systemMeshes.length)];
+      if (c) {
+        const bbox = new THREE.Box3().setFromObject(c.mesh);
+        const center = bbox.getCenter(new THREE.Vector3());
+        fp.set(center.x + (Math.random()-0.5)*2, center.y, center.z + (Math.random()-0.5)*2);
+      }
+    }
+  }
+  flowParticles.geometry.attributes.position.needsUpdate = true;
+}
+
+function toggleFlow() {
+  flowEnabled = !flowEnabled;
+  if (flowEnabled && !flowParticles) initFlowParticles();
+  if (flowParticles) flowParticles.visible = flowEnabled;
+  const btn = document.getElementById('flowToggle');
+  if (btn) btn.style.background = flowEnabled ? 'rgba(45,212,191,.2)' : '';
+}
+
+/* ══════════════════ INTEGRATE INTO RENDER LOOP ══════════════════ */
+// Anomaly check every 60s with data refresh
+var _origFetchForAnom = fetchLiveData;
+fetchLiveData = async function() {
+  await _origFetchForAnom();
+  initMepTimeSlider();
+  checkAnomalies();
+};
 
 /* ══════════════════════════════════════════ LEGEND ══════════════════════════════════════════ */
 function buildLegend() {
@@ -990,6 +1586,8 @@ function buildLegend() {
     row.innerHTML = `<div class="sys-dot" style="background:${sys.color}"></div><span class="sys-name">${sys.label}</span><span class="sys-count">${Math.round(counts[i]/1000)}K</span>`;
     row.addEventListener('click', () => { systemVisible[i] = !systemVisible[i]; row.classList.toggle('off', !systemVisible[i]);
       systemMeshes.forEach(sm => { if (sm.sysIndex === i) sm.mesh.visible = systemVisible[i]; }); });
+    row.addEventListener('dblclick', (e) => { e.stopPropagation(); toggleCompare(i); });
+    row.title = 'Click: toggle · Double-click: compare';
     list.appendChild(row);
   });
 }
@@ -1138,27 +1736,53 @@ renderer.domElement.addEventListener('click', e => {
     const hasLive = (isElectrical || isPipe) && liveData;
 
     if (isElectrical && liveData) {
-      // Show REAL BMO data for electrical systems
-      const m3 = liveData.meters?.['3']?.latest || {};
-      const m76 = liveData.meters?.['76']?.latest || {};
-      const m77 = liveData.meters?.['77']?.latest || {};
+      // Show FLOOR-SPECIFIC BMO data based on component position
+      const m = liveData.meters;
+      const m3 = m?.['3']?.latest || {};
+      const m76 = m?.['76']?.latest || {};
+      const m77 = m?.['77']?.latest || {};
       const totalKw = (m3.kw||0) + (m76.kw||0) + (m77.kw||0);
 
-      const liveReadings = [
-        { label:'TOTAL LOAD', val:totalKw, unit:'kW', color:'#fb923c' },
-        { label:'ROOF ELEC', val:m3.kw, unit:'kW', color:'#2dd4bf' },
-        { label:'480/277V', val:m76.kw, unit:'kW', color:'#38bdf8' },
-        { label:'208/120V', val:m77.kw, unit:'kW', color:'#a78bfa' },
-        { label:'VOLTAGE', val:m3.voltage_ll, unit:'V', color:'#2dd4bf' },
-        { label:'CURRENT', val:m3.current_avg, unit:'A', color:'#e2e8f0' },
-        { label:'POWER FACTOR', val:m3.power_factor, unit:'', color: (m3.power_factor && (m3.power_factor > 1 ? m3.power_factor/100 : m3.power_factor) < 0.92) ? '#fb923c' : '#2dd4bf' },
-        { label:'FREQUENCY', val:m3.frequency, unit:'Hz', color:'#2dd4bf' },
-      ];
-      liveReadings.forEach(r => {
-        if (r.val == null) return;
-        const v = typeof r.val === 'number' ? (r.unit === '' && r.val < 2 ? r.val.toFixed(3) : r.val.toFixed(1)) : r.val;
-        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${r.label} <span style="color:#2dd4bf;font-size:7px">LIVE</span></div><div class="dp-card-val" style="color:${r.color}">${v} <span class="dp-card-unit">${r.unit}</span></div></div>`;
+      // Floor-specific energy
+      const floorName = point.y > 15 ? 'SRV' : point.y > 10 ? 'L3' : point.y > 6 ? 'L2' : point.y > 3 ? 'L1' : 'B1';
+      const fi = FLOOR_RATIOS[floorName];
+      let thisFloorKw = 0;
+      const sources = [];
+      for (const mt of fi.meters) {
+        const mKw = m?.[mt.id]?.latest?.kw || 0;
+        const contrib = Math.round(mKw * mt.ratio * 10) / 10;
+        thisFloorKw += contrib;
+        sources.push({ label: 'Meter #' + mt.id, val: contrib, pct: Math.round(mt.ratio * 100) });
+      }
+      thisFloorKw = Math.round(thisFloorKw * 10) / 10;
+      const floorPct = totalKw > 0 ? Math.round(thisFloorKw / totalKw * 100) : 0;
+      const perPanel = fi.panels > 0 ? Math.round(thisFloorKw / fi.panels * 10) / 10 : 0;
+
+      // Floor header
+      sensorsEl.innerHTML += `<div class="dp-card" style="grid-column:span 2"><div class="dp-card-label">${floorName} FLOOR LOAD <span style="color:#2dd4bf;font-size:7px">BIM+LIVE</span></div><div class="dp-card-val" style="color:#FDB515;font-size:20px">${thisFloorKw} <span class="dp-card-unit">kW</span></div></div>`;
+
+      // Source breakdown
+      sources.forEach(s => {
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${s.label} ×${s.pct}% <span style="color:#2dd4bf;font-size:7px">LIVE</span></div><div class="dp-card-val" style="color:#2dd4bf">${s.val} <span class="dp-card-unit">kW</span></div></div>`;
       });
+
+      // Context stats
+      const contextReadings = [
+        { label: floorName + ' PANELS', val: fi.panels, unit: 'panels', color: '#e2e8f0' },
+        { label: 'PER PANEL', val: perPanel, unit: 'kW/panel', color: perPanel > 2 ? '#fb923c' : '#2dd4bf' },
+        { label: '% OF BUILDING', val: floorPct, unit: '%', color: '#a78bfa' },
+        { label: 'BUILDING TOTAL', val: totalKw, unit: 'kW', color: '#64748b' },
+      ];
+      contextReadings.forEach(r => {
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">${r.label}</div><div class="dp-card-val" style="color:${r.color}">${r.val} <span class="dp-card-unit">${r.unit}</span></div></div>`;
+      });
+
+      // Grid status (from Meter #3)
+      if (m3.voltage_ll || m3.power_factor || m3.frequency) {
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">VOLTAGE <span style="color:#2dd4bf;font-size:7px">LIVE</span></div><div class="dp-card-val" style="color:#2dd4bf">${(m3.voltage_ll||0).toFixed(0)} <span class="dp-card-unit">V</span></div></div>`;
+        const pf = m3.power_factor > 1 ? m3.power_factor/100 : m3.power_factor;
+        sensorsEl.innerHTML += `<div class="dp-card"><div class="dp-card-label">POWER FACTOR <span style="color:#2dd4bf;font-size:7px">LIVE</span></div><div class="dp-card-val" style="color:${pf < 0.92 ? '#fb923c' : '#2dd4bf'}">${pf ? pf.toFixed(3) : '—'} <span class="dp-card-unit"></span></div></div>`;
+      }
     } else if (isPipe && liveData) {
       // Show REAL BMO water data for pipe systems
       const w = liveData.water?.latest || {};
@@ -1408,6 +2032,7 @@ let xrFrame = 0;
 renderer.setAnimationLoop(()=>{
   if(renderer.xr.isPresenting){ vrInput(); if(++xrFrame % 5 === 0) xrContinuousRaycast(); }
   else{updateFP();updateJoy();if(!fpMode)orbitControls.update();}
+  updateFlowParticles();
   renderer.render(scene,camera);
 });
 window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
