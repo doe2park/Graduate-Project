@@ -133,7 +133,11 @@
   <div class="tour-kw" id="tourKw">—</div>
   <p id="tourDesc">—</p>
   <p id="tourDetail" style="color:#94A3B8;font-size:10px;margin-top:4px">—</p>
-  <button onclick="skipTour()" style="margin-top:10px;background:none;border:1px solid rgba(253,181,21,.3);color:#FDB515;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:10px">Skip →</button>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+    <button onclick="prevTour()" style="background:none;border:1px solid rgba(253,181,21,.3);color:#FDB515;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:10px">← Prev</button>
+    <button onclick="skipTour()" style="background:none;border:1px solid rgba(253,181,21,.3);color:#FDB515;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:10px">Next →</button>
+    <button onclick="endTour()" style="background:none;border:1px solid rgba(248,113,113,.3);color:#fca5a5;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:10px">✕ End</button>
+  </div>
 </div>
 
 <!-- Anomaly Alert -->
@@ -1146,9 +1150,13 @@ fetchLiveData = async function() {
   checkAnomalies();
 };
 
-/* ══════════════════ A. FLOOR ISOLATION ══════════════════ */
+/* ══════════════════ A. FLOOR ISOLATION (Clipping Planes) ══════════════════ */
 var isolatedFloor = null;
-var floorYRanges = { SRV:[15,22], L3:[10,15], L2:[6,10], L1:[3,6], B1:[-2,3] };
+var clipPlanes = [new THREE.Plane(new THREE.Vector3(0,-1,0), 0), new THREE.Plane(new THREE.Vector3(0,1,0), 0)];
+renderer.clippingPlanes = [];
+renderer.localClippingEnabled = true;
+
+var floorYRanges = { B1:[0,4], L1:[4,8], L2:[8,12], L3:[12,16], SRV:[16,22] };
 
 document.querySelectorAll('.fl-btn').forEach(btn => {
   btn.addEventListener('dblclick', function() {
@@ -1156,14 +1164,10 @@ document.querySelectorAll('.fl-btn').forEach(btn => {
     const floorName = y > 15 ? 'SRV' : y > 10 ? 'L3' : y > 6 ? 'L2' : y > 3 ? 'L1' : 'B1';
 
     if (isolatedFloor === floorName) {
-      // Un-isolate: show all
+      // Un-isolate
       isolatedFloor = null;
+      renderer.clippingPlanes = [];
       document.querySelectorAll('.fl-btn').forEach(b => b.classList.remove('isolated'));
-      systemMeshes.forEach(sm => {
-        sm.mesh.material.opacity = 0.85;
-        sm.mesh.material.transparent = true;
-        sm.mesh.visible = true;
-      });
       return;
     }
 
@@ -1171,36 +1175,54 @@ document.querySelectorAll('.fl-btn').forEach(btn => {
     document.querySelectorAll('.fl-btn').forEach(b => b.classList.remove('isolated'));
     this.classList.add('isolated');
 
+    // Clip above and below this floor
     const range = floorYRanges[floorName];
-    systemMeshes.forEach(sm => {
-      const bbox = new THREE.Box3().setFromObject(sm.mesh);
-      const meshY = (bbox.min.y + bbox.max.y) / 2;
-      if (meshY >= range[0] && meshY < range[1]) {
-        sm.mesh.material.opacity = 0.9;
-        sm.mesh.visible = true;
-      } else {
-        sm.mesh.material.opacity = 0.05;
-        sm.mesh.visible = true;
-      }
-      sm.mesh.material.transparent = true;
-    });
+    clipPlanes[0].constant = range[1];  // clip above
+    clipPlanes[1].constant = -range[0]; // clip below
+    renderer.clippingPlanes = clipPlanes;
+
+    // Move camera to floor level
+    const targetY = (range[0] + range[1]) / 2;
+    animateCamera(new THREE.Vector3(20, targetY + 5, 20), new THREE.Vector3(0, targetY, 0), 800);
   });
 });
 
-/* ══════════════════ B. GUIDED TOUR ══════════════════ */
+function animateCamera(endPos, endTarget, dur) {
+  const startPos = camera.position.clone();
+  const startTarget = orbitControls.target.clone();
+  const startTime = Date.now();
+  function anim() {
+    const t = Math.min(1, (Date.now() - startTime) / dur);
+    const ease = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
+    camera.position.lerpVectors(startPos, endPos, ease);
+    orbitControls.target.lerpVectors(startTarget, endTarget, ease);
+    orbitControls.update();
+    if (t < 1) requestAnimationFrame(anim);
+  }
+  anim();
+}
+
+/* ══════════════════ B. GUIDED TOUR (System + Floor) ══════════════════ */
 var tourSteps = [
-  { floor:'B1', y:2, title:'B1 — Basement / Mechanical', desc:'Main switchboards MSB-1 & MSB-2. Mechanical room, workshop, server closets.', detail:'17× 480V + 10× 208V = 27 panelboards' },
-  { floor:'L1', y:5, title:'L1 — Ground Floor', desc:'Lobby, classrooms, offices. Highest energy density — dual voltage distribution.', detail:'14× 480V + 19× 208V = 33 panelboards' },
-  { floor:'L2', y:9, title:'L2 — Second Floor', desc:'Offices, small labs. 208V only — outlets and IT equipment.', detail:'22× 208V panelboards, no 480V HVAC panels' },
-  { floor:'L3', y:13, title:'L3 — Third Floor', desc:'Upper labs, more exterior exposure. Smallest electrical footprint.', detail:'11× 208V panelboards, 18% of outlet load' },
-  { floor:'SRV', y:17, title:'SRV — Rooftop Service', desc:'Air handling units, exhaust fans, cooling equipment. Dedicated Meter #3.', detail:'Direct AHU feed — no panelboards, 100% of roof electric' },
+  { type:'system', sysIdx:0, title:'HVAC Ductwork', desc:'Supply and return air ducts distributing conditioned air throughout all floors.', cam:[25,12,25], look:[0,8,0] },
+  { type:'system', sysIdx:1, title:'HVAC Equipment', desc:'Air handling units, fans, VAV boxes. Primary energy consumers connected to Meter #76 (480V).', cam:[15,18,20], look:[0,10,0] },
+  { type:'system', sysIdx:2, title:'Plumbing / Piping', desc:'Hot/cold water supply, drain waste vent. Water meter tracks consumption.', cam:[20,8,25], look:[0,6,0] },
+  { type:'system', sysIdx:3, title:'Fire Protection', desc:'Sprinkler system by Pribuss Engineering + Pragmatic PE. 4 floors covered.', cam:[25,10,15], look:[0,7,0] },
+  { type:'system', sysIdx:4, title:'Electrical', desc:'93 panelboards across 4 floors. 480V on B1/L1, 208V on all floors. Live BMO data.', cam:[20,6,20], look:[0,5,0] },
+  { type:'floor', floor:'B1', title:'B1 — Basement', desc:'MSB-1 & MSB-2 switchboards. 27 panels (17×480V + 10×208V). Mechanical room.', cam:[18,5,18], look:[0,2,0] },
+  { type:'floor', floor:'L1', title:'L1 — Ground Floor', desc:'Highest energy density. 33 panels (14×480V + 19×208V). HVAC + outlets.', cam:[20,8,20], look:[0,5,0] },
+  { type:'floor', floor:'L2', title:'L2 — Second Floor', desc:'208V only. 22 panels. Offices, IT equipment, small labs.', cam:[22,12,22], look:[0,9,0] },
+  { type:'floor', floor:'SRV', title:'SRV — Rooftop', desc:'AHUs, exhaust fans. Meter #3 dedicated. No panelboards — direct feed.', cam:[25,22,25], look:[0,17,0] },
 ];
 var tourIdx = -1;
 var tourTimer = null;
+var tourOrbitTimer = null;
 
 function startTour() {
+  if (tourIdx >= 0) { endTour(); return; } // toggle off
   tourIdx = 0;
   document.getElementById('tourBtn').style.background = 'rgba(253,181,21,.2)';
+  document.getElementById('tourBtn').textContent = '⏹ Stop';
   showTourStep();
 }
 
@@ -1210,46 +1232,74 @@ function showTourStep() {
   const overlay = document.getElementById('tourOverlay');
   overlay.style.display = 'block';
 
-  // Get floor kW
-  const floors = getAllFloorKw();
-  const fData = floors[step.floor];
-  const kw = fData ? fData.kw : 0;
+  // Get data
+  var kwText = '';
+  if (step.type === 'floor') {
+    const floors = getAllFloorKw();
+    const fData = floors[step.floor];
+    kwText = fData ? fData.kw + ' kW · ' + fData.panels + ' panels' : '';
+  } else {
+    const sys = SYSTEM_INFO[step.sysIdx];
+    const data = SIM_DATA[sys.id];
+    kwText = data?.energy?.val ? data.energy.val + ' ' + data.energy.unit + ' · ' + data.energy.label : sys.label;
+  }
 
   document.getElementById('tourTitle').textContent = step.title;
-  document.getElementById('tourKw').textContent = kw + ' kW';
+  document.getElementById('tourKw').textContent = kwText;
   document.getElementById('tourDesc').textContent = step.desc;
-  document.getElementById('tourDetail').textContent = step.detail;
+  document.getElementById('tourDetail').textContent = (tourIdx + 1) + ' / ' + tourSteps.length;
+
+  // Highlight: show only this system or clip to floor
+  renderer.clippingPlanes = [];
+  if (step.type === 'system') {
+    systemMeshes.forEach(sm => {
+      if (sm.sysIndex === step.sysIdx) {
+        sm.mesh.material.opacity = 0.9;
+        sm.mesh.material.transparent = true;
+        sm.mesh.visible = true;
+      } else {
+        sm.mesh.material.opacity = 0.08;
+        sm.mesh.material.transparent = true;
+        sm.mesh.visible = true;
+      }
+    });
+  } else if (step.type === 'floor') {
+    // Show all systems but clip to floor
+    systemMeshes.forEach(sm => {
+      sm.mesh.material.opacity = 0.85;
+      sm.mesh.material.transparent = true;
+      sm.mesh.visible = true;
+    });
+    const range = floorYRanges[step.floor];
+    clipPlanes[0].constant = range[1];
+    clipPlanes[1].constant = -range[0];
+    renderer.clippingPlanes = clipPlanes;
+  }
 
   // Animate camera
-  const targetY = step.y;
-  const startPos = camera.position.clone();
-  const endPos = new THREE.Vector3(25, targetY + 8, 25);
-  const startTarget = orbitControls.target.clone();
-  const endTarget = new THREE.Vector3(0, targetY, 0);
-  const dur = 1500;
-  const startTime = Date.now();
+  animateCamera(
+    new THREE.Vector3(step.cam[0], step.cam[1], step.cam[2]),
+    new THREE.Vector3(step.look[0], step.look[1], step.look[2]),
+    1200
+  );
 
-  function animCam() {
-    const t = Math.min(1, (Date.now() - startTime) / dur);
-    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    camera.position.lerpVectors(startPos, endPos, ease);
-    orbitControls.target.lerpVectors(startTarget, endTarget, ease);
+  // Slow orbit
+  if (tourOrbitTimer) clearInterval(tourOrbitTimer);
+  var angle = 0;
+  const orbitRadius = Math.sqrt(step.cam[0]*step.cam[0] + step.cam[2]*step.cam[2]);
+  const orbitY = step.cam[1];
+  tourOrbitTimer = setInterval(() => {
+    angle += 0.003;
+    camera.position.x = Math.cos(angle) * orbitRadius;
+    camera.position.z = Math.sin(angle) * orbitRadius;
+    camera.position.y = orbitY;
+    orbitControls.target.set(step.look[0], step.look[1], step.look[2]);
     orbitControls.update();
-    if (t < 1) requestAnimationFrame(animCam);
-  }
-  animCam();
+  }, 30);
 
-  // Isolate floor visually
-  const range = floorYRanges[step.floor];
-  systemMeshes.forEach(sm => {
-    const bbox = new THREE.Box3().setFromObject(sm.mesh);
-    const meshY = (bbox.min.y + bbox.max.y) / 2;
-    sm.mesh.material.opacity = (meshY >= range[0] && meshY < range[1]) ? 0.9 : 0.06;
-    sm.mesh.material.transparent = true;
-  });
-
-  // Auto-advance after 5 seconds
-  tourTimer = setTimeout(() => { tourIdx++; showTourStep(); }, 5000);
+  // Auto-advance
+  if (tourTimer) clearTimeout(tourTimer);
+  tourTimer = setTimeout(() => { tourIdx++; showTourStep(); }, 6000);
 }
 
 function skipTour() {
@@ -1259,16 +1309,25 @@ function skipTour() {
   showTourStep();
 }
 
+function prevTour() {
+  if (tourTimer) clearTimeout(tourTimer);
+  tourIdx = Math.max(0, tourIdx - 1);
+  showTourStep();
+}
+
 function endTour() {
   tourIdx = -1;
   document.getElementById('tourOverlay').style.display = 'none';
   document.getElementById('tourBtn').style.background = '';
-  // Restore all meshes
+  document.getElementById('tourBtn').textContent = '🎬 Tour';
+  renderer.clippingPlanes = [];
+  if (tourTimer) clearTimeout(tourTimer);
+  if (tourOrbitTimer) clearInterval(tourOrbitTimer);
   systemMeshes.forEach(sm => {
     sm.mesh.material.opacity = 0.85;
     sm.mesh.material.transparent = true;
+    sm.mesh.visible = true;
   });
-  if (tourTimer) clearTimeout(tourTimer);
 }
 
 /* ══════════════════ C. ANOMALY DETECTION ══════════════════ */
@@ -1472,6 +1531,8 @@ function toggleFlow() {
 // Expose functions for inline onclick handlers (module scope → global)
 window.startTour = startTour;
 window.skipTour = skipTour;
+window.prevTour = prevTour;
+window.endTour = endTour;
 window.toggleFlow = toggleFlow;
 window.mepTogglePlay = mepTogglePlay;
 window.mepOnTimeChange = mepOnTimeChange;
