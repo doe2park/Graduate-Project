@@ -1469,6 +1469,13 @@ function toggleFlow() {
 
 /* Anomaly + time slider integrated into fetchLiveData above */
 
+// Expose functions for inline onclick handlers (module scope → global)
+window.startTour = startTour;
+window.skipTour = skipTour;
+window.toggleFlow = toggleFlow;
+window.mepTogglePlay = mepTogglePlay;
+window.mepOnTimeChange = mepOnTimeChange;
+
 /* ══════════════════════════════════════════ LEGEND ══════════════════════════════════════════ */
 function buildLegend() {
   const list = document.getElementById('systemList');
