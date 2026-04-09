@@ -130,6 +130,7 @@
   <button class="view-btn" id="bldgToggle" style="margin-left:8px;border-color:rgba(148,163,184,0.3)">🏢 Building</button>
   <button class="view-btn" id="dbToggleBar" style="margin-left:4px;border-color:rgba(45,212,191,0.3);color:var(--cyan)">📊 Data</button>
   <button class="view-btn" id="tourBtn" style="margin-left:4px;border-color:rgba(253,181,21,.3);color:#FDB515" onclick="startTour()">🎬 Tour</button>
+  <button class="view-btn" id="flowBtn" style="margin-left:4px;border-color:rgba(45,212,191,.2);color:#2dd4bf" onclick="toggleFlow()">⚡ Flow</button>
 </div>
 
 <!-- Tour Overlay -->
@@ -1417,8 +1418,135 @@ function exitCompare() {
   });
 }
 
-/* ══════════════════ E. (Flow removed — replaced by Tour orbit) ══════════════════ */
-function updateFlowParticles() {} // no-op
+/* ══════════════════ E. ENERGY FLOW — Particles Along Pipes ══════════════════ */
+var flowEnabled = false;
+var flowGroup = null;
+var flowPaths = []; // extracted from mesh geometry
+var flowDots = [];  // active particles
+
+function extractFlowPaths() {
+  // Sample vertex positions from each MEP mesh to create flow paths
+  flowPaths = [];
+  systemMeshes.forEach(sm => {
+    const geo = sm.mesh.geometry;
+    if (!geo || !geo.attributes.position) return;
+    const pos = geo.attributes.position;
+    const sys = SYSTEM_INFO[sm.sysIndex];
+    const worldMatrix = sm.mesh.matrixWorld;
+
+    // Sample every Nth vertex to create path points
+    const points = [];
+    const stride = Math.max(1, Math.floor(pos.count / 40)); // ~40 points per mesh
+    for (let i = 0; i < pos.count; i += stride) {
+      const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      v.applyMatrix4(worldMatrix);
+      points.push(v);
+    }
+    if (points.length < 3) return;
+
+    // Sort by main axis to create a continuous path
+    // Ducts/pipes tend to run horizontally or vertically
+    const bbox = new THREE.Box3().setFromObject(sm.mesh);
+    const size = bbox.getSize(new THREE.Vector3());
+    const mainAxis = size.x > size.z ? 'x' : 'z';
+    points.sort((a, b) => a[mainAxis] - b[mainAxis]);
+
+    flowPaths.push({
+      points,
+      sysIdx: sm.sysIndex,
+      color: new THREE.Color(sys.hex),
+      speed: sm.sysIndex <= 1 ? 0.02 : sm.sysIndex === 2 ? 0.015 : 0.025, // HVAC fast, plumbing slow, elec fastest
+    });
+  });
+  console.log('Flow paths extracted:', flowPaths.length, 'with', flowPaths.reduce((a,p) => a+p.points.length, 0), 'points');
+}
+
+function spawnFlowDot(path) {
+  const geo = new THREE.SphereGeometry(0.08, 4, 4);
+  const mat = new THREE.MeshBasicMaterial({
+    color: path.color,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false,
+  });
+  const dot = new THREE.Mesh(geo, mat);
+  dot.position.copy(path.points[0]);
+  flowGroup.add(dot);
+  return {
+    mesh: dot,
+    path,
+    t: 0, // progress 0-1 along path
+    speed: path.speed * (0.8 + Math.random() * 0.4),
+  };
+}
+
+function updateEnergyFlow() {
+  if (!flowEnabled || !flowGroup) return;
+
+  // Move existing particles along their paths
+  for (let i = flowDots.length - 1; i >= 0; i--) {
+    const d = flowDots[i];
+    d.t += d.speed;
+
+    if (d.t >= 1) {
+      // Reached end — remove
+      flowGroup.remove(d.mesh);
+      d.mesh.geometry.dispose();
+      d.mesh.material.dispose();
+      flowDots.splice(i, 1);
+      continue;
+    }
+
+    // Interpolate position along path points
+    const pts = d.path.points;
+    const idx = d.t * (pts.length - 1);
+    const lo = Math.floor(idx);
+    const hi = Math.min(lo + 1, pts.length - 1);
+    const frac = idx - lo;
+    d.mesh.position.lerpVectors(pts[lo], pts[hi], frac);
+
+    // Fade out near end
+    if (d.t > 0.85) {
+      d.mesh.material.opacity = (1 - d.t) / 0.15;
+    }
+  }
+
+  // Spawn new particles — rate proportional to live kW
+  if (flowDots.length < 150 && flowPaths.length > 0) {
+    // Spawn 1-2 per frame on random paths, weighted by energy
+    const spawns = Math.min(2, Math.max(1, flowPaths.length > 4 ? 2 : 1));
+    for (let s = 0; s < spawns; s++) {
+      const pathIdx = Math.floor(Math.random() * flowPaths.length);
+      const path = flowPaths[pathIdx];
+
+      // Randomly start from beginning or end (bidirectional flow)
+      if (Math.random() < 0.3) {
+        // Reverse: create a reversed copy
+        const revPath = { ...path, points: [...path.points].reverse() };
+        flowDots.push(spawnFlowDot(revPath));
+      } else {
+        flowDots.push(spawnFlowDot(path));
+      }
+    }
+  }
+}
+
+function toggleFlow() {
+  flowEnabled = !flowEnabled;
+  if (flowEnabled) {
+    if (!flowGroup) { flowGroup = new THREE.Group(); scene.add(flowGroup); }
+    if (flowPaths.length === 0) extractFlowPaths();
+  }
+  if (!flowEnabled) {
+    flowDots.forEach(d => { flowGroup.remove(d.mesh); d.mesh.geometry.dispose(); d.mesh.material.dispose(); });
+    flowDots = [];
+  }
+  const btn = document.getElementById('flowBtn');
+  if (btn) {
+    btn.style.background = flowEnabled ? 'rgba(45,212,191,.2)' : '';
+    btn.style.borderColor = flowEnabled ? '#2dd4bf' : 'rgba(45,212,191,.2)';
+  }
+}
 
 /* Anomaly + time slider integrated into fetchLiveData above */
 
@@ -1427,6 +1555,7 @@ window.startTour = startTour;
 window.skipTour = skipTour;
 window.prevTour = prevTour;
 window.endTour = endTour;
+window.toggleFlow = toggleFlow;
 window.mepTogglePlay = mepTogglePlay;
 window.mepOnTimeChange = mepOnTimeChange;
 
@@ -1890,6 +2019,7 @@ let xrFrame = 0;
 renderer.setAnimationLoop(()=>{
   if(renderer.xr.isPresenting){ vrInput(); if(++xrFrame % 5 === 0) xrContinuousRaycast(); }
   else{updateFP();updateJoy();if(!fpMode)orbitControls.update();}
+  updateEnergyFlow();
   renderer.render(scene,camera);
 });
 window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
