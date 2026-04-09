@@ -154,7 +154,7 @@
 <div id="anomalyAlert">⚠️ <span id="anomalyText">—</span></div>
 
 <!-- Pulse Label -->
-<div id="pulseLabel" style="display:none;position:fixed;bottom:110px;left:50%;transform:translateX(-50%);z-index:45;background:rgba(10,16,32,.9);backdrop-filter:blur(8px);border:1px solid rgba(45,212,191,.2);border-radius:8px;padding:6px 16px;font:600 12px 'Calibri',sans-serif;color:#e2e8f0;white-space:nowrap;pointer-events:none;transition:opacity 0.3s"></div>
+<div id="pulseLabel" style="display:none;position:fixed;bottom:110px;left:50%;transform:translateX(-50%);z-index:45;background:rgba(10,16,32,.92);backdrop-filter:blur(10px);border:1px solid rgba(45,212,191,.15);border-radius:10px;padding:8px 14px;font:11px 'Calibri',sans-serif;color:#e2e8f0;white-space:nowrap;pointer-events:none;transition:opacity 0.3s;max-width:500px"></div>
 
 <!-- Legend -->
 <div id="legend"><h3>MEP Systems</h3><div id="systemList"></div></div>
@@ -1421,12 +1421,27 @@ function exitCompare() {
   });
 }
 
-/* ══════════════════ E. ENERGY PULSE — Spotlight one system at a time ══════════════════ */
+/* ══════════════════ E. ENERGY PULSE — Spotlight + Future-Ready Data ══════════════════ */
 var pulseEnabled = false;
-var pulseTarget = -1;      // current highlighted sysIndex
-var pulsePhase = 0;        // 0=fade-in, 1=hold, 2=fade-out
-var pulseProgress = 0;     // 0-1 within current phase
-var pulseCycleTimer = null;
+var pulseTarget = -1;
+var pulsePhase = 0;
+var pulseProgress = 0;
+var pulseWireframe = null; // outline mesh for highlighted system
+
+// ── DATA ADAPTER: swap 'sim' → 'bas' when BAS sensors are connected ──
+// Each system defines where its data comes from and what sensors it has.
+// To connect real BAS: change source to 'bas', add endpoint URL, data auto-populates.
+const SYSTEM_DATA_SOURCE = {
+  hvac_duct:  { source:'sim', sensors:['temp','flow','energy','pressure'],   basEndpoint:null, label:'Supply Air Ductwork' },
+  hvac_equip: { source:'sim', sensors:['temp','flow','energy','status'],     basEndpoint:null, label:'HVAC Equipment (AHU, VAV)' },
+  pipe:       { source:'partial', sensors:['flow','total'],                  basEndpoint:null, label:'Plumbing / Hot Water' },
+  sprinkler:  { source:'sim', sensors:['pressure','status'],                 basEndpoint:null, label:'Fire Sprinkler (Standby)' },
+  conduit:    { source:'live', sensors:['energy','voltage','current','pf'],  basEndpoint:null, label:'Electrical — Meter #3 (Roof)' },
+  elec:       { source:'live', sensors:['energy','voltage','current'],       basEndpoint:null, label:'Electrical — Meters #76/#77' },
+  diffuser:   { source:'sim', sensors:['temp','flow','co2'],                 basEndpoint:null, label:'Diffusers / Return Air' },
+  pump:       { source:'sim', sensors:['flow','energy','speed'],             basEndpoint:null, label:'Pumps / Valves' },
+  spiral:     { source:'sim', sensors:['temp','flow','energy','pressure'],   basEndpoint:null, label:'Spiral Ductwork' },
+};
 
 const LOAD_MAX = { elec: 100, hvac: 80, water: 2 };
 
@@ -1439,53 +1454,103 @@ function getLiveLoad() {
   return { elec: m77, hvac: m76 + m3, water: wf, total: m3 + m76 + m77 };
 }
 
-function getSystemLoad(sysId) {
+function getSystemReadings(sysId) {
+  const ds = SYSTEM_DATA_SOURCE[sysId];
   const load = getLiveLoad();
-  if (sysId === 'conduit' || sysId === 'elec') return { ratio: Math.min(1, load.elec / LOAD_MAX.elec), kw: load.elec, label: 'Outlets/IT ' + load.elec.toFixed(0) + ' kW' };
-  if (sysId === 'hvac_duct' || sysId === 'hvac_equip' || sysId === 'spiral' || sysId === 'diffuser') return { ratio: Math.min(1, load.hvac / LOAD_MAX.hvac), kw: load.hvac, label: 'HVAC ' + load.hvac.toFixed(0) + ' kW' };
-  if (sysId === 'pipe' || sysId === 'pump') return { ratio: Math.min(1, load.water / LOAD_MAX.water), kw: load.water, label: 'Water ' + load.water.toFixed(2) + ' cf/m' };
-  if (sysId === 'sprinkler') return { ratio: 0.05, kw: 0, label: 'Standby' };
-  return { ratio: 0.3, kw: 0, label: '' };
+  const sim = SIM_DATA[sysId] || {};
+
+  // Build reading cards based on data source
+  const readings = [];
+
+  if (ds.source === 'live') {
+    if (sysId === 'conduit') {
+      const m3 = liveData?.meters?.['3']?.latest || {};
+      readings.push({ label:'Roof kW', val:(m3.kw||0).toFixed(1), unit:'kW', tag:'LIVE' });
+      readings.push({ label:'Voltage', val:(m3.voltage_ll||0).toFixed(0), unit:'V', tag:'LIVE' });
+      readings.push({ label:'Current', val:(m3.current_avg||0).toFixed(1), unit:'A', tag:'LIVE' });
+    } else if (sysId === 'elec') {
+      readings.push({ label:'480V', val:(liveData?.meters?.['76']?.latest?.kw||0).toFixed(1), unit:'kW', tag:'LIVE' });
+      readings.push({ label:'208V', val:(liveData?.meters?.['77']?.latest?.kw||0).toFixed(1), unit:'kW', tag:'LIVE' });
+    }
+    return { ratio: Math.min(1, load.elec / LOAD_MAX.elec), readings, source: 'LIVE' };
+  }
+
+  if (ds.source === 'partial') {
+    readings.push({ label:'Flow', val:(load.water).toFixed(2), unit:'cf/m', tag:'LIVE' });
+    for (const [k, s] of Object.entries(sim)) {
+      if (k !== 'flow') readings.push({ label:s.label, val:typeof s.val==='number'?s.val.toFixed(1):s.val, unit:s.unit, tag:'SIM' });
+    }
+    return { ratio: Math.min(1, load.water / LOAD_MAX.water), readings, source: 'PARTIAL' };
+  }
+
+  // source === 'sim' or 'bas'
+  if (ds.source === 'bas' && ds.basEndpoint) {
+    // FUTURE: fetch from BAS API
+    // const basData = await fetch(ds.basEndpoint).then(r => r.json());
+    // readings = basData.sensors.map(s => ({ label:s.name, val:s.value, unit:s.unit, tag:'BAS' }));
+  }
+
+  // Fallback to SIM_DATA
+  const sysLoad = (sysId.includes('hvac') || sysId === 'spiral' || sysId === 'diffuser')
+    ? { ratio: Math.min(1, load.hvac / LOAD_MAX.hvac) }
+    : { ratio: 0.3 };
+
+  for (const [k, s] of Object.entries(sim)) {
+    readings.push({ label:s.label, val:typeof s.val==='number'?s.val.toFixed(1):s.val, unit:s.unit, tag:'SIM' });
+  }
+  return { ratio: sysLoad.ratio, readings, source: ds.source.toUpperCase() };
 }
 
 function pickNextTarget() {
-  // Pick random system that exists in scene
   const available = [...new Set(systemMeshes.map(sm => sm.sysIndex))];
   if (available.length === 0) return;
-  // Don't pick same one twice in a row
   let next;
   do { next = available[Math.floor(Math.random() * available.length)]; } while (next === pulseTarget && available.length > 1);
   pulseTarget = next;
   pulsePhase = 0;
   pulseProgress = 0;
+  // Remove old wireframe
+  if (pulseWireframe) { scene.remove(pulseWireframe); pulseWireframe = null; }
 }
 
 function updateEnergyPulse() {
   if (!pulseEnabled) return;
 
-  // Advance phase
-  const speed = 0.008; // ~7 seconds per full cycle (fade-in + hold + fade-out)
+  const speed = 0.008;
   pulseProgress += speed;
 
   if (pulseProgress >= 1) {
     pulseProgress = 0;
     pulsePhase++;
-    if (pulsePhase > 2) {
-      pickNextTarget();
-    }
+    if (pulsePhase > 2) pickNextTarget();
   }
 
-  // Calculate glow intensity for highlighted system
-  let glowIntensity = 0;
-  if (pulsePhase === 0) glowIntensity = pulseProgress;           // fade in
-  else if (pulsePhase === 1) glowIntensity = 1.0;                // hold
-  else if (pulsePhase === 2) glowIntensity = 1.0 - pulseProgress; // fade out
-
-  // Ease
-  glowIntensity = glowIntensity * glowIntensity * (3 - 2 * glowIntensity); // smoothstep
+  let glow = 0;
+  if (pulsePhase === 0) glow = pulseProgress;
+  else if (pulsePhase === 1) glow = 1.0;
+  else if (pulsePhase === 2) glow = 1.0 - pulseProgress;
+  glow = glow * glow * (3 - 2 * glow); // smoothstep
 
   const targetSys = SYSTEM_INFO[pulseTarget];
-  const loadInfo = targetSys ? getSystemLoad(targetSys.id) : { ratio: 0, label: '' };
+  if (!targetSys) return;
+  const sysData = getSystemReadings(targetSys.id);
+
+  // Add wireframe outline during hold phase
+  if (pulsePhase === 1 && !pulseWireframe) {
+    const targetMesh = systemMeshes.find(sm => sm.sysIndex === pulseTarget);
+    if (targetMesh) {
+      const wireGeo = targetMesh.mesh.geometry.clone();
+      const wireMat = new THREE.MeshBasicMaterial({ color: targetSys.hex, wireframe: true, transparent: true, opacity: 0.4 });
+      pulseWireframe = new THREE.Mesh(wireGeo, wireMat);
+      pulseWireframe.position.copy(targetMesh.mesh.position);
+      pulseWireframe.rotation.copy(targetMesh.mesh.rotation);
+      pulseWireframe.scale.copy(targetMesh.mesh.scale);
+      scene.add(pulseWireframe);
+    }
+  }
+  if (pulsePhase === 2 && pulseWireframe) {
+    pulseWireframe.material.opacity = 0.4 * (1 - pulseProgress);
+  }
 
   systemMeshes.forEach(sm => {
     const sys = SYSTEM_INFO[sm.sysIndex];
@@ -1493,24 +1558,44 @@ function updateEnergyPulse() {
     const baseColor = new THREE.Color(sys.hex);
 
     if (sm.sysIndex === pulseTarget) {
-      // Highlighted: vivid original color + load-based brightness
-      const loadBright = 1.0 + loadInfo.ratio * 0.5; // 1.0-1.5x
+      const loadBright = 1.0 + sysData.ratio * 0.5;
       sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(loadBright));
-      sm.mesh.material.opacity = 0.3 + glowIntensity * 0.65;
+      sm.mesh.material.opacity = 0.3 + glow * 0.65;
     } else {
-      // Others: nearly invisible
       sm.mesh.material.color.copy(baseColor);
       sm.mesh.material.opacity = 0.06;
     }
   });
 
-  // Update pulse label
+  // Rich label with sensor readings
   const labelEl = document.getElementById('pulseLabel');
   if (labelEl && targetSys) {
-    if (glowIntensity > 0.1) {
+    if (glow > 0.1) {
       labelEl.style.display = 'block';
-      labelEl.innerHTML = '<span style="color:' + targetSys.color + '">' + targetSys.label + '</span> — <span style="color:#2dd4bf">' + loadInfo.label + '</span>';
-      labelEl.style.opacity = glowIntensity;
+      labelEl.style.opacity = glow;
+
+      const ds = SYSTEM_DATA_SOURCE[targetSys.id];
+      const srcBadge = sysData.source === 'LIVE' ? '<span style="color:#2dd4bf;font-size:9px">● LIVE</span>'
+        : sysData.source === 'PARTIAL' ? '<span style="color:#38bdf8;font-size:9px">◐ PARTIAL</span>'
+        : sysData.source === 'BAS' ? '<span style="color:#22c55e;font-size:9px">● BAS</span>'
+        : '<span style="color:#64748b;font-size:9px">○ SIM</span>';
+
+      let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
+      html += '<span style="color:' + targetSys.color + ';font-weight:700">' + targetSys.label + '</span> ' + srcBadge;
+      html += '</div>';
+
+      // Sensor cards
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+      sysData.readings.slice(0, 4).forEach(r => {
+        const tagColor = r.tag === 'LIVE' ? '#2dd4bf' : r.tag === 'BAS' ? '#22c55e' : '#64748b';
+        html += '<div style="background:rgba(255,255,255,.05);border-radius:4px;padding:2px 8px;text-align:center">';
+        html += '<div style="font-size:8px;color:#64748b">' + r.label + ' <span style="color:' + tagColor + ';font-size:7px">' + r.tag + '</span></div>';
+        html += '<div style="font-size:13px;font-weight:700;color:#e2e8f0">' + r.val + ' <span style="font-size:9px;color:#94A3B8">' + r.unit + '</span></div>';
+        html += '</div>';
+      });
+      html += '</div>';
+
+      labelEl.innerHTML = html;
     } else {
       labelEl.style.display = 'none';
     }
@@ -1522,7 +1607,7 @@ function toggleFlow() {
   if (pulseEnabled) {
     pickNextTarget();
   } else {
-    // Restore
+    if (pulseWireframe) { scene.remove(pulseWireframe); pulseWireframe = null; }
     systemMeshes.forEach(sm => {
       const sys = SYSTEM_INFO[sm.sysIndex];
       sm.mesh.material.color.set(sys.hex);
