@@ -1418,13 +1418,32 @@ function exitCompare() {
   });
 }
 
-/* ══════════════════ E. ENERGY PULSE — Pipes glow with live load ══════════════════ */
+/* ══════════════════ E. ENERGY PULSE — Live kW drives glow ══════════════════ */
 var pulseEnabled = false;
 var pulseTime = 0;
 
+// Load thresholds: what's "normal" vs "high" for each system
+const LOAD_MAX = { elec: 100, hvac: 80, water: 2, fire: 0 };
+
+function getLiveLoad() {
+  if (!liveData?.meters) return { elec: 0, hvac: 0, water: 0, total: 0 };
+  const m3 = liveData.meters['3']?.latest?.kw || 0;
+  const m76 = liveData.meters['76']?.latest?.kw || 0;
+  const m77 = liveData.meters['77']?.latest?.kw || 0;
+  const waterFlow = liveData.water?.latest?.water1_rate_cfm || 0;
+  return {
+    elec: m77,           // 208V outlets/IT
+    hvac: m76 + m3,      // 480V HVAC + roof AHU
+    water: waterFlow,
+    total: m3 + m76 + m77
+  };
+}
+
 function updateEnergyPulse() {
   if (!pulseEnabled) return;
-  pulseTime += 0.03;
+  pulseTime += 0.016; // ~60fps
+
+  const load = getLiveLoad();
 
   systemMeshes.forEach(sm => {
     const sys = SYSTEM_INFO[sm.sysIndex];
@@ -1432,32 +1451,36 @@ function updateEnergyPulse() {
     const sysId = sys.id;
     const baseColor = new THREE.Color(sys.hex);
 
-    // Pulse wave: each system has different speed and phase
-    let wave = 0;
+    // Determine load ratio (0-1) and pulse speed from LIVE data
+    let loadRatio = 0;
     if (sysId === 'conduit' || sysId === 'elec') {
-      wave = Math.sin(pulseTime * 3.0) * 0.5 + 0.5; // fast
-    } else if (sysId === 'hvac_duct' || sysId === 'hvac_equip' || sysId === 'spiral') {
-      wave = Math.sin(pulseTime * 1.8 + sm.sysIndex * 0.5) * 0.5 + 0.5; // medium
+      loadRatio = Math.min(1, load.elec / LOAD_MAX.elec);
+    } else if (sysId === 'hvac_duct' || sysId === 'hvac_equip' || sysId === 'spiral' || sysId === 'diffuser') {
+      loadRatio = Math.min(1, load.hvac / LOAD_MAX.hvac);
     } else if (sysId === 'pipe' || sysId === 'pump') {
-      wave = Math.sin(pulseTime * 1.0 + 2) * 0.5 + 0.5; // slow
+      loadRatio = Math.min(1, load.water / LOAD_MAX.water);
     } else if (sysId === 'sprinkler') {
-      wave = 0.15 + Math.sin(pulseTime * 0.5) * 0.1; // barely pulses
-    } else {
-      wave = Math.sin(pulseTime * 1.5 + 1) * 0.5 + 0.5;
+      loadRatio = 0.05; // fire: always standby
     }
 
-    // Brighten: lerp from dim (0.3x) to bright (1.5x) based on wave
-    const brightness = 0.4 + wave * 1.1;
-    const pulsedColor = baseColor.clone().multiplyScalar(brightness);
-    sm.mesh.material.color.copy(pulsedColor);
-    sm.mesh.material.opacity = 0.5 + wave * 0.45;
+    // Pulse speed: idle=0.5Hz, full load=3Hz
+    const pulseSpeed = 0.5 + loadRatio * 2.5;
+    const wave = Math.sin(pulseTime * pulseSpeed * 6.28 + sm.sysIndex) * 0.5 + 0.5;
+
+    // Brightness: idle=dim(0.3), full load=bright(1.5)
+    // Wave amplitude: idle=small flicker, full load=strong pulse
+    const minBright = 0.3 + loadRatio * 0.2;
+    const maxBright = 0.6 + loadRatio * 0.9;
+    const brightness = minBright + wave * (maxBright - minBright);
+
+    sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(brightness));
+    sm.mesh.material.opacity = 0.4 + loadRatio * 0.3 + wave * 0.25;
   });
 }
 
 function toggleFlow() {
   pulseEnabled = !pulseEnabled;
   if (!pulseEnabled) {
-    // Restore original colors
     systemMeshes.forEach(sm => {
       const sys = SYSTEM_INFO[sm.sysIndex];
       sm.mesh.material.color.set(sys.hex);
