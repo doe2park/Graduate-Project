@@ -98,11 +98,17 @@
   #mepTimeBar button { background:none;border:1px solid rgba(45,212,191,.2);color:#2dd4bf;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:9px; }
   /* Floor isolation */
   .fl-btn.isolated { background:#FDB515;color:#000;border-color:#FDB515; }
-  /* Tour overlay */
-  #tourOverlay { position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;background:rgba(0,50,98,.92);backdrop-filter:blur(12px);border:1px solid rgba(253,181,21,.3);border-radius:14px;padding:20px 30px;text-align:center;display:none;max-width:360px; }
-  #tourOverlay h2 { color:#FDB515;font-size:18px;margin:0 0 6px; }
-  #tourOverlay p { color:#CBD5E1;font-size:12px;margin:0 0 4px; }
-  #tourOverlay .tour-kw { font:700 28px 'JetBrains Mono',monospace;color:#2dd4bf; }
+  /* Tour overlay - bottom left, doesn't block view */
+  #tourOverlay { position:fixed;bottom:80px;left:16px;z-index:60;background:rgba(0,50,98,.94);backdrop-filter:blur(16px);border:1px solid rgba(253,181,21,.3);border-radius:12px;padding:16px 20px;display:none;width:320px;text-align:left;transition:opacity 0.3s; }
+  #tourOverlay h2 { color:#FDB515;font-size:15px;margin:0 0 4px;font-weight:700; }
+  #tourOverlay p { color:#CBD5E1;font-size:11px;margin:0 0 3px;line-height:1.4; }
+  #tourOverlay .tour-kw { font:700 22px 'JetBrains Mono',monospace;color:#2dd4bf;margin:4px 0; }
+  #tourProgress { width:100%;height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin:8px 0 6px;overflow:hidden; }
+  #tourProgressBar { height:100%;background:#FDB515;border-radius:2px;transition:width 0.4s ease; }
+  #tourBtns button { background:none;border:1px solid rgba(253,181,21,.25);color:#FDB515;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:9px;font-weight:600;transition:all 0.15s; }
+  #tourBtns button:hover { background:rgba(253,181,21,.15); }
+  #tourBtns .end-btn { border-color:rgba(248,113,113,.25);color:#fca5a5; }
+  #tourBtns .end-btn:hover { background:rgba(248,113,113,.15); }
   /* Anomaly alert */
   #anomalyAlert { position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:55;background:rgba(248,113,113,.15);border:1px solid #f87171;border-radius:10px;padding:8px 18px;display:none;color:#fca5a5;font-size:11px;backdrop-filter:blur(8px); }
   @keyframes pulseRed { 0%,100%{opacity:0.4} 50%{opacity:1} }
@@ -124,19 +130,22 @@
   <button class="view-btn" id="bldgToggle" style="margin-left:8px;border-color:rgba(148,163,184,0.3)">🏢 Building</button>
   <button class="view-btn" id="dbToggleBar" style="margin-left:4px;border-color:rgba(45,212,191,0.3);color:var(--cyan)">📊 Data</button>
   <button class="view-btn" id="tourBtn" style="margin-left:4px;border-color:rgba(253,181,21,.3);color:#FDB515" onclick="startTour()">🎬 Tour</button>
-  <button class="view-btn" id="flowToggle" style="margin-left:4px;border-color:rgba(45,212,191,.2);color:#2dd4bf" onclick="toggleFlow()">✨ Flow</button>
 </div>
 
 <!-- Tour Overlay -->
 <div id="tourOverlay">
-  <h2 id="tourTitle">—</h2>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2 id="tourTitle">—</h2>
+    <span id="tourStep" style="font-size:9px;color:#94A3B8;font-weight:600">1/9</span>
+  </div>
   <div class="tour-kw" id="tourKw">—</div>
   <p id="tourDesc">—</p>
-  <p id="tourDetail" style="color:#94A3B8;font-size:10px;margin-top:4px">—</p>
-  <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
-    <button onclick="prevTour()" style="background:none;border:1px solid rgba(253,181,21,.3);color:#FDB515;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:10px">← Prev</button>
-    <button onclick="skipTour()" style="background:none;border:1px solid rgba(253,181,21,.3);color:#FDB515;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:10px">Next →</button>
-    <button onclick="endTour()" style="background:none;border:1px solid rgba(248,113,113,.3);color:#fca5a5;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:10px">✕ End</button>
+  <p id="tourDetail" style="color:#64748b;font-size:9px;font-style:italic">—</p>
+  <div id="tourProgress"><div id="tourProgressBar" style="width:0%"></div></div>
+  <div id="tourBtns" style="display:flex;gap:6px">
+    <button onclick="prevTour()">← Prev</button>
+    <button onclick="skipTour()">Next →</button>
+    <button onclick="endTour()" class="end-btn">✕ End</button>
   </div>
 </div>
 
@@ -1187,7 +1196,7 @@ document.querySelectorAll('.fl-btn').forEach(btn => {
   });
 });
 
-function animateCamera(endPos, endTarget, dur) {
+function animateCamera(endPos, endTarget, dur, onDone) {
   const startPos = camera.position.clone();
   const startTarget = orbitControls.target.clone();
   const startTime = Date.now();
@@ -1198,6 +1207,7 @@ function animateCamera(endPos, endTarget, dur) {
     orbitControls.target.lerpVectors(startTarget, endTarget, ease);
     orbitControls.update();
     if (t < 1) requestAnimationFrame(anim);
+    else if (onDone) onDone();
   }
   anim();
 }
@@ -1216,7 +1226,6 @@ var tourSteps = [
 ];
 var tourIdx = -1;
 var tourTimer = null;
-var tourOrbitTimer = null;
 
 function startTour() {
   if (tourIdx >= 0) { endTour(); return; } // toggle off
@@ -1231,6 +1240,10 @@ function showTourStep() {
   const step = tourSteps[tourIdx];
   const overlay = document.getElementById('tourOverlay');
   overlay.style.display = 'block';
+
+  // Progress
+  document.getElementById('tourStep').textContent = (tourIdx+1) + '/' + tourSteps.length;
+  document.getElementById('tourProgressBar').style.width = Math.round((tourIdx+1)/tourSteps.length*100) + '%';
 
   // Get data
   var kwText = '';
@@ -1247,24 +1260,17 @@ function showTourStep() {
   document.getElementById('tourTitle').textContent = step.title;
   document.getElementById('tourKw').textContent = kwText;
   document.getElementById('tourDesc').textContent = step.desc;
-  document.getElementById('tourDetail').textContent = (tourIdx + 1) + ' / ' + tourSteps.length;
+  document.getElementById('tourDetail').textContent = step.type === 'system' ? 'MEP System View' : 'Floor Isolation (Clipping)';
 
   // Highlight: show only this system or clip to floor
   renderer.clippingPlanes = [];
   if (step.type === 'system') {
     systemMeshes.forEach(sm => {
-      if (sm.sysIndex === step.sysIdx) {
-        sm.mesh.material.opacity = 0.9;
-        sm.mesh.material.transparent = true;
-        sm.mesh.visible = true;
-      } else {
-        sm.mesh.material.opacity = 0.08;
-        sm.mesh.material.transparent = true;
-        sm.mesh.visible = true;
-      }
+      sm.mesh.material.opacity = sm.sysIndex === step.sysIdx ? 0.9 : 0.06;
+      sm.mesh.material.transparent = true;
+      sm.mesh.visible = true;
     });
   } else if (step.type === 'floor') {
-    // Show all systems but clip to floor
     systemMeshes.forEach(sm => {
       sm.mesh.material.opacity = 0.85;
       sm.mesh.material.transparent = true;
@@ -1276,30 +1282,16 @@ function showTourStep() {
     renderer.clippingPlanes = clipPlanes;
   }
 
-  // Animate camera
+  // Smooth camera move only (no orbit)
   animateCamera(
     new THREE.Vector3(step.cam[0], step.cam[1], step.cam[2]),
     new THREE.Vector3(step.look[0], step.look[1], step.look[2]),
-    1200
+    1500
   );
-
-  // Slow orbit
-  if (tourOrbitTimer) clearInterval(tourOrbitTimer);
-  var angle = 0;
-  const orbitRadius = Math.sqrt(step.cam[0]*step.cam[0] + step.cam[2]*step.cam[2]);
-  const orbitY = step.cam[1];
-  tourOrbitTimer = setInterval(() => {
-    angle += 0.003;
-    camera.position.x = Math.cos(angle) * orbitRadius;
-    camera.position.z = Math.sin(angle) * orbitRadius;
-    camera.position.y = orbitY;
-    orbitControls.target.set(step.look[0], step.look[1], step.look[2]);
-    orbitControls.update();
-  }, 30);
 
   // Auto-advance
   if (tourTimer) clearTimeout(tourTimer);
-  tourTimer = setTimeout(() => { tourIdx++; showTourStep(); }, 6000);
+  tourTimer = setTimeout(function() { tourIdx++; showTourStep(); }, 7000);
 }
 
 function skipTour() {
@@ -1322,7 +1314,6 @@ function endTour() {
   document.getElementById('tourBtn').textContent = '🎬 Tour';
   renderer.clippingPlanes = [];
   if (tourTimer) clearTimeout(tourTimer);
-  if (tourOrbitTimer) clearInterval(tourOrbitTimer);
   systemMeshes.forEach(sm => {
     sm.mesh.material.opacity = 0.85;
     sm.mesh.material.transparent = true;
@@ -1426,105 +1417,8 @@ function exitCompare() {
   });
 }
 
-/* ══════════════════ E. ENERGY FLOW PARTICLES ══════════════════ */
-var flowParticles = null;
-var flowEnabled = false;
-var flowPositions = [];
-var flowVelocities = [];
-const PARTICLE_COUNT = 600;
-
-function initFlowParticles() {
-  const geo = new THREE.BufferGeometry();
-  const positions = new Float32Array(PARTICLE_COUNT * 3);
-  const colors = new Float32Array(PARTICLE_COUNT * 3);
-  flowPositions = [];
-  flowVelocities = [];
-
-  // Sample positions from visible meshes
-  const candidates = [];
-  systemMeshes.forEach(sm => {
-    if (!sm.mesh.visible) return;
-    const bbox = new THREE.Box3().setFromObject(sm.mesh);
-    const center = bbox.getCenter(new THREE.Vector3());
-    const size = bbox.getSize(new THREE.Vector3());
-    candidates.push({ center, size, sysIdx: sm.sysIndex });
-  });
-
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
-    const c = candidates[Math.floor(Math.random() * candidates.length)];
-    if (!c) continue;
-    const x = c.center.x + (Math.random() - 0.5) * c.size.x * 1.2;
-    const y = c.center.y + (Math.random() - 0.5) * c.size.y * 0.3;
-    const z = c.center.z + (Math.random() - 0.5) * c.size.z * 1.2;
-    positions[i*3] = x;
-    positions[i*3+1] = y;
-    positions[i*3+2] = z;
-    flowPositions.push(new THREE.Vector3(x, y, z));
-
-    // Velocity: upward for HVAC, downward for plumbing, horizontal for electrical
-    const vx = (Math.random()-0.5) * 0.02;
-    const vy = c.sysIdx <= 1 ? 0.03 : c.sysIdx === 2 ? -0.02 : 0.01;
-    const vz = (Math.random()-0.5) * 0.02;
-    flowVelocities.push(new THREE.Vector3(vx, vy, vz));
-
-    // Colors: system-based
-    const sys = SYSTEM_INFO[c.sysIdx];
-    const col = new THREE.Color(sys.hex);
-    colors[i*3] = col.r;
-    colors[i*3+1] = col.g;
-    colors[i*3+2] = col.b;
-  }
-
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-  const mat = new THREE.PointsMaterial({
-    size: 0.15,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.7,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-
-  flowParticles = new THREE.Points(geo, mat);
-  scene.add(flowParticles);
-}
-
-function updateFlowParticles() {
-  if (!flowParticles || !flowEnabled) return;
-  const pos = flowParticles.geometry.attributes.position.array;
-
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
-    const fp = flowPositions[i];
-    const fv = flowVelocities[i];
-    if (!fp || !fv) continue;
-
-    fp.add(fv);
-    pos[i*3] = fp.x;
-    pos[i*3+1] = fp.y;
-    pos[i*3+2] = fp.z;
-
-    // Reset particles that go too far
-    if (fp.y > 22 || fp.y < -3 || Math.abs(fp.x) > 40 || Math.abs(fp.z) > 40) {
-      const c = systemMeshes[Math.floor(Math.random() * systemMeshes.length)];
-      if (c) {
-        const bbox = new THREE.Box3().setFromObject(c.mesh);
-        const center = bbox.getCenter(new THREE.Vector3());
-        fp.set(center.x + (Math.random()-0.5)*2, center.y, center.z + (Math.random()-0.5)*2);
-      }
-    }
-  }
-  flowParticles.geometry.attributes.position.needsUpdate = true;
-}
-
-function toggleFlow() {
-  flowEnabled = !flowEnabled;
-  if (flowEnabled && !flowParticles) initFlowParticles();
-  if (flowParticles) flowParticles.visible = flowEnabled;
-  const btn = document.getElementById('flowToggle');
-  if (btn) btn.style.background = flowEnabled ? 'rgba(45,212,191,.2)' : '';
-}
+/* ══════════════════ E. (Flow removed — replaced by Tour orbit) ══════════════════ */
+function updateFlowParticles() {} // no-op
 
 /* Anomaly + time slider integrated into fetchLiveData above */
 
@@ -1533,7 +1427,6 @@ window.startTour = startTour;
 window.skipTour = skipTour;
 window.prevTour = prevTour;
 window.endTour = endTour;
-window.toggleFlow = toggleFlow;
 window.mepTogglePlay = mepTogglePlay;
 window.mepOnTimeChange = mepOnTimeChange;
 
@@ -1997,7 +1890,6 @@ let xrFrame = 0;
 renderer.setAnimationLoop(()=>{
   if(renderer.xr.isPresenting){ vrInput(); if(++xrFrame % 5 === 0) xrContinuousRaycast(); }
   else{updateFP();updateJoy();if(!fpMode)orbitControls.update();}
-  updateFlowParticles();
   renderer.render(scene,camera);
 });
 window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
