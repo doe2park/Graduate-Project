@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grimes MEP · Digital Twin</title>
 <style>
-  :root { --cyan:#2dd4bf; --bg:#0a0e1a; --panel:rgba(10,14,26,0.92); --border:rgba(45,212,191,0.15); }
+  :root { --cyan:#2dd4bf; --bg:#080c18; --panel:rgba(8,12,24,0.94); --border:rgba(45,212,191,0.12); --mono:'JetBrains Mono',monospace; --gold:#FDB515; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:var(--bg); color:#e2e8f0; font-family:system-ui,sans-serif; overflow:hidden; }
 
@@ -332,32 +332,49 @@ let viewMode = 'system'; // 'system' | 'temp' | 'flow' | 'energy'
 const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setClearColor(0x0f1320, 1);
+renderer.setClearColor(0x080c18, 1);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 2.8;
+renderer.toneMappingExposure = 2.2;
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 /* ══════════════════════════════════════════ SCENE ══════════════════════════════════════════ */
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0f1320, 0.003);
+scene.fog = new THREE.FogExp2(0x080c18, 0.004);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 300);
 camera.position.set(0, 6, 0);
-camera.rotation.order = 'YXZ'; // critical for FPS: yaw first, then pitch
+camera.rotation.order = 'YXZ';
 const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping = true; orbitControls.dampingFactor = 0.1;
 orbitControls.target.set(0, 6, -5);
 
-scene.add(new THREE.AmbientLight(0xffffff, 3.0));
-const sun = new THREE.DirectionalLight(0xffffff, 3.5); sun.position.set(30,50,20); scene.add(sun);
-scene.add(new THREE.DirectionalLight(0xaaccff, 2.5).translateX(-30).translateY(20));
-scene.add(new THREE.DirectionalLight(0xffeedd, 2.0).translateZ(30).translateY(-10));
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 2.0));
+// Lighting — cooler blue ambient + warm key
+scene.add(new THREE.AmbientLight(0x1a2a4a, 2.0));
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.0); keyLight.position.set(30,50,20); scene.add(keyLight);
+scene.add(new THREE.DirectionalLight(0x2dd4bf, 1.5).translateX(-30).translateY(20));
+scene.add(new THREE.DirectionalLight(0x38bdf8, 1.0).translateZ(30).translateY(-10));
+scene.add(new THREE.HemisphereLight(0x2dd4bf, 0x0a1020, 1.5));
+// Rim light for edge definition
+const rimLight = new THREE.DirectionalLight(0x2dd4bf, 0.8); rimLight.position.set(-20, 10, -30); scene.add(rimLight);
 
-const grid = new THREE.GridHelper(80,40,0x2dd4bf,0x1a2535);
-grid.material.opacity=0.12; grid.material.transparent=true; scene.add(grid);
-const floorMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,opacity:0.03,side:THREE.DoubleSide});
-[0,4,8,12,16].forEach(y=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(70,55),floorMat);p.rotation.x=-Math.PI/2;p.position.y=y;scene.add(p);});
+// Ground grid — neon style
+const grid = new THREE.GridHelper(80,80,0x2dd4bf,0x0d1a2a);
+grid.material.opacity=0.15; grid.material.transparent=true; scene.add(grid);
+const grid2 = new THREE.GridHelper(80,16,0x2dd4bf,0x2dd4bf);
+grid2.material.opacity=0.04; grid2.material.transparent=true; scene.add(grid2);
+
+// Floor planes with glow edge
+[0,4,8,12,16].forEach((y,i) => {
+  // Main floor plane
+  const floorMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,opacity:0.02,side:THREE.DoubleSide});
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(50,40),floorMat);
+  p.rotation.x=-Math.PI/2; p.position.y=y; scene.add(p);
+  // Floor edge ring
+  const edgeGeo = new THREE.RingGeometry(24, 25, 4);
+  const edgeMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,opacity:0.06,side:THREE.DoubleSide});
+  const edge = new THREE.Mesh(edgeGeo, edgeMat);
+  edge.rotation.x=-Math.PI/2; edge.position.y=y; scene.add(edge);
+});
 
 /* ══════════════════════════════════════════ LOAD MODEL ══════════════════════════════════════════ */
 const loadingEl = document.getElementById('loadText');
@@ -379,13 +396,32 @@ gltfLoader.load('grimes-mep-only.glb', (gltf) => {
     allMeshes.push(child);
     const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
     const sys = SYSTEM_INFO[sysIdx];
-    const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+
+    // Main material — slightly brighter for neon look
+    const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.88 });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
     child.userData.sysId = sys.id;
     child.userData.sysLabel = sys.label;
     originalMaterials.set(child.uuid, mat);
     systemMeshes.push({ mesh: child, sysIndex: sysIdx });
+
+    // Glow halo — larger, dimmer duplicate
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: sys.hex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.08,
+      depthWrite: false,
+    });
+    const glow = new THREE.Mesh(child.geometry, glowMat);
+    glow.position.copy(child.position);
+    glow.rotation.copy(child.rotation);
+    glow.scale.copy(child.scale).multiplyScalar(1.08);
+    glow.userData.isGlow = true;
+    glow.userData.parentSysIdx = sysIdx;
+    child.parent.add(glow);
+
     meshIdx++;
   });
   document.getElementById('loading').style.display = 'none';
