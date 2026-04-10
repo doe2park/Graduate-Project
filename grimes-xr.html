@@ -154,7 +154,7 @@
 <div id="anomalyAlert">⚠️ <span id="anomalyText">—</span></div>
 
 <!-- Pulse Label -->
-<div id="pulseLabel" style="display:none;position:fixed;bottom:110px;left:50%;transform:translateX(-50%);z-index:45;background:rgba(10,16,32,.92);backdrop-filter:blur(10px);border:1px solid rgba(45,212,191,.15);border-radius:10px;padding:8px 14px;font:11px 'Calibri',sans-serif;color:#e2e8f0;white-space:nowrap;pointer-events:none;transition:opacity 0.3s;max-width:500px"></div>
+<div id="pulseLabel" style="display:none;position:fixed;bottom:110px;left:50%;transform:translateX(-50%);z-index:45;background:rgba(10,16,32,.92);backdrop-filter:blur(10px);border:1px solid rgba(45,212,191,.15);border-radius:10px;padding:8px 14px;font:11px 'Calibri',sans-serif;color:#e2e8f0;pointer-events:none;transition:opacity 0.3s;width:auto;max-width:90vw"></div>
 
 <!-- Legend -->
 <div id="legend"><h3>MEP Systems</h3><div id="systemList"></div></div>
@@ -1537,14 +1537,13 @@ function updateEnergyPulse() {
 
   // Add wireframe outline during hold phase
   if (pulsePhase === 1 && !pulseWireframe) {
-    const targetMesh = systemMeshes.find(sm => sm.sysIndex === pulseTarget);
-    if (targetMesh) {
-      const wireGeo = targetMesh.mesh.geometry.clone();
-      const wireMat = new THREE.MeshBasicMaterial({ color: targetSys.hex, wireframe: true, transparent: true, opacity: 0.4 });
+    const targetMeshes = systemMeshes.filter(sm => sm.sysIndex === pulseTarget);
+    if (targetMeshes.length > 0) {
+      const tm = targetMeshes[0];
+      const wireGeo = tm.mesh.geometry;
+      const wireMat = new THREE.MeshBasicMaterial({ color: targetSys.hex, wireframe: true, transparent: true, opacity: 0.3 });
       pulseWireframe = new THREE.Mesh(wireGeo, wireMat);
-      pulseWireframe.position.copy(targetMesh.mesh.position);
-      pulseWireframe.rotation.copy(targetMesh.mesh.rotation);
-      pulseWireframe.scale.copy(targetMesh.mesh.scale);
+      pulseWireframe.applyMatrix4(tm.mesh.matrixWorld);
       scene.add(pulseWireframe);
     }
   }
