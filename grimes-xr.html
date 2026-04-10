@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grimes MEP · Digital Twin</title>
 <style>
-  :root { --cyan:#2dd4bf; --bg:#080c18; --panel:rgba(8,12,24,0.94); --border:rgba(45,212,191,0.12); --mono:'JetBrains Mono',monospace; --gold:#FDB515; }
+  :root { --cyan:#2dd4bf; --bg:#0a0e1a; --panel:rgba(10,14,26,0.92); --border:rgba(45,212,191,0.15); --mono:'JetBrains Mono',monospace; --gold:#FDB515; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:var(--bg); color:#e2e8f0; font-family:system-ui,sans-serif; overflow:hidden; }
 
@@ -332,15 +332,15 @@ let viewMode = 'system'; // 'system' | 'temp' | 'flow' | 'energy'
 const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setClearColor(0x080c18, 1);
+renderer.setClearColor(0x0f1320, 1);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 2.2;
+renderer.toneMappingExposure = 2.8;
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 /* ══════════════════════════════════════════ SCENE ══════════════════════════════════════════ */
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x080c18, 0.004);
+scene.fog = new THREE.FogExp2(0x0f1320, 0.003);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 300);
 camera.position.set(0, 6, 0);
 camera.rotation.order = 'YXZ';
@@ -348,33 +348,16 @@ const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping = true; orbitControls.dampingFactor = 0.1;
 orbitControls.target.set(0, 6, -5);
 
-// Lighting — cooler blue ambient + warm key
-scene.add(new THREE.AmbientLight(0x1a2a4a, 2.0));
-const keyLight = new THREE.DirectionalLight(0xffffff, 3.0); keyLight.position.set(30,50,20); scene.add(keyLight);
-scene.add(new THREE.DirectionalLight(0x2dd4bf, 1.5).translateX(-30).translateY(20));
-scene.add(new THREE.DirectionalLight(0x38bdf8, 1.0).translateZ(30).translateY(-10));
-scene.add(new THREE.HemisphereLight(0x2dd4bf, 0x0a1020, 1.5));
-// Rim light for edge definition
-const rimLight = new THREE.DirectionalLight(0x2dd4bf, 0.8); rimLight.position.set(-20, 10, -30); scene.add(rimLight);
+scene.add(new THREE.AmbientLight(0xffffff, 3.0));
+const sun = new THREE.DirectionalLight(0xffffff, 3.5); sun.position.set(30,50,20); scene.add(sun);
+scene.add(new THREE.DirectionalLight(0xaaccff, 2.5).translateX(-30).translateY(20));
+scene.add(new THREE.DirectionalLight(0xffeedd, 2.0).translateZ(30).translateY(-10));
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 2.0));
 
-// Ground grid — neon style
-const grid = new THREE.GridHelper(80,80,0x2dd4bf,0x0d1a2a);
-grid.material.opacity=0.15; grid.material.transparent=true; scene.add(grid);
-const grid2 = new THREE.GridHelper(80,16,0x2dd4bf,0x2dd4bf);
-grid2.material.opacity=0.04; grid2.material.transparent=true; scene.add(grid2);
-
-// Floor planes with glow edge
-[0,4,8,12,16].forEach((y,i) => {
-  // Main floor plane
-  const floorMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,opacity:0.02,side:THREE.DoubleSide});
-  const p = new THREE.Mesh(new THREE.PlaneGeometry(50,40),floorMat);
-  p.rotation.x=-Math.PI/2; p.position.y=y; scene.add(p);
-  // Floor edge ring
-  const edgeGeo = new THREE.RingGeometry(24, 25, 4);
-  const edgeMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,opacity:0.06,side:THREE.DoubleSide});
-  const edge = new THREE.Mesh(edgeGeo, edgeMat);
-  edge.rotation.x=-Math.PI/2; edge.position.y=y; scene.add(edge);
-});
+const grid = new THREE.GridHelper(80,40,0x2dd4bf,0x1a2535);
+grid.material.opacity=0.12; grid.material.transparent=true; scene.add(grid);
+const floorMat = new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,opacity:0.03,side:THREE.DoubleSide});
+[0,4,8,12,16].forEach(y=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(70,55),floorMat);p.rotation.x=-Math.PI/2;p.position.y=y;scene.add(p);});
 
 /* ══════════════════════════════════════════ LOAD MODEL ══════════════════════════════════════════ */
 const loadingEl = document.getElementById('loadText');
@@ -396,32 +379,13 @@ gltfLoader.load('grimes-mep-only.glb', (gltf) => {
     allMeshes.push(child);
     const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
     const sys = SYSTEM_INFO[sysIdx];
-
-    // Main material — slightly brighter for neon look
-    const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.88 });
+    const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
     child.material = mat;
     child.userData.sysIndex = sysIdx;
     child.userData.sysId = sys.id;
     child.userData.sysLabel = sys.label;
     originalMaterials.set(child.uuid, mat);
     systemMeshes.push({ mesh: child, sysIndex: sysIdx });
-
-    // Glow halo — larger, dimmer duplicate
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: sys.hex,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.08,
-      depthWrite: false,
-    });
-    const glow = new THREE.Mesh(child.geometry, glowMat);
-    glow.position.copy(child.position);
-    glow.rotation.copy(child.rotation);
-    glow.scale.copy(child.scale).multiplyScalar(1.08);
-    glow.userData.isGlow = true;
-    glow.userData.parentSysIdx = sysIdx;
-    child.parent.add(glow);
-
     meshIdx++;
   });
   document.getElementById('loading').style.display = 'none';
@@ -1552,7 +1516,7 @@ function pickNextTarget() {
 function updateEnergyPulse() {
   if (!pulseEnabled) return;
 
-  const speed = 0.008;
+  const speed = 0.006; // ~9 seconds per cycle
   pulseProgress += speed;
 
   if (pulseProgress >= 1) {
@@ -1571,27 +1535,26 @@ function updateEnergyPulse() {
   if (!targetSys) return;
   const sysData = getSystemReadings(targetSys.id);
 
-  // Add wireframe outline during hold phase
+  // Wireframe outline during hold
   if (pulsePhase === 1 && !pulseWireframe) {
     const targetMeshes = systemMeshes.filter(sm => sm.sysIndex === pulseTarget);
     if (targetMeshes.length > 0) {
       const tm = targetMeshes[0];
-      const wireGeo = tm.mesh.geometry;
       const wireMat = new THREE.MeshBasicMaterial({ color: targetSys.hex, wireframe: true, transparent: true, opacity: 0.3 });
-      pulseWireframe = new THREE.Mesh(wireGeo, wireMat);
+      pulseWireframe = new THREE.Mesh(tm.mesh.geometry, wireMat);
       pulseWireframe.applyMatrix4(tm.mesh.matrixWorld);
       scene.add(pulseWireframe);
     }
   }
   if (pulsePhase === 2 && pulseWireframe) {
-    pulseWireframe.material.opacity = 0.4 * (1 - pulseProgress);
+    pulseWireframe.material.opacity = 0.3 * (1 - pulseProgress);
   }
 
+  // Highlight/dim meshes
   systemMeshes.forEach(sm => {
     const sys = SYSTEM_INFO[sm.sysIndex];
     if (!sys) return;
     const baseColor = new THREE.Color(sys.hex);
-
     if (sm.sysIndex === pulseTarget) {
       const loadBright = 1.0 + sysData.ratio * 0.5;
       sm.mesh.material.color.copy(baseColor.clone().multiplyScalar(loadBright));
@@ -1602,7 +1565,7 @@ function updateEnergyPulse() {
     }
   });
 
-  // Rich label with sensor readings
+  // Info label
   const labelEl = document.getElementById('pulseLabel');
   if (labelEl && targetSys) {
     if (glow > 0.1) {
@@ -1610,25 +1573,79 @@ function updateEnergyPulse() {
       labelEl.style.opacity = glow;
 
       const ds = SYSTEM_DATA_SOURCE[targetSys.id];
-      const srcBadge = sysData.source === 'LIVE' ? '<span style="color:#2dd4bf;font-size:9px">● LIVE</span>'
-        : sysData.source === 'PARTIAL' ? '<span style="color:#38bdf8;font-size:9px">◐ PARTIAL</span>'
-        : sysData.source === 'BAS' ? '<span style="color:#22c55e;font-size:9px">● BAS</span>'
-        : '<span style="color:#64748b;font-size:9px">○ SIM</span>';
+      const sysId = targetSys.id;
 
-      let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
-      html += '<span style="color:' + targetSys.color + ';font-weight:700">' + targetSys.label + '</span> ' + srcBadge;
+      // Source badge
+      const srcBadge = sysData.source === 'LIVE' ? '<span style="color:#2dd4bf">● LIVE</span>'
+        : sysData.source === 'PARTIAL' ? '<span style="color:#38bdf8">◐ PARTIAL</span>'
+        : '<span style="color:#64748b">○ SIM</span>';
+
+      // System description
+      const descriptions = {
+        hvac_duct: 'Supply & return air ducts distributing conditioned air',
+        hvac_equip: 'AHUs, VAV boxes, fans — primary HVAC consumers',
+        pipe: 'Hot/cold water supply, drain waste vent piping',
+        sprinkler: 'Fire sprinkler system — designed by Pribuss + Pragmatic PE',
+        conduit: 'Electrical conduit — Meter #3 feeds rooftop AHUs',
+        elec: 'Panelboards & distribution — 93 panels across 4 floors',
+        diffuser: 'Supply air diffusers & return grilles at ceiling level',
+        pump: 'Chilled/hot water pumps, control valves, VFDs',
+        spiral: 'Spiral ductwork — round ducts for branch distribution',
+      };
+
+      // Floor coverage
+      const floorInfo = {
+        hvac_duct: 'All floors (B1–SRV)',
+        hvac_equip: 'SRV (AHU), B1 (mechanical)',
+        pipe: 'All floors',
+        sprinkler: 'B1–L3 (4 floors)',
+        conduit: 'SRV only (Meter #3)',
+        elec: 'B1: 27 panels · L1: 33 · L2: 22 · L3: 11',
+        diffuser: 'L1–L3 (occupied floors)',
+        pump: 'B1 (mechanical room)',
+        spiral: 'All floors',
+      };
+
+      // What data is missing
+      const needsData = {
+        hvac_duct: 'Needs: zone temp sensors, airflow meters',
+        hvac_equip: 'Needs: BAS integration for AHU status',
+        pipe: 'Has: water flow rate · Needs: temp, pressure sensors',
+        sprinkler: 'Needs: fire panel integration',
+        conduit: 'Connected: kW, V, A, PF, Hz, kWh',
+        elec: 'Connected: Meter #76 + #77 · Needs: sub-metering',
+        diffuser: 'Needs: CO₂ sensors, zone airflow',
+        pump: 'Needs: VFD monitoring, flow meters',
+        spiral: 'Needs: airflow sensors',
+      };
+
+      let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      html += '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + targetSys.color + '"></span>';
+      html += '<span style="font-weight:700;font-size:13px;color:' + targetSys.color + '">' + targetSys.label + '</span>';
+      html += '<span style="font-size:9px;margin-left:auto">' + srcBadge + '</span>';
       html += '</div>';
 
-      // Sensor cards
-      html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
-      sysData.readings.slice(0, 4).forEach(r => {
-        const tagColor = r.tag === 'LIVE' ? '#2dd4bf' : r.tag === 'BAS' ? '#22c55e' : '#64748b';
-        html += '<div style="background:rgba(255,255,255,.05);border-radius:4px;padding:2px 8px;text-align:center">';
-        html += '<div style="font-size:8px;color:#64748b">' + r.label + ' <span style="color:' + tagColor + ';font-size:7px">' + r.tag + '</span></div>';
-        html += '<div style="font-size:13px;font-weight:700;color:#e2e8f0">' + r.val + ' <span style="font-size:9px;color:#94A3B8">' + r.unit + '</span></div>';
+      // Description
+      html += '<div style="font-size:10px;color:#94A3B8;margin-bottom:6px">' + (descriptions[sysId] || '') + '</div>';
+
+      // Key readings
+      if (sysData.readings.length > 0) {
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">';
+        sysData.readings.slice(0, 3).forEach(r => {
+          const tagColor = r.tag === 'LIVE' ? '#2dd4bf' : '#64748b';
+          html += '<div style="background:rgba(255,255,255,.06);border-radius:5px;padding:3px 10px;text-align:center">';
+          html += '<div style="font-size:14px;font-weight:700;color:#e2e8f0">' + r.val + ' <span style="font-size:9px;color:#94A3B8">' + r.unit + '</span></div>';
+          html += '<div style="font-size:8px;color:' + tagColor + '">' + r.label + ' · ' + r.tag + '</div>';
+          html += '</div>';
+        });
         html += '</div>';
-      });
+      }
+
+      // Floor coverage + data status
+      html += '<div style="display:flex;gap:12px;font-size:9px;color:#64748b">';
+      html += '<span>📍 ' + (floorInfo[sysId] || '') + '</span>';
       html += '</div>';
+      html += '<div style="font-size:9px;color:#475569;margin-top:3px">' + (needsData[sysId] || '') + '</div>';
 
       labelEl.innerHTML = html;
     } else {
