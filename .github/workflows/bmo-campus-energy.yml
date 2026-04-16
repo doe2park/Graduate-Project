@@ -32,6 +32,13 @@ jobs:
       - name: Generate weekly report
         run: python generate_weekly_report.py || true
 
+      - name: Archive daily snapshot
+        run: |
+          TODAY=$(date +'%Y-%m-%d')
+          cp data/campus_energy.json "data/archive/${TODAY}.json"
+          cp data/building_data.json "data/archive/buildings_${TODAY}.json"
+          echo "Archived: ${TODAY}"
+      
       - name: Commit and push
         run: |
           git config user.name "BMO Auto-Fetcher"
