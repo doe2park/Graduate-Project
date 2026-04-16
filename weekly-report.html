@@ -52,12 +52,17 @@ a{color:var(--cyan);text-decoration:none}
   <a href="grimes-campus-map-arcgis.html" class="hdr-back">← Map</a>
   <a href="campus-energy-dashboard.html" class="hdr-back">📊 Dashboard</a>
   <h1>📋 Weekly Energy Report</h1>
-  <div class="hdr-period" id="period">--</div>
+  <div id="weekNav" style="display:flex;align-items:center;gap:6px;margin-left:8px"><button onclick="changeWeek(-1)" id="prevBtn" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--dim);cursor:pointer;font-size:11px">← Prev</button><span id="weekLabel" style="font-size:10px;color:var(--cyan);font-family:var(--mono);min-width:80px;text-align:center">This week</span><button onclick="changeWeek(1)" id="nextBtn" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--dim);cursor:pointer;font-size:11px" disabled>Next →</button></div><div class="hdr-period" id="period">--</div>
 </div>
 <div class="wrap" id="app"><div id="loading"><div class="spin"></div>Loading report...</div></div>
 
 <script>
 const REPORT_URL='https://doe2park.github.io/Graduate-Project/data/weekly_report.json';
+const ARCHIVE_BASE='https://doe2park.github.io/Graduate-Project/data/archive/';
+var weekOffset=0;
+function getArchiveDate(o){var d=new Date();d.setDate(d.getDate()+o*7);return d.toISOString().slice(0,10)}
+function changeWeek(dir){weekOffset+=dir;if(weekOffset>0)weekOffset=0;document.getElementById('nextBtn').disabled=(weekOffset>=0);if(weekOffset===0){document.getElementById('weekLabel').textContent='This week';document.getElementById('weekLabel').style.color='var(--cyan)'}else{document.getElementById('weekLabel').textContent=getArchiveDate(weekOffset);document.getElementById('weekLabel').style.color='var(--gold)'}init()}
+
 const NAMES_URL='https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
 
 Chart.defaults.color='#64748b';
@@ -70,7 +75,9 @@ var tooltipOpts={backgroundColor:'rgba(10,16,32,.95)',borderColor:'rgba(253,181,
 async function init(){
   var app=document.getElementById('app');
   try{
-    var [rRes,nRes]=await Promise.all([fetch(REPORT_URL+'?t='+Date.now()),fetch(NAMES_URL+'?t='+Date.now())]);
+    var reportUrl=REPORT_URL;
+    if(weekOffset<0){reportUrl=ARCHIVE_BASE+'weekly_'+getArchiveDate(weekOffset)+'.json'}
+    var [rRes,nRes]=await Promise.all([fetch(reportUrl+'?t='+Date.now()),fetch(NAMES_URL+'?t='+Date.now())]);
     if(!rRes.ok){app.innerHTML='<div class="empty">No weekly report yet. Data needs to accumulate for at least 1 day.<br><br><a href="campus-energy-dashboard.html">View live dashboard instead →</a></div>';return}
     var report=await rRes.json();
     var names={};try{var nd=await nRes.json();for(var k in nd.buildings)names[k]=nd.buildings[k].name}catch(e){}
