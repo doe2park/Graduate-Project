@@ -120,6 +120,20 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .p-cta-title{font:600 14px 'DM Sans';color:#fff}
 .p-cta-sub{font-size:10.5px;color:var(--dim);margin-top:2px}
 .p-cta-arrow{font-size:20px;color:var(--gold);margin-left:auto;font-weight:300}
+/* Story card — plain-language framing (Froehlich CHI'10 — tangible, meaningful feedback) */
+.p-story{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,rgba(253,181,21,.08),rgba(52,211,153,.05));border:1px solid rgba(253,181,21,.22);margin-bottom:10px}
+.p-story.busy{background:linear-gradient(135deg,rgba(248,113,113,.12),rgba(248,113,113,.04));border-color:rgba(248,113,113,.3)}
+.p-story.quiet{background:linear-gradient(135deg,rgba(96,165,250,.12),rgba(96,165,250,.04));border-color:rgba(96,165,250,.3)}
+.p-story.dim{background:rgba(255,255,255,.03);border-color:var(--border)}
+.ps-icon{font-size:22px;line-height:1;flex-shrink:0}
+.ps-title{font:600 13px/1.25 'DM Sans';color:#fff}
+.ps-sub{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4}
+.p-details{margin-top:10px;border-top:1px solid var(--border);padding-top:4px}
+.p-details summary{cursor:pointer;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;padding:6px 0;user-select:none;list-style:none;display:flex;align-items:center;gap:6px;font-weight:600}
+.p-details summary::-webkit-details-marker{display:none}
+.p-details summary::before{content:'▸';color:var(--gold);transition:transform .2s;display:inline-block;font-size:10px}
+.p-details[open] summary::before{transform:rotate(90deg)}
+.p-details[open] summary{color:var(--gold)}
 
 /* MEP chips */
 .mep-grid{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
@@ -180,15 +194,18 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .esri-popup{display:none!important}
 .esri-ui-corner .esri-component{border-radius:9px!important}
 
-/* Time Slider */
-#timeSlider{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);z-index:15;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:12px;padding:10px 16px;display:flex;align-items:center;gap:10px;min-width:340px;max-width:500px}
-@media(max-width:768px){#timeSlider{bottom:80px;left:10px;right:10px;transform:none;min-width:auto}}
-#timeSlider .ts-label{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
-#timeSlider .ts-time{font:700 14px var(--mono);color:var(--gold);min-width:50px}
-#timeSlider input[type=range]{flex:1;-webkit-appearance:none;height:4px;background:var(--faint);border-radius:2px;outline:none;cursor:pointer}
-#timeSlider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--gold);cursor:pointer;box-shadow:0 0 6px rgba(253,181,21,.4)}
-#timeSlider .ts-play{background:none;border:1px solid var(--border);color:var(--gold);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
-#timeSlider .ts-play:hover{background:rgba(253,181,21,.1)}
+/* Campus Mood pill (top-center) */
+#campusMood{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:12;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;padding:7px 16px;font-size:11px;color:var(--text);max-width:min(560px,calc(100vw - 160px));text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .4s}
+#campusMood.ready{opacity:1}
+#campusMood .cm-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:baseline;background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.55);animation:cmPulse 2.6s ease-in-out infinite}
+#campusMood.busy .cm-dot{background:#f87171;box-shadow:0 0 8px rgba(248,113,113,.55)}
+#campusMood.quiet .cm-dot{background:#60a5fa;box-shadow:0 0 8px rgba(96,165,250,.55)}
+#campusMood .cm-strong{color:var(--gold);font-weight:700}
+#campusMood .cm-sub{color:var(--dim);margin-left:6px;font-size:10px}
+@keyframes cmPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+@media(max-width:768px){#campusMood{top:52px;font-size:10px;padding:6px 12px;max-width:calc(100vw - 24px);white-space:normal;border-radius:12px}}
+
+/* Map legend */
 .ts-legend{position:absolute;bottom:40px;right:20px;z-index:15;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:9px;color:var(--dim)}
 @media(max-width:768px){.ts-legend{bottom:130px;right:10px}}
 .ts-legend-row{display:flex;align-items:center;gap:6px;margin:2px 0}
@@ -228,6 +245,11 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 <div id="ma">
   <button id="tb">☰</button>
   <a href="campus-3d.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(45,212,191,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--cyan);font-size:10px;font-weight:600;text-decoration:none">🏛 3D View</a>
+
+  <!-- Campus Mood: one-line plain-language summary -->
+  <div id="campusMood" title="How the campus compares to typical load at this hour">
+    <span class="cm-dot"></span><span id="cmText">Reading campus mood…</span>
+  </div>
 
   <!-- Mode Toggle -->
   <div id="modeToggle" style="display:none">
@@ -312,13 +334,6 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
   <div id="grimes-pulse"></div>
   <div id="grimes-label" onclick="document.querySelector('[data-idx=\\'0\\']')?.click()">◆ Grimes Digital Twin →</div>
   <div id="pop"></div>
-  <!-- Time Slider -->
-  <div id="timeSlider">
-    <div class="ts-label">24hr</div>
-    <button class="ts-play" id="tsPlay" onclick="togglePlayback()">▶</button>
-    <input type="range" id="tsRange" min="0" max="95" value="95" oninput="onSliderMove(this.value)">
-    <div class="ts-time" id="tsTime">Live</div>
-  </div>
   <div class="ts-legend">
     <div style="font-weight:600;margin-bottom:4px">Energy Intensity</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#34d399"></div> Low (&lt;100kW)</div>
@@ -447,8 +462,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     return [248,113,113];
   }
 
+  // ── Breathing registry — load-proportional glow animation ──
+  // Rationale: Weiser "Designing Calm Technology" (1995) — ambient motion reveals state without demanding attention.
+  // Higher load = faster breath, bigger amplitude.
+  var _breathers=[];
+
   function renderMarkers(energyData){
     gL.removeAll();
+    _breathers.length=0;
     var maxKw=500;
     if(energyData){
       var vals=Object.values(energyData).map(function(b){return b.kw}).filter(function(v){return v});
@@ -482,11 +503,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         if (kw > 0) {
           var glowSize = 14 + loadRatio * 16;  // 14-30 px
           var glowAlpha = 40 + loadRatio * 100; // 40-140
-          gL.add(new Graphic({
+          var glowCol = eCol ? [eCol[0],eCol[1],eCol[2]] : [cc.r[0],cc.r[1],cc.r[2]];
+          var glowGfx = new Graphic({
             geometry:new Point({longitude:b.lng,latitude:b.lat}),
-            symbol:{type:'simple-marker',color:eCol?[...eCol,glowAlpha]:[...cc.r,glowAlpha],size:glowSize,
+            symbol:{type:'simple-marker',color:[glowCol[0],glowCol[1],glowCol[2],glowAlpha],size:glowSize,
               outline:{color:[0,0,0,0],width:0}}
-          }));
+          });
+          gL.add(glowGfx);
+          _breathers.push({gfx:glowGfx,baseSize:glowSize,baseAlpha:glowAlpha,col:glowCol,ratio:loadRatio,phase:Math.random()*Math.PI*2});
         }
 
         // Core dot — size also scales with load
@@ -504,6 +528,28 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   renderMarkers(null);
   window.render3DFn=renderMarkers;
   window.currentEnergyData=null;
+
+  // ── Breathing tick — mutates glow symbols at ~12 Hz ──
+  var _breathT0=Date.now();
+  setInterval(function(){
+    if(!_breathers.length)return;
+    var t=(Date.now()-_breathT0)/1000;
+    for(var i=0;i<_breathers.length;i++){
+      var br=_breathers[i];
+      // Freq: 0.22 Hz (~4.5s cycle) idle → 0.75 Hz (~1.3s) at full load
+      var freq=0.22+br.ratio*0.53;
+      var s=Math.sin(t*freq*2*Math.PI+br.phase);
+      var amp=0.18+br.ratio*0.38; // 18–56% size swing
+      var newSize=br.baseSize*(1+s*amp);
+      var newAlpha=Math.round(Math.max(20,Math.min(220,br.baseAlpha*(0.75+(s+1)*0.25))));
+      try{
+        var sym=br.gfx.symbol.clone();
+        sym.size=newSize;
+        sym.color=[br.col[0],br.col[1],br.col[2],newAlpha];
+        br.gfx.symbol=sym;
+      }catch(e){/* map may be reloading */}
+    }
+  },85);
 
   view.ui.add(new Locate({view}),'top-right');
   view.ui.add(new BasemapToggle({view,nextBasemap:'hybrid'}),'bottom-left');
@@ -564,23 +610,57 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   const bSlugs={grimes:'grimes-engineering-center',cory:'cory-hall',soda:'soda-hall',davis:'davis-hall',etch:'etcheverry-hall',hmm:'hearst-memorial-mining-building',hesse:'hesse-hall',obrien:'obrien-hall',jacobs:'jacobs-hall',sutardja:'sutardja-dai-hall',mclaughlin:'mclaughlin-hall',blum:'blum-hall',stanley:'stanley-hall',tan:'tan-hall',latimer:'latimer-hall',lewis:'lewis-hall',pimentel:'pimentel-hall',evans:'evans-hall',campbell:'campbell-hall',birge:'birge-hall',leconte:'leconte-hall',vlsb:'valley-life-sciences-building',hilde:'hildebrand-hall',lksc:'li-ka-shing-center',wheeler:'wheeler-hall',dwinelle:'dwinelle-hall',moses:'moses-hall',durant:'durant-hall',south:'south-hall',barrows:'barrows-hall',stephens:'stephens-hall',haas:'haas-school-of-business',boalt:'boalt-hall',wurster:'wurster-hall',kroeber:'kroeber-hall',tolman:'tolman-hall',morgan:'morgan-hall',giannini:'giannini-hall',california:'california-hall',mlk:'martin-luther-king-jr-student-union',rsf:'recreational-sports-facility',chavez:'cesar-e-chavez-student-center',anthony:'anthony-hall',sproul:'sproul-hall',doe:'doe-memorial-library',moffitt:'moffitt-library',uhall:'university-hall',campanile:'sather-tower',zeller:'zellerbach-hall',donner:'donner-laboratory',mulford:'mulford-hall',northgate:'north-gate-hall',bww:'berkeley-way-west',stadium:'california-memorial-stadium',sgate:'sather-gate'};
   function getBerkeleyUrl(id){return 'https://www.berkeley.edu/map/'+(bSlugs[id]||id)+'/';}
 
+  // Build a plain-language "story" for a building based on live kW vs its own 24h sparkline average.
+  // Source: Opower Home Energy Reports (Allcott, 2011) — relative comparisons drive engagement.
+  function buildingStory(b){
+    var homes=b.kw?Math.max(1,Math.round(b.kw/1.25)):0; // US avg household ~1.25 kW continuous (EIA RECS)
+    var shortN=b.n.split(' ').slice(0,2).join(' ');
+    if(!b.kw){
+      if(b.nrg)return{icon:'\uD83C\uDF19',mood:'dim',title:shortN+' is offline right now',sub:'This building is metered by BMO, but isn\'t reporting live power at the moment.'};
+      return{icon:'\uD83D\uDCCD',mood:'dim',title:'No live energy data for '+shortN,sub:'Not currently metered in the live feed. Building info is still below.'};
+    }
+    var sp=(b.sparkline&&b.sparkline.length>2)?b.sparkline:null;
+    var avg=sp?sp.reduce(function(a,c){return a+c},0)/sp.length:null;
+    var tone='in a steady rhythm',mood='normal',icon='\u26A1';
+    if(avg&&avg>0){
+      var pct=(b.kw-avg)/avg*100;
+      if(pct>25){tone='<b style="color:#f87171">busier</b> than its 24-hour average';mood='busy';icon='\uD83D\uDD25';}
+      else if(pct<-25){tone='<b style="color:#60a5fa">quieter</b> than its 24-hour average';mood='quiet';icon='\uD83C\uDF0A';}
+      else{tone='running near its typical rhythm';}
+    }
+    var hStr=homes.toLocaleString()+' home'+(homes===1?'':'s');
+    return{
+      icon:icon,mood:mood,
+      title:'Using about '+hStr+' worth of power right now',
+      sub:shortN+' is '+tone+'.'
+    };
+  }
+
   function showPop(b){
     const cc=C[b.c];
     let h=`<div class="p-h"><button class="p-x" onclick="closePop()">✕</button>
       <div class="p-t">${b.n}</div>${b.a?`<div class="p-a">${b.a}</div>`:''}
       <div class="p-badge" style="background:${cc.h}15;color:${cc.h}">${b.c}</div></div><div class="p-b">`;
 
+    // ── Story card (plain-language, no raw kW) ──
+    var st=buildingStory(b);
+    h+='<div class="p-story '+st.mood+'"><div class="ps-icon">'+st.icon+'</div>';
+    h+='<div><div class="ps-title">'+st.title+'</div><div class="ps-sub">'+st.sub+'</div></div></div>';
+
+    // ── Primary CTA (Grimes only) ──
     if(b.xr){
       h+=`<a class="p-cta" href="${b.xr}" target="_blank">
         <div class="p-cta-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
-        <div class="p-cta-text"><div class="p-cta-title">Enter 3D Digital Twin</div><div class="p-cta-sub">Walk through MEP systems in WebXR</div></div>
+        <div class="p-cta-text"><div class="p-cta-title">Peek inside Grimes (3D)</div><div class="p-cta-sub">See the building's heart, arteries, and breath</div></div>
         <div class="p-cta-arrow">\u2192</div></a>`;
     }
 
-    // ── Building Info (ALL buildings) ──
+    // ── Engineer details (collapsed) ──
+    h+='<details class="p-details"><summary>Engineer details</summary>';
+
     var status=b.bim?'BIM + Live':(b.kw?'Live Data':(b.nrg?'Metered':'Standard'));
     var stColor=b.bim?'var(--cyan)':(b.kw?'var(--green)':(b.nrg?'var(--amber)':'var(--dim)'));
-    h+=`<div class="gs" style="margin-top:8px">
+    h+=`<div class="gs" style="margin-top:6px">
       <div class="gs-item"><div class="gs-val" style="color:var(--cyan)">${b.yr||'—'}</div><div class="gs-lbl">Built</div></div>
       <div class="gs-item"><div class="gs-val" style="color:var(--text)">${b.floors||'—'}</div><div class="gs-lbl">Floors</div></div>
       <div class="gs-item"><div class="gs-val" style="color:${stColor};font-size:11px">${status}</div><div class="gs-lbl">Data</div></div>
@@ -588,7 +668,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
     if(b.a){h+=`<div class="ip" style="margin-top:6px"><div class="ip-item">\uD83C\uDFEB <strong>${b.a}</strong></div></div>`}
 
-    // ── Energy (if live kW available) ──
     if(b.kw){
       var slices=[{val:b.kw,color:'var(--gold)'},{val:Math.max(10,500-b.kw),color:'rgba(255,255,255,.06)'}];
       var donutSvg=mkDonut(Math.max(b.kw+10,500),slices,72);
@@ -609,7 +688,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
             </div>
           </div>
         </div>`;
-      // Prediction + Anomaly row
       var extras=[];
       if(b.predicted)extras.push('<span style="color:var(--cyan)">Predicted: ~'+b.predicted+' kW</span>');
       if(b.anomaly)extras.push('<span style="color:var(--red)">\u26A0 '+b.anomaly.type+' ('+Math.round((b.anomaly.ratio-1)*100)+'% vs avg)</span>');
@@ -622,13 +700,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       </div>`;
     }
 
-    // ── BIM extras (Grimes only) ──
     if(b.bim){
       var meps=[{name:'HVAC Duct',color:'#22d3ee'},{name:'Hot Water',color:'#f87171'},{name:'Cold Water',color:'#60a5fa'},{name:'Electrical',color:'#fbbf24'},{name:'Fire Protection',color:'#f97316'},{name:'Sanitary',color:'#a78bfa'},{name:'Storm Drain',color:'#34d399'},{name:'Plumbing Vent',color:'#e879f9'}];
       h+=`<div style="margin-top:8px;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">MEP Systems (${b.mep})</div><div class="mep-grid">`;
       meps.forEach(function(m){h+=`<div class="mep-chip"><span class="mep-dot" style="background:${m.color}"></span>${m.name}</div>`});
       h+=`</div>`;
     }
+
+    h+='</details>'; // end engineer details
 
     if(b.kw){h+=`<a href="campus-energy-dashboard.html" style="display:block;margin-top:8px;padding:6px;border-radius:6px;background:rgba(253,181,21,.08);border:1px solid rgba(253,181,21,.15);text-align:center;text-decoration:none;font-size:10px;font-weight:600;color:var(--gold)">\uD83D\uDCCA Full Campus Analytics \u2192</a>`}
 
@@ -753,50 +832,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 });
 </script>
 <script>
-// ═══ TIME SLIDER ═══
-var histData=null,histTimes=[],playInterval=null;
-fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json?t='+Date.now())
-.then(function(r){return r.json()}).then(function(d){
-  histData=d;
-  var ts=new Set();
-  for(var bid in d)(d[bid]||[]).forEach(function(p){ts.add(p.t)});
-  histTimes=[].concat(Array.from(ts)).sort().slice(-96);
-  var slider=document.getElementById('tsRange');
-  if(slider){slider.max=Math.max(0,histTimes.length-1);slider.value=slider.max}
-  console.log('[TimeSlider] '+histTimes.length+' time points');
-}).catch(function(){});
-
-function onSliderMove(val){
-  val=parseInt(val);
-  if(!histData||!histTimes.length)return;
-  var isLive=(val>=histTimes.length-1);
-  document.getElementById('tsTime').textContent=isLive?'Live':histTimes[val]||'--';
-  if(isLive){
-    if(window.render3DFn&&chatData){window.render3DFn(chatData.buildings);window.currentEnergyData=chatData.buildings}
-    window._sliderTime='Live';
-    return;
-  }
-  var t=histTimes[val],snapshot={};
-  for(var bid in histData){var pts=histData[bid]||[];for(var i=0;i<pts.length;i++){if(pts[i].t===t){snapshot[bid]={kw:pts[i].kw,name:bid};break}}}
-  if(window.render3DFn)window.render3DFn(snapshot);
-  window.currentEnergyData=snapshot;
-  window._sliderTime=t;
-}
-
-function togglePlayback(){
-  var btn=document.getElementById('tsPlay'),slider=document.getElementById('tsRange');
-  if(playInterval){clearInterval(playInterval);playInterval=null;btn.textContent='▶';return}
-  btn.textContent='⏸';slider.value=0;onSliderMove(0);
-  playInterval=setInterval(function(){
-    var v=parseInt(slider.value)+1;
-    if(v>parseInt(slider.max)){clearInterval(playInterval);playInterval=null;btn.textContent='▶';slider.value=slider.max;onSliderMove(slider.max);return}
-    slider.value=v;onSliderMove(v);
-  },300);
-}
-
-function toggleViewMode(){}
-</script>
-<script>
 // ═══ SMART CAMPUS CHATBOT v3 — AI + Local Fallback ═══
 // Set your Cloudflare Worker URL here after deploying
 var AI_PROXY = 'https://campus-chatbot.ucb-dt.workers.dev';
@@ -819,7 +854,6 @@ function buildContext(){
     else lines.push((b.name||e[0])+': offline');
   });
   lines.unshift('Total: '+Math.round(totalKw)+' kW, '+onCount+' online');
-  if(window._sliderTime&&window._sliderTime!=='Live')lines.unshift('Viewing historical time: '+window._sliderTime);
   // Add building details
   lines.push('\nBuilding details:');
   D.forEach(function(b){lines.push(b.n+(b.a?' ('+b.a+')':'')+': '+b.c+', '+b.yr+', '+b.floors+'fl')});
@@ -919,9 +953,9 @@ function processQuery(q){
   var i=intent(q),o=on(),f=off();
   var bld=findBuilding(q);
   if(bld&&(!i||i==='help'||q.split(' ').length<=4))return bInfo(bld);
-  // Calculate totals from current data (slider or live)
+  // Calculate totals from current (live) data
   var T=0;o.forEach(function(e){T+=e[1].kw||0});T=Math.round(T*10)/10;
-  var timeCtx=window._sliderTime&&window._sliderTime!=='Live'?' (at '+window._sliderTime+')':'';
+  var timeCtx='';
   if(!chatData&&o.length===0&&!['help','hi','howwork','thanks'].includes(i))return "⏳ Loading energy data... try again in a moment.";
 
   switch(i){
@@ -1091,6 +1125,61 @@ if (typeof window.renderMarkers === 'function') {
     if (currentMode === 'pub') updatePublicPanel();
   };
 }
+</script>
+
+<script>
+// ═══ CAMPUS MOOD — plain-language summary ═══
+// Design rationale: Weiser & Brown (Calm Tech, 1995) — inform in periphery, don't demand attention.
+// Froehlich et al. (CHI 2010) — make impact tangible; prefer relative comparison over raw units.
+// Allcott (2011) / Opower field trials — "vs. typical" framing drives engagement.
+var _moodHist=null;
+async function _loadMoodHist(){
+  if(_moodHist)return _moodHist;
+  try{
+    var r=await fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json?t='+Date.now());
+    if(r.ok)_moodHist=await r.json();
+  }catch(e){_moodHist={}}
+  return _moodHist;
+}
+function _hourOf(ts){var d=new Date(String(ts).replace(' ','T'));return isNaN(d)?null:d.getHours()}
+async function computeCampusMood(){
+  var mood=document.getElementById('campusMood');
+  var txt=document.getElementById('cmText');
+  if(!mood||!txt)return;
+  var cur=window.currentEnergyData;
+  if(!cur){return}
+  // Current total
+  var curTotal=0,onlineN=0;
+  for(var id in cur){var b=cur[id];if(b&&typeof b.kw==='number'&&b.kw>0){curTotal+=b.kw;onlineN++}}
+  if(curTotal<=0){txt.textContent='Campus offline — waiting for live data…';mood.className='';mood.classList.add('ready');return}
+  var hist=await _loadMoodHist();
+  // Sum per timestamp across all buildings
+  var sums={};
+  for(var bid in hist){(hist[bid]||[]).forEach(function(p){if(p&&p.ts&&typeof p.kw==='number'){sums[p.ts]=(sums[p.ts]||0)+p.kw}})}
+  var now=new Date(),hr=now.getHours();
+  var dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
+  // Gather matches for same hour-of-day
+  var matches=[];
+  Object.keys(sums).forEach(function(ts){var h=_hourOf(ts);if(h===hr)matches.push(sums[ts])});
+  mood.className='';
+  // Home-equivalent: US avg household draws ~1.25 kW continuously (EIA RECS)
+  var homes=Math.round(curTotal/1.25);
+  if(matches.length<3){
+    txt.innerHTML='Campus is drawing <span class="cm-strong">'+Math.round(curTotal)+' kW</span> — about <span class="cm-strong">'+homes.toLocaleString()+' homes</span> worth<span class="cm-sub">· baseline still forming</span>';
+    mood.classList.add('ready');return;
+  }
+  var typical=matches.reduce(function(a,b){return a+b},0)/matches.length;
+  var pct=typical>0?(curTotal-typical)/typical*100:0;
+  var phrase;
+  if(pct>12){mood.classList.add('busy');phrase='<span class="cm-strong">'+Math.round(pct)+'% busier</span> than typical';}
+  else if(pct<-12){mood.classList.add('quiet');phrase='<span class="cm-strong">'+Math.round(-pct)+'% quieter</span> than typical';}
+  else{phrase='running <span class="cm-strong">about as usual</span>';}
+  txt.innerHTML='Campus is '+phrase+' for '+dayName+'s around '+hr+':00<span class="cm-sub">· ~'+homes.toLocaleString()+' homes worth right now</span>';
+  mood.classList.add('ready');
+}
+// Kick off when live data lands, then refresh each minute
+var _moodInit=setInterval(function(){if(window.currentEnergyData){computeCampusMood();clearInterval(_moodInit)}},400);
+setInterval(computeCampusMood,60000);
 </script>
 
 </body>
