@@ -139,7 +139,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 
 @keyframes gPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.6}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}
 @keyframes gGlow{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px 2px rgba(253,181,21,.3)}}
-#grimes-pulse{position:absolute;pointer-events:none;z-index:5;width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(253,181,21,.6);animation:gGlow 3s ease-in-out infinite;margin-left:-14px;margin-top:-14px}
+
 #grimes-pulse::before,#grimes-pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(253,181,21,.4);animation:gPulse 3s ease-out infinite}
 #grimes-pulse::after{animation-delay:1.5s}
 #grimes-label{position:absolute;pointer-events:auto;cursor:pointer;z-index:6;background:rgba(253,181,21,.95);color:#003262;font:700 10px/1 system-ui;padding:4px 10px 4px 8px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);transform:translate(18px,-50%)}
@@ -310,19 +310,9 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
     <div class="pub-tip" id="pubTip">💡 Peak hours are typically 2-5 PM. Energy use drops ~40% overnight.</div>
   </div>
   <div id="viewDiv"></div>
-  <div id="grimes-pulse"></div>
   <div id="grimes-label" onclick="document.querySelector('[data-idx=\\'0\\']')?.click()">◆ Grimes Digital Twin →</div>
   <div id="pop"></div>
-  <!-- Time Slider -->
-  <div id="timeSlider">
-    <div class="ts-label">24hr</div>
-    <button class="ts-play" id="tsPlay" onclick="togglePlayback()">▶</button>
-    <input type="range" id="tsRange" min="0" max="95" value="95" oninput="onSliderMove(this.value)">
-    <div class="ts-time" id="tsTime">Live</div>
-  </div>
-  <div class="ts-legend">
-    <div style="font-weight:600;margin-bottom:4px">Energy Intensity</div>
-    <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#34d399"></div> Low (&lt;100kW)</div>
+  <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#34d399"></div> Low (&lt;100kW)</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#FDB515"></div> Medium (100-300kW)</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#f87171"></div> High (&gt;300kW)</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#787878"></div> No data</div>
@@ -507,7 +497,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   var heatmapLayer = null;
   var heatmapOn = false;
 
-  function toggleHeatmap() {
+  window.toggleHeatmap = function() {
     console.log('[Heatmap] toggle clicked, data:', window.currentEnergyData ? Object.keys(window.currentEnergyData).length : 'none');
     heatmapOn = !heatmapOn;
     var btn = document.getElementById('heatmapToggle');
@@ -523,7 +513,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     }
   }
 
-  function renderHeatmap() {
+  window.renderHeatmap = function() {
     console.log('[Heatmap] render start');
     if (heatmapLayer) view.map.remove(heatmapLayer);
     var data = window.currentEnergyData;
