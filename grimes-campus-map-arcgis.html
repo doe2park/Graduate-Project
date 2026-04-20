@@ -237,80 +237,16 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
   <!-- Public Dashboard -->
   <div id="pubPanel">
     <div class="pub-hdr">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-size:11px;color:var(--dim)">UC Berkeley Campus</div>
-          <div style="font-size:16px;font-weight:700;color:var(--text)">Building Health Report</div>
-        </div>
-        <div style="text-align:right">
-          <div class="pub-grade" id="pubGrade" style="color:var(--green)">—</div>
-          <div style="font-size:9px;color:var(--dim)">Energy Grade</div>
-        </div>
-      </div>
+      <div style="font-size:11px;color:var(--dim)">UC Berkeley Campus</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px">How does your building feel?</div>
+      <div style="font-size:10px;color:var(--dim);margin-top:4px">Click any building on the map, then vote</div>
     </div>
-
-    <div class="pub-row">
-      <div class="pub-icon">⚡</div>
-      <div style="flex:1">
-        <div class="pub-label">Energy Right Now</div>
-        <div class="pub-val" id="pubKw">—</div>
-      </div>
+    <div class="pub-row" style="flex-direction:column;gap:8px;padding:14px 16px">
+      <div id="voteBox" style="width:100%"></div>
     </div>
-
-    <div class="pub-row">
-      <div class="pub-icon">💰</div>
-      <div style="flex:1">
-        <div class="pub-label">Estimated Cost Today</div>
-        <div class="pub-val" id="pubCost">—</div>
-      </div>
-    </div>
-
-    <div class="pub-row">
-      <div class="pub-icon">🌱</div>
-      <div style="flex:1">
-        <div class="pub-label">CO₂ Emissions Today</div>
-        <div class="pub-val" id="pubCo2">—</div>
-      </div>
-      <div style="text-align:right">
-        <div class="pub-label" id="pubCo2Eq" style="color:var(--dim)">—</div>
-      </div>
-    </div>
-
-    <div class="pub-row">
-      <div class="pub-icon">🏢</div>
-      <div style="flex:1">
-        <div class="pub-label">Buildings Online</div>
-        <div class="pub-val" id="pubBldgs">—</div>
-      </div>
-    </div>
-
-    <div class="pub-row" style="flex-direction:column;gap:6px">
-      <div style="display:flex;align-items:center;gap:10px;width:100%">
-        <div class="pub-icon">📊</div>
-        <div class="pub-label">Campus Efficiency vs Average</div>
-      </div>
-      <div class="pub-bar" style="width:100%"><div class="pub-fill" id="pubEffBar" style="width:65%;background:var(--green)"></div></div>
-      <div style="display:flex;justify-content:space-between;width:100%">
-        <span style="font-size:8px;color:var(--dim)">Poor</span>
-        <span style="font-size:9px;font-weight:600;color:var(--green)" id="pubEffLabel">Above average</span>
-        <span style="font-size:8px;color:var(--dim)">Excellent</span>
-      </div>
-    </div>
-
-    <div class="pub-row" style="flex-direction:column;gap:4px">
-      <div style="display:flex;align-items:center;gap:10px;width:100%">
-        <div class="pub-icon">🔝</div>
-        <div class="pub-label">Top Energy Users Right Now</div>
-      </div>
-      <div id="pubTop3" style="width:100%;font-size:10px;color:var(--text)"></div>
-    </div>
-
-    <div class="pub-tip" id="pubTip">💡 Peak hours are typically 2-5 PM. Energy use drops ~40% overnight.</div>
+    <div class="pub-tip" style="font-size:10px">Votes stay for 2 hours. Results help facility managers spot comfort issues.</div>
   </div>
-  <div id="viewDiv"></div>
-  <div id="grimes-pulse"></div>
-  <div id="grimes-label" onclick="document.querySelector('[data-idx=\\'0\\']')?.click()">◆ Grimes Digital Twin →</div>
-  <div id="pop"></div>
+
   <!-- Time Slider -->
   <div id="timeSlider">
     <div class="ts-label">24hr</div>
@@ -1055,97 +991,11 @@ function setMode(mode) {
   document.getElementById('modeEng').className = mode === 'eng' ? 'active' : '';
   document.getElementById('modePub').className = mode === 'pub' ? 'active' : '';
   document.getElementById('pubPanel').className = mode === 'pub' ? 'show' : '';
-  // Hide engineer popup when in public mode
   if (mode === 'pub') {
-    var pop = document.getElementById('pop');
-    if (pop) { pop.style.opacity = '0'; pop.style.pointerEvents = 'none'; }
-    updatePublicPanel();
     fetchVotes();
     if (!window._voteInterval) window._voteInterval = setInterval(fetchVotes, 30000);
+    updateVoteDisplay();
   }
-}
-
-function updatePublicPanel() {
-  var bldgs = window.currentEnergyData;
-  if (!bldgs) return;
-
-  var totalKw = 0, online = 0, topList = [];
-  for (var key in bldgs) {
-    var b = bldgs[key];
-    if (b && b.kw && b.kw > 0) {
-      totalKw += b.kw;
-      online++;
-      topList.push({ name: b.name || key, kw: b.kw });
-    }
-  }
-  topList.sort(function(a, b) { return b.kw - a.kw; });
-
-  // Energy Grade: based on kW per building ratio
-  var avgKw = online > 0 ? totalKw / online : 0;
-  var grade = 'A', gradeColor = 'var(--green)';
-  if (avgKw > 120) { grade = 'D'; gradeColor = 'var(--red)'; }
-  else if (avgKw > 80) { grade = 'C'; gradeColor = 'var(--amber)'; }
-  else if (avgKw > 50) { grade = 'B+'; gradeColor = 'var(--cyan)'; }
-  else if (avgKw > 30) { grade = 'A-'; gradeColor = 'var(--green)'; }
-  else { grade = 'A'; gradeColor = 'var(--green)'; }
-
-  document.getElementById('pubGrade').textContent = grade;
-  document.getElementById('pubGrade').style.color = gradeColor;
-
-  // Simple kW display
-  var kwStr = totalKw > 1000 ? (totalKw / 1000).toFixed(1) + ' MW' : Math.round(totalKw) + ' kW';
-  document.getElementById('pubKw').textContent = kwStr + ' across campus';
-
-  // Cost
-  var dailyCost = Math.round(totalKw * 24 * 0.15);
-  document.getElementById('pubCost').textContent = '$' + dailyCost.toLocaleString() + '/day (~$' + Math.round(dailyCost * 30 / 1000) + 'K/month)';
-
-  // CO2
-  var dailyCo2 = Math.round(totalKw * 24 * 0.21);
-  document.getElementById('pubCo2').textContent = dailyCo2.toLocaleString() + ' kg CO₂/day';
-  // Equivalence
-  var treeDays = Math.round(dailyCo2 / 22); // 1 tree absorbs ~22kg CO2/year... per day ~0.06
-  var carMiles = Math.round(dailyCo2 / 0.41); // 0.41 kg per mile
-  document.getElementById('pubCo2Eq').textContent = '≈ ' + carMiles.toLocaleString() + ' car miles';
-
-  // Buildings
-  document.getElementById('pubBldgs').textContent = online + ' of 64 reporting live data';
-
-  // Efficiency bar
-  // Lower avg = better. Scale: 120kW avg = 0%, 20kW avg = 100%
-  var effPct = Math.max(5, Math.min(95, Math.round((1 - avgKw / 120) * 100)));
-  document.getElementById('pubEffBar').style.width = effPct + '%';
-  var effColor = effPct > 65 ? 'var(--green)' : effPct > 40 ? 'var(--amber)' : 'var(--red)';
-  document.getElementById('pubEffBar').style.background = effColor;
-  var effLabel = effPct > 65 ? 'Above average' : effPct > 40 ? 'Average' : 'Below average';
-  document.getElementById('pubEffLabel').textContent = effLabel;
-  document.getElementById('pubEffLabel').style.color = effColor;
-
-  // Top 3
-  var top3Html = '';
-  topList.slice(0, 3).forEach(function(b, i) {
-    var pct = totalKw > 0 ? Math.round(b.kw / totalKw * 100) : 0;
-    var barW = Math.max(5, Math.min(100, pct * 3));
-    top3Html += '<div style="display:flex;align-items:center;gap:8px;margin:3px 0">';
-    top3Html += '<span style="color:var(--dim);width:14px;font-size:9px">' + (i + 1) + '.</span>';
-    top3Html += '<span style="width:90px;font-size:10px;color:var(--text)">' + b.name.split(' ').slice(0, 2).join(' ') + '</span>';
-    top3Html += '<div style="flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px"><div style="width:' + barW + '%;height:100%;background:var(--gold);border-radius:3px"></div></div>';
-    top3Html += '<span style="font-size:10px;font-weight:600;color:var(--gold);width:50px;text-align:right">' + Math.round(b.kw) + ' kW</span>';
-    top3Html += '</div>';
-  });
-  document.getElementById('pubTop3').innerHTML = top3Html;
-
-  // Tips based on time
-  var hour = new Date().getHours();
-  var tips = [
-    { h: [6,7,8,9], t: '🌅 Morning ramp-up — HVAC systems starting, expect rising demand' },
-    { h: [10,11,12,13], t: '☀️ Midday — buildings at moderate load, good time for energy audits' },
-    { h: [14,15,16,17], t: '🔥 Peak hours — highest energy demand, cooling systems at max' },
-    { h: [18,19,20,21], t: '🌙 Evening wind-down — demand dropping as buildings close' },
-    { h: [22,23,0,1,2,3,4,5], t: '🌃 Off-hours — minimal occupancy, baseline load only' }
-  ];
-  var tip = tips.find(function(t) { return t.h.indexOf(hour) >= 0; });
-  document.getElementById('pubTip').textContent = tip ? tip.t : '💡 Peak hours are typically 2-5 PM';
 }
 
 // Show toggle after data loads
