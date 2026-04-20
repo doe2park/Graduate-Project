@@ -139,7 +139,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 
 @keyframes gPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.6}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}
 @keyframes gGlow{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px 2px rgba(253,181,21,.3)}}
-
+#grimes-pulse{position:absolute;pointer-events:none;z-index:5;width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(253,181,21,.6);animation:gGlow 3s ease-in-out infinite;margin-left:-14px;margin-top:-14px}
 #grimes-pulse::before,#grimes-pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(253,181,21,.4);animation:gPulse 3s ease-out infinite}
 #grimes-pulse::after{animation-delay:1.5s}
 #grimes-label{position:absolute;pointer-events:auto;cursor:pointer;z-index:6;background:rgba(253,181,21,.95);color:#003262;font:700 10px/1 system-ui;padding:4px 10px 4px 8px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);transform:translate(18px,-50%)}
@@ -227,7 +227,6 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 </div>
 <div id="ma">
   <button id="tb">☰</button>
-  <button id="heatmapToggle" onclick="toggleHeatmap()" style="position:absolute;top:12px;right:150px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(248,113,113,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:#f87171;font-size:10px;font-weight:600;cursor:pointer">🔥 Heatmap</button>
   <a href="campus-3d.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(45,212,191,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--cyan);font-size:10px;font-weight:600;text-decoration:none">🏛 3D View</a>
 
   <!-- Mode Toggle -->
@@ -310,9 +309,19 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
     <div class="pub-tip" id="pubTip">💡 Peak hours are typically 2-5 PM. Energy use drops ~40% overnight.</div>
   </div>
   <div id="viewDiv"></div>
+  <div id="grimes-pulse"></div>
   <div id="grimes-label" onclick="document.querySelector('[data-idx=\\'0\\']')?.click()">◆ Grimes Digital Twin →</div>
   <div id="pop"></div>
-  <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#34d399"></div> Low (&lt;100kW)</div>
+  <!-- Time Slider -->
+  <div id="timeSlider">
+    <div class="ts-label">24hr</div>
+    <button class="ts-play" id="tsPlay" onclick="togglePlayback()">▶</button>
+    <input type="range" id="tsRange" min="0" max="95" value="95" oninput="onSliderMove(this.value)">
+    <div class="ts-time" id="tsTime">Live</div>
+  </div>
+  <div class="ts-legend">
+    <div style="font-weight:600;margin-bottom:4px">Energy Intensity</div>
+    <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#34d399"></div> Low (&lt;100kW)</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#FDB515"></div> Medium (100-300kW)</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#f87171"></div> High (&gt;300kW)</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#787878"></div> No data</div>
@@ -489,81 +498,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           attributes:{idx:i}
         }));
       }
-    });
-  }
-
-
-  // ═══ HEATMAP LAYER ═══
-  var heatmapLayer = null;
-  var heatmapOn = false;
-
-  window.toggleHeatmap = function() {
-    console.log('[Heatmap] toggle clicked, data:', window.currentEnergyData ? Object.keys(window.currentEnergyData).length : 'none');
-    heatmapOn = !heatmapOn;
-    var btn = document.getElementById('heatmapToggle');
-    if (heatmapOn) {
-      btn.style.background = 'rgba(248,113,113,.3)';
-      btn.style.color = '#fff';
-      renderHeatmap();
-    } else {
-      btn.style.background = 'rgba(10,16,32,.8)';
-      btn.style.color = '#f87171';
-      if (heatmapLayer) view.map.remove(heatmapLayer);
-      heatmapLayer = null;
-    }
-  }
-
-  window.renderHeatmap = function() {
-    console.log('[Heatmap] render start');
-    if (heatmapLayer) view.map.remove(heatmapLayer);
-    var data = window.currentEnergyData;
-    if (!data) return;
-
-    var features = [];
-    D.forEach(function(b){
-      var live = data[b.id];
-      var kw = (live && live.kw) ? live.kw : 0;
-      if (kw > 0) {
-        features.push({
-          geometry: { type: 'point', longitude: b.lng, latitude: b.lat },
-          attributes: { kw: kw, id: b.id, name: b.n }
-        });
-      }
-    });
-
-    console.log('[Heatmap] features:', features.length);
-    if (features.length === 0) { console.warn('[Heatmap] no data yet'); return; }
-    require(['esri/layers/FeatureLayer'], function(FeatureLayer) {
-      console.log('[Heatmap] FeatureLayer loaded');
-      heatmapLayer = new FeatureLayer({
-        source: features,
-        fields: [
-          { name: 'ObjectID', type: 'oid' },
-          { name: 'kw', type: 'double' },
-          { name: 'id', type: 'string' },
-          { name: 'name', type: 'string' }
-        ],
-        objectIdField: 'ObjectID',
-        geometryType: 'point',
-        spatialReference: { wkid: 4326 },
-        renderer: {
-          type: 'heatmap',
-          field: 'kw',
-          radius: 40,
-          maxDensity: 0.08,
-          minDensity: 0,
-          colorStops: [
-            { ratio: 0, color: 'rgba(0, 0, 255, 0)' },
-            { ratio: 0.2, color: 'rgba(59, 130, 246, 0.5)' },
-            { ratio: 0.4, color: 'rgba(34, 197, 94, 0.7)' },
-            { ratio: 0.6, color: 'rgba(250, 204, 21, 0.85)' },
-            { ratio: 0.8, color: 'rgba(251, 146, 60, 0.9)' },
-            { ratio: 1, color: 'rgba(239, 68, 68, 0.95)' }
-          ]
-        }
-      });
-      view.map.add(heatmapLayer, 0);
-      console.log("[Heatmap] added to map");
     });
   }
 
@@ -807,7 +741,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       renderList();
       window.currentEnergyData=bldgs;
       renderMarkers(bldgs);  // Re-render markers with live energy colors
-      if (heatmapOn) renderHeatmap();
       console.log('[BMO] Updated ' + updated + ' buildings, total: ' + totalKw + ' kW');
     } catch (e) {
       console.warn('[BMO] Fetch failed:', e.message);
