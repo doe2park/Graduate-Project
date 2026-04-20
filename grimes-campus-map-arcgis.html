@@ -1174,7 +1174,34 @@ async function computeCampusMood(){
   if(pct>12){mood.classList.add('busy');phrase='<span class="cm-strong">'+Math.round(pct)+'% busier</span> than typical';}
   else if(pct<-12){mood.classList.add('quiet');phrase='<span class="cm-strong">'+Math.round(-pct)+'% quieter</span> than typical';}
   else{phrase='running <span class="cm-strong">about as usual</span>';}
-  txt.innerHTML='Campus is '+phrase+' for '+dayName+'s around '+hr+':00<span class="cm-sub">· ~'+homes.toLocaleString()+' homes worth right now</span>';
+  // Anomaly callout: buildings >40% off their own 24h sparkline avg
+  // (Froehlich CHI'10 — surface deviations; Opower — flag "unusual" behavior)
+  var flagged=[];
+  for(var id in cur){
+    var b=cur[id];
+    if(!b||typeof b.kw!=='number'||b.kw<=0)continue;
+    var sp=b.sparkline;
+    if(!sp||sp.length<6)continue;
+    var avg=sp.reduce(function(a,c){return a+c},0)/sp.length;
+    if(avg<=0)continue;
+    var d=(b.kw-avg)/avg*100;
+    if(Math.abs(d)>=40){
+      flagged.push({id:id,name:(b.name||id).split(' ')[0],pct:Math.round(d)});
+    }
+  }
+  flagged.sort(function(a,b){return Math.abs(b.pct)-Math.abs(a.pct)});
+  var extra='';
+  if(flagged.length){
+    var top=flagged.slice(0,2).map(function(f){
+      var arrow=f.pct>0?'\u25B2':'\u25BC';
+      var col=f.pct>0?'#f87171':'#60a5fa';
+      return '<span style="color:'+col+'">'+arrow+' '+f.name+'</span>';
+    }).join(' · ');
+    extra='<span class="cm-sub">· unusual: '+top+(flagged.length>2?' +'+(flagged.length-2):'')+'</span>';
+  } else {
+    extra='<span class="cm-sub">· ~'+homes.toLocaleString()+' homes worth right now</span>';
+  }
+  txt.innerHTML='Campus is '+phrase+' for '+dayName+'s around '+hr+':00'+extra;
   mood.classList.add('ready');
 }
 // Kick off when live data lands, then refresh each minute
