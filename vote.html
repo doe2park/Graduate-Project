@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Building Comfort Vote · UC Berkeley</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--navy:#003262;--gold:#FDB515;--bg:#f8fafc;--card:#fff;--text:#1e293b;--dim:#64748b;--faint:#cbd5e1;--red:#ef4444;--green:#10b981;--blue:#3b82f6}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;line-height:1.5}
+.container{max-width:420px;width:100%;margin-top:20px}
+.logo{text-align:center;margin-bottom:24px}
+.logo-bar{display:inline-flex;background:var(--navy);color:#fff;padding:4px 12px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
+h1{font-size:22px;font-weight:700;margin:12px 0 4px;color:var(--navy)}
+.sub{font-size:13px;color:var(--dim);margin-bottom:20px}
+.card{background:var(--card);border-radius:16px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.06);margin-bottom:16px}
+.bldg-name{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px}
+.bldg-meta{font-size:12px;color:var(--dim);margin-bottom:20px}
+.question{font-size:16px;font-weight:600;margin-bottom:16px;text-align:center}
+.options{display:flex;flex-direction:column;gap:10px}
+.opt{display:flex;align-items:center;gap:14px;padding:16px;border:2px solid var(--faint);border-radius:12px;cursor:pointer;transition:all .15s;background:#fff}
+.opt:active{transform:scale(.98)}
+.opt.hot:hover,.opt.hot.selected{border-color:var(--red);background:#fef2f2}
+.opt.ok:hover,.opt.ok.selected{border-color:var(--green);background:#f0fdf4}
+.opt.cold:hover,.opt.cold.selected{border-color:var(--blue);background:#eff6ff}
+.opt-icon{font-size:28px;flex-shrink:0}
+.opt-text{flex:1}
+.opt-title{font-size:15px;font-weight:600}
+.opt-desc{font-size:11px;color:var(--dim);margin-top:2px}
+.submit{width:100%;padding:14px;background:var(--navy);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;transition:opacity .15s}
+.submit:disabled{opacity:.4;cursor:not-allowed}
+.stats{margin-top:24px}
+.stats-title{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.stats-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:#e2e8f0;margin-bottom:8px}
+.stats-labels{display:flex;justify-content:space-between;font-size:11px;font-weight:600}
+.footer{font-size:10px;color:var(--dim);text-align:center;margin-top:20px;padding:0 10px}
+.thanks{text-align:center;padding:40px 20px}
+.thanks-icon{font-size:56px;margin-bottom:12px}
+.thanks-title{font-size:20px;font-weight:700;color:var(--green);margin-bottom:8px}
+.thanks-sub{font-size:13px;color:var(--dim);margin-bottom:20px}
+.vote-again{color:var(--navy);font-size:13px;text-decoration:none;font-weight:600}
+.error{color:var(--red);font-size:12px;text-align:center;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <div class="logo-bar">UC BERKELEY</div>
+  </div>
+  <h1 id="pageTitle">Comfort Check</h1>
+  <div class="sub">Your feedback helps facility managers keep buildings comfortable</div>
+
+  <div class="card" id="voteCard">
+    <div class="bldg-name" id="bldgName">Loading...</div>
+    <div class="bldg-meta" id="bldgMeta">—</div>
+
+    <div class="question">How does it feel right now?</div>
+
+    <div class="options">
+      <div class="opt hot" onclick="select('hot')">
+        <div class="opt-icon">🔥</div>
+        <div class="opt-text">
+          <div class="opt-title">Too Hot</div>
+          <div class="opt-desc">Uncomfortably warm, stuffy</div>
+        </div>
+      </div>
+      <div class="opt ok" onclick="select('ok')">
+        <div class="opt-icon">😊</div>
+        <div class="opt-text">
+          <div class="opt-title">Just Right</div>
+          <div class="opt-desc">Comfortable temperature</div>
+        </div>
+      </div>
+      <div class="opt cold" onclick="select('cold')">
+        <div class="opt-icon">❄️</div>
+        <div class="opt-text">
+          <div class="opt-title">Too Cold</div>
+          <div class="opt-desc">Chilly, need a jacket</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="submit" id="submitBtn" disabled onclick="submit()">Submit Vote</button>
+    <div class="error" id="errMsg"></div>
+
+    <div class="stats" id="stats" style="display:none">
+      <div class="stats-title">Last 2 hours · <span id="voteCount">0</span> votes</div>
+      <div class="stats-bar" id="statsBar"></div>
+      <div class="stats-labels" id="statsLabels"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Anonymous · No login · One vote per 10 min<br>
+    <a href="https://doe2park.github.io/Graduate-Project/" style="color:var(--dim)">← Back to Campus Map</a>
+  </div>
+</div>
+
+<script>
+const API = 'https://comfort-vote.ucb-dt.workers.dev';
+const params = new URLSearchParams(location.search);
+const building = params.get('b') || 'grimes';
+const floor = params.get('floor') || '';
+const room = params.get('room') || '';
+
+const NAMES = {
+  grimes: 'Grimes Engineering Center',
+  etcheverry: 'Etcheverry Hall',
+  cory: 'Cory Hall',
+  soda: 'Soda Hall',
+  sutardja: 'Sutardja Dai Hall',
+  valley: 'Valley Life Sciences',
+  evans: 'Evans Hall',
+  wheeler: 'Wheeler Hall'
+};
+
+document.getElementById('bldgName').textContent = NAMES[building] || building.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+var meta = [];
+if (floor) meta.push('Floor ' + floor);
+if (room) meta.push('Room ' + room);
+meta.push(new Date().toLocaleString('en-US', {weekday:'short', hour:'numeric', minute:'2-digit'}));
+document.getElementById('bldgMeta').textContent = meta.join(' · ');
+
+var selected = null;
+function select(v) {
+  selected = v;
+  document.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+  document.querySelector('.opt.' + v).classList.add('selected');
+  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('errMsg').textContent = '';
+}
+
+async function submit() {
+  if (!selected) return;
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+  try {
+    var r = await fetch(API + '/vote', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({building: building, vote: selected})
+    });
+    var d = await r.json();
+    if (d.error) {
+      document.getElementById('errMsg').textContent = d.error;
+      btn.disabled = false;
+      btn.textContent = 'Submit Vote';
+      return;
+    }
+    showThanks();
+  } catch(e) {
+    document.getElementById('errMsg').textContent = 'Connection failed. Try again.';
+    btn.disabled = false;
+    btn.textContent = 'Submit Vote';
+  }
+}
+
+function showThanks() {
+  var card = document.getElementById('voteCard');
+  card.innerHTML = '<div class="thanks">' +
+    '<div class="thanks-icon">✅</div>' +
+    '<div class="thanks-title">Thanks for voting!</div>' +
+    '<div class="thanks-sub">Your feedback is now part of the building\'s comfort record.</div>' +
+    '<a href="javascript:location.reload()" class="vote-again">Vote again in 10 min →</a>' +
+    '</div>';
+  loadStats();
+}
+
+async function loadStats() {
+  try {
+    var r = await fetch(API + '/votes?t=' + Date.now());
+    var d = await r.json();
+    var v = (d.buildings || {})[building];
+    if (!v || v.total === 0) return;
+    var hp = Math.round(v.hot/v.total*100);
+    var op = Math.round(v.ok/v.total*100);
+    var cp = 100 - hp - op;
+
+    var bar = '';
+    if (hp>0) bar += '<div style="width:'+hp+'%;background:#ef4444"></div>';
+    if (op>0) bar += '<div style="width:'+op+'%;background:#10b981"></div>';
+    if (cp>0) bar += '<div style="width:'+cp+'%;background:#3b82f6"></div>';
+
+    var card = document.getElementById('voteCard');
+    card.innerHTML += '<div class="stats"><div class="stats-title">Last 2 hours · ' + v.total + ' votes</div>' +
+      '<div class="stats-bar">' + bar + '</div>' +
+      '<div class="stats-labels">' +
+      '<span style="color:#ef4444">🔥 ' + hp + '%</span>' +
+      '<span style="color:#10b981">😊 ' + op + '%</span>' +
+      '<span style="color:#3b82f6">❄️ ' + cp + '%</span>' +
+      '</div></div>';
+  } catch(e) {}
+}
+</script>
+</body>
+</html>
