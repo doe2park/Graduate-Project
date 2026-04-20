@@ -209,6 +209,18 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 #modeToggle button{padding:6px 12px;font-size:10px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--dim)}
 #modeToggle button.active{background:var(--gold);color:#000}
 @media(max-width:768px){#pubPanel{width:calc(100vw - 24px);right:12px;top:auto;bottom:60px;max-height:60vh;overflow-y:auto}#modeToggle{right:auto;left:56px;top:12px}}
+
+#modeToggle{position:absolute;top:12px;right:345px;z-index:25;display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(12px)}
+#modeToggle button{padding:6px 12px;font-size:10px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--dim)}
+#modeToggle button.active{background:var(--gold);color:#000}
+#votePanel{position:absolute;top:60px;right:12px;z-index:24;width:300px;background:var(--panel);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;padding:14px;display:none;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+#votePanel.show{display:block}
+.vote-hdr{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
+.vote-sub{font-size:10px;color:var(--dim);margin-bottom:12px}
+.vote-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:8px 0}
+.vote-btn{flex:1;padding:8px 4px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid;transition:transform .1s}
+.vote-btn:hover{transform:scale(1.03)}
+@media(max-width:768px){#modeToggle{right:auto;left:56px}#votePanel{width:calc(100vw - 24px);right:12px;top:110px}}
 </style>
 </head>
 <body>
@@ -306,6 +318,15 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
     </div>
 
     <div class="pub-tip" id="pubTip">💡 Peak hours are typically 2-5 PM. Energy use drops ~40% overnight.</div>
+  </div>
+  <div id="modeToggle" style="display:none">
+    <button id="modeEng" class="active" onclick="setMode('eng')">🔧 Engineer</button>
+    <button id="modePub" onclick="setMode('pub')">👤 Public</button>
+  </div>
+  <div id="votePanel">
+    <div class="vote-hdr">How does it feel here?</div>
+    <div class="vote-sub" id="voteBldg">Click a building on the map</div>
+    <div id="voteContent"></div>
   </div>
   <div id="viewDiv"></div>
   <div id="grimes-pulse"></div>
@@ -1077,5 +1098,123 @@ if (typeof window.renderMarkers === 'function') {
 }
 </script>
 
+
+<script>
+// ══ Public / Engineer Mode + Comfort Voting ══
+var VOTE_API = 'https://comfort-vote.ucb-dt.workers.dev';
+var currentMode = 'eng';
+var voteData = {};
+var selectedB = null;
+
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('modeEng').className = m==='eng'?'active':'';
+  document.getElementById('modePub').className = m==='pub'?'active':'';
+  document.getElementById('votePanel').className = m==='pub'?'show':'';
+  if (m==='pub') {
+    fetchVotes();
+    if (!window._vI) window._vI = setInterval(fetchVotes, 30000);
+    renderVote();
+  }
+}
+
+async function fetchVotes() {
+  try {
+    var r = await fetch(VOTE_API+'/votes?t='+Date.now());
+    var d = await r.json();
+    voteData = d.buildings || {};
+    renderVote();
+  } catch(e) { console.warn('[vote] fetch', e); }
+}
+
+async function submitVote(v) {
+  if (!selectedB) return;
+  try {
+    var r = await fetch(VOTE_API+'/vote', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({building:selectedB.id, vote:v})
+    });
+    var d = await r.json();
+    var msg = document.getElementById('voteMsg');
+    if (d.error) { msg.textContent=d.error; msg.style.color='#f87171'; return; }
+    msg.textContent='Thanks! Vote recorded'; msg.style.color='#34d399';
+    setTimeout(fetchVotes, 400);
+  } catch(e) { console.warn('[vote] submit', e); }
+}
+
+function renderVote() {
+  var el = document.getElementById('voteContent');
+  var sub = document.getElementById('voteBldg');
+  if (!el) return;
+
+  if (!selectedB) {
+    sub.textContent = 'Click a building on the map';
+    // Show campus-wide summary
+    var hot=0,ok=0,cold=0,tot=0,bc=0;
+    for (var k in voteData) { var v=voteData[k]; hot+=v.hot; ok+=v.ok; cold+=v.cold; tot+=v.total; bc++; }
+    if (tot === 0) {
+      el.innerHTML = '<div style="font-size:10px;color:var(--dim);text-align:center;padding:8px">No campus votes yet</div>';
+    } else {
+      var hp=Math.round(hot/tot*100), op=Math.round(ok/tot*100), cp=100-hp-op;
+      el.innerHTML = '<div style="font-size:10px;color:var(--dim);margin-bottom:4px">Campus overall · '+tot+' votes from '+bc+' buildings</div>'+
+        '<div class="vote-bar">'+
+        (hp>0?'<div style="width:'+hp+'%;background:#f87171"></div>':'')+
+        (op>0?'<div style="width:'+op+'%;background:#34d399"></div>':'')+
+        (cp>0?'<div style="width:'+cp+'%;background:#60a5fa"></div>':'')+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:10px">'+
+        '<span style="color:#f87171">🔥 '+hp+'% hot</span>'+
+        '<span style="color:#34d399">😊 '+op+'% ok</span>'+
+        '<span style="color:#60a5fa">❄️ '+cp+'% cold</span></div>';
+    }
+    return;
+  }
+
+  sub.textContent = selectedB.name;
+  var bv = voteData[selectedB.id] || {hot:0,ok:0,cold:0,total:0};
+  var html = '';
+  if (bv.total > 0) {
+    var hp=Math.round(bv.hot/bv.total*100), op=Math.round(bv.ok/bv.total*100), cp=100-hp-op;
+    html += '<div style="font-size:10px;color:var(--dim);margin-bottom:4px">'+bv.total+' votes in last 2h</div>'+
+      '<div class="vote-bar">'+
+      (hp>0?'<div style="width:'+hp+'%;background:#f87171"></div>':'')+
+      (op>0?'<div style="width:'+op+'%;background:#34d399"></div>':'')+
+      (cp>0?'<div style="width:'+cp+'%;background:#60a5fa"></div>':'')+
+      '</div>';
+    var tag = bv.status==='too_hot'?'🔥 Running warm':bv.status==='too_cold'?'❄️ Running cold':'😊 Comfortable';
+    html += '<div style="font-size:11px;font-weight:600;text-align:center;margin-bottom:10px">'+tag+'</div>';
+  } else {
+    html += '<div style="font-size:10px;color:var(--dim);text-align:center;padding:8px">No votes yet — be first!</div>';
+  }
+  html += '<div style="display:flex;gap:4px;margin-top:8px">'+
+    '<button class="vote-btn" onclick="submitVote(\'hot\')" style="border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#f87171">🔥 Too Hot</button>'+
+    '<button class="vote-btn" onclick="submitVote(\'ok\')" style="border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.1);color:#34d399">😊 OK</button>'+
+    '<button class="vote-btn" onclick="submitVote(\'cold\')" style="border-color:rgba(96,165,250,.4);background:rgba(96,165,250,.1);color:#60a5fa">❄️ Too Cold</button>'+
+    '</div>';
+  html += '<div id="voteMsg" style="font-size:10px;text-align:center;margin-top:6px;min-height:14px"></div>';
+  el.innerHTML = html;
+}
+
+// Hook building clicks (list items or markers trigger pop)
+document.addEventListener('click', function(e) {
+  var li = e.target.closest('[data-idx]');
+  if (li && window.D) {
+    var idx = parseInt(li.getAttribute('data-idx'));
+    var b = window.D[idx];
+    if (b) {
+      selectedB = { id: b.id, name: b.n };
+      if (currentMode === 'pub') renderVote();
+    }
+  }
+}, true);
+
+// Show toggle after data loads
+var _mt = setInterval(function(){
+  if (window.currentEnergyData || document.querySelector('[data-idx]')) {
+    document.getElementById('modeToggle').style.display = 'flex';
+    clearInterval(_mt);
+  }
+}, 1000);
+</script>
 </body>
 </html>
