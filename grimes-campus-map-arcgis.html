@@ -475,11 +475,26 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           attributes:{idx:i}
         }));
       } else {
-        // Category dot (always shown, small)
+        // Load intensity (0-1) based on kW
+        var loadRatio = kw && maxKw > 0 ? Math.min(1, kw / maxKw) : 0;
+
+        // Outer glow halo — bigger and brighter with more load
+        if (kw > 0) {
+          var glowSize = 14 + loadRatio * 16;  // 14-30 px
+          var glowAlpha = 40 + loadRatio * 100; // 40-140
+          gL.add(new Graphic({
+            geometry:new Point({longitude:b.lng,latitude:b.lat}),
+            symbol:{type:'simple-marker',color:eCol?[...eCol,glowAlpha]:[...cc.r,glowAlpha],size:glowSize,
+              outline:{color:[0,0,0,0],width:0}}
+          }));
+        }
+
+        // Core dot — size also scales with load
+        var coreSize = 6 + loadRatio * 6; // 6-12 px
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'simple-marker',color:[...cc.r,kw?220:140],size:7,
-            outline:{color:eCol?[...eCol,200]:[255,255,255,60],width:eCol?2:0.5}},
+          symbol:{type:'simple-marker',color:[...cc.r,kw?240:140],size:coreSize,
+            outline:{color:eCol?[...eCol,220]:[255,255,255,60],width:eCol?1.5:0.5}},
           attributes:{idx:i}
         }));
       }
