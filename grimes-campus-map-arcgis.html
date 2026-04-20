@@ -227,6 +227,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 </div>
 <div id="ma">
   <button id="tb">☰</button>
+  <button id="heatmapToggle" onclick="toggleHeatmap()" style="position:absolute;top:12px;right:150px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(248,113,113,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:#f87171;font-size:10px;font-weight:600;cursor:pointer">🔥 Heatmap</button>
   <a href="campus-3d.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(45,212,191,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--cyan);font-size:10px;font-weight:600;text-decoration:none">🏛 3D View</a>
 
   <!-- Mode Toggle -->
@@ -501,6 +502,75 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     });
   }
 
+
+  // ═══ HEATMAP LAYER ═══
+  var heatmapLayer = null;
+  var heatmapOn = false;
+
+  function toggleHeatmap() {
+    heatmapOn = !heatmapOn;
+    var btn = document.getElementById('heatmapToggle');
+    if (heatmapOn) {
+      btn.style.background = 'rgba(248,113,113,.3)';
+      btn.style.color = '#fff';
+      renderHeatmap();
+    } else {
+      btn.style.background = 'rgba(10,16,32,.8)';
+      btn.style.color = '#f87171';
+      if (heatmapLayer) view.map.remove(heatmapLayer);
+      heatmapLayer = null;
+    }
+  }
+
+  function renderHeatmap() {
+    if (heatmapLayer) view.map.remove(heatmapLayer);
+    var data = window.currentEnergyData;
+    if (!data) return;
+
+    var features = [];
+    D.forEach(function(b){
+      var live = data[b.id];
+      var kw = (live && live.kw) ? live.kw : 0;
+      if (kw > 0) {
+        features.push({
+          geometry: { type: 'point', longitude: b.lng, latitude: b.lat },
+          attributes: { kw: kw, id: b.id, name: b.n }
+        });
+      }
+    });
+
+    require(['esri/layers/FeatureLayer'], function(FeatureLayer) {
+      heatmapLayer = new FeatureLayer({
+        source: features,
+        fields: [
+          { name: 'ObjectID', type: 'oid' },
+          { name: 'kw', type: 'double' },
+          { name: 'id', type: 'string' },
+          { name: 'name', type: 'string' }
+        ],
+        objectIdField: 'ObjectID',
+        geometryType: 'point',
+        spatialReference: { wkid: 4326 },
+        renderer: {
+          type: 'heatmap',
+          field: 'kw',
+          radius: 40,
+          maxDensity: 0.08,
+          minDensity: 0,
+          colorStops: [
+            { ratio: 0, color: 'rgba(0, 0, 255, 0)' },
+            { ratio: 0.2, color: 'rgba(59, 130, 246, 0.5)' },
+            { ratio: 0.4, color: 'rgba(34, 197, 94, 0.7)' },
+            { ratio: 0.6, color: 'rgba(250, 204, 21, 0.85)' },
+            { ratio: 0.8, color: 'rgba(251, 146, 60, 0.9)' },
+            { ratio: 1, color: 'rgba(239, 68, 68, 0.95)' }
+          ]
+        }
+      });
+      view.map.add(heatmapLayer, 0); // below markers
+    });
+  }
+
   renderMarkers(null);
   window.render3DFn=renderMarkers;
   window.currentEnergyData=null;
@@ -741,6 +811,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       renderList();
       window.currentEnergyData=bldgs;
       renderMarkers(bldgs);  // Re-render markers with live energy colors
+      if (heatmapOn) renderHeatmap();
       console.log('[BMO] Updated ' + updated + ' buildings, total: ' + totalKw + ' kW');
     } catch (e) {
       console.warn('[BMO] Fetch failed:', e.message);
