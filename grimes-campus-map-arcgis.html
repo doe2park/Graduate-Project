@@ -960,6 +960,95 @@ function processQuery(q){
 <script>
 // ═══ PUBLIC MODE ═══
 var currentMode = 'eng';
+var VOTE_API = 'https://comfort-vote.ucb-dt.workers.dev';
+var voteData = {};
+var selectedBuilding = null;
+
+async function fetchVotes() {
+  try {
+    var r = await fetch(VOTE_API + '/votes?t=' + Date.now());
+    var d = await r.json();
+    voteData = d.buildings || {};
+    if (currentMode === 'pub') updateVoteDisplay();
+  } catch(e) { console.warn('[Vote] fetch failed', e); }
+}
+
+async function submitVote(building, vote) {
+  try {
+    var r = await fetch(VOTE_API + '/vote', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({building:building, vote:vote})
+    });
+    var d = await r.json();
+    var msg = document.getElementById('voteMsg');
+    if (d.error) { if(msg){msg.textContent=d.error;msg.style.color='#f87171'} return; }
+    if (msg) { msg.textContent = 'Thanks for voting!'; msg.style.color='#34d399'; }
+    setTimeout(fetchVotes, 500);
+  } catch(e) { console.warn('[Vote] submit failed', e); }
+}
+
+function setSelectedBuildingForVote(id, name) {
+  selectedBuilding = { id: id, name: name };
+  if (currentMode === 'pub') updateVoteDisplay();
+}
+
+function updateVoteDisplay() {
+  var box = document.getElementById('voteBox');
+  if (!box || currentMode !== 'pub') return;
+  var totalHot=0, totalCold=0, totalOk=0, totalVotes=0, bldgCount=0;
+  for (var b in voteData) {
+    var v = voteData[b];
+    totalHot += v.hot; totalCold += v.cold; totalOk += v.ok; totalVotes += v.total;
+    bldgCount++;
+  }
+  var html = '';
+  if (totalVotes === 0) {
+    html = '<div style="font-size:10px;color:var(--dim);text-align:center;padding:8px">No votes yet. Be the first!</div>';
+  } else {
+    var hotPct = Math.round(totalHot/totalVotes*100);
+    var okPct = Math.round(totalOk/totalVotes*100);
+    var coldPct = 100 - hotPct - okPct;
+    html = '<div style="font-size:9px;color:var(--dim);margin-bottom:4px">Campus comfort (' + totalVotes + ' votes)</div>';
+    html += '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:6px">';
+    if (hotPct>0) html += '<div style="width:' + hotPct + '%;background:#f87171"></div>';
+    if (okPct>0) html += '<div style="width:' + okPct + '%;background:#34d399"></div>';
+    if (coldPct>0) html += '<div style="width:' + coldPct + '%;background:#60a5fa"></div>';
+    html += '</div>';
+    html += '<div style="display:flex;justify-content:space-between;font-size:8px">';
+    html += '<span style="color:#f87171">🔥 ' + hotPct + '%</span>';
+    html += '<span style="color:#34d399">😊 ' + okPct + '%</span>';
+    html += '<span style="color:#60a5fa">❄️ ' + coldPct + '%</span></div>';
+  }
+  html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05)">';
+  if (selectedBuilding) {
+    html += '<div style="font-size:9px;color:var(--dim);margin-bottom:6px">How does it feel in <b style="color:var(--text)">' + selectedBuilding.name + '</b>?</div>';
+    html += '<div style="display:flex;gap:4px">';
+    html += '<button onclick="submitVote(\'' + selectedBuilding.id + '\',\'hot\')" style="flex:1;padding:6px;border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.08);color:#f87171;border-radius:6px;font-size:10px;cursor:pointer">🔥 Hot</button>';
+    html += '<button onclick="submitVote(\'' + selectedBuilding.id + '\',\'ok\')" style="flex:1;padding:6px;border:1px solid rgba(52,211,153,.3);background:rgba(52,211,153,.08);color:#34d399;border-radius:6px;font-size:10px;cursor:pointer">😊 OK</button>';
+    html += '<button onclick="submitVote(\'' + selectedBuilding.id + '\',\'cold\')" style="flex:1;padding:6px;border:1px solid rgba(96,165,250,.3);background:rgba(96,165,250,.08);color:#60a5fa;border-radius:6px;font-size:10px;cursor:pointer">❄️ Cold</button>';
+    html += '</div>';
+    var bv = voteData[selectedBuilding.id];
+    if (bv && bv.total > 0) {
+      var tag = bv.status==='too_hot'?'<span style="color:#f87171">🔥 Running warm</span>':bv.status==='too_cold'?'<span style="color:#60a5fa">❄️ Running cold</span>':'<span style="color:#34d399">😊 Comfortable</span>';
+      html += '<div style="font-size:9px;color:var(--dim);margin-top:6px;text-align:center">' + tag + ' · ' + bv.total + ' votes</div>';
+    }
+    html += '<div id="voteMsg" style="font-size:9px;text-align:center;margin-top:4px;min-height:12px"></div>';
+  } else {
+    html += '<div style="font-size:9px;color:var(--dim);text-align:center;padding:4px">Click a building on the map to vote</div>';
+  }
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+document.addEventListener('click', function(e) {
+  var li = e.target.closest('[data-idx]');
+  if (li && window.D) {
+    var idx = parseInt(li.getAttribute('data-idx'));
+    var b = window.D[idx];
+    if (b) setSelectedBuildingForVote(b.id, b.n);
+  }
+}, true);
+
 
 function setMode(mode) {
   currentMode = mode;
@@ -971,6 +1060,8 @@ function setMode(mode) {
     var pop = document.getElementById('pop');
     if (pop) { pop.style.opacity = '0'; pop.style.pointerEvents = 'none'; }
     updatePublicPanel();
+    fetchVotes();
+    if (!window._voteInterval) window._voteInterval = setInterval(fetchVotes, 30000);
   }
 }
 
