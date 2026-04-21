@@ -2237,7 +2237,7 @@ function togglePublic(){
     if(on){el.dataset._prevDisp=el.style.display;el.style.display='none'}
     else {el.style.display=el.dataset._prevDisp||''}
   });
-  if(on)updatePublicStory();
+  if(on){updatePublicStory();if(typeof _publicFetch==='function')_publicFetch();}
 }
 
 function updatePublicStory(){
@@ -2340,19 +2340,19 @@ function updatePublicStory(){
   }
 }
 
-// Refresh every minute + on every liveData fetch (catches slow first load)
-setInterval(updatePublicStory,60000);
-var _poInit=setInterval(function(){
-  if(typeof liveData!=='undefined'&&liveData){updatePublicStory();clearInterval(_poInit);}
-},500);
-(function hookPublicToFetch(){
-  if(typeof fetchLiveData!=='function')return;
-  var _prev=fetchLiveData;
-  fetchLiveData=async function(){
-    await _prev();
-    try{updatePublicStory();}catch(e){}
-  };
-})();
+// The main Grimes data lives in a <script type="module">, whose top-level
+// `let liveData` is scoped to that module and invisible here.
+// Fetch the same JSON ourselves and expose it on window so the `liveData`
+// identifier in updatePublicStory() resolves via the global scope chain.
+async function _publicFetch(){
+  try{
+    var r=await fetch('https://doe2park.github.io/Graduate-Project/data/building_data.json?t='+Date.now());
+    window.liveData=await r.json();
+    updatePublicStory();
+  }catch(e){console.warn('Public fetch failed:',e);}
+}
+_publicFetch();
+setInterval(_publicFetch,60000);
 </script>
 </body>
 </html>
