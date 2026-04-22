@@ -285,6 +285,6 @@ yoonsung_chung@berkeley.edu
 ## Acknowledgments
 
 - UC Berkeley Facilities Services — BMO metering system access
-- Prof. Kenichi Soga— Thesis advisor
+- Prof. Kenichi Soga — Thesis advisor
 - Tianyu — BMO data coordination
 - BIM model contributors: SOM (Architecture), Rutherford & Chekene (Electrical), Pribuss Engineering + Pragmatic PE (Fire Protection)
