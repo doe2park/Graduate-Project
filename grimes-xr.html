@@ -25,7 +25,7 @@
   /* ── Legend ── */
   #legend { position:fixed;top:52px;left:12px;z-index:50;background:var(--panel);padding:12px 14px;border-radius:10px;backdrop-filter:blur(10px);border:1px solid var(--border);max-width:200px;font-size:11px; }
   #legend h3 { font-size:12px;color:var(--cyan);margin-bottom:8px;cursor:pointer; }
-  @media(max-width:768px) { #legend { display:none; } #dashboard { display:none; } #dashboard.show { display:block;position:fixed;top:44px;right:0;left:0;bottom:0;width:100%;max-width:100%;max-height:100%;border-radius:0;z-index:100;overflow-y:auto; } #dbMobileBtn { display:block; } }
+  @media(max-width:768px) { #legend { display:none; } #dashboard { display:none; } #dashboard.show { display:block;position:fixed;top:44px;right:0;left:0;bottom:0;width:100%;max-width:100%;max-height:100%;border-radius:0;z-index:100;overflow-y:auto; } }
   .sys-row { display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;user-select:none;transition:opacity .2s; }
   .sys-row:hover { opacity:.8; } .sys-row.off { opacity:.25;text-decoration:line-through; }
   .sys-dot { width:12px;height:12px;border-radius:3px;flex-shrink:0;border:1px solid rgba(255,255,255,.15); }
@@ -70,7 +70,6 @@
   .dp-maint-label { font-size:8px;color:#475569; }
   .dp-close { position:absolute;top:8px;right:12px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px; }
   .dp-sim { margin-top:6px;font-size:8px;color:#334155;text-align:center; }
-  #dbMobileBtn { display:none;position:fixed;top:48px;right:10px;z-index:101;padding:6px 12px;border-radius:8px;background:var(--panel);border:1px solid var(--border);color:var(--cyan);font-size:12px;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);font-family:var(--font); }
 
   /* ── Heatmap Legend ── */
   #heatLegend { position:fixed;bottom:90px;right:14px;z-index:50;background:var(--panel);padding:10px 12px;border-radius:10px;border:1px solid var(--border);display:none;font-size:10px; }
@@ -90,12 +89,6 @@
   .fl-btn.active { background:var(--cyan);color:#000;border-color:var(--cyan); }
 
   #ctrlHint { position:fixed;bottom:8px;left:12px;z-index:40;font-size:9px;color:#334155;line-height:1.4; }
-  #mepTimeBar { position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:45;background:var(--panel);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:10px;padding:6px 14px;display:flex;align-items:center;gap:10px;min-width:320px; }
-  #mepTimeBar label { font-size:8px;color:#64748b;white-space:nowrap; }
-  #mepTimeBar input[type=range] { flex:1;-webkit-appearance:none;height:3px;background:#334155;border-radius:2px;outline:none; }
-  #mepTimeBar input[type=range]::-webkit-slider-thumb { -webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#FDB515;cursor:pointer; }
-  #mepTimeBar .tval { font:700 12px 'JetBrains Mono',monospace;color:#FDB515;min-width:40px; }
-  #mepTimeBar button { background:none;border:1px solid rgba(45,212,191,.2);color:#2dd4bf;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:9px; }
   /* Floor isolation */
   .fl-btn.isolated { background:#FDB515;color:#000;border-color:#FDB515; }
   /* Tour overlay - bottom left, doesn't block view */
@@ -116,29 +109,34 @@
 
   /* Public mode — plain-language Grimes "vitals" overlay.
      Rationale: Weiser Calm Tech (1995) ambient motion + Froehlich CHI'10 tangible units. */
-  #publicOverlay { position:fixed;top:52px;right:14px;z-index:52;width:300px;max-height:calc(100vh - 72px);overflow-y:auto;background:var(--panel);backdrop-filter:blur(14px);border:1px solid rgba(253,181,21,.22);border-radius:14px;padding:16px 18px;display:none;box-shadow:0 12px 40px rgba(0,0,0,.45); }
+  #publicOverlay { position:fixed;top:52px;right:14px;z-index:52;width:320px;max-height:calc(100vh - 72px);overflow-y:auto;background:var(--panel);backdrop-filter:blur(14px);border:1px solid rgba(253,181,21,.22);border-radius:14px;padding:18px 20px;display:none;box-shadow:0 12px 40px rgba(0,0,0,.45); font-family:var(--font); }
   #publicOverlay::-webkit-scrollbar { width:4px; }
   #publicOverlay::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08);border-radius:2px; }
-  .po-v-sub { color:#64748b;font-weight:400;font-size:9px;margin-left:4px; }
-  #poStatus { display:inline-block;padding:1px 5px;border-radius:3px;background:rgba(45,212,191,.14);color:#2dd4bf;font-size:9px;letter-spacing:.4px; }
   #publicOverlay.show { display:block; }
-  .po-title { font-size:10px;color:#FDB515;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px; }
-  .po-story { font-size:13px;color:#e2e8f0;line-height:1.45;margin-bottom:12px; }
-  .po-story b { color:#FDB515; }
-  .po-vital { display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.05); }
-  .po-ico { font-size:20px;width:30px;text-align:center;flex-shrink:0;line-height:1; }
+  #poStatus { display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(45,212,191,.14);color:#2dd4bf;font-size:9px;letter-spacing:.6px;font-weight:700; }
+  .po-title { font-size:10px;color:#FDB515;font-weight:700;letter-spacing:.7px;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:8px; }
+  .po-story { font-size:14px;color:#f1f5f9;line-height:1.55;margin:4px 0 14px;font-weight:500;letter-spacing:.1px; }
+  .po-story b { color:#FDB515;font-weight:700; }
+  .po-vital { display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid rgba(255,255,255,.05); }
+  .po-ico { font-size:22px;width:32px;text-align:center;flex-shrink:0;line-height:1; }
   .po-heart { animation:poBeat 1s ease-in-out infinite;color:#f87171;transform-origin:center; }
   @keyframes poBeat { 0%,100%{transform:scale(1)} 12%{transform:scale(1.25)} 25%{transform:scale(1)} 38%{transform:scale(1.15)} 52%{transform:scale(1)} }
   .po-v { flex:1;min-width:0; }
-  .po-v-lbl { font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.3px; }
-  .po-v-bar { height:5px;border-radius:3px;background:rgba(255,255,255,.06);margin-top:4px;overflow:hidden;position:relative; }
+  .po-v-lbl { font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600; }
+  .po-v-sub { color:#64748b;font-weight:500;letter-spacing:.2px;margin-left:5px;text-transform:none; }
+  .po-v-bar { height:6px;border-radius:3px;background:rgba(255,255,255,.06);margin-top:6px;overflow:hidden;position:relative; }
   .po-v-fill { position:absolute;top:0;height:100%;width:40%;border-radius:3px;background:linear-gradient(90deg,transparent,#2dd4bf 40%,#2dd4bf 60%,transparent);animation:poFlow 2.6s linear infinite; }
   @keyframes poFlow { 0%{left:-40%}100%{left:100%} }
   .po-v-breath { position:absolute;top:0;left:0;height:100%;width:100%;background:linear-gradient(90deg,#60a5fa,#93c5fd);border-radius:3px;transform-origin:left;animation:poBreath 4s ease-in-out infinite; }
   @keyframes poBreath { 0%,100%{transform:scaleX(.2);opacity:.55} 50%{transform:scaleX(.95);opacity:.9} }
-  .po-v-val { font-size:11px;color:#e2e8f0;font-weight:600;margin-top:3px;font-family:var(--mono); }
-  .po-close { position:absolute;top:8px;right:12px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;line-height:1; }
-  .po-hint { font-size:9px;color:#475569;margin-top:10px;text-align:center;font-style:italic;line-height:1.3; }
+  .po-v-val { font-size:13px;color:#f1f5f9;font-weight:600;margin-top:5px;letter-spacing:.2px; }
+  .po-v-val .po-num { font-family:var(--mono);color:#FDB515; }
+  .po-activity { display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.3px;margin-top:4px; }
+  .po-activity.busy { background:rgba(248,113,113,.14);color:#fca5a5; }
+  .po-activity.quiet { background:rgba(96,165,250,.14);color:#93c5fd; }
+  .po-activity.typical { background:rgba(148,163,184,.14);color:#cbd5e1; }
+  .po-close { position:absolute;top:10px;right:14px;background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;line-height:1; }
+  .po-hint { font-size:11px;color:#64748b;margin-top:12px;text-align:center;line-height:1.4;padding-top:10px;border-top:1px solid rgba(255,255,255,.05); }
   @media(max-width:768px) { #publicOverlay { left:10px;right:10px;top:46px;width:auto; } }
 </style>
 </head>
@@ -155,7 +153,6 @@
   <button class="view-btn" data-mode="flow">💧 Flow</button>
   <button class="view-btn" data-mode="energy">⚡ Energy</button>
   <button class="view-btn" id="bldgToggle" style="margin-left:8px;border-color:rgba(148,163,184,0.3)">🏢 Building</button>
-  <button class="view-btn" id="dbToggleBar" style="margin-left:4px;border-color:rgba(45,212,191,0.3);color:var(--cyan)">📊 Data</button>
   <button class="view-btn" id="tourBtn" style="margin-left:4px;border-color:rgba(253,181,21,.3);color:#FDB515" onclick="startTour()">🎬 Tour</button>
   <button class="view-btn" id="flowBtn" style="margin-left:4px;border-color:rgba(45,212,191,.2);color:#2dd4bf" onclick="toggleFlow()">⚡ Flow</button>
   <button class="view-btn" id="publicBtn" style="margin-left:4px;border-color:rgba(147,197,253,.35);color:#93c5fd" onclick="togglePublic()">👥 Public</button>
@@ -164,33 +161,53 @@
 <!-- Public mode overlay: plain-language Grimes story -->
 <div id="publicOverlay">
   <button class="po-close" onclick="togglePublic()" aria-label="Close">✕</button>
-  <div class="po-title"><span id="poStatus">LIVE</span> &nbsp; Grimes · Right Now</div>
+  <div class="po-title"><span id="poStatus">LIVE</span><span>Grimes · Right Now</span></div>
   <div class="po-story" id="poStory">Reading the building's vitals…</div>
   <div class="po-vital">
     <div class="po-ico po-heart" id="poHeart">❤</div>
-    <div class="po-v"><div class="po-v-lbl">Heart · Main panel<span id="poBpm" class="po-v-sub"></span></div><div class="po-v-val" id="poHeartVal">— kW</div></div>
+    <div class="po-v">
+      <div class="po-v-lbl">Heartbeat<span id="poBpm" class="po-v-sub"></span></div>
+      <div class="po-v-val" id="poHeartVal">— kW</div>
+    </div>
   </div>
   <div class="po-vital">
     <div class="po-ico">🩸</div>
-    <div class="po-v"><div class="po-v-lbl">Arteries · HVAC vs Plugs</div><div class="po-v-bar"><div class="po-v-fill" id="poFlowFill"></div></div><div class="po-v-val" id="poSplitVal">—</div></div>
+    <div class="po-v">
+      <div class="po-v-lbl">Power flow <span class="po-v-sub">HVAC vs plugs</span></div>
+      <div class="po-v-bar"><div class="po-v-fill" id="poFlowFill"></div></div>
+      <div class="po-v-val" id="poSplitVal">—</div>
+    </div>
   </div>
   <div class="po-vital">
     <div class="po-ico">🌬️</div>
-    <div class="po-v"><div class="po-v-lbl">Breath · HVAC intensity</div><div class="po-v-bar"><div class="po-v-breath" id="poBreath"></div></div><div class="po-v-val" id="poBreathVal">—</div></div>
+    <div class="po-v">
+      <div class="po-v-lbl">Breathing <span class="po-v-sub">airflow pace</span></div>
+      <div class="po-v-bar"><div class="po-v-breath" id="poBreath"></div></div>
+      <div class="po-v-val" id="poBreathVal">—</div>
+    </div>
   </div>
   <div class="po-vital">
     <div class="po-ico">🌞</div>
-    <div class="po-v"><div class="po-v-lbl">Today so far · energy</div><div class="po-v-val" id="poTodayVal">—</div></div>
+    <div class="po-v">
+      <div class="po-v-lbl">Today so far</div>
+      <div class="po-v-val" id="poTodayVal">—</div>
+    </div>
   </div>
   <div class="po-vital">
     <div class="po-ico">💧</div>
-    <div class="po-v"><div class="po-v-lbl">Thirst · water</div><div class="po-v-val" id="poWaterVal">—</div></div>
+    <div class="po-v">
+      <div class="po-v-lbl">Water use</div>
+      <div class="po-v-val" id="poWaterVal">—</div>
+    </div>
   </div>
   <div class="po-vital">
-    <div class="po-ico" id="poActIco">📊</div>
-    <div class="po-v"><div class="po-v-lbl">Activity vs typical</div><div class="po-v-val" id="poActVal">—</div></div>
+    <div class="po-ico">📈</div>
+    <div class="po-v">
+      <div class="po-v-lbl">Compared to today's average</div>
+      <div class="po-v-val"><span class="po-activity typical" id="poActVal">—</span></div>
+    </div>
   </div>
-  <div class="po-hint" id="poFresh">The 3D model is the building's body — click anywhere to peek inside.</div>
+  <div class="po-hint" id="poFresh">Tap the 3D model to peek inside any system.</div>
 </div>
 
 <!-- Tour Overlay -->
@@ -219,7 +236,6 @@
 <!-- Legend -->
 <div id="legend"><h3>MEP Systems</h3><div id="systemList"></div></div>
 
-<button id="dbMobileBtn">⚡ Live Data</button>
 
 <!-- Dashboard -->
 <div id="dashboard">
@@ -321,14 +337,6 @@
   <button class="fl-btn" data-y="9"><span class="fl-name">L2</span><span class="fl-kw" id="fkL2"></span></button>
   <button class="fl-btn" data-y="5"><span class="fl-name">L1</span><span class="fl-kw" id="fkL1"></span></button>
   <button class="fl-btn active" data-y="1.6"><span class="fl-name">B1</span><span class="fl-kw" id="fkB1"></span></button>
-</div>
-
-<!-- Time Slider -->
-<div id="mepTimeBar">
-  <label>24hr</label>
-  <button id="mepPlayBtn" onclick="mepTogglePlay()">▶</button>
-  <input type="range" id="mepTimeRange" min="0" max="95" value="95" oninput="mepOnTimeChange(this.value)">
-  <div class="tval" id="mepTimeVal">Live</div>
 </div>
 
 <!-- Joysticks -->
@@ -1840,21 +1848,6 @@ function getMaintenanceInfo(point) {
   };
 }
 
-document.getElementById('dbToggleBar').addEventListener('click', () => {
-  const db = document.getElementById('dashboard');
-  db.classList.toggle('show');
-  document.getElementById('dbToggleBar').textContent = db.classList.contains('show') ? '✕ Close' : '📊 Data';
-  if (db.classList.contains('show') && liveData) setTimeout(() => { drawCharts(); updateDashboard(); }, 50);
-});
-
-document.getElementById('dbMobileBtn').addEventListener('click', () => {
-  const db = document.getElementById('dashboard');
-  db.classList.toggle('show');
-  const isOpen = db.classList.contains('show');
-  document.getElementById('dbMobileBtn').textContent = isOpen ? '✕ Close' : '⚡ Live Data';
-  if (isOpen && liveData) setTimeout(() => { drawCharts(); updateDashboard(); }, 50);
-});
-
 document.getElementById('dpClose').addEventListener('click', () => {
   detailPanel.style.display = 'none';
   if (highlightedMesh) { highlightedMesh.material = originalMaterials.get(highlightedMesh.uuid) || highlightedMesh.material; highlightedMesh = null; }
@@ -1905,6 +1898,76 @@ renderer.domElement.addEventListener('click', e => {
 
     const sensorsEl = document.getElementById('dpSensors');
     sensorsEl.innerHTML = '';
+
+    // ──────────────── PUBLIC MODE BRANCH ────────────────
+    // When the Public overlay is visible, render plain-language cards instead
+    // of engineering sensor dumps. Rationale: Calm Tech (Weiser '95) +
+    // Tangible units (Froehlich CHI'10) — fewer numbers, more meaning.
+    const publicEl = document.getElementById('publicOverlay');
+    const inPublic = publicEl && publicEl.classList.contains('show');
+    if (inPublic) {
+      const friendly = {
+        hvac_duct:   { name:'air duct',          story:'This duct carries heated or cooled air to the rooms on this floor. When the building "breathes," this is the airway.' },
+        hvac_equip:  { name:'HVAC unit',         story:'This unit conditions the air — heating, cooling, filtering. It\u2019s part of what lets the building "breathe" comfortably.' },
+        pipe:        { name:'water pipe',        story:'A pipe that brings water through the building — for restrooms, lab sinks, and the cooling loop.' },
+        sprinkler:   { name:'fire sprinkler',    story:'A fire sprinkler line. It sits quietly pressurized and only activates in emergencies.' },
+        conduit:     { name:'power conduit',     story:'This carries electricity down from the rooftop service, feeding the main panel — the building\u2019s artery.' },
+        diffuser:    { name:'air diffuser',      story:'A ceiling vent where conditioned air finally enters the room you\u2019re standing in.' },
+        pump:        { name:'pump / valve',      story:'Pumps and valves move water and coolant where they\u2019re needed — the circulation system of the building.' },
+        spiral:      { name:'main air trunk',    story:'A large spiral duct — the main air highway between HVAC units and the smaller branches.' },
+        elec:        { name:'electrical panel',  story:'An electrical panel splits incoming power into circuits for lights, outlets, and equipment on this floor.' }
+      };
+      const meta = friendly[sysId] || { name: sys.label, story:'Part of the building\u2019s hidden systems.' };
+      // Replace the tag with the friendly name (no tech acronyms)
+      document.getElementById('dpTag').textContent = meta.name;
+      document.getElementById('dpTitle').textContent = zone + ' · ' + floor;
+      document.getElementById('dpFloor').textContent = floorKw > 0
+        ? 'Floor ' + floor + ' is using about ' + Math.round(floorKw) + ' kW right now'
+        : 'Floor ' + floor;
+
+      // Story card
+      sensorsEl.innerHTML = '<div class="dp-card" style="grid-column:span 2;padding:10px 12px;background:rgba(253,181,21,.06);border:1px solid rgba(253,181,21,.12);border-radius:8px"><div style="color:#FDB515;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">What you\u2019re looking at</div><div style="color:#f1f5f9;font-size:12.5px;line-height:1.55">' + meta.story + '</div></div>';
+
+      // Activity card — qualitative state of this system
+      let activity = 'Idle';
+      let actColor = '#94a3b8';
+      if (sysId === 'conduit' || sysId === 'elec') {
+        const totalKw = (liveData?.summary?.total_kw_now) || 0;
+        if (totalKw > 200) { activity = 'Busy · lots of power moving'; actColor = '#f87171'; }
+        else if (totalKw > 100) { activity = 'Steady flow'; actColor = '#fb923c'; }
+        else if (totalKw > 40)  { activity = 'Gentle use'; actColor = '#2dd4bf'; }
+        else { activity = 'Quiet'; actColor = '#60a5fa'; }
+      } else if (sysId === 'hvac_duct' || sysId === 'hvac_equip' || sysId === 'spiral' || sysId === 'diffuser') {
+        const hvacKw = (liveData?.summary?.kw_sub_a) || 0;
+        if (hvacKw > 70) { activity = 'Working hard · moving a lot of air'; actColor = '#f87171'; }
+        else if (hvacKw > 30) { activity = 'Breathing steadily'; actColor = '#2dd4bf'; }
+        else if (hvacKw > 10) { activity = 'Light breathing'; actColor = '#60a5fa'; }
+        else { activity = 'Barely breathing'; actColor = '#94a3b8'; }
+      } else if (sysId === 'pipe' || sysId === 'pump') {
+        const wRate = (liveData?.water?.latest?.water1_rate_cfm) || 0;
+        if (wRate > 1) { activity = 'Water flowing'; actColor = '#38bdf8'; }
+        else if (wRate > 0.1) { activity = 'Trickling'; actColor = '#60a5fa'; }
+        else { activity = 'Still'; actColor = '#94a3b8'; }
+      } else if (sysId === 'sprinkler') {
+        activity = 'On standby';
+        actColor = '#94a3b8';
+      }
+
+      sensorsEl.innerHTML += '<div class="dp-card" style="grid-column:span 2"><div class="dp-card-label">Right now</div><div class="dp-card-val" style="color:' + actColor + ';font-size:16px;font-weight:700">' + activity + '</div></div>';
+
+      // Zoom-out context card — where it sits in the building
+      sensorsEl.innerHTML += '<div class="dp-card" style="grid-column:span 2"><div class="dp-card-label">Where it fits</div><div class="dp-card-val" style="color:#cbd5e1;font-size:12px;font-weight:500;line-height:1.5">Part of the <b style="color:#FDB515">' + floor + '</b> floor\u2019s systems' + (floorInfo && floorInfo.panels ? ' · shares ' + floorInfo.panels + ' panel' + (floorInfo.panels === 1 ? '' : 's') + ' with nearby equipment' : '') + '</div></div>';
+
+      // Hide engineer-only pieces
+      document.getElementById('dpMiniChart').style.display = 'none';
+      document.getElementById('dpMaint').innerHTML = '';
+      const simEl = document.querySelector('.dp-sim');
+      if (simEl) simEl.innerHTML = '<span style="color:#FDB515">Public view</span> — tap another part to learn more';
+
+      detailPanel.style.display = 'block';
+      return;
+    }
+    // ────────────── END PUBLIC MODE BRANCH ──────────────
 
     // Check if this is an electrical or pipe system with LIVE BMO data
     const isElectrical = (sysId === 'conduit' || sysId === 'elec');
@@ -2231,7 +2294,7 @@ function togglePublic(){
   var on=ov.classList.toggle('show');
   if(btn)btn.classList.toggle('active',on);
   // Hide engineering panels when in public mode — declutter for non-expert viewer
-  ['legend','dashboard','heatLegend','mepTimeBar','floorNav'].forEach(function(id){
+  ['legend','dashboard','heatLegend','floorNav'].forEach(function(id){
     var el=document.getElementById(id);
     if(!el)return;
     if(on){el.dataset._prevDisp=el.style.display;el.style.display='none'}
@@ -2244,20 +2307,12 @@ function updatePublicStory(){
   var ov=document.getElementById('publicOverlay');
   if(!ov||!ov.classList.contains('show'))return;
   var ld=(typeof liveData!=='undefined')?liveData:null;
-  var story=document.getElementById('poStory');
-  var heart=document.getElementById('poHeart');
-  var heartVal=document.getElementById('poHeartVal');
-  var bpm=document.getElementById('poBpm');
-  var flowFill=document.getElementById('poFlowFill');
-  var splitVal=document.getElementById('poSplitVal');
-  var breath=document.getElementById('poBreath');
-  var breathVal=document.getElementById('poBreathVal');
-  var todayVal=document.getElementById('poTodayVal');
-  var waterVal=document.getElementById('poWaterVal');
-  var actIco=document.getElementById('poActIco');
-  var actVal=document.getElementById('poActVal');
-  var fresh=document.getElementById('poFresh');
-  var status=document.getElementById('poStatus');
+  var $=function(id){return document.getElementById(id);};
+  var story=$('poStory'),heart=$('poHeart'),heartVal=$('poHeartVal'),bpm=$('poBpm');
+  var flowFill=$('poFlowFill'),splitVal=$('poSplitVal');
+  var breath=$('poBreath'),breathVal=$('poBreathVal');
+  var todayVal=$('poTodayVal'),waterVal=$('poWaterVal');
+  var actVal=$('poActVal'),fresh=$('poFresh'),status=$('poStatus');
   if(!ld||!ld.summary){
     if(story)story.textContent='Live vitals unavailable — showing steady baseline.';
     if(status){status.textContent='SIM';status.style.background='rgba(148,163,184,.14)';status.style.color='#94a3b8';}
@@ -2266,26 +2321,29 @@ function updatePublicStory(){
   if(status){status.textContent='LIVE';status.style.background='rgba(45,212,191,.14)';status.style.color='#2dd4bf';}
   var sum=ld.summary,m=ld.meters||{},w=(ld.water&&ld.water.latest)?ld.water.latest:{};
   var totalKw=sum.total_kw_now||0,mainKw=sum.kw_main||0,subA=sum.kw_sub_a||0,subB=sum.kw_sub_b||0;
-  var homes=Math.max(1,Math.round(totalKw/1.25)); // EIA RECS: ~1.25 kW avg US household
+  var homes=Math.max(1,Math.round(totalKw/1.25));
   var loadRatio=Math.min(1,Math.max(0,totalKw/300));
 
-  // Heart — load-proportional beat (idle 1.1s → full 0.45s)
+  // Heartbeat — whole-building load animates the beat; label shows kW only (no dup)
   var beatSec=1.1-loadRatio*0.65;
   if(heart)heart.style.animationDuration=beatSec.toFixed(2)+'s';
-  if(bpm)bpm.textContent=' · '+Math.round(60/beatSec)+' bpm';
-  if(heartVal)heartVal.textContent=Math.round(mainKw)+' kW main · '+Math.round(totalKw)+' kW total';
+  if(bpm)bpm.textContent='· '+Math.round(60/beatSec)+' beats/min';
+  if(heartVal)heartVal.innerHTML='<span class="po-num">'+Math.round(totalKw)+'</span> kW pulsing through the building';
 
-  // Arteries — HVAC (sub A) vs Plugs (sub B) split
+  // Power flow — balance between HVAC and plug loads (percent, not raw kW)
+  var splitTotal=Math.max(1,subA+subB);
+  var hvacPct=Math.round(subA/splitTotal*100);
+  var plugPct=100-hvacPct;
   if(flowFill)flowFill.style.animationDuration=(3.2-loadRatio*2.0).toFixed(2)+'s';
-  if(splitVal)splitVal.textContent='HVAC '+Math.round(subA)+' kW · Plugs '+Math.round(subB)+' kW';
+  if(splitVal)splitVal.innerHTML='HVAC <span class="po-num">'+hvacPct+'%</span> · Plugs &amp; lights <span class="po-num">'+plugPct+'%</span>';
 
-  // Breath — HVAC intensity (meter 76 is 480V HVAC)
+  // Breathing — purely qualitative airflow pace; HVAC kW is NOT repeated here
   var hvacRatio=Math.min(1,Math.max(0,subA/120));
   if(breath)breath.style.animationDuration=(5.0-hvacRatio*2.5).toFixed(2)+'s';
-  var hvacMood=subA<10?'idle · coasting':subA<30?'gentle breathing':subA<70?'steady circulation':'working hard';
-  if(breathVal)breathVal.textContent=hvacMood+' · '+Math.round(subA)+' kW';
+  var breathMood=subA<10?'barely breathing':subA<30?'calm and slow':subA<70?'steady and even':'deep and fast';
+  if(breathVal)breathVal.textContent=breathMood;
 
-  // Today so far — aggregate stats_today.kw across all meters
+  // Today so far — aggregate kWh + peak
   var todayAvgSum=0,peakKw=0,peakTime='';
   ['3','76','77'].forEach(function(k){
     var st=(m[k]&&m[k].stats_today&&m[k].stats_today.kw)?m[k].stats_today.kw:null;
@@ -2297,46 +2355,46 @@ function updatePublicStory(){
   var todayKwh=Math.round(todayAvgSum*hoursSoFar);
   if(todayVal){
     var tt=peakTime?peakTime.split(' ')[1]:'';
-    todayVal.textContent=todayKwh.toLocaleString()+' kWh · peak '+Math.round(peakKw)+' kW'+(tt?' @ '+tt.slice(0,5):'');
+    todayVal.innerHTML='<span class="po-num">'+todayKwh.toLocaleString()+'</span> kWh used · peak <span class="po-num">'+Math.round(peakKw)+'</span> kW'+(tt?' at '+tt.slice(0,5):'');
   }
 
-  // Water — current rate + today delta
-  var wRate=w.water1_rate_cfm||0;
-  var wTodayCf=0;
+  // Water — current rate + today cumulative in gallons
+  var wRate=w.water1_rate_cfm||0,wTodayCf=0;
   if(ld.water&&ld.water.stats_today&&ld.water.stats_today.water_total){
     var wst=ld.water.stats_today.water_total;
     if(typeof wst.max==='number'&&typeof wst.min==='number')wTodayCf=Math.max(0,wst.max-wst.min);
   }
-  var wGal=Math.round(wTodayCf*7.48); // 1 cf ≈ 7.48 gal
+  var wGal=Math.round(wTodayCf*7.48);
   if(waterVal){
-    if(wRate>0.01)waterVal.textContent=wRate.toFixed(2)+' cf/min flowing · ~'+wGal.toLocaleString()+' gal today';
-    else waterVal.textContent='quiet · ~'+wGal.toLocaleString()+' gal used today';
+    if(wRate>0.01)waterVal.innerHTML='flowing · <span class="po-num">'+wGal.toLocaleString()+'</span> gal today';
+    else waterVal.innerHTML='quiet · <span class="po-num">'+wGal.toLocaleString()+'</span> gal used today';
   }
 
-  // Activity vs typical (current vs today's average)
+  // Activity vs typical — pill, no emoji
   var delta=todayAvgSum>0?(totalKw-todayAvgSum)/todayAvgSum*100:0;
-  var actWord,actEmoji;
-  if(delta>25){actWord='busier than usual';actEmoji='⚡';}
-  else if(delta<-25){actWord='quieter than usual';actEmoji='💤';}
-  else {actWord='typical rhythm';actEmoji='✅';}
-  if(actIco)actIco.textContent=actEmoji;
-  if(actVal)actVal.textContent=actWord+' ('+(delta>=0?'+':'')+Math.round(delta)+'% vs today avg)';
+  var pillCls='typical',phrase='about average';
+  if(delta>25){pillCls='busy';phrase='busier than usual';}
+  else if(delta<-25){pillCls='quiet';phrase='quieter than usual';}
+  if(actVal){
+    actVal.className='po-activity '+pillCls;
+    actVal.textContent=phrase+' ('+(delta>=0?'+':'')+Math.round(delta)+'%)';
+  }
 
-  // Story — mood + homes equivalence (Froehlich CHI'10)
+  // Story — plain English mood + homes equivalence (Froehlich CHI'10)
   var mood='in a steady rhythm';
   if(loadRatio>0.7)mood='<b>working hard</b> — lots happening inside';
   else if(loadRatio>0.35)mood='<b>moderately busy</b> — steady occupancy';
   else if(loadRatio<0.1)mood='<b>resting quietly</b> — mostly empty';
   else mood='<b>in a steady rhythm</b>';
   var homesText=homes.toLocaleString()+' home'+(homes===1?'':'s');
-  if(story)story.innerHTML='Grimes is '+mood+'. About <b>'+homesText+'</b> worth of power flows through its heart right now.';
+  if(story)story.innerHTML='Grimes is '+mood+'. Right now it uses about as much power as <b>'+homesText+'</b>.';
 
-  // Freshness
+  // Freshness line (uses #poFresh at bottom)
   if(fresh&&ld.generated_at){
     var g=new Date(ld.generated_at.replace(' ','T'));
     var mins=Math.max(0,Math.round((Date.now()-g.getTime())/60000));
     var ago=mins<1?'just now':mins+' min ago';
-    fresh.textContent='Last reading '+ago+' · tap the 3D model to peek inside';
+    fresh.textContent='Last reading '+ago+' · tap the 3D model to peek inside any system';
   }
 }
 
