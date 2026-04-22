@@ -71,6 +71,30 @@
   .dp-close { position:absolute;top:8px;right:12px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px; }
   .dp-sim { margin-top:6px;font-size:8px;color:#334155;text-align:center; }
 
+  /* Public mode — museum-label style for the click popup.
+     Rationale: strip card scaffolding, let typography carry hierarchy (A)
+     + small line-art icon per system for instant visual recognition (C). */
+  #detailPanel.public { min-width:380px;max-width:440px;padding:22px 26px 20px;border-color:rgba(253,181,21,.18);font-family:var(--font); }
+  .dp-pub { display:block; }
+  .dp-pub-head { display:flex;align-items:flex-start;gap:14px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:14px; }
+  .dp-pub-ico { width:40px;height:40px;flex-shrink:0;color:#FDB515;opacity:.92; }
+  .dp-pub-ico svg { width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round; }
+  .dp-pub-kicker { font-size:10px;color:#64748b;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;margin-bottom:4px; }
+  .dp-pub-title { font-size:19px;font-weight:600;color:#f1f5f9;letter-spacing:.1px;line-height:1.25; }
+  .dp-pub-body { font-size:14px;color:#e2e8f0;line-height:1.65;margin:0 0 14px;font-weight:400;letter-spacing:.15px; }
+  .dp-pub-body b { color:#FDB515;font-weight:600; }
+  .dp-pub-meta { font-size:11.5px;color:#94a3b8;line-height:1.7;letter-spacing:.2px; }
+  .dp-pub-meta b { color:#f1f5f9;font-weight:600; }
+  .dp-pub-meta + .dp-pub-meta { margin-top:2px; }
+  .dp-pub-foot { margin-top:14px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.07);font-size:11px;color:#64748b;text-align:center; }
+  #detailPanel.public .dp-header,
+  #detailPanel.public .dp-grid,
+  #detailPanel.public #dpMiniChart,
+  #detailPanel.public .dp-maint,
+  #detailPanel.public .dp-sim { display:none !important; }
+  #detailPanel.public #dpPub { display:block !important; }
+  #detailPanel:not(.public) #dpPub { display:none !important; }
+
   /* ── Heatmap Legend ── */
   #heatLegend { position:fixed;bottom:90px;right:14px;z-index:50;background:var(--panel);padding:10px 12px;border-radius:10px;border:1px solid var(--border);display:none;font-size:10px; }
   .heat-bar { width:120px;height:12px;border-radius:4px;margin:4px 0; }
@@ -321,6 +345,7 @@
   </div>
   <div class="dp-maint" id="dpMaint"></div>
   <div class="dp-sim">SIM — values vary by location</div>
+  <div class="dp-pub" id="dpPub" style="display:none"></div>
 </div>
 
 <!-- Heatmap Legend -->
@@ -1900,70 +1925,61 @@ renderer.domElement.addEventListener('click', e => {
     sensorsEl.innerHTML = '';
 
     // ──────────────── PUBLIC MODE BRANCH ────────────────
-    // When the Public overlay is visible, render plain-language cards instead
-    // of engineering sensor dumps. Rationale: Calm Tech (Weiser '95) +
-    // Tangible units (Froehlich CHI'10) — fewer numbers, more meaning.
+    // Museum-label typography (A) + small line-art SVG per system (C).
+    // Writes into a dedicated #dpPub container; CSS hides engineer children when .public is on.
     const publicEl = document.getElementById('publicOverlay');
     const inPublic = publicEl && publicEl.classList.contains('show');
-    if (inPublic) {
+    detailPanel.classList.toggle('public', !!inPublic);
+    const dpPubEl = document.getElementById('dpPub');
+    if (inPublic && dpPubEl) {
       const friendly = {
-        hvac_duct:   { name:'air duct',          story:'This duct carries heated or cooled air to the rooms on this floor. When the building "breathes," this is the airway.' },
-        hvac_equip:  { name:'HVAC unit',         story:'This unit conditions the air — heating, cooling, filtering. It\u2019s part of what lets the building "breathe" comfortably.' },
-        pipe:        { name:'water pipe',        story:'A pipe that brings water through the building — for restrooms, lab sinks, and the cooling loop.' },
-        sprinkler:   { name:'fire sprinkler',    story:'A fire sprinkler line. It sits quietly pressurized and only activates in emergencies.' },
-        conduit:     { name:'power conduit',     story:'This carries electricity down from the rooftop service, feeding the main panel — the building\u2019s artery.' },
-        diffuser:    { name:'air diffuser',      story:'A ceiling vent where conditioned air finally enters the room you\u2019re standing in.' },
-        pump:        { name:'pump / valve',      story:'Pumps and valves move water and coolant where they\u2019re needed — the circulation system of the building.' },
-        spiral:      { name:'main air trunk',    story:'A large spiral duct — the main air highway between HVAC units and the smaller branches.' },
-        elec:        { name:'electrical panel',  story:'An electrical panel splits incoming power into circuits for lights, outlets, and equipment on this floor.' }
+        hvac_duct:  { name:'Air duct',          icon:'<svg viewBox="0 0 24 24"><rect x="3" y="7" width="12" height="10" rx="1"/><path d="M16 10c3 0 3 2 0 2M18 13c3 0 3 2 0 2M16 16c2 0 2 1.5 0 1.5"/></svg>', story:'This duct carries heated or cooled air to the rooms on this floor. When the building <b>"breathes"</b>, this is the airway.' },
+        hvac_equip: { name:'HVAC unit',         icon:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M6 9h12M6 12h12M6 15h12"/></svg>', story:'This unit conditions the air — heating, cooling, and filtering. It is the part of the building that lets it <b>breathe</b> comfortably.' },
+        pipe:       { name:'Water pipe',        icon:'<svg viewBox="0 0 24 24"><path d="M3 8h8a5 5 0 015 5v8"/><path d="M3 6v4M18 21h-3"/></svg>', story:'A pipe carrying water through the building — for restrooms, sinks, and the cooling loop. Part of the <b>circulation</b> system.' },
+        sprinkler:  { name:'Fire sprinkler',    icon:'<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="2.5"/><path d="M12 9.5v2M10 13l-1.5 3M14 13l1.5 3M12 14v4"/></svg>', story:'A fire sprinkler line. It stays quietly <b>pressurized</b>, waiting. Only activates in emergencies — less than 1 in a million trigger by accident.' },
+        conduit:    { name:'Power conduit',     icon:'<svg viewBox="0 0 24 24"><rect x="10" y="3" width="4" height="18" rx="0.5"/><path d="M8 7h8M8 12h8M8 17h8"/></svg>', story:'This carries electricity down from the rooftop service into the main panel — the building\u2019s <b>main artery</b>.' },
+        diffuser:   { name:'Air diffuser',      icon:'<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 9h16M4 14h16M4 19h16M9 4v16M14 4v16"/></svg>', story:'A ceiling vent — where conditioned air finally <b>enters the room</b> you\u2019re standing in. If you feel a breeze, it came from here.' },
+        pump:       { name:'Pump / valve',      icon:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M10 9v6M10 9h3a1.5 1.5 0 010 3h-3"/></svg>', story:'Pumps and valves move water and coolant around the building — the <b>circulation</b> that keeps every floor comfortable.' },
+        spiral:     { name:'Main air trunk',    icon:'<svg viewBox="0 0 24 24"><path d="M4 7c2 2 2 8 0 10M9 7c2 2 2 8 0 10M14 7c2 2 2 8 0 10M19 7c2 2 2 8 0 10"/></svg>', story:'A large spiral duct — the <b>main highway</b> for air between HVAC units and the smaller branches that reach each room.' },
+        elec:       { name:'Electrical panel', icon:'<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><rect x="7" y="6" width="4" height="2.5"/><rect x="13" y="6" width="4" height="2.5"/><rect x="7" y="11" width="4" height="2.5"/><rect x="13" y="11" width="4" height="2.5"/><rect x="7" y="16" width="4" height="2.5"/><rect x="13" y="16" width="4" height="2.5"/></svg>', story:'An electrical panel splits incoming power into the <b>circuits</b> that feed lights, outlets, and equipment on this floor.' }
       };
-      const meta = friendly[sysId] || { name: sys.label, story:'Part of the building\u2019s hidden systems.' };
-      // Replace the tag with the friendly name (no tech acronyms)
-      document.getElementById('dpTag').textContent = meta.name;
-      document.getElementById('dpTitle').textContent = zone + ' · ' + floor;
-      document.getElementById('dpFloor').textContent = floorKw > 0
-        ? 'Floor ' + floor + ' is using about ' + Math.round(floorKw) + ' kW right now'
-        : 'Floor ' + floor;
+      const meta = friendly[sysId] || { name:sys.label, icon:'', story:'Part of the building\u2019s hidden systems.' };
 
-      // Story card
-      sensorsEl.innerHTML = '<div class="dp-card" style="grid-column:span 2;padding:10px 12px;background:rgba(253,181,21,.06);border:1px solid rgba(253,181,21,.12);border-radius:8px"><div style="color:#FDB515;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">What you\u2019re looking at</div><div style="color:#f1f5f9;font-size:12.5px;line-height:1.55">' + meta.story + '</div></div>';
-
-      // Activity card — qualitative state of this system
-      let activity = 'Idle';
-      let actColor = '#94a3b8';
+      let state = 'Idle', stateColor = '#94a3b8';
+      const totalKw = (liveData?.summary?.total_kw_now) || 0;
+      const hvacKw  = (liveData?.summary?.kw_sub_a) || 0;
+      const wRate   = (liveData?.water?.latest?.water1_rate_cfm) || 0;
       if (sysId === 'conduit' || sysId === 'elec') {
-        const totalKw = (liveData?.summary?.total_kw_now) || 0;
-        if (totalKw > 200) { activity = 'Busy · lots of power moving'; actColor = '#f87171'; }
-        else if (totalKw > 100) { activity = 'Steady flow'; actColor = '#fb923c'; }
-        else if (totalKw > 40)  { activity = 'Gentle use'; actColor = '#2dd4bf'; }
-        else { activity = 'Quiet'; actColor = '#60a5fa'; }
-      } else if (sysId === 'hvac_duct' || sysId === 'hvac_equip' || sysId === 'spiral' || sysId === 'diffuser') {
-        const hvacKw = (liveData?.summary?.kw_sub_a) || 0;
-        if (hvacKw > 70) { activity = 'Working hard · moving a lot of air'; actColor = '#f87171'; }
-        else if (hvacKw > 30) { activity = 'Breathing steadily'; actColor = '#2dd4bf'; }
-        else if (hvacKw > 10) { activity = 'Light breathing'; actColor = '#60a5fa'; }
-        else { activity = 'Barely breathing'; actColor = '#94a3b8'; }
+        if (totalKw > 200)      { state = 'busy — lots of power moving';    stateColor = '#fca5a5'; }
+        else if (totalKw > 100) { state = 'steady flow';                    stateColor = '#fdba74'; }
+        else if (totalKw > 40)  { state = 'gentle use';                     stateColor = '#5eead4'; }
+        else                    { state = 'quiet';                          stateColor = '#93c5fd'; }
+      } else if (['hvac_duct','hvac_equip','spiral','diffuser'].includes(sysId)) {
+        if (hvacKw > 70)      { state = 'working hard — moving a lot of air'; stateColor = '#fca5a5'; }
+        else if (hvacKw > 30) { state = 'breathing steadily';                 stateColor = '#5eead4'; }
+        else if (hvacKw > 10) { state = 'light breathing';                    stateColor = '#93c5fd'; }
+        else                  { state = 'barely breathing';                   stateColor = '#94a3b8'; }
       } else if (sysId === 'pipe' || sysId === 'pump') {
-        const wRate = (liveData?.water?.latest?.water1_rate_cfm) || 0;
-        if (wRate > 1) { activity = 'Water flowing'; actColor = '#38bdf8'; }
-        else if (wRate > 0.1) { activity = 'Trickling'; actColor = '#60a5fa'; }
-        else { activity = 'Still'; actColor = '#94a3b8'; }
+        if (wRate > 1)        { state = 'water flowing';                      stateColor = '#7dd3fc'; }
+        else if (wRate > 0.1) { state = 'trickling';                          stateColor = '#93c5fd'; }
+        else                  { state = 'still';                              stateColor = '#94a3b8'; }
       } else if (sysId === 'sprinkler') {
-        activity = 'On standby';
-        actColor = '#94a3b8';
+        state = 'on standby'; stateColor = '#94a3b8';
       }
 
-      sensorsEl.innerHTML += '<div class="dp-card" style="grid-column:span 2"><div class="dp-card-label">Right now</div><div class="dp-card-val" style="color:' + actColor + ';font-size:16px;font-weight:700">' + activity + '</div></div>';
-
-      // Zoom-out context card — where it sits in the building
-      sensorsEl.innerHTML += '<div class="dp-card" style="grid-column:span 2"><div class="dp-card-label">Where it fits</div><div class="dp-card-val" style="color:#cbd5e1;font-size:12px;font-weight:500;line-height:1.5">Part of the <b style="color:#FDB515">' + floor + '</b> floor\u2019s systems' + (floorInfo && floorInfo.panels ? ' · shares ' + floorInfo.panels + ' panel' + (floorInfo.panels === 1 ? '' : 's') + ' with nearby equipment' : '') + '</div></div>';
-
-      // Hide engineer-only pieces
-      document.getElementById('dpMiniChart').style.display = 'none';
-      document.getElementById('dpMaint').innerHTML = '';
-      const simEl = document.querySelector('.dp-sim');
-      if (simEl) simEl.innerHTML = '<span style="color:#FDB515">Public view</span> — tap another part to learn more';
-
+      dpPubEl.innerHTML = `
+        <div class="dp-pub-head">
+          <div class="dp-pub-ico">${meta.icon}</div>
+          <div>
+            <div class="dp-pub-kicker">${meta.name}</div>
+            <div class="dp-pub-title">${zone} \u00b7 ${floor}</div>
+          </div>
+        </div>
+        <p class="dp-pub-body">${meta.story}</p>
+        <div class="dp-pub-meta">Right now \u00b7 <b style="color:${stateColor}">${state}</b></div>
+        <div class="dp-pub-meta">Floor ${floor}${(floorKw > 0) ? ' is using about <b>' + Math.round(floorKw) + ' kW</b> right now' : ''}${(floorInfo && floorInfo.panels) ? ' \u00b7 shares ' + floorInfo.panels + ' panel' + (floorInfo.panels === 1 ? '' : 's') + ' with nearby equipment' : ''}</div>
+        <div class="dp-pub-foot">Tap another part of the 3D model to learn more</div>
+      `;
       detailPanel.style.display = 'block';
       return;
     }
