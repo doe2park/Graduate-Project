@@ -190,6 +190,24 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .chat-quick{display:flex;gap:4px;flex-wrap:wrap;padding:0 12px 8px}
 .chat-q{padding:4px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--dim);font-size:10px;cursor:pointer;white-space:nowrap}
 .chat-q:hover{border-color:var(--gold);color:var(--gold)}
+/* Museum-label tone for bot answers — less emoji, more hierarchy */
+.chat-msg.bot .tb-kicker{font-size:9px;color:#64748b;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:3px}
+.chat-msg.bot .tb-title{font-size:14px;font-weight:600;color:#f1f5f9;letter-spacing:.1px;line-height:1.3;margin-bottom:8px}
+.chat-msg.bot .tb-title b{color:var(--gold);font-weight:600}
+.chat-msg.bot .tb-body{font-size:12px;color:#cbd5e1;line-height:1.55}
+.chat-msg.bot .tb-row{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,.04)}
+.chat-msg.bot .tb-row:last-child{border-bottom:none}
+.chat-msg.bot .tb-lbl{color:#94a3b8;font-size:11px}
+.chat-msg.bot .tb-val{color:#f1f5f9;font-family:var(--mono,SF Mono,Menlo,monospace);font-weight:600;font-size:12px;text-align:right;white-space:nowrap}
+.chat-msg.bot .tb-val b{color:var(--gold)}
+.chat-msg.bot .tb-line{padding:3px 0}
+.chat-msg.bot .tb-line b{color:#f1f5f9;font-weight:600}
+.chat-msg.bot .tb-meta{margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.06);font-size:10px;color:#64748b;letter-spacing:.2px}
+.chat-msg.bot .tb-act{display:inline-block;margin-top:8px;margin-right:6px;padding:4px 10px;border-radius:6px;background:rgba(253,181,21,.1);border:1px solid rgba(253,181,21,.25);color:var(--gold);font-size:10px;font-weight:600;cursor:pointer;text-decoration:none;letter-spacing:.2px}
+.chat-msg.bot .tb-act:hover{background:rgba(253,181,21,.22)}
+.chat-msg.bot .tb-act.sec{background:rgba(45,212,191,.1);border-color:rgba(45,212,191,.25);color:var(--cyan,#2dd4bf)}
+.chat-msg.bot .tb-spark{margin:8px 0 4px;display:block}
+.chat-msg.bot .tb-num{font-family:var(--mono,SF Mono,Menlo,monospace);color:var(--gold);font-weight:700}
 
 .esri-popup{display:none!important}
 .esri-ui-corner .esri-component{border-radius:9px!important}
@@ -353,17 +371,17 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 <div id="chatPanel">
   <div class="chat-hdr"><h3>⚡ Campus Energy AI</h3><button class="chat-close" onclick="toggleChat()">✕</button></div>
   <div class="chat-msgs" id="chatMsgs">
-    <div class="chat-msg bot">Hi! Ask me anything about UC Berkeley campus buildings and energy — I can answer in English or Korean.<br><br>Try: <i>"Which building uses the most energy?"</i> or <i>"Tell me about Davis Hall"</i></div>
+    <div class="chat-msg bot"><div class="tb-kicker">Campus AI · ready</div><div class="tb-title">Ask me about any UC Berkeley building</div><div class="tb-body"><div class="tb-line">I can look up <b>live energy</b>, show <b>24 h trends</b>, and drive the map for you. English or Korean.</div><div class="tb-line" style="margin-top:6px;color:#94a3b8">Try: <i>"zoom to Davis Hall"</i>, <i>"show only Engineering"</i>, <i>"Grimes trend"</i>.</div></div></div>
   </div>
   <div class="chat-quick" id="chatQuick">
-    <div class="chat-q" onclick="askChat(this.textContent)">Top energy users?</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Campus total kW?</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Daily cost?</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">CO₂ footprint?</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Oldest building?</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Top energy users</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Campus total</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Daily cost</div>
     <div class="chat-q" onclick="askChat(this.textContent)">About Davis Hall</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Offline buildings?</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Compare Engineering vs Science</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Show only Engineering</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Zoom to Wheeler</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Reset map</div>
+    <div class="chat-q" onclick="askChat(this.textContent)">Any anomalies</div>
   </div>
   <div class="chat-input"><input id="chatIn" placeholder="Ask about buildings, energy..." onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Ask</button></div>
 </div>
@@ -575,6 +593,37 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     sel=0;renderList();
     view.goTo({target:gPt,zoom:18},{duration:1000,easing:'ease-in-out'}).then(function(){showPop(D[0])});
   });
+
+  // ─── Expose map controls for chatbot (chat→map actions) ───
+  // Chatbot uses this to fly to buildings, filter categories, reset view.
+  window.campusMap = {
+    goTo: function(id){
+      var b = D.find(function(x){return x.id===id});
+      if(!b) return false;
+      sel = D.indexOf(b); renderList();
+      view.goTo({target:new Point({longitude:b.lng,latitude:b.lat}),zoom:18},{duration:1000,easing:'ease-in-out'})
+          .then(function(){ showPop(b); });
+      return true;
+    },
+    filterCategory: function(cat){
+      af = cat || 'All'; renderList(); updVis();
+      // reflect in UI chips if present
+      document.querySelectorAll('.fl').forEach(function(el){
+        el.classList.toggle('on', (el.textContent||'').trim() === (cat||'All'));
+      });
+      return true;
+    },
+    resetView: function(){
+      af='All'; sq=''; var qi=document.getElementById('qi'); if(qi)qi.value='';
+      renderList(); updVis();
+      view.goTo({center:[-122.2590,37.8715],zoom:16},{duration:800,easing:'ease-in-out'});
+      document.querySelectorAll('.fl').forEach(function(el){
+        el.classList.toggle('on', (el.textContent||'').trim() === 'All');
+      });
+      return true;
+    },
+    buildings: D
+  };
 
   // ═══ POPUP ═══
   const pop=document.getElementById('pop');
@@ -838,8 +887,20 @@ var AI_PROXY = 'https://campus-chatbot.ucb-dt.workers.dev';
 
 var chatOpen=false;
 function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('open',chatOpen);if(chatOpen)document.getElementById('chatIn').focus()}
-var chatData=null;
+var chatData=null, chatHistory=null, chatWeekly=null;
 fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatData=d}).catch(function(){});
+fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatHistory=d}).catch(function(){});
+fetch('https://doe2park.github.io/Graduate-Project/data/weekly_report.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatWeekly=d}).catch(function(){});
+
+// ─── Event delegation for in-answer action buttons (zoom / filter / reset) ───
+document.addEventListener('click',function(e){
+  var t=e.target.closest('.tb-act'); if(!t)return;
+  var act=t.dataset.act, arg=t.dataset.arg;
+  if(!window.campusMap)return;
+  if(act==='zoom'&&arg){window.campusMap.goTo(arg);}
+  else if(act==='filter'&&arg){window.campusMap.filterCategory(arg);}
+  else if(act==='reset'){window.campusMap.resetView();}
+});
 
 function addMsg(t,type){var m=document.getElementById('chatMsgs');var d=document.createElement('div');d.className='chat-msg '+type;d.innerHTML=t;m.appendChild(d);m.scrollTop=m.scrollHeight;return d}
 function askChat(q){document.getElementById('chatIn').value=q;sendChat()}
@@ -865,7 +926,17 @@ async function sendChat(){
   var q=input.value.trim();if(!q)return;
   input.value='';addMsg(q,'user');
 
-  // Try AI proxy first
+  // Action intents (zoom / filter / reset / trend / about-building) are handled
+  // locally so we can drive the map. LLM proxy only handles open-ended Qs.
+  var ql=q.toLowerCase();
+  var isAction=/zoom|fly|take me|go to|show only|filter to|hide offline|reset|trend|history|24\s*h/.test(ql);
+  var isBuilding=!!findBuilding(q);
+  if(isAction||isBuilding){
+    setTimeout(function(){addMsg(processQuery(q),'bot')},120);
+    return;
+  }
+
+  // LLM proxy for open-ended
   if(AI_PROXY){
     var loading=addMsg('Thinking...','bot loading');
     try{
@@ -900,6 +971,12 @@ function findBuilding(q){
 function intent(q){
   var ql=q.toLowerCase();
   var map={
+    // map-control intents first (handled locally to drive the view)
+    reset:/reset map|show all|clear filter|restore map|show everything/,
+    filter:/show only|filter to|hide offline|only show|just the/,
+    zoomto:/zoom to|fly to|take me to|go to|show .* on (the )?map/,
+    trend:/trend|history|24\s*h|last day|over time|past 24|past day|주간.*(추세|트렌드)/,
+    // ─ existing intents ─
     summary:/total|campus.*(kw|power|energy|load)|overall|summary|overview|how much.*(power|energy|electricity)|what.*campus|전체|얼마/,
     top:/top|most|highest|biggest|rank|consumer|hungry|많이|순위|who uses|which.*most/,
     bottom:/low|least|efficient|small|min|little|적게/,
@@ -927,6 +1004,14 @@ function intent(q){
   return null;
 }
 
+// Parse the category keyword out of a "show only X" style query
+function categoryFromQ(q){
+  var ql=q.toLowerCase();
+  var map={Engineering:/engineer|공학/,Science:/\bscience\b|과학/,Humanities:/humanit|인문/,Professional:/professional|business|law/,'Student Life':/student life|gym|rec/,Libraries:/librar|도서관/};
+  for(var k in map){if(map[k].test(ql))return k}
+  return null;
+}
+
 function on(){
   var src=window.currentEnergyData||chatData&&chatData.buildings||{};
   return Object.entries(src).filter(function(e){return e[1].kw!==null&&e[1].kw!==undefined}).sort(function(a,b){return(b[1].kw||0)-(a[1].kw||0)});
@@ -936,17 +1021,78 @@ function off(){
   return Object.entries(src).filter(function(e){return e[1].kw===null||e[1].kw===undefined});
 }
 
+// ─── Museum-label tone helpers ───
+// card(kicker, title, rows[], meta) — rows are {lbl, val} or plain HTML strings
+function tCard(kicker, title, rows, meta){
+  var body=(rows||[]).map(function(r){
+    if(r&&typeof r==='object'&&'lbl' in r)return '<div class="tb-row"><span class="tb-lbl">'+r.lbl+'</span><span class="tb-val">'+r.val+'</span></div>';
+    return '<div class="tb-line">'+r+'</div>';
+  }).join('');
+  return '<div class="tb-kicker">'+kicker+'</div><div class="tb-title">'+title+'</div>'+
+         (body?'<div class="tb-body">'+body+'</div>':'')+
+         (meta?'<div class="tb-meta">'+meta+'</div>':'');
+}
+function tNum(v,unit){return '<span class="tb-num">'+v+'</span>'+(unit?' '+unit:'');}
+function tAct(label,act,arg,secondary){
+  return '<span class="tb-act'+(secondary?' sec':'')+'" data-act="'+act+'"'+(arg?' data-arg="'+arg+'"':'')+'>'+label+'</span>';
+}
+// Tiny inline SVG sparkline from numeric array
+function sparkSVG(values, opts){
+  opts=opts||{}; values=(values||[]).filter(function(v){return typeof v==='number'&&!isNaN(v)});
+  if(values.length<2)return '';
+  var w=opts.w||220, h=opts.h||36, pad=2;
+  var mn=Math.min.apply(null,values), mx=Math.max.apply(null,values), rg=(mx-mn)||1;
+  var pts=values.map(function(v,i){
+    var x=(i/(values.length-1))*(w-pad*2)+pad;
+    var y=h-pad-((v-mn)/rg)*(h-pad*2);
+    return x.toFixed(1)+','+y.toFixed(1);
+  });
+  var color=opts.color||'#FDB515';
+  var area='M'+pts[0]+' L '+pts.join(' ')+' L '+(w-pad)+','+(h-pad)+' L '+pad+','+(h-pad)+' Z';
+  return '<svg class="tb-spark" viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" preserveAspectRatio="none">'+
+         '<path d="'+area+'" fill="'+color+'" opacity=".08"/>'+
+         '<polyline fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round" points="'+pts.join(' ')+'"/>'+
+         '</svg>';
+}
+// Pull 24h sparkline values for a building id
+function bldgTrend(id){
+  if(!chatHistory||!chatHistory[id])return null;
+  return chatHistory[id].map(function(p){return p.kw}).filter(function(v){return typeof v==='number'});
+}
+
 function bInfo(b){
   var l=chatData&&chatData.buildings[b.id];
   var slugs={grimes:'grimes-engineering-center',cory:'cory-hall',soda:'soda-hall',davis:'davis-hall',etch:'etcheverry-hall',hmm:'hearst-memorial-mining-building',hesse:'hesse-hall',jacobs:'jacobs-hall',sutardja:'sutardja-dai-hall',mclaughlin:'mclaughlin-hall',stanley:'stanley-hall',tan:'tan-hall',latimer:'latimer-hall',evans:'evans-hall',birge:'birge-hall',hilde:'hildebrand-hall',wheeler:'wheeler-hall',dwinelle:'dwinelle-hall',moses:'moses-hall',south:'south-hall',barrows:'barrows-hall',stephens:'stephens-hall',wurster:'wurster-hall',giannini:'giannini-hall',california:'california-hall',mlk:'martin-luther-king-jr-student-union',rsf:'recreational-sports-facility',chavez:'cesar-e-chavez-student-center',sproul:'sproul-hall',doe:'doe-memorial-library',moffitt:'moffitt-library',uhall:'university-hall',zeller:'zellerbach-hall',donner:'donner-laboratory',mulford:'mulford-hall',northgate:'north-gate-hall',haas:'haas-school-of-business',morgan:'morgan-hall'};
   var bUrl='https://www.berkeley.edu/map/'+(slugs[b.id]||b.id)+'/';
-  var r="🏢 <b>"+b.n+"</b>"+(b.a?" — "+b.a:"")+"<br>📍 "+b.c+" · Built "+(b.yr||"?")+(b.yr?" ("+(2026-b.yr)+"yr)":"")+" · "+(b.floors||"?")+" floors";
-  if(l&&l.kw!==null){r+="<br>⚡ <b>"+l.kw+" kW</b> right now<br>💰 ~$"+(l.est_daily_cost||0)+"/day · 🌿 "+(l.est_daily_co2_kg||0)+"kg CO₂/day";if(l.predicted_kw)r+="<br>🔮 Predicted: ~"+l.predicted_kw+" kW";if(l.anomaly)r+="<br>⚠️ <span style=\'color:var(--red)\'>Anomaly detected!</span>"}
-  else if(l)r+="<br>📡 BMO metered — currently <b>offline</b>";
-  else r+="<br>📡 No energy metering";
-  r+="<br><br><a href='"+bUrl+"' target='_blank' style='color:var(--dim);font-size:11px'>🏛️ View on berkeley.edu →</a>";
-  if(b.xr)r+=" · <a href='"+b.xr+"' target='_blank' style='color:var(--cyan);font-size:11px'>🏗 3D Viewer →</a>";
-  return r;
+  var rows=[];
+  rows.push({lbl:'Category',val:b.c});
+  if(b.yr)rows.push({lbl:'Built',val:b.yr+' · '+(2026-b.yr)+' yrs'});
+  if(b.floors)rows.push({lbl:'Floors',val:b.floors});
+  if(l&&l.kw!==null&&l.kw!==undefined){
+    rows.push({lbl:'Live load',val:'<b>'+l.kw+'</b> kW'});
+    if(l.est_daily_cost!=null)rows.push({lbl:'Daily cost',val:'~$'+l.est_daily_cost});
+    if(l.est_daily_co2_kg!=null)rows.push({lbl:'CO₂ today',val:l.est_daily_co2_kg+' kg'});
+    if(l.predicted_kw)rows.push({lbl:'Next reading',val:'~'+l.predicted_kw+' kW'});
+    if(l.anomaly)rows.push({lbl:'Status',val:'<b style="color:var(--red)">Anomaly</b>'});
+  } else if(l){
+    rows.push({lbl:'BMO status',val:'<b style="color:var(--red)">offline</b>'});
+  } else {
+    rows.push({lbl:'Energy',val:'unmetered'});
+  }
+  // Optional sparkline — last 24h trend if we have history
+  var trend=bldgTrend(b.id);
+  var sparkHtml=trend?('<div class="tb-line" style="font-size:10px;color:#64748b;letter-spacing:.4px;text-transform:uppercase;font-weight:600;margin-top:6px">24 h trend</div>'+sparkSVG(trend,{color:(l&&l.anomaly)?'#f87171':'#FDB515'})):'';
+  var actions=tAct('View on map','zoom',b.id);
+  if(b.xr)actions+=' <a class="tb-act sec" href="'+b.xr+'" target="_blank" rel="noopener">Open 3D viewer</a>';
+  actions+=' <a class="tb-act sec" href="'+bUrl+'" target="_blank" rel="noopener" style="background:rgba(148,163,184,.08);border-color:rgba(148,163,184,.2);color:#94a3b8">berkeley.edu</a>';
+  var meta='Source: BMO · '+(chatData&&chatData.updated_at?chatData.updated_at.replace('T',' ').slice(0,16)+' UTC':'live reading');
+  var body=rows.map(function(r){return '<div class="tb-row"><span class="tb-lbl">'+r.lbl+'</span><span class="tb-val">'+r.val+'</span></div>';}).join('');
+  return '<div class="tb-kicker">Building</div>'+
+         '<div class="tb-title">'+b.n+(b.a?' · <b>'+b.a+'</b>':'')+'</div>'+
+         '<div class="tb-body">'+body+'</div>'+
+         sparkHtml+
+         '<div style="margin-top:8px">'+actions+'</div>'+
+         '<div class="tb-meta">'+meta+'</div>';
 }
 
 function processQuery(q){
@@ -959,19 +1105,93 @@ function processQuery(q){
   if(!chatData&&o.length===0&&!['help','hi','howwork','thanks'].includes(i))return "⏳ Loading energy data... try again in a moment.";
 
   switch(i){
-  case 'summary':return "⚡ <b>Campus"+timeCtx+": "+T+" kW</b> ("+o.length+" online, "+f.length+" offline)<br>💰 ~$"+Math.round(T*24*0.15)+"/day<br>🌿 "+(T*24*0.21/1000).toFixed(1)+"t CO₂/day<br>📊 "+Math.round(T*24).toLocaleString()+" kWh/day"+(timeCtx?'<br>🕐 Viewing historical data':'<br>🕐 Live');
+  case 'zoomto':
+    if(bld&&window.campusMap){
+      window.campusMap.goTo(bld.id);
+      return tCard('Map', 'Flying to <b>'+bld.n+'</b>', [{lbl:'Category',val:bld.c}, {lbl:'Coordinates',val:bld.lat.toFixed(4)+', '+bld.lng.toFixed(4)}], 'Map view updated');
+    }
+    return tCard('Map','Which building?',['Try: <i>"zoom to Davis Hall"</i> or <i>"take me to Wheeler"</i>']);
+  case 'filter':
+    var cat=categoryFromQ(q);
+    if(/hide offline|only online|online only/.test(q.toLowerCase())){
+      return tCard('Map','Filter: online only', ['Use the Engineering / Science chips at the top of the sidebar to filter by category. I can also filter by category — try <i>"show only Engineering"</i>.']);
+    }
+    if(cat&&window.campusMap){
+      window.campusMap.filterCategory(cat);
+      var matches=D.filter(function(b){return b.c===cat});
+      return tCard('Map','Filtered to <b>'+cat+'</b>', [{lbl:'Matches',val:tNum(matches.length,'buildings')}], 'Say "reset map" to clear');
+    }
+    return tCard('Map','Filter which category?', ['Try: Engineering, Science, Humanities, Professional, Libraries, Student Life.']);
+  case 'reset':
+    if(window.campusMap)window.campusMap.resetView();
+    return tCard('Map','View reset', ['All '+D.length+' buildings visible, camera back to default.']);
+  case 'trend':
+    if(bld){
+      var tr=bldgTrend(bld.id);
+      if(!tr)return tCard('Trend','No history for '+bld.n, ['This building does not have a 24-hour trend yet.']);
+      var mn=Math.min.apply(null,tr),mx=Math.max.apply(null,tr),avg=tr.reduce(function(s,v){return s+v},0)/tr.length;
+      return tCard('24-hour trend', bld.n, [
+        {lbl:'Min',val:tNum(mn.toFixed(1),'kW')},
+        {lbl:'Avg',val:tNum(avg.toFixed(1),'kW')},
+        {lbl:'Peak',val:tNum(mx.toFixed(1),'kW')}
+      ], 'Source: BMO · 96 readings over last 24 h') + sparkSVG(tr,{color:'#FDB515'}) + '<div style="margin-top:8px">'+tAct('View on map','zoom',bld.id)+'</div>';
+    }
+    return tCard('Trend','Which building?', ['Ask about a specific building, e.g. <i>"Grimes trend"</i>.']);
 
-  case 'top':var t=o.slice(0,5);return "🏆 <b>Top 5:</b><br>"+t.map(function(e,j){return"<b>"+(j+1)+".</b> "+e[1].name+" — <b>"+e[1].kw+"kW</b> ("+Math.round(e[1].kw/T*100)+"%)"}).join("<br>")+"<br><br>Top 5 = <b>"+Math.round(t.reduce(function(s,e){return s+e[1].kw},0)/T*100)+"%</b> of campus.";
+  case 'summary':
+    var hourly=Math.round(T), dailyKWh=Math.round(T*24), daily$=Math.round(T*24*0.15), dailyCO2=(T*24*0.21/1000).toFixed(1);
+    return tCard('Campus · right now', tNum(hourly,'kW')+' flowing through campus', [
+      {lbl:'Online',val:tNum(o.length)+' / '+tNum(o.length+f.length)},
+      {lbl:'Today (projected)',val:tNum(dailyKWh.toLocaleString(),'kWh')},
+      {lbl:'Daily cost',val:'~$'+daily$.toLocaleString()},
+      {lbl:'CO₂ today',val:dailyCO2+' t'}
+    ], 'Source: BMO · '+(chatData&&chatData.updated_at?chatData.updated_at.replace('T',' ').slice(0,16)+' UTC':'live'));
 
-  case 'bottom':var b=o.slice(-5).reverse();return "🌱 <b>Lowest:</b><br>"+b.map(function(e,j){return(j+1)+". "+e[1].name+" — <b>"+e[1].kw+"kW</b> (~$"+(e[1].est_daily_cost||0)+"/day)"}).join("<br>");
+  case 'top':
+    var tList=o.slice(0,5);
+    var tRows=tList.map(function(e,j){
+      var pct=Math.round(e[1].kw/T*100);
+      return {lbl:(j+1)+'. '+e[1].name, val:tNum(e[1].kw,'kW')+' <span style="color:#64748b">('+pct+'%)</span>'};
+    });
+    var topShare=Math.round(tList.reduce(function(s,e){return s+e[1].kw},0)/T*100);
+    return tCard('Leaders · right now', 'Top 5 buildings by live load', tRows, 'Top 5 together = <b>'+topShare+'%</b> of campus · BMO live');
 
-  case 'cost':return "💰 <b>Daily: ~$"+chatData.total_daily_cost+"</b><br>📅 Weekly: ~$"+Math.round(chatData.total_daily_cost*7).toLocaleString()+" · Monthly: ~$"+Math.round(chatData.total_daily_cost*30).toLocaleString()+"<br><br>Most expensive:<br>"+o.slice(0,5).map(function(e,j){return(j+1)+". "+e[1].name+" — <b>$"+(e[1].est_daily_cost||0)+"/day</b>"}).join("<br>");
+  case 'bottom':
+    var bList=o.slice(-5).reverse();
+    return tCard('Lightest load', 'Lowest 5 by current kW', bList.map(function(e,j){
+      return {lbl:(j+1)+'. '+e[1].name, val:tNum(e[1].kw,'kW')+' <span style="color:#64748b">~$'+(e[1].est_daily_cost||0)+'/day</span>'};
+    }), 'Live readings · BMO');
 
-  case 'co2':var t2=(chatData.total_daily_co2_kg/1000).toFixed(2);return "🌿 <b>Daily: "+chatData.total_daily_co2_kg+"kg</b> ("+t2+" tons)<br>🌳 <b>"+Math.round(chatData.total_daily_co2_kg/21.7)+" trees</b> to offset<br>📅 Annual: ~"+(chatData.total_daily_co2_kg*365/1000).toFixed(0)+" tons<br><br>CA grid: 0.21 kg CO₂/kWh";
+  case 'cost':
+    return tCard('Electricity cost', '~$'+chatData.total_daily_cost+' / day across campus', [
+      {lbl:'Weekly',val:'~$'+Math.round(chatData.total_daily_cost*7).toLocaleString()},
+      {lbl:'Monthly',val:'~$'+Math.round(chatData.total_daily_cost*30).toLocaleString()},
+      {lbl:'Annual',val:'~$'+Math.round(chatData.total_daily_cost*365).toLocaleString()}
+    ].concat(o.slice(0,3).map(function(e,j){
+      return {lbl:(j+1)+'. '+e[1].name, val:'$'+(e[1].est_daily_cost||0)+'/day'};
+    })), 'Tariff ≈ $0.15 / kWh · BMO live');
 
-  case 'offline':return "🔴 <b>"+f.length+" offline:</b><br>"+f.map(function(e){return "• "+e[1].name}).join("<br>")+"<br><br>BMO meters may be disconnected.";
+  case 'co2':
+    var tons=(chatData.total_daily_co2_kg/1000).toFixed(2);
+    var trees=Math.round(chatData.total_daily_co2_kg/21.7);
+    return tCard('Carbon footprint', tNum(chatData.total_daily_co2_kg,'kg CO₂')+' emitted today', [
+      {lbl:'Tons',val:tons+' t'},
+      {lbl:'Trees to offset',val:tNum(trees.toLocaleString())},
+      {lbl:'Annual',val:'~'+(chatData.total_daily_co2_kg*365/1000).toFixed(0)+' t'}
+    ], 'CA grid intensity ≈ 0.21 kg CO₂ / kWh');
 
-  case 'anomaly':var a=chatData.anomalies||{},k=Object.keys(a);if(!k.length)return "✅ All clear! No anomalies.";return "⚠️ <b>"+k.length+" anomalies:</b><br>"+k.map(function(k2){var x=a[k2];return "🔴 "+(chatData.buildings[k2]?chatData.buildings[k2].name:k2)+": "+x.current+"kW ("+(x.type==='high'?'↑':'↓')+Math.round((x.ratio-1)*100)+"%)"}).join("<br>");
+  case 'offline':
+    if(!f.length)return tCard('Meter status','All BMO meters online', ['Every metered building is reporting right now.']);
+    return tCard('Meter status', tNum(f.length)+' offline', f.map(function(e){return '· '+e[1].name;}), 'BMO meters may be disconnected or lagging');
+
+  case 'anomaly':
+    var aMap=chatData.anomalies||{},aK=Object.keys(aMap);
+    if(!aK.length)return tCard('Anomalies','All clear', ['No unusual readings across '+o.length+' online buildings.']);
+    return tCard('Anomalies', tNum(aK.length)+' unusual readings', aK.map(function(k2){
+      var x=aMap[k2], nm=chatData.buildings[k2]?chatData.buildings[k2].name:k2;
+      var dir=x.type==='high'?'↑':'↓', pct=Math.round((x.ratio-1)*100);
+      return {lbl:nm, val:x.current+' kW <span style="color:#f87171">'+dir+Math.abs(pct)+'%</span>'};
+    }), 'Detected vs 7-day rolling average · BMO');
 
   case 'compare':var c={};var cm={grimes:'Eng',cory:'Eng',soda:'Eng',davis:'Eng',etch:'Eng',hmm:'Eng',hesse:'Eng',sutardja:'Eng',mclaughlin:'Eng',stanley:'Sci',tan:'Sci',latimer:'Sci',birge:'Sci',hilde:'Sci',wheeler:'Hum',dwinelle:'Hum',barrows:'Hum',moses:'Hum',stephens:'Hum',wurster:'Prof',giannini:'Prof',tolman:'Prof',morgan:'Prof',boalt:'Prof',mlk:'Life',rsf:'Life',chavez:'Life',anthony:'Life',sproul:'Other',doe:'Lib',moffitt:'Lib',uhall:'Other',northgate:'Other',donner:'Other',bww:'Other',mulford:'Other'};Object.entries(chatData.buildings).forEach(function(e){var cat=cm[e[0]]||'Other';if(!c[cat])c[cat]={kw:0,n:0};if(e[1].kw){c[cat].kw+=e[1].kw;c[cat].n++}});return "🏛 <b>By category:</b><br>"+Object.entries(c).sort(function(a,b){return b[1].kw-a[1].kw}).map(function(e){return "• <b>"+e[0]+":</b> "+Math.round(e[1].kw)+"kW ("+e[1].n+" bldgs, "+Math.round(e[1].kw/T*100)+"%)"}).join("<br>");
 
