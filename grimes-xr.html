@@ -2403,14 +2403,26 @@ function updatePublicStory(){
     actVal.textContent=phrase+' ('+(delta>=0?'+':'')+Math.round(delta)+'%)';
   }
 
-  // Story — plain English mood + homes equivalence (Froehlich CHI'10)
-  var mood='in a steady rhythm';
-  if(loadRatio>0.7)mood='<b>working hard</b> — lots happening inside';
-  else if(loadRatio>0.35)mood='<b>moderately busy</b> — steady occupancy';
-  else if(loadRatio<0.1)mood='<b>resting quietly</b> — mostly empty';
-  else mood='<b>in a steady rhythm</b>';
+  // Story — time-of-day + plain English mood + homes equivalence (Froehlich CHI'10)
+  var now=new Date(),hh=now.getHours(),dow=now.getDay(),isWknd=(dow===0||dow===6);
+  var timePhrase;
+  if(isWknd){
+    if(hh<9)timePhrase='an early weekend morning';
+    else if(hh<18)timePhrase='a weekend afternoon — mostly ventilation and weekend labs';
+    else timePhrase='a weekend evening';
+  }else{
+    if(hh<6)timePhrase='the quiet pre-dawn hours';
+    else if(hh<11)timePhrase='the morning ramp-up';
+    else if(hh<14)timePhrase='midday class crunch';
+    else if(hh<17)timePhrase='the afternoon teaching block';
+    else if(hh<20)timePhrase='the evening wind-down';
+    else timePhrase='the night shift — just labs and security';
+  }
+  var mood=loadRatio>0.7?'working hard':loadRatio>0.35?'moderately busy':loadRatio<0.1?'resting quietly':'in a steady rhythm';
+  var deltaPhrase=(pillCls==='busy')?'busier than usual':(pillCls==='quiet')?'quieter than usual':'about average';
+  var timeCap=timePhrase.charAt(0).toUpperCase()+timePhrase.slice(1);
   var homesText=homes.toLocaleString()+' home'+(homes===1?'':'s');
-  if(story)story.innerHTML='Grimes is '+mood+'. Right now it uses about as much power as <b>'+homesText+'</b>.';
+  if(story)story.innerHTML='<b>'+timeCap+'.</b> Grimes is <b>'+mood+'</b>, '+deltaPhrase+' — as much power as <b>'+homesText+'</b>.';
 
   // Freshness line (uses #poFresh at bottom)
   if(fresh&&ld.generated_at){
