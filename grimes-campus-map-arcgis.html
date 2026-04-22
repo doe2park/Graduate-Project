@@ -907,18 +907,62 @@ function askChat(q){document.getElementById('chatIn').value=q;sendChat()}
 
 function buildContext(){
   var src=window.currentEnergyData||chatData&&chatData.buildings||{};
-  var lines=['UC Berkeley Campus Energy Data:'];
-  var totalKw=0,onCount=0;
-  Object.entries(src).forEach(function(e){
+  var entries=Object.entries(src);
+  var totalKw=0,onCount=0,offList=[];
+  var ranked=entries.map(function(e){
+    var b=e[1]; if(b.kw){totalKw+=b.kw;onCount++;return [e[0],b]} else{offList.push(b.name||e[0]);return null}
+  }).filter(Boolean).sort(function(a,b){return(b[1].kw||0)-(a[1].kw||0)});
+
+  var lines=[];
+  lines.push('CAMPUS LIVE — '+(chatData&&chatData.updated_at?chatData.updated_at:'now'));
+  lines.push('Total: '+Math.round(totalKw)+' kW · '+onCount+' online · '+offList.length+' offline');
+  if(chatData&&chatData.total_daily_cost!=null)lines.push('Daily cost ≈ $'+chatData.total_daily_cost+' · CO₂ ≈ '+(chatData.total_daily_co2_kg||0)+' kg');
+  lines.push('');
+  lines.push('TOP 10 BY LIVE LOAD (id · name · kW · $/day · CO₂kg/day · anomaly?):');
+  ranked.slice(0,10).forEach(function(e){
     var b=e[1];
-    if(b.kw){totalKw+=b.kw;onCount++;lines.push((b.name||e[0])+': '+b.kw+' kW')}
-    else lines.push((b.name||e[0])+': offline');
+    lines.push(e[0]+' · '+(b.name||e[0])+' · '+b.kw+' · '+(b.est_daily_cost||0)+' · '+(b.est_daily_co2_kg||0)+(b.anomaly?' · ANOMALY':''));
   });
-  lines.unshift('Total: '+Math.round(totalKw)+' kW, '+onCount+' online');
-  // Add building details
-  lines.push('\nBuilding details:');
-  D.forEach(function(b){lines.push(b.n+(b.a?' ('+b.a+')':'')+': '+b.c+', '+b.yr+', '+b.floors+'fl')});
+  var anomK=chatData&&chatData.anomalies?Object.keys(chatData.anomalies):[];
+  if(anomK.length){
+    lines.push('');
+    lines.push('ANOMALIES ('+anomK.length+'): '+anomK.map(function(k){var x=chatData.anomalies[k];return k+' '+(x.type==='high'?'↑':'↓')+Math.round((x.ratio-1)*100)+'%'}).join(', '));
+  }
+  if(offList.length){
+    lines.push('');
+    lines.push('OFFLINE ('+offList.length+'): '+offList.slice(0,12).join(', ')+(offList.length>12?' …':''));
+  }
+
+  // Building registry — id keys are the canonical ones to use in <<ZOOM:id>>
+  lines.push('');
+  lines.push('BUILDING REGISTRY (id · name · category · yr · floors · 24h_trend?):');
+  D.forEach(function(b){
+    var hasTrend=chatHistory && chatHistory[b.id] ? 'Y' : 'N';
+    lines.push(b.id+' · '+b.n+(b.a?' ('+b.a+')':'')+' · '+b.c+' · '+(b.yr||'?')+' · '+(b.floors||'?')+' · '+hasTrend);
+  });
   return lines.join('\n');
+}
+
+// Short conversation memory for follow-up questions ("and Davis?").
+// Pairs of {role: 'user'|'assistant', content: string}, text-only (no HTML).
+// Note: `chatHistory` is the 24h trend data fetched on boot; conversation turns
+// live in `chatTurns` to avoid the name collision.
+var chatTurns = [];
+function stripHtml(s){var d=document.createElement('div');d.innerHTML=s||'';return (d.textContent||'').trim().replace(/\s+/g,' ').slice(0,1200)}
+
+// Dispatch action markers returned by the Phase 2 worker
+function runActions(actions){
+  if(!Array.isArray(actions)||!window.campusMap)return;
+  actions.forEach(function(a){
+    if(!a||!a.type)return;
+    if(a.type==='zoom')window.campusMap.goTo(a.arg);
+    else if(a.type==='filter')window.campusMap.filterCategory(a.arg);
+    else if(a.type==='reset')window.campusMap.resetView();
+    else if(a.type==='trend'){
+      var b=(window.campusMap.buildings||[]).find(function(x){return x.id===a.arg});
+      if(b)addMsg(processQuery('trend for '+b.n),'bot');
+    }
+  });
 }
 
 async function sendChat(){
@@ -927,12 +971,17 @@ async function sendChat(){
   input.value='';addMsg(q,'user');
 
   // Action intents (zoom / filter / reset / trend / about-building) are handled
-  // locally so we can drive the map. LLM proxy only handles open-ended Qs.
+  // locally so we can drive the map instantly. LLM handles open-ended Qs.
   var ql=q.toLowerCase();
   var isAction=/zoom|fly|take me|go to|show only|filter to|hide offline|reset|trend|history|24\s*h/.test(ql);
   var isBuilding=!!findBuilding(q);
   if(isAction||isBuilding){
-    setTimeout(function(){addMsg(processQuery(q),'bot')},120);
+    setTimeout(function(){
+      var reply=processQuery(q);
+      addMsg(reply,'bot');
+      chatTurns.push({role:'user',content:q},{role:'assistant',content:stripHtml(reply)});
+      if(chatTurns.length>12)chatTurns=chatTurns.slice(-12);
+    },120);
     return;
   }
 
@@ -943,16 +992,34 @@ async function sendChat(){
       var res=await fetch(AI_PROXY,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({question:q,context:buildContext()})
+        body:JSON.stringify({
+          question:q,
+          history:chatTurns.slice(-8),
+          context:buildContext(),
+          lang:/[\uAC00-\uD7AF]/.test(q)?'ko':'en'
+        })
       });
       var data=await res.json();
-      if(data.answer){loading.innerHTML=data.answer;loading.classList.remove('loading');return}
+      if(data.answer){
+        loading.innerHTML=data.answer;
+        loading.classList.remove('loading');
+        // Phase 2 worker returns an `actions` array — execute against the map
+        if(data.actions&&data.actions.length)runActions(data.actions);
+        chatTurns.push({role:'user',content:q},{role:'assistant',content:stripHtml(data.answer)});
+        if(chatTurns.length>12)chatTurns=chatTurns.slice(-12);
+        return;
+      }
     }catch(e){console.log('AI proxy failed, using local:',e.message)}
     loading.remove();
   }
 
   // Local fallback
-  setTimeout(function(){addMsg(processQuery(q),'bot')},150);
+  setTimeout(function(){
+    var reply=processQuery(q);
+    addMsg(reply,'bot');
+    chatTurns.push({role:'user',content:q},{role:'assistant',content:stripHtml(reply)});
+    if(chatTurns.length>12)chatTurns=chatTurns.slice(-12);
+  },150);
 }
 
 function sim(a,b){a=a.toLowerCase();b=b.toLowerCase();if(a===b)return 1;if(b.length>2&&a.includes(b))return 0.85;if(a.length>2&&b.includes(a))return 0.8;var m=0,l=Math.max(a.length,b.length);for(var i=0;i<Math.min(a.length,b.length);i++){if(a[i]===b[i])m++}return m/l}

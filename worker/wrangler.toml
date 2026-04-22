@@ -1,0 +1,20 @@
+# Cloudflare Worker config for the upgraded campus chatbot (Phase 2).
+#
+# Deploy with:
+#   cd worker && wrangler deploy
+#
+# Requires an account with Workers AI enabled (free tier is fine).
+# The AI binding (env.AI) is provided automatically when [ai] is set.
+
+name = "campus-chatbot"
+main = "chatbot-worker.js"
+compatibility_date = "2026-04-20"
+
+# Workers AI binding — exposes env.AI.run(model, input)
+[ai]
+binding = "AI"
+
+# (Optional) Route the worker behind your own subdomain instead of workers.dev:
+# [[routes]]
+# pattern = "chatbot.example.com/*"
+# custom_domain = true
