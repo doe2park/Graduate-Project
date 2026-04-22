@@ -68,18 +68,29 @@ STYLE RULES (important):
 - Always end with a tiny source line: "Source: BMO · live" or a similar single short line.
 - Keep replies under 6 short lines whenever possible.
 
-MAP ACTION MARKERS:
-When the user asks you to do something on the map, emit ONE of these markers on its OWN line at the very end of your reply:
-  <<ZOOM:{building_id}>>     — fly map to a single building (also use when user says "show me X", "where is X", "take me to X")
-  <<FILTER:{Category}>>      — filter markers by category ("show only Engineering", "hide other categories")
-  <<RESET>>                  — restore full view ("reset map", "show everything", "clear filter")
-  <<TREND:{building_id}>>    — render the 24h trend inline ("how has X been doing", "X trend")
+MAP ACTION MARKERS (VERY IMPORTANT — exact format):
+When the user asks you to do something on the map, emit ONE marker on its OWN line at the very end of your reply. The format is EXACTLY two angle brackets on each side:
 
-You may emit MULTIPLE markers if the user asks for multiple things (e.g. "compare Davis and Wheeler on the map" → two <<ZOOM:…>>).
+  <<ZOOM:grimes>>
+  <<FILTER:Engineering>>
+  <<RESET>>
+  <<TREND:davis>>
 
-Valid building_id values: ${BUILDING_IDS.join(', ')}
-Valid Category values: ${CATEGORIES.join(', ')}
-(If the user names a building, use the id above, not the full name.)
+Common mistakes to avoid:
+  × <FILTER:Engineering>>   (only one bracket on left — WRONG)
+  × <<FILTER:Engineering>   (only one bracket on right — WRONG)
+  × <<FILTER: Engineering>> (leading space inside the arg — WRONG)
+  × <<filter:engineering>>  (lowercase — WRONG)
+
+You may emit MULTIPLE markers if the user asks for multiple things — one per line (e.g. "compare Davis and Wheeler on the map" → "<<ZOOM:davis>>" newline "<<ZOOM:wheeler>>").
+
+Valid building_id values (use EXACTLY these, never the pretty name): ${BUILDING_IDS.join(', ')}
+Valid Category values (use EXACTLY these, case-sensitive): ${CATEGORIES.join(', ')}
+
+GROUNDING RULES:
+- NEVER invent buildings that are not in the BUILDING REGISTRY below.
+- When asked "which buildings are in category X", filter the registry by category column, do not guess from the name.
+- When asked for numbers (kW, $, CO₂), only use numbers present in the LIVE CONTEXT. If missing, say "I don't have that reading yet".
 
 LIVE CONTEXT (fresh at time of question):
 ${context || '(context not provided)'}
@@ -92,9 +103,10 @@ Do NOT invent numbers. If the context doesn't have it, say you don't have that d
 }
 
 // Parse <<ACTION:arg>> markers from an LLM reply. Returns { actions, clean }.
+// Tolerant of Llama 8B dropping one bracket on either side (e.g. "<FILTER:X>>").
 function parseActions(text) {
   const actions = [];
-  const re = /<<\s*(ZOOM|FILTER|RESET|TREND)\s*(?::\s*([^>]+?))?\s*>>/gi;
+  const re = /<{1,2}\s*(ZOOM|FILTER|RESET|TREND)\s*(?::\s*([^<>\n]+?))?\s*>{1,2}/gi;
   const clean = (text || '').replace(re, (_m, kind, arg) => {
     const type = kind.toUpperCase();
     const value = (arg || '').trim();
