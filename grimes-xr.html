@@ -142,17 +142,19 @@
   .po-story { font-size:14px;color:#f1f5f9;line-height:1.55;margin:4px 0 14px;font-weight:500;letter-spacing:.1px; }
   .po-story b { color:#FDB515;font-weight:700; }
   .po-vital { display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid rgba(255,255,255,.05); }
-  .po-ico { font-size:22px;width:32px;text-align:center;flex-shrink:0;line-height:1; }
-  .po-heart { animation:poBeat 1s ease-in-out infinite;color:#f87171;transform-origin:center; }
-  @keyframes poBeat { 0%,100%{transform:scale(1)} 12%{transform:scale(1.25)} 25%{transform:scale(1)} 38%{transform:scale(1.15)} 52%{transform:scale(1)} }
+  .po-ico { font-size:20px;width:32px;text-align:center;flex-shrink:0;line-height:1;filter:grayscale(.15); }
+  .po-bolt { animation:poBoltPulse 1s ease-in-out infinite;color:#FDB515;transform-origin:center;text-shadow:0 0 8px rgba(253,181,21,.35); }
+  @keyframes poBoltPulse { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.18);opacity:1} }
+  .po-leaf { animation:poLeafSway 4.5s ease-in-out infinite;color:#86efac;transform-origin:bottom center; }
+  @keyframes poLeafSway { 0%,100%{transform:rotate(-6deg)} 50%{transform:rotate(6deg)} }
   .po-v { flex:1;min-width:0; }
   .po-v-lbl { font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600; }
   .po-v-sub { color:#64748b;font-weight:500;letter-spacing:.2px;margin-left:5px;text-transform:none; }
   .po-v-bar { height:6px;border-radius:3px;background:rgba(255,255,255,.06);margin-top:6px;overflow:hidden;position:relative; }
-  .po-v-fill { position:absolute;top:0;height:100%;width:40%;border-radius:3px;background:linear-gradient(90deg,transparent,#2dd4bf 40%,#2dd4bf 60%,transparent);animation:poFlow 2.6s linear infinite; }
-  @keyframes poFlow { 0%{left:-40%}100%{left:100%} }
-  .po-v-breath { position:absolute;top:0;left:0;height:100%;width:100%;background:linear-gradient(90deg,#60a5fa,#93c5fd);border-radius:3px;transform-origin:left;animation:poBreath 4s ease-in-out infinite; }
-  @keyframes poBreath { 0%,100%{transform:scaleX(.2);opacity:.55} 50%{transform:scaleX(.95);opacity:.9} }
+  .po-v-split { position:absolute;top:0;left:0;height:100%;border-radius:3px;background:linear-gradient(90deg,#FDB515,#f59e0b);transition:width .8s ease; }
+  .po-v-split-b { position:absolute;top:0;right:0;height:100%;border-radius:3px;background:linear-gradient(90deg,#7dd3fc,#38bdf8);transition:width .8s ease; }
+  .po-v-air { position:absolute;top:0;left:0;height:100%;width:100%;background:linear-gradient(90deg,#6ee7b7,#86efac,#bef264);border-radius:3px;transform-origin:left;animation:poAir 5s ease-in-out infinite;opacity:.75; }
+  @keyframes poAir { 0%,100%{transform:scaleX(.35);opacity:.5} 50%{transform:scaleX(.95);opacity:.85} }
   .po-v-val { font-size:13px;color:#f1f5f9;font-weight:600;margin-top:5px;letter-spacing:.2px; }
   .po-v-val .po-num { font-family:var(--mono);color:#FDB515; }
   .po-activity { display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.3px;margin-top:4px; }
@@ -186,39 +188,39 @@
 <div id="publicOverlay">
   <button class="po-close" onclick="togglePublic()" aria-label="Close">✕</button>
   <div class="po-title"><span id="poStatus">LIVE</span><span>Grimes · Right Now</span></div>
-  <div class="po-story" id="poStory">Reading the building's vitals…</div>
+  <div class="po-story" id="poStory">Reading the building's live signals…</div>
   <div class="po-vital">
-    <div class="po-ico po-heart" id="poHeart">❤</div>
+    <div class="po-ico po-bolt" id="poHeart">⚡</div>
     <div class="po-v">
-      <div class="po-v-lbl">Heartbeat<span id="poBpm" class="po-v-sub"></span></div>
+      <div class="po-v-lbl">Live load<span id="poBpm" class="po-v-sub"></span></div>
       <div class="po-v-val" id="poHeartVal">— kW</div>
     </div>
   </div>
   <div class="po-vital">
-    <div class="po-ico">🩸</div>
+    <div class="po-ico">⚖</div>
     <div class="po-v">
-      <div class="po-v-lbl">Power flow <span class="po-v-sub">HVAC vs plugs</span></div>
-      <div class="po-v-bar"><div class="po-v-fill" id="poFlowFill"></div></div>
+      <div class="po-v-lbl">Energy mix <span class="po-v-sub">HVAC vs plugs &amp; lights</span></div>
+      <div class="po-v-bar"><div class="po-v-split" id="poFlowFill"></div><div class="po-v-split-b" id="poFlowFillB"></div></div>
       <div class="po-v-val" id="poSplitVal">—</div>
     </div>
   </div>
   <div class="po-vital">
-    <div class="po-ico">🌬️</div>
+    <div class="po-ico po-leaf">🍃</div>
     <div class="po-v">
-      <div class="po-v-lbl">Breathing <span class="po-v-sub">airflow pace</span></div>
-      <div class="po-v-bar"><div class="po-v-breath" id="poBreath"></div></div>
+      <div class="po-v-lbl">Fresh air <span class="po-v-sub">ventilation turnover</span></div>
+      <div class="po-v-bar"><div class="po-v-air" id="poBreath"></div></div>
       <div class="po-v-val" id="poBreathVal">—</div>
     </div>
   </div>
   <div class="po-vital">
-    <div class="po-ico">🌞</div>
+    <div class="po-ico">🕐</div>
     <div class="po-v">
       <div class="po-v-lbl">Today so far</div>
       <div class="po-v-val" id="poTodayVal">—</div>
     </div>
   </div>
   <div class="po-vital">
-    <div class="po-ico">💧</div>
+    <div class="po-ico">🚰</div>
     <div class="po-v">
       <div class="po-v-lbl">Water use</div>
       <div class="po-v-val" id="poWaterVal">—</div>
@@ -2340,24 +2342,26 @@ function updatePublicStory(){
   var homes=Math.max(1,Math.round(totalKw/1.25));
   var loadRatio=Math.min(1,Math.max(0,totalKw/300));
 
-  // Heartbeat — whole-building load animates the beat; label shows kW only (no dup)
+  // Live load — pulse speed scales with load; icon is a ⚡ bolt (not a heart)
   var beatSec=1.1-loadRatio*0.65;
   if(heart)heart.style.animationDuration=beatSec.toFixed(2)+'s';
-  if(bpm)bpm.textContent='· '+Math.round(60/beatSec)+' beats/min';
-  if(heartVal)heartVal.innerHTML='<span class="po-num">'+Math.round(totalKw)+'</span> kW pulsing through the building';
+  if(bpm)bpm.textContent='· right now';
+  if(heartVal)heartVal.innerHTML='<span class="po-num">'+Math.round(totalKw)+'</span> kW flowing through the building';
 
-  // Power flow — balance between HVAC and plug loads (percent, not raw kW)
+  // Energy mix — real HVAC vs plug split, drawn as a two-color split bar (no "blood")
   var splitTotal=Math.max(1,subA+subB);
   var hvacPct=Math.round(subA/splitTotal*100);
   var plugPct=100-hvacPct;
-  if(flowFill)flowFill.style.animationDuration=(3.2-loadRatio*2.0).toFixed(2)+'s';
+  var flowFillB=$('poFlowFillB');
+  if(flowFill)flowFill.style.width=hvacPct+'%';
+  if(flowFillB)flowFillB.style.width=plugPct+'%';
   if(splitVal)splitVal.innerHTML='HVAC <span class="po-num">'+hvacPct+'%</span> · Plugs &amp; lights <span class="po-num">'+plugPct+'%</span>';
 
-  // Breathing — purely qualitative airflow pace; HVAC kW is NOT repeated here
+  // Fresh air — qualitative ventilation turnover tied to real HVAC draw
   var hvacRatio=Math.min(1,Math.max(0,subA/120));
   if(breath)breath.style.animationDuration=(5.0-hvacRatio*2.5).toFixed(2)+'s';
-  var breathMood=subA<10?'barely breathing':subA<30?'calm and slow':subA<70?'steady and even':'deep and fast';
-  if(breathVal)breathVal.textContent=breathMood;
+  var airMood=subA<10?'still — minimal turnover':subA<30?'gently circulating':subA<70?'actively refreshing':'strong ventilation';
+  if(breathVal)breathVal.textContent=airMood;
 
   // Today so far — aggregate kWh + peak
   var todayAvgSum=0,peakKw=0,peakTime='';
@@ -2371,18 +2375,21 @@ function updatePublicStory(){
   var todayKwh=Math.round(todayAvgSum*hoursSoFar);
   if(todayVal){
     var tt=peakTime?peakTime.split(' ')[1]:'';
-    todayVal.innerHTML='<span class="po-num">'+todayKwh.toLocaleString()+'</span> kWh used · peak <span class="po-num">'+Math.round(peakKw)+'</span> kW'+(tt?' at '+tt.slice(0,5):'');
+    var hrsLbl=hoursSoFar<1?Math.round(hoursSoFar*60)+' min':hoursSoFar.toFixed(1)+' hrs';
+    todayVal.innerHTML='<span class="po-num">'+todayKwh.toLocaleString()+'</span> kWh in '+hrsLbl+' · peak <span class="po-num">'+Math.round(peakKw)+'</span> kW'+(tt?' at '+tt.slice(0,5):'');
   }
 
-  // Water — current rate + today cumulative in gallons
+  // Water — current rate + real today cumulative from water_rate.avg × elapsed minutes
   var wRate=w.water1_rate_cfm||0,wTodayCf=0;
-  if(ld.water&&ld.water.stats_today&&ld.water.stats_today.water_total){
-    var wst=ld.water.stats_today.water_total;
-    if(typeof wst.max==='number'&&typeof wst.min==='number')wTodayCf=Math.max(0,wst.max-wst.min);
+  var wStats=(ld.water&&ld.water.stats_today&&ld.water.stats_today.water_rate)?ld.water.stats_today.water_rate:null;
+  if(wStats&&typeof wStats.avg==='number'){
+    // rate is in CFM (cubic feet per minute); minutes elapsed so far × avg CFM = CF today
+    wTodayCf=Math.max(0,wStats.avg*hoursSoFar*60);
   }
-  var wGal=Math.round(wTodayCf*7.48);
+  var wGal=Math.round(wTodayCf*7.48);  // 1 cubic foot ≈ 7.48 US gallons
+  var wGpm=wRate*7.48;  // current flow in gallons per minute
   if(waterVal){
-    if(wRate>0.01)waterVal.innerHTML='flowing · <span class="po-num">'+wGal.toLocaleString()+'</span> gal today';
+    if(wRate>0.01)waterVal.innerHTML='flowing · <span class="po-num">'+wGpm.toFixed(1)+'</span> gpm now · <span class="po-num">'+wGal.toLocaleString()+'</span> gal today';
     else waterVal.innerHTML='quiet · <span class="po-num">'+wGal.toLocaleString()+'</span> gal used today';
   }
 
