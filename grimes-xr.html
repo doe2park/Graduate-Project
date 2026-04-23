@@ -163,6 +163,17 @@
   .po-activity.typical { background:rgba(148,163,184,.14);color:#cbd5e1; }
   .po-close { position:absolute;top:10px;right:14px;background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;line-height:1; }
   .po-hint { font-size:11px;color:#64748b;margin-top:12px;text-align:center;line-height:1.4;padding-top:10px;border-top:1px solid rgba(255,255,255,.05); }
+  /* Hero block — homes-equivalence as the headline */
+  .po-hero { padding:14px 0 12px;border-top:1px solid rgba(255,255,255,.05);text-align:center; }
+  .po-hero-num { font-family:var(--mono);font-size:46px;font-weight:700;color:#FDB515;line-height:1;letter-spacing:-1px;text-shadow:0 0 14px rgba(253,181,21,.18); }
+  .po-hero-lbl { font-size:11px;color:#cbd5e1;margin-top:6px;letter-spacing:.3px; }
+  .po-hero-lbl .po-hero-bolt { display:inline-block;margin-right:4px;font-size:13px; }
+  .po-hero-sub { font-size:10px;color:#64748b;font-family:var(--mono);margin-top:3px; }
+  .po-hero-pill { margin-top:8px; }
+  /* Compact chips row for ambient context (air + water) */
+  .po-chips { display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05); }
+  .po-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);font-size:10px;color:#94a3b8;letter-spacing:.2px; }
+  .po-chip .po-num { font-family:var(--mono);color:#cbd5e1; }
   @media(max-width:768px) { #publicOverlay { left:10px;right:10px;top:46px;width:auto; } }
 </style>
 </head>
@@ -184,55 +195,46 @@
   <button class="view-btn" id="publicBtn" style="margin-left:4px;border-color:rgba(147,197,253,.35);color:#93c5fd" onclick="togglePublic()">👥 Public</button>
 </div>
 
-<!-- Public mode overlay: plain-language Grimes story -->
+<!-- Public mode overlay: plain-language Grimes story (compressed: 1 hero + 2 vitals + chips) -->
 <div id="publicOverlay">
   <button class="po-close" onclick="togglePublic()" aria-label="Close">✕</button>
   <div class="po-title"><span id="poStatus">LIVE</span><span>Grimes · Right Now</span></div>
   <div class="po-story" id="poStory">Reading the building's live signals…</div>
-  <div class="po-vital">
-    <div class="po-ico po-bolt" id="poHeart">⚡</div>
-    <div class="po-v">
-      <div class="po-v-lbl">Live load<span id="poBpm" class="po-v-sub"></span></div>
-      <div class="po-v-val" id="poHeartVal">— kW</div>
-    </div>
+
+  <!-- HERO: homes-equivalence as the headline -->
+  <div class="po-hero">
+    <div class="po-hero-num" id="poHomesNum">—</div>
+    <div class="po-hero-lbl"><span class="po-hero-bolt po-bolt" id="poHeart">⚡</span> homes worth of power right now</div>
+    <div class="po-hero-sub" id="poHeartVal">— kW</div>
+    <div class="po-hero-pill"><span class="po-activity typical" id="poActVal">—</span></div>
+    <span id="poBpm" style="display:none"></span>
   </div>
+
+  <!-- Where the power goes -->
   <div class="po-vital">
     <div class="po-ico">⚖</div>
     <div class="po-v">
-      <div class="po-v-lbl">Energy mix <span class="po-v-sub">HVAC vs plugs &amp; lights</span></div>
+      <div class="po-v-lbl">Where the power goes <span class="po-v-sub">HVAC vs plugs &amp; lights</span></div>
       <div class="po-v-bar"><div class="po-v-split" id="poFlowFill"></div><div class="po-v-split-b" id="poFlowFillB"></div></div>
       <div class="po-v-val" id="poSplitVal">—</div>
     </div>
   </div>
-  <div class="po-vital">
-    <div class="po-ico po-leaf">🍃</div>
-    <div class="po-v">
-      <div class="po-v-lbl">Indoor air <span class="po-v-sub">how hard HVAC is moving air</span></div>
-      <div class="po-v-bar"><div class="po-v-air" id="poBreath"></div></div>
-      <div class="po-v-val" id="poBreathVal">—</div>
-    </div>
-  </div>
+
+  <!-- Today so far -->
   <div class="po-vital">
     <div class="po-ico">🕐</div>
     <div class="po-v">
-      <div class="po-v-lbl">Grimes today <span class="po-v-sub">energy used since midnight</span></div>
+      <div class="po-v-lbl">Today so far <span class="po-v-sub">since midnight</span></div>
       <div class="po-v-val" id="poTodayVal">—</div>
     </div>
   </div>
-  <div class="po-vital">
-    <div class="po-ico">🚰</div>
-    <div class="po-v">
-      <div class="po-v-lbl">Water use</div>
-      <div class="po-v-val" id="poWaterVal">—</div>
-    </div>
+
+  <!-- Compact ambient chips: air + water -->
+  <div class="po-chips">
+    <span class="po-chip"><span class="po-leaf" id="poBreath" style="display:inline-block">🍃</span> <span id="poBreathVal">—</span></span>
+    <span class="po-chip">🚰 <span id="poWaterVal">—</span></span>
   </div>
-  <div class="po-vital">
-    <div class="po-ico">📈</div>
-    <div class="po-v">
-      <div class="po-v-lbl">Pace right now <span class="po-v-sub">vs. the building's own daily average</span></div>
-      <div class="po-v-val"><span class="po-activity typical" id="poActVal">—</span></div>
-    </div>
-  </div>
+
   <div class="po-hint" id="poFresh">Tap the 3D model to peek inside any system.</div>
 </div>
 
@@ -2342,11 +2344,12 @@ function updatePublicStory(){
   var homes=Math.max(1,Math.round(totalKw/1.25));
   var loadRatio=Math.min(1,Math.max(0,totalKw/300));
 
-  // Live load — pulse speed scales with load; icon is a ⚡ bolt (not a heart)
+  // Hero — homes-equivalence is the headline; kW is a small caption
   var beatSec=1.1-loadRatio*0.65;
   if(heart)heart.style.animationDuration=beatSec.toFixed(2)+'s';
-  if(bpm)bpm.textContent='· right now';
-  if(heartVal)heartVal.innerHTML='<span class="po-num">'+Math.round(totalKw)+'</span> kW flowing through the building';
+  var homesNum=document.getElementById('poHomesNum');
+  if(homesNum)homesNum.textContent=homes.toLocaleString();
+  if(heartVal)heartVal.innerHTML='≈ '+Math.round(totalKw)+' kW';
 
   // Energy mix — real HVAC vs plug split, drawn as a two-color split bar (no "blood")
   var splitTotal=Math.max(1,subA+subB);
@@ -2389,8 +2392,8 @@ function updatePublicStory(){
   var wGal=Math.round(wTodayCf*7.48);  // 1 cubic foot ≈ 7.48 US gallons
   var wGpm=wRate*7.48;  // current flow in gallons per minute
   if(waterVal){
-    if(wRate>0.01)waterVal.innerHTML='flowing · <span class="po-num">'+wGpm.toFixed(1)+'</span> gpm now · <span class="po-num">'+wGal.toLocaleString()+'</span> gal today';
-    else waterVal.innerHTML='quiet · <span class="po-num">'+wGal.toLocaleString()+'</span> gal used today';
+    if(wRate>0.01)waterVal.innerHTML='<span class="po-num">'+wGpm.toFixed(1)+'</span> gpm';
+    else waterVal.innerHTML='<span class="po-num">'+wGal.toLocaleString()+'</span> gal today';
   }
 
   // Activity vs typical — pill, no emoji
@@ -2422,7 +2425,7 @@ function updatePublicStory(){
   var deltaPhrase=(pillCls==='busy')?'busier than usual':(pillCls==='quiet')?'quieter than usual':'about average';
   var timeCap=timePhrase.charAt(0).toUpperCase()+timePhrase.slice(1);
   var homesText=homes.toLocaleString()+' home'+(homes===1?'':'s');
-  if(story)story.innerHTML='<b>'+timeCap+'.</b> Grimes is <b>'+mood+'</b>, '+deltaPhrase+' — as much power as <b>'+homesText+'</b>.';
+  if(story)story.innerHTML='<b>'+timeCap+'.</b> Grimes is <b>'+mood+'</b>, '+deltaPhrase+'.';
 
   // Freshness line (uses #poFresh at bottom)
   if(fresh&&ld.generated_at){
