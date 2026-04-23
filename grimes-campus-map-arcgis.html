@@ -78,6 +78,8 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pp-hero-unit{font-size:13px;color:#cbd5e1;font-weight:500}
 .pp-homes{margin-top:8px;font-size:12px;color:#94a3b8;line-height:1.4}
 .pp-homes b{color:#fff;font-family:var(--mono);font-weight:700}
+.pp-meter-note{margin-top:6px;padding:6px 9px;background:rgba(148,163,184,.06);border-left:2px solid rgba(253,181,21,.35);border-radius:3px;font-size:10.5px;color:#94a3b8;line-height:1.4;letter-spacing:.1px}
+.pp-meter-note b{color:#cbd5e1;font-weight:600}
 .pp-pill{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:.2px}
 .pp-pill.calm{background:rgba(52,211,153,.12);color:#6ee7b7;border:1px solid rgba(52,211,153,.22)}
 .pp-pill.steady{background:rgba(253,181,21,.1);color:#fbbf24;border:1px solid rgba(253,181,21,.2)}
@@ -174,6 +176,60 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .mep-grid{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
 .mep-chip{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;background:var(--card);font-size:9.5px;color:var(--dim)}
 .mep-dot{width:6px;height:6px;border-radius:2px;flex-shrink:0}
+
+/* ENGINEER SUMMARY POPUP v2 — structured hero + stats grid + hover sparkline */
+.pe-stripe{height:4px}
+.pe-head{padding:14px 16px 10px;background:linear-gradient(135deg,#001238,var(--navy));position:relative}
+.pe-title{font-size:16px;font-weight:700;color:#fff;line-height:1.2;padding-right:36px;letter-spacing:-.2px}
+.pe-sub{font-size:10.5px;color:#94a3b8;margin-top:3px;letter-spacing:.15px}
+.pe-badges{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+.pe-bdg{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:4px;font-size:9px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.pe-bdg-cat{color:#fff}
+.pe-bdg-bim{background:rgba(45,212,191,.18);color:var(--cyan);border:1px solid rgba(45,212,191,.3)}
+.pe-bdg-nrg{background:rgba(52,211,153,.15);color:var(--green);border:1px solid rgba(52,211,153,.3)}
+.pe-bdg-off{background:rgba(148,163,184,.1);color:#94a3b8;border:1px solid rgba(148,163,184,.25)}
+.pe-body{padding:12px 14px 14px;overflow-y:auto;max-height:calc(100vh - 120px)}
+.pe-hero{display:flex;align-items:baseline;gap:10px;padding:12px 14px;border-radius:11px;background:linear-gradient(135deg,rgba(253,181,21,.08),rgba(253,181,21,.02));border:1px solid rgba(253,181,21,.22)}
+.pe-hero-num{font-family:var(--mono);font-size:34px;font-weight:700;color:var(--gold);line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(253,181,21,.22)}
+.pe-hero-unit{font-size:12px;color:#cbd5e1;font-weight:500;display:flex;flex-direction:column;line-height:1.2}
+.pe-hero-unit small{font-size:9.5px;color:var(--dim);font-weight:400}
+.pe-hero-live{margin-left:auto;display:flex;align-items:center;gap:4px;font-size:9px;color:var(--green);font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+.pe-hero-live::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;box-shadow:0 0 6px rgba(52,211,153,.5)}
+.pe-meter-note{margin-top:8px;padding:7px 10px;border-radius:7px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);font-size:10px;color:var(--dim);line-height:1.45;display:flex;gap:7px;align-items:flex-start}
+.pe-meter-note b{color:#cbd5e1;font-weight:600;font-family:var(--mono);font-size:10.5px}
+.pe-meter-ico{flex-shrink:0;width:14px;height:14px;border-radius:50%;background:rgba(253,181,21,.15);color:var(--gold);font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700;margin-top:1px}
+.pe-anomaly{margin-top:9px;padding:8px 11px;border-radius:8px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#fca5a5;font-size:10.5px;line-height:1.4;display:flex;align-items:center;gap:7px}
+.pe-anomaly.low{background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.3);color:#93c5fd}
+.pe-section-hdr{display:flex;justify-content:space-between;align-items:baseline;margin:13px 0 6px;font-size:9.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;font-weight:700}
+.pe-section-hdr span:last-child{font-weight:400;letter-spacing:.1px;text-transform:none;color:var(--dim);font-size:9px}
+.pe-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.pe-stat{background:var(--card);border:1px solid rgba(255,255,255,.04);border-radius:8px;padding:9px 8px;text-align:center;position:relative}
+.pe-stat-val{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text);letter-spacing:-.3px;font-variant-numeric:tabular-nums;line-height:1.1}
+.pe-stat-val.gold{color:var(--gold)}
+.pe-stat-val.cyan{color:var(--cyan)}
+.pe-stat-val.green{color:var(--green)}
+.pe-stat-val.dim{color:var(--dim);font-size:11.5px}
+.pe-stat-lbl{font-size:8.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;margin-top:4px;font-weight:600}
+.pe-stat-sub{font-size:8.5px;color:var(--dim);margin-top:2px;font-family:var(--mono)}
+/* Sparkline (mirrors Public popup's hover logic) */
+.pe-spark{margin-top:4px;padding:10px 12px;background:var(--card);border-radius:9px;border:1px solid rgba(255,255,255,.04);position:relative}
+.pe-spark-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.pe-spark-hdr .pe-peak{color:var(--gold);font-family:var(--mono);font-size:10px}
+.pe-spark-chart{position:relative;height:56px;width:100%;cursor:crosshair}
+.pe-spark-chart svg{width:100%;height:100%;display:block}
+.pe-spark-tip{position:absolute;top:-38px;transform:translateX(-50%);background:rgba(10,14,26,.97);border:1px solid rgba(253,181,21,.3);border-radius:6px;padding:5px 9px;font-family:var(--mono);font-size:11px;color:var(--gold);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;box-shadow:0 4px 14px rgba(0,0,0,.55);letter-spacing:.2px;font-variant-numeric:tabular-nums;z-index:5}
+.pe-spark-tip.vis{opacity:1}
+.pe-spark-tip-sub{color:#94a3b8;font-size:9px;margin-top:1px}
+.pe-spark-axis{display:flex;justify-content:space-between;margin-top:3px;font-size:8.5px;color:#64748b;font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* MEP system chips + CTA */
+.pe-mep-wrap{margin-top:4px;padding:10px 12px;background:var(--card);border-radius:9px;border:1px solid rgba(45,212,191,.15)}
+.pe-mep-cnt{font-family:var(--mono);color:var(--cyan);font-weight:700}
+.pe-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.pe-btn{padding:9px 10px;border-radius:9px;text-align:center;text-decoration:none;font-size:10.5px;font-weight:600;letter-spacing:.2px;transition:all .15s;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);color:var(--dim)}
+.pe-btn:hover{background:rgba(255,255,255,.06);color:var(--text);border-color:rgba(253,181,21,.25)}
+.pe-btn-primary{grid-column:span 2;background:linear-gradient(135deg,rgba(253,181,21,.15),rgba(253,181,21,.05));border-color:rgba(253,181,21,.4);color:var(--gold)}
+.pe-btn-xr{background:linear-gradient(135deg,rgba(45,212,191,.12),rgba(45,212,191,.03));border-color:rgba(45,212,191,.35);color:var(--cyan);grid-column:span 2}
+.pe-btn-xr:hover{background:linear-gradient(135deg,rgba(45,212,191,.2),rgba(45,212,191,.08))}
 
 /* Energy bar */
 .nrg-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:var(--card);margin-top:8px}
@@ -741,87 +797,205 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     };
   }
 
+  // Translate BMO meter ID → plain-English description (reused by both popups)
+  // Meter voltage class (per BMO install convention at Berkeley):
+  //   "3"  — main service tie (often low-kW shared feed)
+  //   "76" — 480/277V mechanical/HVAC main (typically bulk of building load)
+  //   "77" — 208/120V plugs & lighting submeter
+  function meterLabel(mid){
+    if(mid==='76') return { short:'mechanical main', full:'Meter 76 — 480/277V mechanical feed (HVAC, chillers, large equipment)', excludes:'plugs & lighting not included' };
+    if(mid==='77') return { short:'plugs & lights', full:'Meter 77 — 208/120V plugs & lighting submeter', excludes:'mechanical load not included' };
+    if(mid==='3')  return { short:'main service tie', full:'Meter 3 — main service tie feed', excludes:'this may only be part of the total building load' };
+    return { short:'meter '+(mid||'?'), full:'Meter '+(mid||'?'), excludes:'' };
+  }
+
   function showPop(b){
     const cc=C[b.c];
-    let h=`<div class="p-h"><button class="p-x" onclick="closePop()">✕</button>
-      <div class="p-t">${b.n}</div>${b.a?`<div class="p-a">${b.a}</div>`:''}
-      <div class="p-badge" style="background:${cc.h}15;color:${cc.h}">${b.c}</div></div><div class="p-b">`;
+    // Pull live data off the fetched energy JSON so the popup stays fresh even
+    // if the static D[] roster hasn't been re-hydrated yet
+    var live = (window.currentEnergyData && window.currentEnergyData[b.id]) || null;
+    var kw = (live && typeof live.kw==='number' && live.kw>0) ? live.kw : (typeof b.kw==='number' && b.kw>0 ? b.kw : null);
+    var sparkData = (live && live.sparkline && live.sparkline.length>2) ? live.sparkline : (b.sparkline && b.sparkline.length>2 ? b.sparkline : null);
+    var meterId  = live && live.meter    ? live.meter    : b.meter;
+    var liveTs   = live && live.timestamp? live.timestamp: b.liveTs;
+    var predicted= live && live.predicted_kw ? live.predicted_kw : b.predicted;
+    var anomaly  = live && live.anomaly  ? live.anomaly  : b.anomaly;
+    var dailyKwh = live && live.est_daily_kwh   ? live.est_daily_kwh   : (kw?Math.round(kw*24):null);
+    var dailyCost= live && live.est_daily_cost  ? live.est_daily_cost  : (kw?+(kw*24*0.15).toFixed(2):null);
+    var dailyCo2 = live && live.est_daily_co2_kg? live.est_daily_co2_kg: (kw?+(kw*24*0.21).toFixed(1):null);
 
-    // ── Story card (plain-language, no raw kW) ──
-    var st=buildingStory(b);
-    h+='<div class="p-story '+st.mood+'"><div class="ps-icon">'+st.icon+'</div>';
-    h+='<div><div class="ps-title">'+st.title+'</div><div class="ps-sub">'+st.sub+'</div></div></div>';
-
-    // ── Primary CTA (Grimes only) ──
-    if(b.xr){
-      h+=`<a class="p-cta" href="${b.xr}" target="_blank">
-        <div class="p-cta-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
-        <div class="p-cta-text"><div class="p-cta-title">Peek inside Grimes (3D)</div><div class="p-cta-sub">See the building's heart, arteries, and breath</div></div>
-        <div class="p-cta-arrow">\u2192</div></a>`;
+    // 24hr stats
+    var avg24=null, peak24=null, trough24=null;
+    if(sparkData && sparkData.length>1){
+      var nums = sparkData.filter(function(v){return typeof v==='number' && !isNaN(v);});
+      if(nums.length){
+        avg24    = nums.reduce(function(a,x){return a+x;},0)/nums.length;
+        peak24   = Math.max.apply(null, nums);
+        trough24 = Math.min.apply(null, nums);
+      }
     }
 
-    // ── Engineer details (collapsed) ──
-    h+='<details class="p-details"><summary>Engineer details</summary>';
+    var mLbl = meterLabel(meterId);
 
-    var status=b.bim?'BIM + Live':(b.kw?'Live Data':(b.nrg?'Metered':'Standard'));
-    var stColor=b.bim?'var(--cyan)':(b.kw?'var(--green)':(b.nrg?'var(--amber)':'var(--dim)'));
-    h+=`<div class="gs" style="margin-top:6px">
-      <div class="gs-item"><div class="gs-val" style="color:var(--cyan)">${b.yr||'—'}</div><div class="gs-lbl">Built</div></div>
-      <div class="gs-item"><div class="gs-val" style="color:var(--text)">${b.floors||'—'}</div><div class="gs-lbl">Floors</div></div>
-      <div class="gs-item"><div class="gs-val" style="color:${stColor};font-size:11px">${status}</div><div class="gs-lbl">Data</div></div>
-    </div>`;
+    // ── HEADER ──
+    var tags = '<span class="pe-bdg pe-bdg-cat" style="background:'+cc.h+'22;color:'+cc.h+';border:1px solid '+cc.h+'55">'+b.c+'</span>';
+    if(b.bim) tags += '<span class="pe-bdg pe-bdg-bim">BIM</span>';
+    if(kw!=null) tags += '<span class="pe-bdg pe-bdg-nrg">LIVE · BMO</span>';
+    else if(b.nrg) tags += '<span class="pe-bdg pe-bdg-off">Metered · Offline</span>';
 
-    if(b.a){h+=`<div class="ip" style="margin-top:6px"><div class="ip-item">\uD83C\uDFEB <strong>${b.a}</strong></div></div>`}
+    var sub = (b.a?b.a+' · ':'') + (b.yr?'Built '+b.yr:'') + (b.floors?' · '+b.floors+' flr':'');
 
-    if(b.kw){
-      var slices=[{val:b.kw,color:'var(--gold)'},{val:Math.max(10,500-b.kw),color:'rgba(255,255,255,.06)'}];
-      var donutSvg=mkDonut(Math.max(b.kw+10,500),slices,72);
-      var spData=(b.sparkline&&b.sparkline.length>2)?b.sparkline:spark(24,b.kw*0.8,b.kw*0.4);
-      var isReal=b.sparkline&&b.sparkline.length>2;
-      h+=`<div class="pw" style="margin-top:8px">
-        <div class="pw-top"><div class="pw-lbl">Building power</div><div class="pw-live">Live \u00B7 BMO</div></div>
-        <div style="display:flex;align-items:center;gap:14px;margin-top:6px">
-          <div class="pw-donut">${donutSvg}<div class="pw-donut-center"><div class="pw-donut-val">${b.kw}</div><div class="pw-donut-unit">kW</div></div></div>
-          <div style="flex:1">
-            <div style="font:600 11px system-ui;color:var(--text);margin-bottom:4px">~$${b.dailyCost||Math.round(b.kw*0.15*24)}/day \u00B7 ${b.dailyCo2||Math.round(b.kw*24*0.21)}kg CO\u2082</div>
-            <div class="sp-row" style="background:transparent;padding:0;margin-top:4px">
-              <div class="sp-chart">${mkSpark(spData,'var(--cyan)',20)}</div>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:2px">
-              <span style="font-size:8px;color:var(--faint)">${isReal?'Real 24hr data':'Collecting data...'}</span>
-              <span style="font-size:8px;color:var(--faint)">${b.liveTs||''}</span>
-            </div>
-          </div>
-        </div>`;
-      var extras=[];
-      if(b.predicted)extras.push('<span style="color:var(--cyan)">Predicted: ~'+b.predicted+' kW</span>');
-      if(b.anomaly)extras.push('<span style="color:var(--red)">\u26A0 '+b.anomaly.type+' ('+Math.round((b.anomaly.ratio-1)*100)+'% vs avg)</span>');
-      if(extras.length)h+='<div style="margin-top:6px;font-size:9px;display:flex;gap:8px;justify-content:space-between">'+extras.join('')+'</div>';
-      h+=`</div>`;
+    var h = '<div class="pe-stripe" style="background:'+cc.h+'"></div>'
+      + '<div class="pe-head">'
+      + '<button class="p-x" onclick="closePop()">✕</button>'
+      + '<div class="pe-title">'+b.n+'</div>'
+      + (sub?'<div class="pe-sub">'+sub+'</div>':'')
+      + '<div class="pe-badges">'+tags+'</div>'
+      + '</div>'
+      + '<div class="pe-body">';
+
+    // ── HERO + METER NOTE ──
+    if(kw!=null){
+      var kwStr = kw>=100 ? Math.round(kw).toLocaleString() : kw.toFixed(1);
+      h += '<div class="pe-hero">'
+         +   '<span class="pe-hero-num">'+kwStr+'</span>'
+         +   '<span class="pe-hero-unit">kW<small>'+(liveTs?liveTs.slice(11,16)+' · '+liveTs.slice(0,10):'live')+'</small></span>'
+         +   '<span class="pe-hero-live">LIVE</span>'
+         + '</div>';
+      // Meter transparency — critical for honest interpretation
+      h += '<div class="pe-meter-note"><span class="pe-meter-ico">i</span>'
+         + '<div><b>'+mLbl.full+'</b>' + (mLbl.excludes?'<br><span style="color:#64748b">· '+mLbl.excludes+'</span>':'') + '</div>'
+         + '</div>';
     } else if(b.nrg){
-      h+=`<div class="pw" style="margin-top:8px;border-color:var(--border)">
-        <div class="pw-top"><div class="pw-lbl">Building power</div><div style="font-size:9px;color:var(--dim)">\u25CB Offline</div></div>
-        <div style="font:600 14px/1 'JetBrains Mono',mono;color:var(--faint);margin-top:6px">BMO metered \u00B7 data unavailable</div>
-      </div>`;
+      h += '<div class="pe-hero" style="border-color:rgba(148,163,184,.2);background:rgba(148,163,184,.05)">'
+         +   '<span class="pe-hero-num" style="color:#64748b">—</span>'
+         +   '<span class="pe-hero-unit" style="color:#64748b">kW<small>Meter offline · BMO not responding</small></span>'
+         + '</div>';
+    } else {
+      h += '<div class="pe-hero" style="border-color:rgba(148,163,184,.15);background:rgba(148,163,184,.03)">'
+         +   '<span class="pe-hero-unit" style="color:#64748b;font-size:11px">No BMO meter installed on this building.</span>'
+         + '</div>';
     }
 
+    // ── ANOMALY BANNER ──
+    if(anomaly){
+      var isHigh = anomaly.type==='high';
+      var pctOff = Math.round((anomaly.ratio-1)*100);
+      h += '<div class="pe-anomaly'+(isHigh?'':' low')+'">'
+         +   (isHigh?'⚠':'ℹ')+' <b>'+anomaly.type.toUpperCase()+'</b> — '
+         +   kw+' kW vs. recent avg '+anomaly.avg+' kW ('+(pctOff>=0?'+':'')+pctOff+'%)'
+         + '</div>';
+    }
+
+    // ── 24HR STATS GRID ──
+    if(kw!=null){
+      h += '<div class="pe-section-hdr"><span>Last 24hr · 15-min polling</span><span>'+(sparkData?sparkData.length+' points':'—')+'</span></div>';
+      h += '<div class="pe-stats">'
+         +   '<div class="pe-stat"><div class="pe-stat-val cyan">'+(avg24!=null?(avg24>=100?Math.round(avg24):avg24.toFixed(1)):'—')+'</div><div class="pe-stat-sub">kW</div><div class="pe-stat-lbl">6hr Avg</div></div>'
+         +   '<div class="pe-stat"><div class="pe-stat-val gold">'+(peak24!=null?(peak24>=100?Math.round(peak24):peak24.toFixed(1)):'—')+'</div><div class="pe-stat-sub">kW</div><div class="pe-stat-lbl">6hr Peak</div></div>'
+         +   '<div class="pe-stat"><div class="pe-stat-val green">'+(predicted!=null?(predicted>=100?Math.round(predicted):(+predicted).toFixed(1)):'—')+'</div><div class="pe-stat-sub">kW</div><div class="pe-stat-lbl">Next 15m</div></div>'
+         + '</div>';
+
+      // Daily projection (extrapolated from current kW)
+      h += '<div class="pe-section-hdr"><span>Daily projection</span><span>@ current rate</span></div>';
+      h += '<div class="pe-stats">'
+         +   '<div class="pe-stat"><div class="pe-stat-val">'+(dailyKwh?dailyKwh.toLocaleString():'—')+'</div><div class="pe-stat-sub">kWh/day</div><div class="pe-stat-lbl">Energy</div></div>'
+         +   '<div class="pe-stat"><div class="pe-stat-val gold">$'+(dailyCost?Math.round(dailyCost).toLocaleString():'—')+'</div><div class="pe-stat-sub">@ $0.15/kWh</div><div class="pe-stat-lbl">Cost</div></div>'
+         +   '<div class="pe-stat"><div class="pe-stat-val" style="color:#f87171">'+(dailyCo2?Math.round(dailyCo2).toLocaleString():'—')+'</div><div class="pe-stat-sub">kg CO₂</div><div class="pe-stat-lbl">Emissions</div></div>'
+         + '</div>';
+    }
+
+    // ── SPARKLINE WITH HOVER ──
+    if(sparkData && sparkData.length>2){
+      var lo=Math.min.apply(null,sparkData), hi=Math.max.apply(null,sparkData);
+      var rSp=hi-lo||1;
+      var wSp=320, hSp=56;
+      var nSp=sparkData.length;
+      var stepSp=wSp/(nSp-1);
+      var ptsSp=sparkData.map(function(v,i){var x=i*stepSp;var y=hSp-((v-lo)/rSp)*(hSp-4)-2; return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+      var areaSp = '0,'+hSp+' ' + ptsSp + ' ' + wSp+','+hSp;
+      var windowMinSp=(nSp-1)*15;
+      var winLblSp = windowMinSp>=60 ? (windowMinSp/60).toFixed(windowMinSp%60===0?0:1)+'hr' : windowMinSp+'min';
+      var midMinSp = Math.round(windowMinSp/2);
+      var midLblSp = midMinSp>=60 ? (midMinSp/60).toFixed(midMinSp%60===0?0:1)+'hr ago' : midMinSp+'m ago';
+      h += '<div class="pe-section-hdr"><span>Power trace</span><span class="pe-peak">peak '+Math.round(hi)+' · min '+Math.round(lo)+' kW</span></div>';
+      h += '<div class="pe-spark">'
+         +   '<div class="pe-spark-chart" id="peSparkChart">'
+         +     '<div class="pe-spark-tip" id="peSparkTip"></div>'
+         +     '<svg viewBox="0 0 '+wSp+' '+hSp+'" preserveAspectRatio="none">'
+         +       '<defs><linearGradient id="peSparkGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+cc.h+'" stop-opacity=".35"/><stop offset="1" stop-color="'+cc.h+'" stop-opacity="0"/></linearGradient></defs>'
+         +       '<polygon points="'+areaSp+'" fill="url(#peSparkGrad)"/>'
+         +       '<polyline points="'+ptsSp+'" fill="none" stroke="'+cc.h+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+         +       '<line id="peSparkGuide" x1="0" y1="0" x2="0" y2="'+hSp+'" stroke="'+cc.h+'" stroke-width="1" stroke-dasharray="2 2" opacity="0"/>'
+         +       '<circle id="peSparkDot" cx="0" cy="0" r="3.5" fill="'+cc.h+'" stroke="#0a0e1a" stroke-width="1.5" opacity="0"/>'
+         +     '</svg>'
+         +   '</div>'
+         +   '<div class="pe-spark-axis"><span>'+winLblSp+' ago</span><span>'+midLblSp+'</span><span>now</span></div>'
+         + '</div>';
+    }
+
+    // ── MEP SYSTEMS (BIM buildings only) ──
     if(b.bim){
       var meps=[{name:'HVAC Duct',color:'#22d3ee'},{name:'Hot Water',color:'#f87171'},{name:'Cold Water',color:'#60a5fa'},{name:'Electrical',color:'#fbbf24'},{name:'Fire Protection',color:'#f97316'},{name:'Sanitary',color:'#a78bfa'},{name:'Storm Drain',color:'#34d399'},{name:'Plumbing Vent',color:'#e879f9'}];
-      h+=`<div style="margin-top:8px;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">MEP Systems (${b.mep})</div><div class="mep-grid">`;
-      meps.forEach(function(m){h+=`<div class="mep-chip"><span class="mep-dot" style="background:${m.color}"></span>${m.name}</div>`});
-      h+=`</div>`;
+      h += '<div class="pe-section-hdr"><span>BIM · MEP Systems</span><span><span class="pe-mep-cnt">'+(b.mep||meps.length)+'</span> tracked</span></div>';
+      h += '<div class="pe-mep-wrap"><div class="mep-grid">';
+      meps.forEach(function(m){ h += '<div class="mep-chip"><span class="mep-dot" style="background:'+m.color+'"></span>'+m.name+'</div>'; });
+      h += '</div></div>';
     }
 
-    h+='</details>'; // end engineer details
-
-    if(b.kw){h+=`<a href="campus-energy-dashboard.html" style="display:block;margin-top:8px;padding:6px;border-radius:6px;background:rgba(253,181,21,.08);border:1px solid rgba(253,181,21,.15);text-align:center;text-decoration:none;font-size:10px;font-weight:600;color:var(--gold)">\uD83D\uDCCA Full Campus Analytics \u2192</a>`}
-
+    // ── ACTIONS ──
+    h += '<div class="pe-actions">';
+    if(b.xr){
+      h += '<a class="pe-btn pe-btn-xr" href="'+b.xr+'" target="_blank">🏗 Open 3D BIM Viewer →</a>';
+    }
+    if(kw!=null){
+      h += '<a class="pe-btn pe-btn-primary" href="campus-energy-dashboard.html">📊 Full Analytics</a>';
+    }
     var bUrl=getBerkeleyUrl(b.id);
-    h+=`<div style="margin-top:8px;display:flex;gap:6px">
-      <a href="${bUrl}" target="_blank" style="flex:1;padding:5px;border-radius:5px;background:rgba(255,255,255,.04);border:1px solid var(--border);text-align:center;text-decoration:none;font-size:9px;color:var(--dim)">\uD83C\uDFDB\uFE0F Building Info</a>
-      ${b.xr?'<a href="'+b.xr+'" target="_blank" style="flex:1;padding:5px;border-radius:5px;background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.15);text-align:center;text-decoration:none;font-size:9px;color:var(--cyan)">\uD83C\uDFD7\uFE0F 3D Viewer</a>':''}
-    </div>`;
-    h+='</div>';pop.innerHTML=h;pop.classList.add('vis');
+    h += '<a class="pe-btn" href="'+bUrl+'" target="_blank">🏛 Campus Info</a>';
+    h += '<a class="pe-btn" href="comfort-dashboard.html">🌡 Comfort</a>';
+    h += '</div>';
+
+    h += '</div>'; // end .pe-body
+    pop.innerHTML = h;
+    pop.classList.add('vis');
+
+    // ── Wire Engineer sparkline hover ──
+    if(sparkData && sparkData.length>2){
+      var chart=document.getElementById('peSparkChart');
+      var tip  =document.getElementById('peSparkTip');
+      var guide=document.getElementById('peSparkGuide');
+      var dotEl=document.getElementById('peSparkDot');
+      if(chart && tip && guide && dotEl){
+        var dd=sparkData, nSp2=dd.length;
+        var loV=Math.min.apply(null,dd), hiV=Math.max.apply(null,dd), rV=hiV-loV||1;
+        var svgW=320, svgH=56;
+        function updE(clientX){
+          var rect=chart.getBoundingClientRect();
+          var rel=Math.max(0,Math.min(1,(clientX-rect.left)/rect.width));
+          var idx=Math.round(rel*(nSp2-1));
+          var v=dd[idx];
+          var minsAgo=(nSp2-1-idx)*15;
+          var timeLbl = minsAgo===0 ? 'now' : (minsAgo>=60 ? ((minsAgo/60).toFixed(minsAgo%60===0?0:1)+'hr ago') : (minsAgo+'m ago'));
+          var svgX=(idx/(nSp2-1))*svgW;
+          var svgY=svgH-((v-loV)/rV)*(svgH-4)-2;
+          guide.setAttribute('x1',svgX); guide.setAttribute('x2',svgX);
+          guide.setAttribute('opacity','0.65');
+          dotEl.setAttribute('cx',svgX); dotEl.setAttribute('cy',svgY);
+          dotEl.setAttribute('opacity','1');
+          var tipX=rel*rect.width;
+          tipX=Math.max(46,Math.min(rect.width-46,tipX));
+          tip.style.left=tipX+'px';
+          tip.innerHTML=(v>=100?Math.round(v):v.toFixed(1))+' kW<div class="pe-spark-tip-sub">'+timeLbl+'</div>';
+          tip.classList.add('vis');
+        }
+        function hideE(){ tip.classList.remove('vis'); guide.setAttribute('opacity','0'); dotEl.setAttribute('opacity','0'); }
+        chart.addEventListener('mousemove', function(e){ updE(e.clientX); });
+        chart.addEventListener('mouseleave', hideE);
+        chart.addEventListener('touchmove', function(e){ if(e.touches[0]){ updE(e.touches[0].clientX); e.preventDefault(); }}, {passive:false});
+        chart.addEventListener('touchend', hideE);
+      }
+    }
   }
 
   window.closePop=()=>pop.classList.remove('vis');
@@ -831,11 +1005,12 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   function showPopPub(b){
     const cc=C[b.c]||C.Admin;
     // Pull live kW from current energy data if available (popup may open before live data lands)
-    var liveKw=null, liveSpark=null;
+    var liveKw=null, liveSpark=null, liveMeter=null;
     if(window.currentEnergyData && window.currentEnergyData[b.id]){
       var lb=window.currentEnergyData[b.id];
       if(typeof lb.kw==='number' && lb.kw>0) liveKw=lb.kw;
       if(lb.sparkline && lb.sparkline.length>2) liveSpark=lb.sparkline;
+      if(lb.meter) liveMeter=String(lb.meter);
     }
     if(liveKw==null && typeof b.kw==='number' && b.kw>0) liveKw=b.kw;
     if(!liveSpark && b.sparkline && b.sparkline.length>2) liveSpark=b.sparkline;
@@ -899,6 +1074,17 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       ? '<div class="pp-hero"><span class="pp-hero-num">⚡ '+Math.round(liveKw).toLocaleString()+'</span><span class="pp-hero-unit">kW flowing right now</span></div>'
       : '<div class="pp-hero" style="border-top:none;padding-top:4px"><span class="pp-hero-unit" style="font-size:12px;color:#64748b">No live meter on this building.</span></div>';
 
+    // Plain-English meter note so folks know the 40 kW isn't always the whole building
+    var meterNote='';
+    if(liveKw!=null && liveMeter){
+      var label='', scope='';
+      if(liveMeter==='76'){ label='mechanical meter'; scope="plugs & lighting aren't included"; }
+      else if(liveMeter==='77'){ label='plugs & lighting meter'; scope="HVAC isn't included"; }
+      else if(liveMeter==='3'){ label='main service feed'; scope='reads most of the building'; }
+      else { label='meter '+liveMeter; scope=''; }
+      meterNote='<div class="pp-meter-note">🔌 reading from <b>'+label+'</b>'+(scope?' · '+scope:'')+'</div>';
+    }
+
     popPub.innerHTML = '<div class="pp-stripe" style="background:'+cc.h+'"></div>'
       + '<div class="pp-body">'
       + '<button class="pp-x" onclick="closePopPub()">✕</button>'
@@ -906,6 +1092,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       + '<div class="pp-cat"><span class="pp-cat-dot" style="background:'+cc.h+'"></span>'+(b.a||b.c)+'</div>'
       + '<span class="pp-pill '+pill.cls+'">'+pill.txt+'</span>'
       + heroHtml
+      + meterNote
       + homesRow
       + sparkSvg
       + '<div class="pp-actions">'+actions+'</div>'
