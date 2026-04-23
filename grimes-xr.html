@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grimes MEP · Digital Twin</title>
 <style>
-  :root { --cyan:#2dd4bf; --bg:#0a0e1a; --panel:rgba(10,14,26,0.92); --border:rgba(45,212,191,0.15); --mono:'JetBrains Mono',monospace; --gold:#FDB515; }
+  :root { --cyan:#2dd4bf; --bg:#0a0e1a; --panel:rgba(10,14,26,0.92); --border:rgba(45,212,191,0.15); --mono:'JetBrains Mono',monospace; --gold:#FDB515; --font:'Inter','Segoe UI','SF Pro Text',system-ui,-apple-system,sans-serif; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:#e2e8f0; font-family:system-ui,sans-serif; overflow:hidden; }
+  body { background:var(--bg); color:#e2e8f0; font-family:var(--font); overflow:hidden; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
 
   #loading { position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);z-index:100;font-size:18px;gap:16px; }
   .spinner { width:48px;height:48px;border:3px solid #334155;border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite; }
@@ -138,8 +138,8 @@
   #publicOverlay::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08);border-radius:2px; }
   #publicOverlay.show { display:block; }
   #poStatus { display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(45,212,191,.14);color:#2dd4bf;font-size:9px;letter-spacing:.6px;font-weight:700; }
-  .po-title { font-size:10px;color:#FDB515;font-weight:700;letter-spacing:.7px;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:8px; }
-  .po-story { font-size:14px;color:#f1f5f9;line-height:1.55;margin:4px 0 14px;font-weight:500;letter-spacing:.1px; }
+  .po-title { font-size:11.5px;color:#FDB515;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px; }
+  .po-story { font-size:15px;color:#f8fafc;line-height:1.55;margin:4px 0 14px;font-weight:500;letter-spacing:.1px; }
   .po-story b { color:#FDB515;font-weight:700; }
   .po-vital { display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid rgba(255,255,255,.05); }
   .po-ico { font-size:20px;width:32px;text-align:center;flex-shrink:0;line-height:1;filter:grayscale(.15); }
@@ -148,32 +148,33 @@
   .po-leaf { animation:poLeafSway 4.5s ease-in-out infinite;color:#86efac;transform-origin:bottom center; }
   @keyframes poLeafSway { 0%,100%{transform:rotate(-6deg)} 50%{transform:rotate(6deg)} }
   .po-v { flex:1;min-width:0; }
-  .po-v-lbl { font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;font-weight:600; }
-  .po-v-sub { color:#64748b;font-weight:500;letter-spacing:.2px;margin-left:5px;text-transform:none; }
+  .po-v-lbl { font-size:11.5px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.6px;font-weight:600; }
+  .po-v-sub { color:#94a3b8;font-weight:500;letter-spacing:.2px;margin-left:5px;text-transform:none;font-size:10.5px; }
   .po-v-bar { height:6px;border-radius:3px;background:rgba(255,255,255,.06);margin-top:6px;overflow:hidden;position:relative; }
   .po-v-split { position:absolute;top:0;left:0;height:100%;border-radius:3px;background:linear-gradient(90deg,#FDB515,#f59e0b);transition:width .8s ease; }
   .po-v-split-b { position:absolute;top:0;right:0;height:100%;border-radius:3px;background:linear-gradient(90deg,#7dd3fc,#38bdf8);transition:width .8s ease; }
   .po-v-air { position:absolute;top:0;left:0;height:100%;width:100%;background:linear-gradient(90deg,#6ee7b7,#86efac,#bef264);border-radius:3px;transform-origin:left;animation:poAir 5s ease-in-out infinite;opacity:.75; }
   @keyframes poAir { 0%,100%{transform:scaleX(.35);opacity:.5} 50%{transform:scaleX(.95);opacity:.85} }
-  .po-v-val { font-size:13px;color:#f1f5f9;font-weight:600;margin-top:5px;letter-spacing:.2px; }
+  .po-v-val { font-size:14.5px;color:#f8fafc;font-weight:600;margin-top:6px;letter-spacing:.2px; }
   .po-v-val .po-num { font-family:var(--mono);color:#FDB515; }
-  .po-activity { display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.3px;margin-top:4px; }
+  .po-activity { display:inline-block;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;letter-spacing:.3px;margin-top:4px; }
   .po-activity.busy { background:rgba(248,113,113,.14);color:#fca5a5; }
   .po-activity.quiet { background:rgba(96,165,250,.14);color:#93c5fd; }
   .po-activity.typical { background:rgba(148,163,184,.14);color:#cbd5e1; }
-  .po-close { position:absolute;top:10px;right:14px;background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;line-height:1; }
-  .po-hint { font-size:11px;color:#64748b;margin-top:12px;text-align:center;line-height:1.4;padding-top:10px;border-top:1px solid rgba(255,255,255,.05); }
+  .po-close { position:absolute;top:10px;right:14px;background:none;border:none;color:#94a3b8;cursor:pointer;font-size:18px;line-height:1; }
+  .po-close:hover { color:#f1f5f9; }
+  .po-hint { font-size:12px;color:#94a3b8;margin-top:12px;text-align:center;line-height:1.45;padding-top:10px;border-top:1px solid rgba(255,255,255,.05); }
   /* Hero block — homes-equivalence as the headline */
   .po-hero { padding:14px 0 12px;border-top:1px solid rgba(255,255,255,.05);text-align:center; }
   .po-hero-num { font-family:var(--mono);font-size:46px;font-weight:700;color:#FDB515;line-height:1;letter-spacing:-1px;text-shadow:0 0 14px rgba(253,181,21,.18); }
-  .po-hero-lbl { font-size:11px;color:#cbd5e1;margin-top:6px;letter-spacing:.3px; }
-  .po-hero-lbl .po-hero-bolt { display:inline-block;margin-right:4px;font-size:13px; }
-  .po-hero-sub { font-size:10px;color:#64748b;font-family:var(--mono);margin-top:3px; }
+  .po-hero-lbl { font-size:12.5px;color:#e2e8f0;margin-top:8px;letter-spacing:.3px;line-height:1.4; }
+  .po-hero-lbl .po-hero-bolt { display:inline-block;margin-right:4px;font-size:14px; }
+  .po-hero-sub { font-size:11.5px;color:#94a3b8;font-family:var(--mono);margin-top:4px;letter-spacing:.2px; }
   .po-hero-pill { margin-top:8px; }
   /* Compact chips row for ambient context (air + water) */
   .po-chips { display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05); }
-  .po-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);font-size:10px;color:#94a3b8;letter-spacing:.2px; }
-  .po-chip .po-num { font-family:var(--mono);color:#cbd5e1; }
+  .po-chip { display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);font-size:11.5px;color:#cbd5e1;letter-spacing:.2px; }
+  .po-chip .po-num { font-family:var(--mono);color:#f1f5f9;font-weight:600; }
   @media(max-width:768px) { #publicOverlay { left:10px;right:10px;top:46px;width:auto; } }
 </style>
 </head>
