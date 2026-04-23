@@ -88,9 +88,14 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pp-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(253,181,21,.3)}
 .pp-btn-primary{background:linear-gradient(135deg,rgba(253,181,21,.18),rgba(253,181,21,.08));border-color:rgba(253,181,21,.4);color:var(--gold)}
 .pp-btn-primary:hover{background:linear-gradient(135deg,rgba(253,181,21,.28),rgba(253,181,21,.14))}
-.pp-spark{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
+.pp-spark{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);position:relative}
 .pp-spark-hdr{display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;font-weight:600}
-.pp-spark svg{width:100%;height:36px;display:block}
+.pp-spark-chart{position:relative;height:44px;width:100%;cursor:crosshair}
+.pp-spark-chart svg{width:100%;height:100%;display:block}
+.pp-spark-tip{position:absolute;top:-30px;transform:translateX(-50%);background:rgba(10,14,26,.97);border:1px solid rgba(253,181,21,.3);border-radius:6px;padding:4px 8px;font-family:var(--mono);font-size:10px;color:var(--gold);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;box-shadow:0 4px 12px rgba(0,0,0,.5);letter-spacing:.2px;font-variant-numeric:tabular-nums}
+.pp-spark-tip.vis{opacity:1}
+.pp-spark-tip-sub{color:#94a3b8;font-size:9px;margin-top:1px}
+.pp-spark-axis{display:flex;justify-content:space-between;margin-top:2px;font-size:8.5px;color:#64748b;font-family:var(--mono);font-variant-numeric:tabular-nums}
 @media(max-width:768px){#popPub{bottom:auto;top:70px;width:calc(100vw - 32px)}}
 .p-h{padding:14px 16px 12px;background:linear-gradient(135deg,var(--navy),#001238);position:relative}
 .p-x{position:absolute;top:10px;right:12px;width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.08);border:0;color:rgba(255,255,255,.5);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
@@ -858,13 +863,29 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     if(liveSpark && liveSpark.length>2){
       var lo=Math.min.apply(null,liveSpark), hi=Math.max.apply(null,liveSpark);
       var r=hi-lo||1;
-      var w=280, h=36;
-      var step=w/(liveSpark.length-1);
-      var pts=liveSpark.map(function(v,i){var x=i*step;var y=h-((v-lo)/r)*h; return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
-      sparkSvg='<div class="pp-spark"><div class="pp-spark-hdr"><span>Last 24 hours</span><span>peak '+Math.round(hi)+' kW</span></div>'
+      var w=280, h=44;
+      var n=liveSpark.length;
+      var step=w/(n-1);
+      var pts=liveSpark.map(function(v,i){var x=i*step;var y=h-((v-lo)/r)*(h-4)-2; return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+      // BMO poll cadence is 15-min; `sparkline` is tail-24, so window ≈ 6 hours
+      var windowMin = (n-1) * 15;
+      var windowLbl = windowMin >= 60 ? (windowMin/60).toFixed(windowMin%60===0?0:1) + 'hr' : windowMin + 'min';
+      // Axis: show label at first/mid/last position
+      var midMin = Math.round(windowMin/2);
+      var axisLeft  = windowLbl + ' ago';
+      var axisMid   = midMin >= 60 ? (midMin/60).toFixed(midMin%60===0?0:1) + 'hr ago' : midMin + 'm ago';
+      var axisRight = 'now';
+      sparkSvg='<div class="pp-spark">'
+        +'<div class="pp-spark-hdr"><span>Last '+windowLbl+'</span><span>peak '+Math.round(hi)+' kW</span></div>'
+        +'<div class="pp-spark-chart" id="ppSparkChart">'
+        +'<div class="pp-spark-tip" id="ppSparkTip"></div>'
         +'<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'
-        +'<polyline points="'+pts+'" fill="none" stroke="'+cc.h+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
-        +'</svg></div>';
+        +  '<polyline points="'+pts+'" fill="none" stroke="'+cc.h+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+        +  '<line id="ppSparkGuide" x1="0" y1="0" x2="0" y2="'+h+'" stroke="'+cc.h+'" stroke-width="1" stroke-dasharray="2 2" opacity="0"/>'
+        +  '<circle id="ppSparkDot" cx="0" cy="0" r="3.5" fill="'+cc.h+'" stroke="#0a0e1a" stroke-width="1.5" opacity="0"/>'
+        +'</svg></div>'
+        +'<div class="pp-spark-axis"><span>'+axisLeft+'</span><span>'+axisMid+'</span><span>'+axisRight+'</span></div>'
+        +'</div>';
     }
 
     var actions='';
@@ -890,6 +911,52 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       + '<div class="pp-actions">'+actions+'</div>'
       + '</div>';
     popPub.classList.add('vis');
+
+    // ── Wire sparkline hover tooltip ──
+    if(liveSpark && liveSpark.length>2){
+      var chart=document.getElementById('ppSparkChart');
+      var tip=document.getElementById('ppSparkTip');
+      var guide=document.getElementById('ppSparkGuide');
+      var dot=document.getElementById('ppSparkDot');
+      if(chart && tip && guide && dot){
+        var data=liveSpark;
+        var n2=data.length;
+        var hMin=Math.min.apply(null,data), hMax=Math.max.apply(null,data), hR=hMax-hMin||1;
+        var svgW=280, svgH=44;
+        function updateTip(clientX){
+          var rect=chart.getBoundingClientRect();
+          var rel=(clientX-rect.left)/rect.width;
+          rel=Math.max(0,Math.min(1,rel));
+          var idx=Math.round(rel*(n2-1));
+          var v=data[idx];
+          // Time-ago: idx 0 = oldest, idx n2-1 = now; each step = 15min
+          var minsAgo=(n2-1-idx)*15;
+          var timeLbl = minsAgo===0 ? 'now' : (minsAgo>=60 ? ((minsAgo/60).toFixed(minsAgo%60===0?0:1)+'hr ago') : (minsAgo+'m ago'));
+          // Place guideline + dot in SVG coords (x stretches with CSS preserveAspectRatio=none)
+          var svgX=(idx/(n2-1))*svgW;
+          var svgY=svgH-((v-hMin)/hR)*(svgH-4)-2;
+          guide.setAttribute('x1',svgX); guide.setAttribute('x2',svgX);
+          guide.setAttribute('opacity','0.6');
+          dot.setAttribute('cx',svgX); dot.setAttribute('cy',svgY);
+          dot.setAttribute('opacity','1');
+          // Position tooltip in DOM pixel coords (clamp so it doesn't clip edges)
+          var tipX=rel*rect.width;
+          tipX=Math.max(40,Math.min(rect.width-40,tipX));
+          tip.style.left=tipX+'px';
+          tip.innerHTML=Math.round(v)+' kW<div class="pp-spark-tip-sub">'+timeLbl+'</div>';
+          tip.classList.add('vis');
+        }
+        function hideTip(){
+          tip.classList.remove('vis');
+          guide.setAttribute('opacity','0');
+          dot.setAttribute('opacity','0');
+        }
+        chart.addEventListener('mousemove', function(e){ updateTip(e.clientX); });
+        chart.addEventListener('mouseleave', hideTip);
+        chart.addEventListener('touchmove', function(e){ if(e.touches[0]){ updateTip(e.touches[0].clientX); e.preventDefault(); }}, {passive:false});
+        chart.addEventListener('touchend', hideTip);
+      }
+    }
   }
   window.closePopPub=function(){popPub.classList.remove('vis');};
   window.showPopPub=showPopPub;
