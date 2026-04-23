@@ -59,9 +59,11 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 #tb{position:absolute;top:12px;left:12px;z-index:20;width:36px;height:36px;border-radius:9px;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
 #tb:hover{border-color:var(--gold);color:var(--gold)}
 
-/* POPUP */
-#pop{position:absolute;z-index:50;width:360px;background:var(--panel);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.07);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.55);overflow:hidden;opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .2s,transform .2s;top:12px;right:12px}
-#pop.vis{opacity:1;pointer-events:auto;transform:translateY(0)}
+/* POPUP — ENGINEER MODE: right-docked SCADA-style panel, taller + narrower, sharper corners, terminal feel */
+#pop{position:absolute;z-index:50;width:390px;background:linear-gradient(180deg,rgba(5,9,20,.97),rgba(8,12,24,.97));backdrop-filter:blur(20px);border:1px solid rgba(34,211,238,.18);border-radius:6px;box-shadow:0 16px 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(34,211,238,.04);overflow:hidden;opacity:0;pointer-events:none;transform:translateX(12px);transition:opacity .2s,transform .2s;top:12px;right:12px;bottom:12px;max-height:calc(100vh - 24px);display:flex;flex-direction:column}
+#pop.vis{opacity:1;pointer-events:auto;transform:translateX(0)}
+#pop::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.5;pointer-events:none;z-index:1}
+@media(max-width:768px){#pop{width:calc(100vw - 24px);left:12px}}
 
 /* PUBLIC MODE POPUP — lighter feel, bottom-center card (opaque frosted glass, large hero number, emoji-led storytelling) */
 #popPub{position:absolute;z-index:55;left:50%;bottom:24px;transform:translate(-50%,20px);width:320px;max-width:calc(100vw - 32px);background:linear-gradient(180deg,rgba(18,23,40,.96),rgba(10,14,26,.98));backdrop-filter:blur(28px);border:1px solid rgba(253,181,21,.18);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;opacity:0;pointer-events:none;transition:opacity .25s cubic-bezier(.4,0,.2,1),transform .25s cubic-bezier(.4,0,.2,1)}
@@ -177,59 +179,92 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .mep-chip{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;background:var(--card);font-size:9.5px;color:var(--dim)}
 .mep-dot{width:6px;height:6px;border-radius:2px;flex-shrink:0}
 
-/* ENGINEER SUMMARY POPUP v2 — structured hero + stats grid + hover sparkline */
-.pe-stripe{height:4px}
-.pe-head{padding:14px 16px 10px;background:linear-gradient(135deg,#001238,var(--navy));position:relative}
-.pe-title{font-size:16px;font-weight:700;color:#fff;line-height:1.2;padding-right:36px;letter-spacing:-.2px}
-.pe-sub{font-size:10.5px;color:#94a3b8;margin-top:3px;letter-spacing:.15px}
-.pe-badges{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
-.pe-bdg{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:4px;font-size:9px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+/* ENGINEER POPUP v3 — SCADA / control-room readout, representationally distinct from the Public friendly card.
+   Monospace everywhere, uppercase labels, bracketed IDs, gridlines, LED-style status indicators, raw-samples table. */
+.pe-stripe{height:2px}
+.pe-head{padding:12px 14px 10px;background:linear-gradient(180deg,rgba(34,211,238,.06),rgba(5,9,20,0));position:relative;border-bottom:1px solid rgba(34,211,238,.1)}
+.pe-ident{font-family:var(--mono);font-size:10px;color:var(--cyan);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:6px;font-weight:600}
+.pe-ident-led{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(52,211,153,.7);animation:blink 1.5s infinite}
+.pe-ident-led.off{background:#475569;box-shadow:none;animation:none}
+.pe-ident-chain{color:#475569;margin:0 3px}
+.pe-title{font-size:15px;font-weight:700;color:#e2e8f0;line-height:1.2;padding-right:36px;letter-spacing:-.2px;font-family:var(--display,inherit)}
+.pe-sub{font-family:var(--mono);font-size:10px;color:#64748b;margin-top:4px;letter-spacing:.3px;text-transform:uppercase}
+.pe-badges{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+.pe-bdg{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:2px;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
 .pe-bdg-cat{color:#fff}
-.pe-bdg-bim{background:rgba(45,212,191,.18);color:var(--cyan);border:1px solid rgba(45,212,191,.3)}
-.pe-bdg-nrg{background:rgba(52,211,153,.15);color:var(--green);border:1px solid rgba(52,211,153,.3)}
-.pe-bdg-off{background:rgba(148,163,184,.1);color:#94a3b8;border:1px solid rgba(148,163,184,.25)}
-.pe-body{padding:12px 14px 14px;overflow-y:auto;max-height:calc(100vh - 120px)}
-.pe-hero{display:flex;align-items:baseline;gap:10px;padding:12px 14px;border-radius:11px;background:linear-gradient(135deg,rgba(253,181,21,.08),rgba(253,181,21,.02));border:1px solid rgba(253,181,21,.22)}
-.pe-hero-num{font-family:var(--mono);font-size:34px;font-weight:700;color:var(--gold);line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(253,181,21,.22)}
-.pe-hero-unit{font-size:12px;color:#cbd5e1;font-weight:500;display:flex;flex-direction:column;line-height:1.2}
-.pe-hero-unit small{font-size:9.5px;color:var(--dim);font-weight:400}
-.pe-hero-live{margin-left:auto;display:flex;align-items:center;gap:4px;font-size:9px;color:var(--green);font-weight:600;letter-spacing:.4px;text-transform:uppercase}
-.pe-hero-live::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;box-shadow:0 0 6px rgba(52,211,153,.5)}
-.pe-meter-note{margin-top:8px;padding:7px 10px;border-radius:7px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);font-size:10px;color:var(--dim);line-height:1.45;display:flex;gap:7px;align-items:flex-start}
-.pe-meter-note b{color:#cbd5e1;font-weight:600;font-family:var(--mono);font-size:10.5px}
-.pe-meter-ico{flex-shrink:0;width:14px;height:14px;border-radius:50%;background:rgba(253,181,21,.15);color:var(--gold);font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700;margin-top:1px}
-.pe-anomaly{margin-top:9px;padding:8px 11px;border-radius:8px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#fca5a5;font-size:10.5px;line-height:1.4;display:flex;align-items:center;gap:7px}
-.pe-anomaly.low{background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.3);color:#93c5fd}
-.pe-section-hdr{display:flex;justify-content:space-between;align-items:baseline;margin:13px 0 6px;font-size:9.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;font-weight:700}
-.pe-section-hdr span:last-child{font-weight:400;letter-spacing:.1px;text-transform:none;color:var(--dim);font-size:9px}
-.pe-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-.pe-stat{background:var(--card);border:1px solid rgba(255,255,255,.04);border-radius:8px;padding:9px 8px;text-align:center;position:relative}
-.pe-stat-val{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text);letter-spacing:-.3px;font-variant-numeric:tabular-nums;line-height:1.1}
-.pe-stat-val.gold{color:var(--gold)}
-.pe-stat-val.cyan{color:var(--cyan)}
-.pe-stat-val.green{color:var(--green)}
-.pe-stat-val.dim{color:var(--dim);font-size:11.5px}
-.pe-stat-lbl{font-size:8.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;margin-top:4px;font-weight:600}
-.pe-stat-sub{font-size:8.5px;color:var(--dim);margin-top:2px;font-family:var(--mono)}
-/* Sparkline (mirrors Public popup's hover logic) */
-.pe-spark{margin-top:4px;padding:10px 12px;background:var(--card);border-radius:9px;border:1px solid rgba(255,255,255,.04);position:relative}
-.pe-spark-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
-.pe-spark-hdr .pe-peak{color:var(--gold);font-family:var(--mono);font-size:10px}
-.pe-spark-chart{position:relative;height:56px;width:100%;cursor:crosshair}
-.pe-spark-chart svg{width:100%;height:100%;display:block}
-.pe-spark-tip{position:absolute;top:-38px;transform:translateX(-50%);background:rgba(10,14,26,.97);border:1px solid rgba(253,181,21,.3);border-radius:6px;padding:5px 9px;font-family:var(--mono);font-size:11px;color:var(--gold);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;box-shadow:0 4px 14px rgba(0,0,0,.55);letter-spacing:.2px;font-variant-numeric:tabular-nums;z-index:5}
-.pe-spark-tip.vis{opacity:1}
-.pe-spark-tip-sub{color:#94a3b8;font-size:9px;margin-top:1px}
-.pe-spark-axis{display:flex;justify-content:space-between;margin-top:3px;font-size:8.5px;color:#64748b;font-family:var(--mono);font-variant-numeric:tabular-nums}
-/* MEP system chips + CTA */
-.pe-mep-wrap{margin-top:4px;padding:10px 12px;background:var(--card);border-radius:9px;border:1px solid rgba(45,212,191,.15)}
-.pe-mep-cnt{font-family:var(--mono);color:var(--cyan);font-weight:700}
-.pe-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
-.pe-btn{padding:9px 10px;border-radius:9px;text-align:center;text-decoration:none;font-size:10.5px;font-weight:600;letter-spacing:.2px;transition:all .15s;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);color:var(--dim)}
-.pe-btn:hover{background:rgba(255,255,255,.06);color:var(--text);border-color:rgba(253,181,21,.25)}
-.pe-btn-primary{grid-column:span 2;background:linear-gradient(135deg,rgba(253,181,21,.15),rgba(253,181,21,.05));border-color:rgba(253,181,21,.4);color:var(--gold)}
-.pe-btn-xr{background:linear-gradient(135deg,rgba(45,212,191,.12),rgba(45,212,191,.03));border-color:rgba(45,212,191,.35);color:var(--cyan);grid-column:span 2}
-.pe-btn-xr:hover{background:linear-gradient(135deg,rgba(45,212,191,.2),rgba(45,212,191,.08))}
+.pe-bdg-bim{background:rgba(45,212,191,.15);color:var(--cyan);border:1px solid rgba(45,212,191,.35)}
+.pe-bdg-nrg{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.3)}
+.pe-bdg-off{background:rgba(148,163,184,.08);color:#64748b;border:1px solid rgba(148,163,184,.2)}
+.pe-body{padding:12px 14px 14px;overflow-y:auto;flex:1;min-height:0}
+.pe-body::-webkit-scrollbar{width:4px}
+.pe-body::-webkit-scrollbar-thumb{background:rgba(34,211,238,.2);border-radius:2px}
+/* Close button */
+.pe-x{position:absolute;top:8px;right:10px;width:22px;height:22px;border-radius:3px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#64748b;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--mono);transition:all .15s}
+.pe-x:hover{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.4);color:#fca5a5}
+/* Section header — SCADA divider */
+.pe-sec{display:flex;justify-content:space-between;align-items:baseline;margin:14px 0 6px;font-family:var(--mono);font-size:9px;color:var(--cyan);text-transform:uppercase;letter-spacing:1px;font-weight:700;padding-bottom:4px;border-bottom:1px dashed rgba(34,211,238,.15)}
+.pe-sec span:last-child{color:#475569;font-weight:500;letter-spacing:.5px}
+/* Meter topology block — shows which meter we're reading */
+.pe-topo{background:rgba(15,23,42,.45);border:1px solid rgba(34,211,238,.12);border-radius:4px;padding:10px 12px;font-family:var(--mono);font-size:10px;line-height:1.55;color:#94a3b8}
+.pe-topo-line{display:flex;align-items:center;gap:6px}
+.pe-topo-line.active{color:var(--green)}
+.pe-topo-line.dim{color:#475569}
+.pe-topo-arrow{color:#475569;font-weight:700}
+.pe-topo-chip{display:inline-block;padding:0 6px;border:1px solid rgba(148,163,184,.25);border-radius:2px;color:#94a3b8;font-size:9px;letter-spacing:.4px}
+.pe-topo-line.active .pe-topo-chip{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.08);color:var(--green);box-shadow:0 0 6px rgba(52,211,153,.18)}
+.pe-topo-foot{margin-top:8px;padding-top:7px;border-top:1px dashed rgba(148,163,184,.12);color:#64748b;font-size:9px;letter-spacing:.3px}
+.pe-topo-foot b{color:#cbd5e1;font-weight:700}
+/* Metric tiles — primary readings */
+.pe-metrics{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:4px}
+.pe-metric{background:rgba(15,23,42,.45);border:1px solid rgba(34,211,238,.08);border-radius:3px;padding:9px 10px;position:relative;overflow:hidden}
+.pe-metric::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--cyan);opacity:.55}
+.pe-metric.gold::before{background:var(--gold)}
+.pe-metric.warn::before{background:#fca5a5}
+.pe-metric.green::before{background:var(--green)}
+.pe-metric-lbl{font-family:var(--mono);font-size:8px;color:#64748b;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.pe-metric-val{font-family:var(--mono);font-size:18px;font-weight:700;color:#e2e8f0;letter-spacing:-.3px;line-height:1.05;margin-top:3px;font-variant-numeric:tabular-nums}
+.pe-metric.gold .pe-metric-val{color:var(--gold)}
+.pe-metric.warn .pe-metric-val{color:#fca5a5}
+.pe-metric.green .pe-metric-val{color:var(--green)}
+.pe-metric-sub{font-family:var(--mono);font-size:8.5px;color:#64748b;margin-top:2px;letter-spacing:.3px}
+/* Anomaly banner — more terminal-ish */
+.pe-anomaly{margin-top:10px;padding:7px 10px;border-radius:3px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.35);border-left-width:3px;color:#fca5a5;font-family:var(--mono);font-size:10px;line-height:1.4;letter-spacing:.3px;display:flex;align-items:center;gap:7px;text-transform:uppercase;font-weight:600}
+.pe-anomaly.low{background:rgba(96,165,250,.08);border-color:rgba(96,165,250,.35);color:#93c5fd}
+/* Chart with real axes + gridlines + anomaly markers */
+.pe-chart{margin-top:4px;padding:10px 8px 4px;background:rgba(15,23,42,.45);border:1px solid rgba(34,211,238,.1);border-radius:4px;position:relative}
+.pe-chart-svg{width:100%;height:120px;display:block;cursor:crosshair}
+.pe-chart-tip{position:absolute;top:-2px;background:rgba(5,9,20,.98);border:1px solid var(--cyan);padding:5px 8px;font-family:var(--mono);font-size:10.5px;color:var(--cyan);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .1s;box-shadow:0 4px 14px rgba(0,0,0,.6);letter-spacing:.3px;font-variant-numeric:tabular-nums;z-index:6;border-radius:2px;transform:translateX(-50%)}
+.pe-chart-tip.vis{opacity:1}
+.pe-chart-tip b{color:#e2e8f0}
+.pe-chart-tip-sub{color:#64748b;font-size:9px;margin-top:1px;letter-spacing:.2px}
+.pe-chart-legend{display:flex;justify-content:space-between;margin-top:4px;font-family:var(--mono);font-size:8.5px;color:#64748b;letter-spacing:.5px}
+/* Raw samples table — totally absent from Public */
+.pe-samples{margin-top:4px;background:rgba(15,23,42,.4);border:1px solid rgba(34,211,238,.08);border-radius:3px;overflow:hidden}
+.pe-samples table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums}
+.pe-samples th{background:rgba(34,211,238,.05);color:#64748b;font-weight:600;text-align:left;padding:6px 10px;letter-spacing:.8px;text-transform:uppercase;font-size:8.5px;border-bottom:1px solid rgba(34,211,238,.15)}
+.pe-samples td{padding:4px 10px;color:#cbd5e1;border-bottom:1px solid rgba(255,255,255,.02)}
+.pe-samples tr:last-child td{border-bottom:0}
+.pe-samples tr.now td{background:rgba(52,211,153,.06);color:var(--green)}
+.pe-samples td.delta-pos{color:#fca5a5}
+.pe-samples td.delta-neg{color:#93c5fd}
+.pe-samples td.col-time{color:#64748b;width:38%}
+.pe-samples td.col-kw{text-align:right;width:32%;font-weight:700}
+.pe-samples td.col-delta{text-align:right;width:30%}
+/* LED-style MEP grid — instead of friendly chips */
+.pe-leds{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:2px}
+.pe-led{display:flex;align-items:center;gap:5px;padding:5px 7px;background:rgba(15,23,42,.4);border:1px solid rgba(34,211,238,.07);border-radius:2px;font-family:var(--mono);font-size:8.5px;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
+.pe-led-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+/* Monospaced rectangular action buttons */
+.pe-actions{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:14px}
+.pe-btn{padding:9px 8px;border-radius:2px;text-align:center;text-decoration:none;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;transition:all .15s;border:1px solid rgba(148,163,184,.2);background:rgba(15,23,42,.5);color:#94a3b8;cursor:pointer}
+.pe-btn:hover{background:rgba(34,211,238,.08);color:var(--cyan);border-color:rgba(34,211,238,.45)}
+.pe-btn-primary{grid-column:span 2;background:linear-gradient(135deg,rgba(253,181,21,.12),rgba(253,181,21,.04));border-color:rgba(253,181,21,.4);color:var(--gold)}
+.pe-btn-primary:hover{background:linear-gradient(135deg,rgba(253,181,21,.2),rgba(253,181,21,.08));color:var(--gold)}
+.pe-btn-xr{grid-column:span 2;background:linear-gradient(135deg,rgba(45,212,191,.12),rgba(45,212,191,.03));border-color:rgba(45,212,191,.45);color:var(--cyan)}
+.pe-btn-xr:hover{background:linear-gradient(135deg,rgba(45,212,191,.22),rgba(45,212,191,.08))}
+/* Offline / no-meter placeholder */
+.pe-offline{padding:16px 14px;text-align:center;font-family:var(--mono);font-size:10.5px;color:#64748b;letter-spacing:.6px;background:rgba(15,23,42,.4);border:1px dashed rgba(148,163,184,.18);border-radius:4px}
+.pe-offline b{color:#94a3b8}
 
 /* Energy bar */
 .nrg-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:var(--card);margin-top:8px}
@@ -606,11 +641,12 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var eCol=kwColor(kw,maxKw);
 
       if(isG){
-        // Grimes: thin ring + diamond
+        // Grimes: thin ring + diamond (ring gets idx so filter/search also hides it)
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
           symbol:{type:'simple-marker',color:[0,0,0,0],size:22,
-            outline:{color:[253,181,21,160],width:1.5}}
+            outline:{color:[253,181,21,160],width:1.5}},
+          attributes:{idx:i,deco:1}
         }));
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
@@ -630,7 +666,8 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           var glowGfx = new Graphic({
             geometry:new Point({longitude:b.lng,latitude:b.lat}),
             symbol:{type:'simple-marker',color:[glowCol[0],glowCol[1],glowCol[2],glowAlpha],size:glowSize,
-              outline:{color:[0,0,0,0],width:0}}
+              outline:{color:[0,0,0,0],width:0}},
+            attributes:{idx:i,deco:1}  // so category filter / search hide the halo along with the core dot
           });
           gL.add(glowGfx);
           // Only enroll in breathing if this is a TOP consumer right now —
@@ -816,7 +853,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     var live = (window.currentEnergyData && window.currentEnergyData[b.id]) || null;
     var kw = (live && typeof live.kw==='number' && live.kw>0) ? live.kw : (typeof b.kw==='number' && b.kw>0 ? b.kw : null);
     var sparkData = (live && live.sparkline && live.sparkline.length>2) ? live.sparkline : (b.sparkline && b.sparkline.length>2 ? b.sparkline : null);
-    var meterId  = live && live.meter    ? live.meter    : b.meter;
+    var meterId  = live && live.meter    ? String(live.meter)    : (b.meter?String(b.meter):null);
     var liveTs   = live && live.timestamp? live.timestamp: b.liveTs;
     var predicted= live && live.predicted_kw ? live.predicted_kw : b.predicted;
     var anomaly  = live && live.anomaly  ? live.anomaly  : b.anomaly;
@@ -824,176 +861,304 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     var dailyCost= live && live.est_daily_cost  ? live.est_daily_cost  : (kw?+(kw*24*0.15).toFixed(2):null);
     var dailyCo2 = live && live.est_daily_co2_kg? live.est_daily_co2_kg: (kw?+(kw*24*0.21).toFixed(1):null);
 
-    // 24hr stats
-    var avg24=null, peak24=null, trough24=null;
+    // 6hr stats
+    var avg6=null, peak6=null, trough6=null, sigma6=null;
     if(sparkData && sparkData.length>1){
       var nums = sparkData.filter(function(v){return typeof v==='number' && !isNaN(v);});
       if(nums.length){
-        avg24    = nums.reduce(function(a,x){return a+x;},0)/nums.length;
-        peak24   = Math.max.apply(null, nums);
-        trough24 = Math.min.apply(null, nums);
+        avg6    = nums.reduce(function(a,x){return a+x;},0)/nums.length;
+        peak6   = Math.max.apply(null, nums);
+        trough6 = Math.min.apply(null, nums);
+        // standard deviation — actual diagnostic value, not shown to Public
+        var sq = nums.reduce(function(a,x){return a+(x-avg6)*(x-avg6);},0);
+        sigma6 = Math.sqrt(sq/nums.length);
       }
+    }
+    // Δ vs predicted — signed percentage
+    var delta=null, deltaPct=null;
+    if(kw!=null && predicted!=null && predicted>0){
+      delta = kw - predicted;
+      deltaPct = (delta/predicted)*100;
     }
 
     var mLbl = meterLabel(meterId);
 
-    // ── HEADER ──
+    // ── HEAD: terminal-style ID + meter chain + status LED ──
+    var idTag = (b.id||'?').toUpperCase();
+    var meterTag = meterId ? ('M'+meterId) : 'NO-METER';
+    var ledClass = kw!=null ? '' : ' off';
+
     var tags = '<span class="pe-bdg pe-bdg-cat" style="background:'+cc.h+'22;color:'+cc.h+';border:1px solid '+cc.h+'55">'+b.c+'</span>';
     if(b.bim) tags += '<span class="pe-bdg pe-bdg-bim">BIM</span>';
-    if(kw!=null) tags += '<span class="pe-bdg pe-bdg-nrg">LIVE · BMO</span>';
-    else if(b.nrg) tags += '<span class="pe-bdg pe-bdg-off">Metered · Offline</span>';
+    if(kw!=null) tags += '<span class="pe-bdg pe-bdg-nrg">LIVE·BMO</span>';
+    else if(b.nrg) tags += '<span class="pe-bdg pe-bdg-off">METERED·OFFLINE</span>';
+    else tags += '<span class="pe-bdg pe-bdg-off">NO-METER</span>';
 
-    var sub = (b.a?b.a+' · ':'') + (b.yr?'Built '+b.yr:'') + (b.floors?' · '+b.floors+' flr':'');
+    var subParts=[];
+    if(b.yr)subParts.push('BLT '+b.yr);
+    if(b.floors)subParts.push(b.floors+' FLR');
+    if(b.a)subParts.push(b.a.toUpperCase());
+    var sub = subParts.join(' · ');
 
     var h = '<div class="pe-stripe" style="background:'+cc.h+'"></div>'
       + '<div class="pe-head">'
-      + '<button class="p-x" onclick="closePop()">✕</button>'
+      + '<button class="pe-x" onclick="closePop()">✕</button>'
+      + '<div class="pe-ident"><span class="pe-ident-led'+ledClass+'"></span>['+idTag+']<span class="pe-ident-chain">▸</span>'+meterTag+'<span class="pe-ident-chain">▸</span>'+(kw!=null?'ONLINE':'OFFLINE')+'</div>'
       + '<div class="pe-title">'+b.n+'</div>'
       + (sub?'<div class="pe-sub">'+sub+'</div>':'')
       + '<div class="pe-badges">'+tags+'</div>'
       + '</div>'
       + '<div class="pe-body">';
 
-    // ── HERO + METER NOTE ──
+    // ── METER TOPOLOGY — shows which of the 3 meters we're reading ──
+    // (Buildings at Berkeley typically have M3 + M76 + M77; BMO returns the first-responding.)
+    if(kw!=null && meterId){
+      function topoLine(mid, label, note){
+        var isActive = meterId===mid;
+        var cls = isActive ? 'active' : 'dim';
+        var chip = '<span class="pe-topo-chip">M'+mid+'</span>';
+        return '<div class="pe-topo-line '+cls+'">'+chip+' <span class="pe-topo-arrow">─</span> '+label+'<span style="margin-left:auto;color:#475569;font-size:9px">'+(isActive?'◉ READING':'—')+'</span></div>';
+      }
+      h += '<div class="pe-sec"><span>Meter Topology</span><span>BMO Feed</span></div>';
+      h += '<div class="pe-topo">'
+         + topoLine('3',  '208V main service tie')
+         + topoLine('76', '480/277V mechanical (HVAC)')
+         + topoLine('77', '208/120V plugs &amp; lighting')
+         + '<div class="pe-topo-foot">Reading from <b>'+mLbl.full.replace(/Meter \d+ — /,'')+'</b>'
+         +   (mLbl.excludes?' · <span style="color:#fca5a5">'+mLbl.excludes+'</span>':'')
+         + '</div>'
+         + '</div>';
+    }
+
+    // ── METRIC TILES — current / Δ vs predicted / σ 6hr ──
     if(kw!=null){
       var kwStr = kw>=100 ? Math.round(kw).toLocaleString() : kw.toFixed(1);
-      h += '<div class="pe-hero">'
-         +   '<span class="pe-hero-num">'+kwStr+'</span>'
-         +   '<span class="pe-hero-unit">kW<small>'+(liveTs?liveTs.slice(11,16)+' · '+liveTs.slice(0,10):'live')+'</small></span>'
-         +   '<span class="pe-hero-live">LIVE</span>'
-         + '</div>';
-      // Meter transparency — critical for honest interpretation
-      h += '<div class="pe-meter-note"><span class="pe-meter-ico">i</span>'
-         + '<div><b>'+mLbl.full+'</b>' + (mLbl.excludes?'<br><span style="color:#64748b">· '+mLbl.excludes+'</span>':'') + '</div>'
-         + '</div>';
-    } else if(b.nrg){
-      h += '<div class="pe-hero" style="border-color:rgba(148,163,184,.2);background:rgba(148,163,184,.05)">'
-         +   '<span class="pe-hero-num" style="color:#64748b">—</span>'
-         +   '<span class="pe-hero-unit" style="color:#64748b">kW<small>Meter offline · BMO not responding</small></span>'
+      var deltaCls = deltaPct==null ? '' : (Math.abs(deltaPct) < 5 ? 'green' : (deltaPct>0?'warn':'green'));
+      var deltaStr = deltaPct==null ? '—' : ((deltaPct>0?'+':'')+deltaPct.toFixed(1)+'%');
+      var sigStr = sigma6==null ? '—' : (sigma6>=10?Math.round(sigma6):sigma6.toFixed(1));
+      h += '<div class="pe-sec"><span>Live Readings</span><span>'+(liveTs?liveTs.slice(11,16)+' UTC':'—')+'</span></div>';
+      h += '<div class="pe-metrics">'
+         +   '<div class="pe-metric gold"><div class="pe-metric-lbl">kW Now</div><div class="pe-metric-val">'+kwStr+'</div><div class="pe-metric-sub">'+(meterId?'via M'+meterId:'meter —')+'</div></div>'
+         +   '<div class="pe-metric '+deltaCls+'"><div class="pe-metric-lbl">Δ vs Pred</div><div class="pe-metric-val">'+deltaStr+'</div><div class="pe-metric-sub">'+(predicted!=null?'p='+((+predicted).toFixed(1)):'no baseline')+'</div></div>'
+         +   '<div class="pe-metric"><div class="pe-metric-lbl">σ 6hr</div><div class="pe-metric-val">'+sigStr+'</div><div class="pe-metric-sub">std dev</div></div>'
          + '</div>';
     } else {
-      h += '<div class="pe-hero" style="border-color:rgba(148,163,184,.15);background:rgba(148,163,184,.03)">'
-         +   '<span class="pe-hero-unit" style="color:#64748b;font-size:11px">No BMO meter installed on this building.</span>'
-         + '</div>';
+      h += '<div class="pe-sec"><span>Live Readings</span><span>—</span></div>';
+      h += '<div class="pe-offline">'+(b.nrg?'<b>METER OFFLINE</b> · BMO not responding for this point':'<b>NO METER INSTALLED</b> · BMO has no endpoint for this building')+'</div>';
     }
 
     // ── ANOMALY BANNER ──
     if(anomaly){
       var isHigh = anomaly.type==='high';
-      var pctOff = Math.round((anomaly.ratio-1)*100);
+      var pctOff = anomaly.ratio!=null ? Math.round((anomaly.ratio-1)*100) : null;
       h += '<div class="pe-anomaly'+(isHigh?'':' low')+'">'
-         +   (isHigh?'⚠':'ℹ')+' <b>'+anomaly.type.toUpperCase()+'</b> — '
-         +   kw+' kW vs. recent avg '+anomaly.avg+' kW ('+(pctOff>=0?'+':'')+pctOff+'%)'
+         +   (isHigh?'[!]':'[i]')+' '+anomaly.type.toUpperCase()+' — '
+         +   kw+' kW vs recent '+anomaly.avg+' kW'
+         +   (pctOff!=null?' ('+(pctOff>=0?'+':'')+pctOff+'%)':'')
          + '</div>';
     }
 
-    // ── 24HR STATS GRID ──
-    if(kw!=null){
-      h += '<div class="pe-section-hdr"><span>Last 24hr · 15-min polling</span><span>'+(sparkData?sparkData.length+' points':'—')+'</span></div>';
-      h += '<div class="pe-stats">'
-         +   '<div class="pe-stat"><div class="pe-stat-val cyan">'+(avg24!=null?(avg24>=100?Math.round(avg24):avg24.toFixed(1)):'—')+'</div><div class="pe-stat-sub">kW</div><div class="pe-stat-lbl">6hr Avg</div></div>'
-         +   '<div class="pe-stat"><div class="pe-stat-val gold">'+(peak24!=null?(peak24>=100?Math.round(peak24):peak24.toFixed(1)):'—')+'</div><div class="pe-stat-sub">kW</div><div class="pe-stat-lbl">6hr Peak</div></div>'
-         +   '<div class="pe-stat"><div class="pe-stat-val green">'+(predicted!=null?(predicted>=100?Math.round(predicted):(+predicted).toFixed(1)):'—')+'</div><div class="pe-stat-sub">kW</div><div class="pe-stat-lbl">Next 15m</div></div>'
-         + '</div>';
-
-      // Daily projection (extrapolated from current kW)
-      h += '<div class="pe-section-hdr"><span>Daily projection</span><span>@ current rate</span></div>';
-      h += '<div class="pe-stats">'
-         +   '<div class="pe-stat"><div class="pe-stat-val">'+(dailyKwh?dailyKwh.toLocaleString():'—')+'</div><div class="pe-stat-sub">kWh/day</div><div class="pe-stat-lbl">Energy</div></div>'
-         +   '<div class="pe-stat"><div class="pe-stat-val gold">$'+(dailyCost?Math.round(dailyCost).toLocaleString():'—')+'</div><div class="pe-stat-sub">@ $0.15/kWh</div><div class="pe-stat-lbl">Cost</div></div>'
-         +   '<div class="pe-stat"><div class="pe-stat-val" style="color:#f87171">'+(dailyCo2?Math.round(dailyCo2).toLocaleString():'—')+'</div><div class="pe-stat-sub">kg CO₂</div><div class="pe-stat-lbl">Emissions</div></div>'
-         + '</div>';
-    }
-
-    // ── SPARKLINE WITH HOVER ──
+    // ── CHART WITH REAL AXES + GRIDLINES + ANOMALY MARKERS ──
     if(sparkData && sparkData.length>2){
-      var lo=Math.min.apply(null,sparkData), hi=Math.max.apply(null,sparkData);
-      var rSp=hi-lo||1;
-      var wSp=320, hSp=56;
-      var nSp=sparkData.length;
-      var stepSp=wSp/(nSp-1);
-      var ptsSp=sparkData.map(function(v,i){var x=i*stepSp;var y=hSp-((v-lo)/rSp)*(hSp-4)-2; return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
-      var areaSp = '0,'+hSp+' ' + ptsSp + ' ' + wSp+','+hSp;
-      var windowMinSp=(nSp-1)*15;
-      var winLblSp = windowMinSp>=60 ? (windowMinSp/60).toFixed(windowMinSp%60===0?0:1)+'hr' : windowMinSp+'min';
-      var midMinSp = Math.round(windowMinSp/2);
-      var midLblSp = midMinSp>=60 ? (midMinSp/60).toFixed(midMinSp%60===0?0:1)+'hr ago' : midMinSp+'m ago';
-      h += '<div class="pe-section-hdr"><span>Power trace</span><span class="pe-peak">peak '+Math.round(hi)+' · min '+Math.round(lo)+' kW</span></div>';
-      h += '<div class="pe-spark">'
-         +   '<div class="pe-spark-chart" id="peSparkChart">'
-         +     '<div class="pe-spark-tip" id="peSparkTip"></div>'
-         +     '<svg viewBox="0 0 '+wSp+' '+hSp+'" preserveAspectRatio="none">'
-         +       '<defs><linearGradient id="peSparkGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+cc.h+'" stop-opacity=".35"/><stop offset="1" stop-color="'+cc.h+'" stop-opacity="0"/></linearGradient></defs>'
-         +       '<polygon points="'+areaSp+'" fill="url(#peSparkGrad)"/>'
-         +       '<polyline points="'+ptsSp+'" fill="none" stroke="'+cc.h+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
-         +       '<line id="peSparkGuide" x1="0" y1="0" x2="0" y2="'+hSp+'" stroke="'+cc.h+'" stroke-width="1" stroke-dasharray="2 2" opacity="0"/>'
-         +       '<circle id="peSparkDot" cx="0" cy="0" r="3.5" fill="'+cc.h+'" stroke="#0a0e1a" stroke-width="1.5" opacity="0"/>'
-         +     '</svg>'
-         +   '</div>'
-         +   '<div class="pe-spark-axis"><span>'+winLblSp+' ago</span><span>'+midLblSp+'</span><span>now</span></div>'
+      var dd=sparkData, nP=dd.length;
+      var lo=Math.min.apply(null,dd), hi=Math.max.apply(null,dd);
+      // Nicer y-scale: round down/up to 10s, 25s, 50s depending on range
+      function niceStep(range){
+        var raw = range/4;
+        if(raw<5) return 2;
+        if(raw<12) return 5;
+        if(raw<25) return 10;
+        if(raw<60) return 25;
+        if(raw<150) return 50;
+        return Math.ceil(raw/100)*100;
+      }
+      var pad = (hi-lo)*0.15 || 1;
+      var yMin = Math.max(0, Math.floor((lo-pad*0.3)/niceStep(hi-lo+pad*2))*niceStep(hi-lo+pad*2));
+      var step = niceStep(hi-lo+pad*2);
+      var yMax = Math.ceil((hi+pad*0.5)/step)*step;
+      var yRange = yMax-yMin || 1;
+
+      var W=360, H=120, ML=32, MR=6, MT=8, MB=20;  // margins leave room for y-axis + x-axis labels
+      var plotW = W-ML-MR, plotH = H-MT-MB;
+      var stepX = plotW/(nP-1);
+
+      // Y gridlines + labels
+      var gridTicks='', yLabels='';
+      for(var yv=yMin; yv<=yMax+0.001; yv+=step){
+        var gy = MT + plotH - ((yv-yMin)/yRange)*plotH;
+        gridTicks += '<line x1="'+ML+'" x2="'+(W-MR)+'" y1="'+gy.toFixed(1)+'" y2="'+gy.toFixed(1)+'" stroke="#1e293b" stroke-width="0.6" stroke-dasharray="2 3" opacity="0.7"/>';
+        yLabels   += '<text x="'+(ML-5)+'" y="'+(gy+3).toFixed(1)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#64748b" text-anchor="end">'+yv+'</text>';
+      }
+
+      // X labels (6hr ago / 4hr / 2hr / now)
+      var windowMin=(nP-1)*15;
+      var xLabels='';
+      var xTicks=[0, 0.33, 0.66, 1];
+      xTicks.forEach(function(t){
+        var mins = Math.round((1-t)*windowMin);
+        var lbl = mins===0 ? 'now' : (mins>=60 ? (mins/60).toFixed(mins%60===0?0:1)+'h' : mins+'m');
+        var xp = ML + t*plotW;
+        xLabels += '<text x="'+xp.toFixed(1)+'" y="'+(H-5)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#64748b" text-anchor="middle">'+lbl+'</text>';
+      });
+
+      // Line points
+      var pts = dd.map(function(v,i){
+        var x = ML + i*stepX;
+        var y = MT + plotH - ((v-yMin)/yRange)*plotH;
+        return x.toFixed(1)+','+y.toFixed(1);
+      }).join(' ');
+      var areaPts = (ML)+','+(MT+plotH)+' '+pts+' '+(ML+plotW)+','+(MT+plotH);
+
+      // Anomaly dots: mark points that are >1.5σ from avg (visual diagnostic)
+      var anomalyDots='';
+      if(avg6!=null && sigma6!=null && sigma6>0){
+        dd.forEach(function(v,i){
+          if(Math.abs(v-avg6)>1.5*sigma6){
+            var x = ML + i*stepX;
+            var y = MT + plotH - ((v-yMin)/yRange)*plotH;
+            var col = v>avg6?'#fca5a5':'#93c5fd';
+            anomalyDots += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="2.8" fill="'+col+'" stroke="#0a0e1a" stroke-width="1"/>';
+          }
+        });
+      }
+
+      // Predicted-value reference line (if available)
+      var predLine='';
+      if(predicted!=null && predicted>=yMin && predicted<=yMax){
+        var py = MT + plotH - ((predicted-yMin)/yRange)*plotH;
+        predLine = '<line x1="'+ML+'" x2="'+(W-MR)+'" y1="'+py.toFixed(1)+'" y2="'+py.toFixed(1)+'" stroke="#34d399" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.65"/>'
+                 + '<text x="'+(W-MR-2)+'" y="'+(py-3).toFixed(1)+'" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34d399" text-anchor="end" opacity="0.85">pred '+(+predicted).toFixed(1)+'</text>';
+      }
+
+      h += '<div class="pe-sec"><span>Power Trace</span><span>6hr · 15m poll · '+nP+' pts</span></div>';
+      h += '<div class="pe-chart">'
+         +   '<div class="pe-chart-tip" id="peChartTip"></div>'
+         +   '<svg class="pe-chart-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" id="peChartSvg">'
+         +     '<defs><linearGradient id="peChartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+cc.h+'" stop-opacity=".28"/><stop offset="1" stop-color="'+cc.h+'" stop-opacity="0"/></linearGradient></defs>'
+         +     gridTicks
+         +     yLabels
+         +     xLabels
+         +     '<polygon points="'+areaPts+'" fill="url(#peChartGrad)"/>'
+         +     '<polyline points="'+pts+'" fill="none" stroke="'+cc.h+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+         +     predLine
+         +     anomalyDots
+         +     '<line id="peChartGuide" x1="0" y1="'+MT+'" x2="0" y2="'+(MT+plotH)+'" stroke="'+cc.h+'" stroke-width="1" stroke-dasharray="2 2" opacity="0"/>'
+         +     '<circle id="peChartDot" cx="0" cy="0" r="3.2" fill="'+cc.h+'" stroke="#0a0e1a" stroke-width="1.2" opacity="0"/>'
+         +   '</svg>'
+         +   '<div class="pe-chart-legend"><span>■ load · ■ pred · <span style="color:#fca5a5">●</span> σ&gt;1.5 high · <span style="color:#93c5fd">●</span> σ&gt;1.5 low</span><span>'+Math.round(lo)+'–'+Math.round(hi)+' kW</span></div>'
+         + '</div>';
+
+      // ── RAW SAMPLES TABLE — last 8 points (not shown to Public) ──
+      var samples = dd.slice(-8).reverse();  // newest first
+      var nowMins=0;
+      h += '<div class="pe-sec"><span>Samples</span><span>last 8 · newest first</span></div>';
+      h += '<div class="pe-samples"><table>'
+         + '<tr><th>Time</th><th style="text-align:right">kW</th><th style="text-align:right">Δ avg</th></tr>';
+      samples.forEach(function(v,i){
+        var mins = i*15;
+        var lbl = mins===0 ? 'now' : ('-'+(mins>=60?(mins/60).toFixed(mins%60===0?0:1)+'h':mins+'m'));
+        var dlt = avg6!=null ? (v-avg6) : null;
+        var dltStr = dlt==null ? '—' : ((dlt>=0?'+':'')+dlt.toFixed(1));
+        var dltCls = dlt==null ? '' : (dlt>0.5?'delta-pos':(dlt<-0.5?'delta-neg':''));
+        h += '<tr'+(i===0?' class="now"':'')+'>'
+           +   '<td class="col-time">'+lbl+'</td>'
+           +   '<td class="col-kw">'+(v>=100?Math.round(v):v.toFixed(1))+'</td>'
+           +   '<td class="col-delta '+dltCls+'">'+dltStr+'</td>'
+           + '</tr>';
+      });
+      h += '</table></div>';
+    }
+
+    // ── DAILY PROJECTION (compact row) ──
+    if(kw!=null){
+      h += '<div class="pe-sec"><span>Daily Projection</span><span>@ current rate</span></div>';
+      h += '<div class="pe-metrics">'
+         +   '<div class="pe-metric"><div class="pe-metric-lbl">Energy</div><div class="pe-metric-val">'+(dailyKwh?dailyKwh.toLocaleString():'—')+'</div><div class="pe-metric-sub">kWh/day</div></div>'
+         +   '<div class="pe-metric gold"><div class="pe-metric-lbl">Cost</div><div class="pe-metric-val">$'+(dailyCost?Math.round(dailyCost).toLocaleString():'—')+'</div><div class="pe-metric-sub">@ $0.15/kWh</div></div>'
+         +   '<div class="pe-metric warn"><div class="pe-metric-lbl">CO₂</div><div class="pe-metric-val">'+(dailyCo2?Math.round(dailyCo2).toLocaleString():'—')+'</div><div class="pe-metric-sub">kg/day</div></div>'
          + '</div>';
     }
 
-    // ── MEP SYSTEMS (BIM buildings only) ──
+    // ── MEP LED GRID (BIM buildings only) ──
     if(b.bim){
-      var meps=[{name:'HVAC Duct',color:'#22d3ee'},{name:'Hot Water',color:'#f87171'},{name:'Cold Water',color:'#60a5fa'},{name:'Electrical',color:'#fbbf24'},{name:'Fire Protection',color:'#f97316'},{name:'Sanitary',color:'#a78bfa'},{name:'Storm Drain',color:'#34d399'},{name:'Plumbing Vent',color:'#e879f9'}];
-      h += '<div class="pe-section-hdr"><span>BIM · MEP Systems</span><span><span class="pe-mep-cnt">'+(b.mep||meps.length)+'</span> tracked</span></div>';
-      h += '<div class="pe-mep-wrap"><div class="mep-grid">';
-      meps.forEach(function(m){ h += '<div class="mep-chip"><span class="mep-dot" style="background:'+m.color+'"></span>'+m.name+'</div>'; });
-      h += '</div></div>';
+      var meps=[{n:'HVAC',col:'#22d3ee'},{n:'HW',col:'#f87171'},{n:'CW',col:'#60a5fa'},{n:'EL',col:'#fbbf24'},{n:'FP',col:'#f97316'},{n:'SAN',col:'#a78bfa'},{n:'STRM',col:'#34d399'},{n:'VENT',col:'#e879f9'}];
+      h += '<div class="pe-sec"><span>MEP Systems</span><span>'+(b.mep||meps.length)+' tracked</span></div>';
+      h += '<div class="pe-leds">';
+      meps.forEach(function(m){
+        h += '<div class="pe-led"><span class="pe-led-dot" style="background:'+m.col+';box-shadow:0 0 5px '+m.col+'88"></span>'+m.n+'</div>';
+      });
+      h += '</div>';
     }
 
-    // ── ACTIONS ──
+    // ── ACTIONS — monospace rectangular buttons ──
     h += '<div class="pe-actions">';
     if(b.xr){
-      h += '<a class="pe-btn pe-btn-xr" href="'+b.xr+'" target="_blank">🏗 Open 3D BIM Viewer →</a>';
+      h += '<a class="pe-btn pe-btn-xr" href="'+b.xr+'" target="_blank">▸ Open 3D BIM Viewer</a>';
     }
     if(kw!=null){
-      h += '<a class="pe-btn pe-btn-primary" href="campus-energy-dashboard.html">📊 Full Analytics</a>';
+      h += '<a class="pe-btn pe-btn-primary" href="campus-energy-dashboard.html">▸ Full Analytics</a>';
     }
     var bUrl=getBerkeleyUrl(b.id);
-    h += '<a class="pe-btn" href="'+bUrl+'" target="_blank">🏛 Campus Info</a>';
-    h += '<a class="pe-btn" href="comfort-dashboard.html">🌡 Comfort</a>';
+    h += '<a class="pe-btn" href="'+bUrl+'" target="_blank">Campus Info</a>';
+    h += '<a class="pe-btn" href="comfort-dashboard.html">Comfort</a>';
     h += '</div>';
 
     h += '</div>'; // end .pe-body
     pop.innerHTML = h;
     pop.classList.add('vis');
 
-    // ── Wire Engineer sparkline hover ──
+    // ── Wire Engineer chart hover (uses the same-size SVG coords) ──
     if(sparkData && sparkData.length>2){
-      var chart=document.getElementById('peSparkChart');
-      var tip  =document.getElementById('peSparkTip');
-      var guide=document.getElementById('peSparkGuide');
-      var dotEl=document.getElementById('peSparkDot');
+      var chart=document.getElementById('peChartSvg');
+      var wrap=chart && chart.parentElement;
+      var tip  =document.getElementById('peChartTip');
+      var guide=document.getElementById('peChartGuide');
+      var dotEl=document.getElementById('peChartDot');
       if(chart && tip && guide && dotEl){
-        var dd=sparkData, nSp2=dd.length;
-        var loV=Math.min.apply(null,dd), hiV=Math.max.apply(null,dd), rV=hiV-loV||1;
-        var svgW=320, svgH=56;
-        function updE(clientX){
+        var dd2=sparkData, nP2=dd2.length;
+        var lo2=Math.min.apply(null,dd2), hi2=Math.max.apply(null,dd2);
+        function niceStep2(r){if(r<5)return 2;if(r<12)return 5;if(r<25)return 10;if(r<60)return 25;if(r<150)return 50;return Math.ceil(r/100)*100}
+        var pad2=(hi2-lo2)*0.15||1;
+        var stp2=niceStep2(hi2-lo2+pad2*2);
+        var yMin2=Math.max(0,Math.floor((lo2-pad2*0.3)/stp2)*stp2);
+        var yMax2=Math.ceil((hi2+pad2*0.5)/stp2)*stp2;
+        var yR2=yMax2-yMin2||1;
+        var W2=360,H2=120,ML2=32,MR2=6,MT2=8,MB2=20;
+        var plotW2=W2-ML2-MR2, plotH2=H2-MT2-MB2;
+        function updC(clientX){
           var rect=chart.getBoundingClientRect();
-          var rel=Math.max(0,Math.min(1,(clientX-rect.left)/rect.width));
-          var idx=Math.round(rel*(nSp2-1));
-          var v=dd[idx];
-          var minsAgo=(nSp2-1-idx)*15;
+          // Map clientX → plot coordinate, taking margins into account
+          var relX = (clientX-rect.left)/rect.width;  // 0..1 in SVG space
+          var svgX = relX*W2;
+          var plotX = svgX - ML2;
+          var fracInPlot = Math.max(0,Math.min(1, plotX/plotW2));
+          var idx = Math.round(fracInPlot*(nP2-1));
+          var v = dd2[idx];
+          var minsAgo=(nP2-1-idx)*15;
           var timeLbl = minsAgo===0 ? 'now' : (minsAgo>=60 ? ((minsAgo/60).toFixed(minsAgo%60===0?0:1)+'hr ago') : (minsAgo+'m ago'));
-          var svgX=(idx/(nSp2-1))*svgW;
-          var svgY=svgH-((v-loV)/rV)*(svgH-4)-2;
-          guide.setAttribute('x1',svgX); guide.setAttribute('x2',svgX);
-          guide.setAttribute('opacity','0.65');
-          dotEl.setAttribute('cx',svgX); dotEl.setAttribute('cy',svgY);
+          var gx = ML2 + (idx/(nP2-1))*plotW2;
+          var gy = MT2 + plotH2 - ((v-yMin2)/yR2)*plotH2;
+          guide.setAttribute('x1',gx); guide.setAttribute('x2',gx);
+          guide.setAttribute('opacity','0.7');
+          dotEl.setAttribute('cx',gx); dotEl.setAttribute('cy',gy);
           dotEl.setAttribute('opacity','1');
-          var tipX=rel*rect.width;
-          tipX=Math.max(46,Math.min(rect.width-46,tipX));
+          // Tooltip sits above the plot area inside the wrapper
+          var tipX=(gx/W2)*rect.width;
+          tipX=Math.max(54,Math.min(rect.width-54,tipX));
           tip.style.left=tipX+'px';
-          tip.innerHTML=(v>=100?Math.round(v):v.toFixed(1))+' kW<div class="pe-spark-tip-sub">'+timeLbl+'</div>';
+          tip.style.top = ((gy/H2)*rect.height - 34) + 'px';
+          var dlt = avg6!=null ? (v-avg6) : null;
+          tip.innerHTML = '<b>'+(v>=100?Math.round(v):v.toFixed(1))+' kW</b>'
+                        + '<div class="pe-chart-tip-sub">'+timeLbl
+                        + (dlt!=null?' · Δavg '+(dlt>=0?'+':'')+dlt.toFixed(1):'')
+                        + '</div>';
           tip.classList.add('vis');
         }
-        function hideE(){ tip.classList.remove('vis'); guide.setAttribute('opacity','0'); dotEl.setAttribute('opacity','0'); }
-        chart.addEventListener('mousemove', function(e){ updE(e.clientX); });
-        chart.addEventListener('mouseleave', hideE);
-        chart.addEventListener('touchmove', function(e){ if(e.touches[0]){ updE(e.touches[0].clientX); e.preventDefault(); }}, {passive:false});
-        chart.addEventListener('touchend', hideE);
+        function hideC(){ tip.classList.remove('vis'); guide.setAttribute('opacity','0'); dotEl.setAttribute('opacity','0'); }
+        chart.addEventListener('mousemove', function(e){ updC(e.clientX); });
+        chart.addEventListener('mouseleave', hideC);
+        chart.addEventListener('touchmove', function(e){ if(e.touches[0]){ updC(e.touches[0].clientX); e.preventDefault(); }}, {passive:false});
+        chart.addEventListener('touchend', hideC);
       }
     }
   }
@@ -1149,7 +1314,9 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   window.showPopPub=showPopPub;
 
   view.on('click',evt=>view.hitTest(evt).then(res=>{
-    const hit=res.results.find(r=>r.graphic?.attributes?.idx!==undefined);
+    // Prefer the core dot (no deco flag) over the halo/ring when both are hit at the same point.
+    const hit=res.results.find(r=>r.graphic?.attributes?.idx!==undefined && !r.graphic.attributes.deco)
+           || res.results.find(r=>r.graphic?.attributes?.idx!==undefined);
     if(hit){
       const b=D[hit.graphic.attributes.idx];
       sel=hit.graphic.attributes.idx;
