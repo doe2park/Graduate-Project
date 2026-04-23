@@ -205,8 +205,8 @@
   <!-- HERO: homes-equivalence as the headline -->
   <div class="po-hero">
     <div class="po-hero-num" id="poHomesNum">—</div>
-    <div class="po-hero-lbl"><span class="po-hero-bolt po-bolt" id="poHeart">⚡</span> homes worth of power right now</div>
-    <div class="po-hero-sub" id="poHeartVal">— kW</div>
+    <div class="po-hero-lbl"><span class="po-hero-bolt po-bolt" id="poHeart">⚡</span> <span id="poHeroLbl">average homes could run on what Grimes uses right now</span></div>
+    <div class="po-hero-sub" id="poHeartVal">— kW flowing in</div>
     <div class="po-hero-pill"><span class="po-activity typical" id="poActVal">—</span></div>
     <span id="poBpm" style="display:none"></span>
   </div>
@@ -215,7 +215,7 @@
   <div class="po-vital">
     <div class="po-ico">⚖</div>
     <div class="po-v">
-      <div class="po-v-lbl">Where the power goes <span class="po-v-sub">HVAC vs plugs &amp; lights</span></div>
+      <div class="po-v-lbl">Where the power goes right now <span class="po-v-sub">cooling the air vs running the gear</span></div>
       <div class="po-v-bar"><div class="po-v-split" id="poFlowFill"></div><div class="po-v-split-b" id="poFlowFillB"></div></div>
       <div class="po-v-val" id="poSplitVal">—</div>
     </div>
@@ -2350,7 +2350,7 @@ function updatePublicStory(){
   if(heart)heart.style.animationDuration=beatSec.toFixed(2)+'s';
   var homesNum=document.getElementById('poHomesNum');
   if(homesNum)homesNum.textContent=homes.toLocaleString();
-  if(heartVal)heartVal.innerHTML='≈ '+Math.round(totalKw)+' kW';
+  if(heartVal)heartVal.innerHTML=Math.round(totalKw)+' kW flowing in right now';
 
   // Energy mix — real HVAC vs plug split, drawn as a two-color split bar (no "blood")
   var splitTotal=Math.max(1,subA+subB);
@@ -2359,7 +2359,16 @@ function updatePublicStory(){
   var flowFillB=$('poFlowFillB');
   if(flowFill)flowFill.style.width=hvacPct+'%';
   if(flowFillB)flowFillB.style.width=plugPct+'%';
-  if(splitVal)splitVal.innerHTML='HVAC <span class="po-num">'+hvacPct+'%</span> · Plugs &amp; lights <span class="po-num">'+plugPct+'%</span>';
+  // Plain-English split: technical split still readable (kW numbers preserved in caption) but framed as verbs a visitor understands
+  if(splitVal){
+    var hvacKw=Math.round(subA),plugKw=Math.round(subB);
+    splitVal.innerHTML=
+      '<span style="color:#fbbf24">🌡 Keeping the air comfy</span> <span class="po-num">'+hvacPct+'%</span> '+
+      '<span style="color:#64748b">('+hvacKw+' kW)</span>'+
+      ' <span style="color:#475569">·</span> '+
+      '<span style="color:#7dd3fc">💡 Running lights &amp; gear</span> <span class="po-num">'+plugPct+'%</span> '+
+      '<span style="color:#64748b">('+plugKw+' kW)</span>';
+  }
 
   // Fresh air — qualitative ventilation turnover tied to real HVAC draw
   var hvacRatio=Math.min(1,Math.max(0,subA/120));
@@ -2380,7 +2389,12 @@ function updatePublicStory(){
   if(todayVal){
     var tt=peakTime?peakTime.split(' ')[1]:'';
     var hrsLbl=hoursSoFar<1?Math.round(hoursSoFar*60)+' min':hoursSoFar.toFixed(1)+' hrs';
-    todayVal.innerHTML='<span class="po-num">'+todayKwh.toLocaleString()+'</span> kWh in '+hrsLbl+' · peak <span class="po-num">'+Math.round(peakKw)+'</span> kW'+(tt?' at '+tt.slice(0,5):'');
+    // Avg US home uses ~29 kWh/day (EIA 2022) — gives a tangible anchor instead of raw kWh
+    var homeDays=Math.max(1,Math.round(todayKwh/29));
+    todayVal.innerHTML=
+      '<span class="po-num">'+todayKwh.toLocaleString()+'</span> kWh used in '+hrsLbl+
+      ' <span class="po-v-sub" style="margin-left:0">≈ '+homeDays.toLocaleString()+' home'+(homeDays===1?'':'s')+' for a full day</span>'+
+      '<br><span style="color:#94a3b8;font-size:11px">Peak so far <span class="po-num">'+Math.round(peakKw)+'</span> kW'+(tt?' at '+tt.slice(0,5):'')+'</span>';
   }
 
   // Water — current rate + real today cumulative from water_rate.avg × elapsed minutes
@@ -2393,8 +2407,15 @@ function updatePublicStory(){
   var wGal=Math.round(wTodayCf*7.48);  // 1 cubic foot ≈ 7.48 US gallons
   var wGpm=wRate*7.48;  // current flow in gallons per minute
   if(waterVal){
-    if(wRate>0.01)waterVal.innerHTML='<span class="po-num">'+wGpm.toFixed(1)+'</span> gpm';
-    else waterVal.innerHTML='<span class="po-num">'+wGal.toLocaleString()+'</span> gal today';
+    // 1 standard bathtub ≈ 40 gal — tangible anchor for "how much water is that really?"
+    var tubs=Math.round(wGal/40);
+    if(wRate>0.01){
+      waterVal.innerHTML='<span class="po-num">'+wGpm.toFixed(1)+'</span> gal/min flowing';
+    } else if(wGal>40){
+      waterVal.innerHTML='<span class="po-num">'+wGal.toLocaleString()+'</span> gal today <span style="color:#94a3b8;font-size:10px">(≈ '+tubs.toLocaleString()+' bathtub'+(tubs===1?'':'s')+')</span>';
+    } else {
+      waterVal.innerHTML='<span class="po-num">'+wGal.toLocaleString()+'</span> gal today';
+    }
   }
 
   // Activity vs typical — pill, no emoji
