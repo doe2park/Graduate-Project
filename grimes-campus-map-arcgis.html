@@ -213,7 +213,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .esri-ui-corner .esri-component{border-radius:9px!important}
 
 /* Campus Mood pill (top-center) */
-#campusMood{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:12;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;padding:7px 16px;font-size:11px;color:var(--text);max-width:min(560px,calc(100vw - 160px));text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .4s}
+#campusMood{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:12;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:999px;padding:7px 16px;font-size:11px;color:var(--text);max-width:min(440px,calc(100vw - 380px));text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .4s}
 #campusMood.ready{opacity:1}
 #campusMood .cm-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:baseline;background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.55);animation:cmPulse 2.6s ease-in-out infinite}
 #campusMood.busy .cm-dot{background:#f87171;box-shadow:0 0 8px rgba(248,113,113,.55)}
@@ -256,10 +256,24 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pub-mini-lbl{font-size:9px;color:var(--dim);margin-bottom:3px;letter-spacing:.4px}
 .pub-mini-val{font-size:13px;font-weight:600;color:var(--text);font-family:var(--mono)}
 .pub-mini-sub{font-size:9px;color:var(--dim);margin-top:2px}
-#modeToggle{position:absolute;top:12px;right:345px;z-index:25;display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(12px)}
+/* Hero block — campus total power */
+.pub-hero{padding:14px 16px 12px;border-bottom:1px solid var(--border);text-align:center}
+.pub-hero-num{font-family:var(--mono);font-size:42px;font-weight:700;color:#FDB515;line-height:1;letter-spacing:-1px;text-shadow:0 0 14px rgba(253,181,21,.18)}
+.pub-hero-lbl{font-size:11.5px;color:#cbd5e1;margin-top:6px;letter-spacing:.2px}
+.pub-hero-bolt{display:inline-block;margin-right:3px;color:#FDB515;animation:pubHeroBolt 1.4s ease-in-out infinite}
+@keyframes pubHeroBolt{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:1;transform:scale(1.15)}}
+.pub-hero-sub{font-size:10.5px;color:#94a3b8;font-family:var(--mono);margin-top:4px}
+/* Stacked horizontal bar — energy mix by category */
+.pub-mix-bar{display:flex;width:100%;height:18px;border-radius:5px;overflow:hidden;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.05)}
+.pub-mix-seg{height:100%;transition:width .6s ease;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(0,0,0,.7);font-weight:700;overflow:hidden;white-space:nowrap}
+.pub-mix-legend{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:4px}
+.pub-mix-lg-row{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text)}
+.pub-mix-lg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.pub-mix-lg-num{margin-left:auto;font-family:var(--mono);color:var(--dim);font-size:9.5px}
+#modeToggle{position:absolute;top:12px;left:56px;z-index:25;display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(12px)}
 #modeToggle button{padding:6px 12px;font-size:10px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--dim)}
 #modeToggle button.active{background:var(--gold);color:#000}
-@media(max-width:768px){#pubPanel{width:calc(100vw - 24px);right:12px;top:auto;bottom:60px;max-height:60vh;overflow-y:auto}#modeToggle{right:auto;left:56px;top:12px}}
+@media(max-width:768px){#pubPanel{width:calc(100vw - 24px);right:12px;top:auto;bottom:60px;max-height:60vh;overflow-y:auto}#modeToggle{left:56px;top:auto;bottom:60px}}
 </style>
 </head>
 <body>
@@ -291,42 +305,48 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
     <button id="modePub" onclick="setMode('pub')">👤 Public</button>
   </div>
 
-  <!-- Public Dashboard — peer-comparison framing -->
+  <!-- Public Dashboard — Berkeley-internal framing (no external benchmarks) -->
   <div id="pubPanel">
     <div class="pub-hdr">
-      <div style="font-size:10px;color:var(--dim);letter-spacing:.6px">UC BERKELEY CAMPUS</div>
-      <div style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px">Energy at a glance</div>
-      <div style="font-size:10px;color:var(--dim);margin-top:3px;line-height:1.4">How does Berkeley stack up against UC peers and national benchmarks?</div>
+      <div style="font-size:10px;color:var(--dim);letter-spacing:.6px">UC BERKELEY · LIVE</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px">Campus right now</div>
+      <div style="font-size:10px;color:var(--dim);margin-top:3px;line-height:1.4">Where the power is going across <span id="pubMonitorCount">26</span> monitored buildings.</div>
     </div>
 
-    <!-- Peer comparison: EUI bar chart -->
-    <div class="pub-row" style="flex-direction:column;gap:4px;align-items:stretch">
-      <div style="display:flex;align-items:center;gap:10px;width:100%">
-        <div class="pub-icon">📊</div>
-        <div class="pub-label">How Berkeley compares</div>
-      </div>
-      <div id="pubCompare" style="width:100%"></div>
-      <div class="cmp-cap">kBtu / sqft / yr · lower = more efficient · sources: UCOP, EPA ENERGY STAR, peer sustainability reports</div>
+    <!-- HERO: total campus load right now -->
+    <div class="pub-hero">
+      <div class="pub-hero-num" id="pubHeroKw">—</div>
+      <div class="pub-hero-lbl"><span class="pub-hero-bolt">⚡</span> being used across campus right now</div>
+      <div class="pub-hero-sub" id="pubHeroHomes">≈ — homes worth of power</div>
     </div>
 
-    <!-- Live snapshot: 2×2 mini grid -->
+    <!-- Energy mix by category — REAL Berkeley data, no peer estimates -->
     <div class="pub-row" style="flex-direction:column;gap:6px;align-items:stretch">
-      <div class="pub-label" style="width:100%">Right now on Berkeley campus</div>
+      <div style="display:flex;align-items:center;gap:10px;width:100%">
+        <div class="pub-icon">🏢</div>
+        <div class="pub-label">Where the power goes</div>
+      </div>
+      <div id="pubMixBar" class="pub-mix-bar"></div>
+      <div id="pubMixLegend" class="pub-mix-legend"></div>
+    </div>
+
+    <!-- Today's footprint: 2-up mini grid -->
+    <div class="pub-row" style="flex-direction:column;gap:6px;align-items:stretch">
+      <div class="pub-label" style="width:100%">Today's footprint (so far)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">
-        <div class="pub-mini"><div class="pub-mini-lbl">⚡ LOAD</div><div class="pub-mini-val" id="pubKw">—</div></div>
-        <div class="pub-mini"><div class="pub-mini-lbl">🏢 ONLINE</div><div class="pub-mini-val" id="pubBldgs">—</div></div>
-        <div class="pub-mini"><div class="pub-mini-lbl">💰 COST TODAY</div><div class="pub-mini-val" id="pubCost">—</div></div>
-        <div class="pub-mini"><div class="pub-mini-lbl">🌱 CO₂ TODAY</div><div class="pub-mini-val" id="pubCo2">—</div><div class="pub-mini-sub" id="pubCo2Eq">—</div></div>
+        <div class="pub-mini"><div class="pub-mini-lbl">💰 COST</div><div class="pub-mini-val" id="pubCost">—</div><div class="pub-mini-sub">at $0.15/kWh</div></div>
+        <div class="pub-mini"><div class="pub-mini-lbl">🌱 CO₂</div><div class="pub-mini-val" id="pubCo2">—</div><div class="pub-mini-sub" id="pubCo2Eq">—</div></div>
       </div>
     </div>
 
-    <!-- Top 3 -->
+    <!-- Top 3 buildings -->
     <div class="pub-row" style="flex-direction:column;gap:4px;align-items:stretch">
       <div style="display:flex;align-items:center;gap:10px;width:100%">
         <div class="pub-icon">🔝</div>
         <div class="pub-label">Top energy users right now</div>
       </div>
       <div id="pubTop3" style="width:100%;font-size:10px;color:var(--text)"></div>
+      <div class="cmp-cap">Pulsing markers on the map = these top users.</div>
     </div>
 
     <div class="pub-tip" id="pubTip">💡 Peak hours are typically 2-5 PM. Energy use drops ~40% overnight.</div>
@@ -341,6 +361,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#FDB515"></div> Medium (100-300kW)</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#f87171"></div> High (&gt;300kW)</div>
     <div class="ts-legend-row"><div class="ts-legend-bar" style="background:#787878"></div> No data</div>
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:9px;color:var(--dim);line-height:1.35">⏱ Pulsing markers = today's <b style="color:var(--text)">top 5</b> energy users.</div>
   </div>
   <button id="mobileExplore" onclick="document.getElementById('sb').classList.toggle('show')"><span class="me-count">57</span> Buildings · Explore ↑</button>
   <div class="bb"><div class="bp">Powered by <b>ArcGIS JS 4.29</b></div><div class="bp">🛰️ Satellite</div></div>
@@ -475,6 +496,13 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     if(energyData){
       var vals=Object.values(energyData).map(function(b){return b.kw}).filter(function(v){return v});
       if(vals.length)maxKw=Math.max.apply(null,vals);
+      // Compute top-5 consumer IDs locally so breathing pulses always reflect the
+      // CURRENT live data, regardless of whether the Public panel has rendered yet.
+      var _ranked = Object.keys(energyData)
+        .filter(function(k){ return energyData[k] && energyData[k].kw > 0; })
+        .sort(function(a,b){ return energyData[b].kw - energyData[a].kw; })
+        .slice(0, 5);
+      window.pubTopIds = _ranked;
     }
 
     D.forEach(function(b,i){
@@ -500,7 +528,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         // Load intensity (0-1) based on kW
         var loadRatio = kw && maxKw > 0 ? Math.min(1, kw / maxKw) : 0;
 
-        // Outer glow halo — bigger and brighter with more load
+        // Outer glow halo — bigger and brighter with more load (STATIC, not animated)
         if (kw > 0) {
           var glowSize = 14 + loadRatio * 16;  // 14-30 px
           var glowAlpha = 40 + loadRatio * 100; // 40-140
@@ -511,7 +539,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
               outline:{color:[0,0,0,0],width:0}}
           });
           gL.add(glowGfx);
-          _breathers.push({gfx:glowGfx,baseSize:glowSize,baseAlpha:glowAlpha,col:glowCol,ratio:loadRatio,phase:Math.random()*Math.PI*2});
+          // Only enroll in breathing if this is a TOP consumer right now —
+          // makes the pulse carry meaning ("look at me — I'm a top user")
+          // instead of looking like random noise across the map.
+          var topIds = window.pubTopIds || [];
+          var isTop = topIds.indexOf(b.id) !== -1 || (b.anomaly === true);
+          if (isTop) {
+            _breathers.push({gfx:glowGfx,baseSize:glowSize,baseAlpha:glowAlpha,col:glowCol,ratio:Math.max(0.55,loadRatio),phase:Math.random()*Math.PI*2});
+          }
         }
 
         // Core dot — size also scales with load
@@ -1294,72 +1329,84 @@ function setMode(mode) {
   }
 }
 
-// EUI peer comparison. Numbers are published-report estimates (kBtu/sqft·yr).
-// Sources: UCOP Annual Sustainability Report, EPA ENERGY STAR Portfolio Manager
-// Higher Education benchmark, Stanford / MIT sustainability dashboards.
-// Lower EUI = more energy-efficient per sqft.
-var EUI_PEERS = [
-  { name: 'Stanford',     eui: 65,  src: 'Stanford SESI report' },
-  { name: 'UC Berkeley',  eui: 78,  src: 'Berkeley Office of Sustainability', me: true },
-  { name: 'UC system avg',eui: 85,  src: 'UCOP Sustainability 2023' },
-  { name: 'ENERGY STAR',  eui: 110, src: 'EPA — Higher-Ed median' },
-  { name: 'MIT',          eui: 135, src: 'MIT Sustainability' }
-];
+// Category palette mirrors the marker colors (C{} above).
+// Stacked-bar viz uses ONLY real Berkeley live data — no external benchmarks.
+var CAT_COLORS = {
+  'Engineering':  '#FDB515',
+  'Science':      '#34d399',
+  'Humanities':   '#a78bfa',
+  'Professional': '#60a5fa',
+  'Student Life': '#f87171',
+  'Libraries':    '#fbbf24',
+  'Other':        '#94a3b8'
+};
 
-function renderPeerCompare() {
-  var el = document.getElementById('pubCompare');
-  if (!el) return;
-  var maxEui = Math.max.apply(null, EUI_PEERS.map(function(p){ return p.eui; }));
-  var html = '';
-  EUI_PEERS.forEach(function(p) {
-    var pct = Math.round(p.eui / maxEui * 100);
-    var color = p.me ? '#FDB515' :
-                p.eui < 80 ? '#34d399' :
-                p.eui < 110 ? '#94a3b8' :
-                '#f87171';
-    html += '<div class="cmp-row' + (p.me ? ' cmp-me' : '') + '" title="' + p.src + '">';
-    html += '<span class="cmp-name">' + p.name + '</span>';
-    html += '<div class="cmp-track"><div class="cmp-fill" style="width:' + pct + '%;background:' + color + '"></div></div>';
-    html += '<span class="cmp-num" style="color:' + color + '">' + p.eui + '</span>';
-    html += '</div>';
+// Render energy mix by category (real data, %-of-total).
+function renderEnergyMix(byCat, totalKw) {
+  var bar = document.getElementById('pubMixBar');
+  var lg  = document.getElementById('pubMixLegend');
+  if (!bar || !lg) return;
+  var entries = Object.keys(byCat)
+    .map(function(c){ return {cat:c, kw:byCat[c]}; })
+    .filter(function(e){ return e.kw > 0; })
+    .sort(function(a,b){ return b.kw - a.kw; });
+
+  var barHtml = '', lgHtml = '';
+  entries.forEach(function(e){
+    var pct = totalKw > 0 ? (e.kw / totalKw * 100) : 0;
+    var color = CAT_COLORS[e.cat] || '#94a3b8';
+    var label = pct >= 12 ? Math.round(pct) + '%' : '';
+    barHtml += '<div class="pub-mix-seg" style="width:' + pct.toFixed(1) + '%;background:' + color + '" title="' + e.cat + ': ' + Math.round(e.kw) + ' kW (' + pct.toFixed(0) + '%)">' + label + '</div>';
+    lgHtml += '<div class="pub-mix-lg-row"><span class="pub-mix-lg-dot" style="background:' + color + '"></span><span>' + e.cat + '</span><span class="pub-mix-lg-num">' + Math.round(e.kw) + ' kW</span></div>';
   });
-  el.innerHTML = html;
+  bar.innerHTML = barHtml;
+  lg.innerHTML  = lgHtml;
 }
 
 function updatePublicPanel() {
   var bldgs = window.currentEnergyData;
   if (!bldgs) return;
 
-  // Render the static peer-comparison chart (idempotent — safe to call repeatedly)
-  renderPeerCompare();
-
-  var totalKw = 0, online = 0, topList = [];
+  // ── Aggregate by building + category (real Berkeley data only) ──
+  var totalKw = 0, online = 0, topList = [], byCat = {};
   for (var key in bldgs) {
     var b = bldgs[key];
-    if (b && b.kw && b.kw > 0) {
-      totalKw += b.kw;
-      online++;
-      topList.push({ name: b.name || key, kw: b.kw });
-    }
+    if (!b || !b.kw || b.kw <= 0) continue;
+    totalKw += b.kw;
+    online++;
+    topList.push({ id: key, name: b.name || key, kw: b.kw });
+    // Lookup category from the static D[] roster
+    var meta = D.find(function(d){ return d.id === key; });
+    var cat = (meta && meta.c) || 'Other';
+    byCat[cat] = (byCat[cat] || 0) + b.kw;
   }
   topList.sort(function(a, b) { return b.kw - a.kw; });
 
-  // Live load — compact for the 2×2 mini grid
-  var kwStr = totalKw > 1000 ? (totalKw / 1000).toFixed(1) + ' MW' : Math.round(totalKw) + ' kW';
-  document.getElementById('pubKw').textContent = kwStr;
+  // Stash top-N building IDs for the breathing animation to consume
+  window.pubTopIds = topList.slice(0, 5).map(function(b){ return b.id; });
 
-  // Cost — drop the per-month parenthetical to fit the small card
+  // ── Hero: total campus load ──
+  var heroEl = document.getElementById('pubHeroKw');
+  var heroSub = document.getElementById('pubHeroHomes');
+  var heroStr = totalKw > 1000 ? (totalKw / 1000).toFixed(1) + ' MW' : Math.round(totalKw) + ' kW';
+  if (heroEl) heroEl.textContent = heroStr;
+  // 1 home ≈ 1.2 kW continuous (avg US household power draw)
+  var homes = Math.max(1, Math.round(totalKw / 1.2));
+  if (heroSub) heroSub.textContent = '≈ ' + homes.toLocaleString() + ' homes worth of power';
+  var monitorCount = document.getElementById('pubMonitorCount');
+  if (monitorCount) monitorCount.textContent = online;
+
+  // ── Energy mix bar ──
+  renderEnergyMix(byCat, totalKw);
+
+  // ── Today's footprint mini cards ──
   var dailyCost = Math.round(totalKw * 24 * 0.15);
   document.getElementById('pubCost').textContent = '$' + dailyCost.toLocaleString();
 
-  // CO₂ + car-miles equivalence
   var dailyCo2 = Math.round(totalKw * 24 * 0.21);
   document.getElementById('pubCo2').textContent = dailyCo2.toLocaleString() + ' kg';
   var carMiles = Math.round(dailyCo2 / 0.41);  // ~0.41 kg CO₂ per mile (avg US car)
-  document.getElementById('pubCo2Eq').textContent = '≈ ' + carMiles.toLocaleString() + ' car miles';
-
-  // Buildings — compact ratio
-  document.getElementById('pubBldgs').textContent = online + ' / 64';
+  document.getElementById('pubCo2Eq').textContent = '≈ ' + carMiles.toLocaleString() + ' car-miles';
 
   // Top 3
   var top3Html = '';
