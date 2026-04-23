@@ -1307,7 +1307,9 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           if(sigma6!=null){ flo2=flo2-sigma6; fhi2=fhi2+sigma6; }
           lo2=Math.min(lo2,flo2); hi2=Math.max(hi2,fhi2);
         }
-        function niceStep2(r){if(r<5)return 2;if(r<12)return 5;if(r<25)return 10;if(r<60)return 25;if(r<150)return 50;return Math.ceil(r/100)*100}
+        // Must mirror chart's niceStep EXACTLY — the chart divides the range by 4 before
+        // the threshold checks; if we don't, yMin/yMax drift and the hover dot lands off the line.
+        function niceStep2(range){var raw=range/4;if(raw<5)return 2;if(raw<12)return 5;if(raw<25)return 10;if(raw<60)return 25;if(raw<150)return 50;return Math.ceil(raw/100)*100}
         var pad2=(hi2-lo2)*0.15||1;
         var stp2=niceStep2(hi2-lo2+pad2*2);
         var yMin2=Math.max(0,Math.floor((lo2-pad2*0.3)/stp2)*stp2);
