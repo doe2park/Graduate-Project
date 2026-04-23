@@ -199,6 +199,17 @@
   .po-dot.on { background:#6ee7b7; box-shadow:0 0 6px rgba(110,231,183,.5); }
   .po-tubs { font-size:13px; line-height:1.3; letter-spacing:.5px; }
   .po-tubs-count { display:block; font-family:var(--mono); color:#38bdf8; font-weight:700; font-size:10.5px; margin-top:3px; }
+  /* Subtle live-freshness footer: just a pulsing dot + timestamp, no instructions */
+  .po-fresh { margin-top:14px; padding-top:10px; border-top:1px solid rgba(255,255,255,.05); display:flex; align-items:center; justify-content:center; gap:6px; font-size:9.5px; color:#64748b; letter-spacing:.4px; text-transform:uppercase; font-family:var(--mono); }
+  .po-fresh-dot { width:6px; height:6px; border-radius:50%; background:#22c55e; box-shadow:0 0 5px rgba(34,197,94,.55); animation:poFreshDot 2s ease-in-out infinite; flex-shrink:0; }
+  @keyframes poFreshDot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.45;transform:scale(.85)} }
+  /* kW caption in split legend */
+  .po-split-kw { font-family:var(--mono); color:#94a3b8; font-size:9.5px; margin-left:4px; }
+  /* Sparkline hover tooltip + guide line */
+  .po-spark-tip { position:absolute; top:-34px; background:rgba(10,14,26,.95); border:1px solid rgba(253,181,21,.3); border-radius:5px; padding:4px 8px; font-size:10px; color:#f8fafc; font-family:var(--mono); white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .15s; transform:translateX(-50%); z-index:3; }
+  .po-spark-tip.show { opacity:1; }
+  .po-spark-tip b { color:#FDB515; font-weight:700; }
+  .po-spark { cursor:crosshair; }
   @media(max-width:768px) { #publicOverlay { left:10px;right:10px;top:46px;width:auto; } }
 </style>
 </head>
@@ -233,13 +244,15 @@
     <div class="po-homes-lbl" id="poHomesLbl">—</div>
   </div>
 
-  <!-- 24hr sparkline chart -->
+  <!-- 24hr sparkline chart (hover for value) -->
   <div class="po-spark-wrap">
     <div class="po-spark-hdr">
       <span class="po-spark-lbl">Last 24 hours</span>
       <span class="po-spark-peak" id="poSparkPeak">—</span>
     </div>
-    <div class="po-spark" id="poSpark"></div>
+    <div class="po-spark" id="poSpark" style="position:relative">
+      <div class="po-spark-tip" id="poSparkTip"></div>
+    </div>
     <div class="po-spark-axis" id="poSparkAxis"><span>24h ago</span><span>18h</span><span>12h</span><span>6h</span><span>now</span></div>
   </div>
 
@@ -253,8 +266,8 @@
       <div class="po-v-split-b" id="poFlowFillB"></div>
     </div>
     <div class="po-split-legend">
-      <span class="po-split-lg"><span class="po-sw" style="background:linear-gradient(90deg,#FDB515,#f59e0b)"></span>🌡 Air comfort <b id="poSplitA">—</b></span>
-      <span class="po-split-lg"><span class="po-sw" style="background:linear-gradient(90deg,#7dd3fc,#38bdf8)"></span>💡 Lights/gear <b id="poSplitB">—</b></span>
+      <span class="po-split-lg"><span class="po-sw" style="background:linear-gradient(90deg,#FDB515,#f59e0b)"></span>🌡 Air comfort <b id="poSplitA">—</b><span class="po-split-kw" id="poSplitAKw">—</span></span>
+      <span class="po-split-lg"><span class="po-sw" style="background:linear-gradient(90deg,#7dd3fc,#38bdf8)"></span>💡 Lights/gear <b id="poSplitB">—</b><span class="po-split-kw" id="poSplitBKw">—</span></span>
     </div>
   </div>
 
@@ -270,7 +283,7 @@
     </div>
   </div>
 
-  <div class="po-hint" id="poFresh">Tap the 3D model to peek inside any system.</div>
+  <div class="po-fresh" id="poFresh"><span class="po-fresh-dot"></span><span id="poFreshTxt">live</span></div>
 </div>
 
 <!-- Tour Overlay -->
@@ -1185,9 +1198,11 @@ function mepOnTimeChange(val) {
   const ts = mepGetTimeSeries();
   if (!ts.length) return;
   const slider = document.getElementById('mepTimeRange');
+  if (!slider) return;  // UI was removed; nothing to drive
   const isLive = val >= ts.length - 1;
   mepIsLive = isLive;
-  document.getElementById('mepTimeVal').textContent = isLive ? 'Live' : (ts[val]?.t || '--');
+  var tvEl = document.getElementById('mepTimeVal');
+  if (tvEl) tvEl.textContent = isLive ? 'Live' : (ts[val]?.t || '--');
 
   if (isLive) {
     // Restore live data
@@ -1251,6 +1266,7 @@ function mepOnTimeChange(val) {
 function mepTogglePlay() {
   const btn = document.getElementById('mepPlayBtn');
   const slider = document.getElementById('mepTimeRange');
+  if (!btn || !slider) return;  // UI was removed in earlier cleanup
   if (mepPlayInterval) {
     clearInterval(mepPlayInterval);
     mepPlayInterval = null;
@@ -1283,6 +1299,7 @@ function initMepTimeSlider() {
   const ts = mepGetTimeSeries();
   if (ts.length) {
     const slider = document.getElementById('mepTimeRange');
+    if (!slider) return;  // slider UI was removed in earlier cleanup; bail silently
     slider.max = ts.length - 1;
     slider.value = ts.length - 1;
   }
@@ -2410,9 +2427,12 @@ function updatePublicStory(){
   var flowFill=$('poFlowFill'),flowFillB=$('poFlowFillB');
   if(flowFill)flowFill.style.width=hvacPct+'%';
   if(flowFillB)flowFillB.style.width=plugPct+'%';
-  var sA=$('poSplitA'),sB=$('poSplitB');
+  var sA=$('poSplitA'),sB=$('poSplitB'),sAkw=$('poSplitAKw'),sBkw=$('poSplitBKw');
   if(sA)sA.textContent=hvacPct+'%';
   if(sB)sB.textContent=plugPct+'%';
+  // Show the live kW reading that drives each half — makes it clear the split is real-data, not invented
+  if(sAkw)sAkw.textContent=Math.round(subA)+' kW';
+  if(sBkw)sBkw.textContent=Math.round(subB)+' kW';
 
   // Ventilation — 5-dot gauge; HVAC draw drives fill (gold tint when high, green when normal)
   var hvacRatio=Math.min(1,Math.max(0,subA/120));
@@ -2442,19 +2462,20 @@ function updatePublicStory(){
     tubsEl.innerHTML=tubIcons+extra+'<span class="po-tubs-count">'+sublbl+'</span>';
   }
 
-  // Freshness line at bottom — compact
-  if(fresh&&ld.generated_at){
+  // Freshness — just a pulsing dot + minimal timestamp, no extra prose
+  var freshTxt=$('poFreshTxt');
+  if(freshTxt&&ld.generated_at){
     var g=new Date(ld.generated_at.replace(' ','T'));
     var mins=Math.max(0,Math.round((Date.now()-g.getTime())/60000));
-    var ago=mins<1?'just now':mins+' min ago';
-    fresh.textContent='Reading '+ago+' · tap any system in the 3D model to peek inside';
+    freshTxt.textContent=mins<1?'live · just now':'live · updated '+mins+'m ago';
   }
 }
 
-// Draw 24-hour sparkline (SVG) of total-building kW with peak marker + blinking "now" dot
+// Draw 24-hour sparkline (SVG) of total-building kW with peak marker + blinking "now" dot + hover tooltip
 function renderSpark(series){
   var el=document.getElementById('poSpark');
   var peakEl=document.getElementById('poSparkPeak');
+  var tipEl=document.getElementById('poSparkTip');
   if(!el) return;
   if(!series||series.length<2){
     el.innerHTML='<div style="color:#64748b;font-size:10px;padding:18px 0;text-align:center">Gathering data…</div>';
@@ -2480,6 +2501,7 @@ function renderSpark(series){
   var peakY=pad+(1-(mx-mn)/range)*(H-pad*2);
   var curX=pad+(W-pad*2);
   var curY=pad+(1-(series[n-1].v-mn)/range)*(H-pad*2);
+  // hover guide line + dot — hidden by default, moved on mousemove
   var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'+
     '<defs><linearGradient id="poSparkGrad" x1="0" x2="0" y1="0" y2="1">'+
       '<stop offset="0%" stop-color="#FDB515" stop-opacity=".35"/>'+
@@ -2487,16 +2509,61 @@ function renderSpark(series){
     '</linearGradient></defs>'+
     '<path d="'+areaPath+'" fill="url(#poSparkGrad)"/>'+
     '<path d="'+path+'" fill="none" stroke="#FDB515" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'+
+    '<line id="poSparkGuide" x1="0" x2="0" y1="'+pad+'" y2="'+(H-pad)+'" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="2,2" opacity="0" style="pointer-events:none"/>'+
+    '<circle id="poSparkHoverDot" cx="0" cy="0" r="3.5" fill="#f1f5f9" stroke="#0a0e1a" stroke-width="1" opacity="0" style="pointer-events:none"/>'+
     '<circle cx="'+peakX.toFixed(1)+'" cy="'+peakY.toFixed(1)+'" r="3" fill="#FDB515" stroke="#0a0e1a" stroke-width="1"/>'+
     '<circle cx="'+curX.toFixed(1)+'" cy="'+curY.toFixed(1)+'" r="3.5" fill="#2dd4bf" stroke="#0a0e1a" stroke-width="1"><animate attributeName="r" values="3.5;5.5;3.5" dur="1.6s" repeatCount="indefinite"/></circle>'+
     '</svg>';
-  el.innerHTML=svg;
+  // Preserve the tooltip div (child of #poSpark) across re-renders by only replacing the SVG.
+  // Find existing svg and replace; if none, prepend.
+  var existingSvg=el.querySelector('svg');
+  if(existingSvg) existingSvg.outerHTML=svg;
+  else el.insertAdjacentHTML('afterbegin',svg);
   if(peakEl){
     var ptime=series[peakIdx].t||'';
     var pt=ptime.split(' ')[1]||'';
     var pts12=pt.slice(0,5);
     peakEl.textContent='peak '+Math.round(mx)+' kW'+(pts12?' · '+pts12:'');
   }
+  // Hover interactivity — bind once per render
+  var svgEl=el.querySelector('svg');
+  if(!svgEl||!tipEl) return;
+  var guide=svgEl.querySelector('#poSparkGuide');
+  var hoverDot=svgEl.querySelector('#poSparkHoverDot');
+  function fmtTime(tstr){
+    // tstr like "2026-04-20 14:30:00" → "14:30"
+    if(!tstr) return '';
+    var parts=tstr.split(' ');
+    return (parts[1]||'').slice(0,5);
+  }
+  function onMove(e){
+    var rect=svgEl.getBoundingClientRect();
+    var relX=Math.max(0,Math.min(rect.width,e.clientX-rect.left));
+    var fx=relX/rect.width;  // 0..1
+    var idx=Math.round(fx*(n-1));
+    idx=Math.max(0,Math.min(n-1,idx));
+    var vx=pad+idx/(n-1)*(W-pad*2);
+    var vy=pad+(1-(series[idx].v-mn)/range)*(H-pad*2);
+    if(guide){guide.setAttribute('x1',vx);guide.setAttribute('x2',vx);guide.setAttribute('opacity','0.45');}
+    if(hoverDot){hoverDot.setAttribute('cx',vx);hoverDot.setAttribute('cy',vy);hoverDot.setAttribute('opacity','1');}
+    // Position tooltip in pixel coords of the container; clamp to stay inside
+    var tipLeft=relX;
+    var tipW=70;  // approx
+    tipLeft=Math.max(tipW/2,Math.min(rect.width-tipW/2,tipLeft));
+    tipEl.style.left=tipLeft+'px';
+    tipEl.innerHTML='<b>'+Math.round(series[idx].v)+' kW</b> · '+fmtTime(series[idx].t);
+    tipEl.classList.add('show');
+  }
+  function onLeave(){
+    if(guide)guide.setAttribute('opacity','0');
+    if(hoverDot)hoverDot.setAttribute('opacity','0');
+    tipEl.classList.remove('show');
+  }
+  svgEl.addEventListener('mousemove',onMove);
+  svgEl.addEventListener('mouseleave',onLeave);
+  // Touch support — single-finger drag reads values
+  svgEl.addEventListener('touchmove',function(e){ if(e.touches&&e.touches[0]){ onMove({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); e.preventDefault(); } },{passive:false});
+  svgEl.addEventListener('touchend',onLeave);
 }
 
 // The main Grimes data lives in a <script type="module">, whose top-level
