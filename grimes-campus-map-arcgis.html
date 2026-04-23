@@ -240,16 +240,27 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pe-chart-legend{display:flex;justify-content:space-between;margin-top:4px;font-family:var(--mono);font-size:8.5px;color:#64748b;letter-spacing:.5px}
 /* Raw samples table — totally absent from Public */
 .pe-samples{margin-top:4px;background:rgba(15,23,42,.4);border:1px solid rgba(34,211,238,.08);border-radius:3px;overflow:hidden}
-.pe-samples table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums}
-.pe-samples th{background:rgba(34,211,238,.05);color:#64748b;font-weight:600;text-align:left;padding:6px 10px;letter-spacing:.8px;text-transform:uppercase;font-size:8.5px;border-bottom:1px solid rgba(34,211,238,.15)}
-.pe-samples td{padding:4px 10px;color:#cbd5e1;border-bottom:1px solid rgba(255,255,255,.02)}
+.pe-samples table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:9.5px;font-variant-numeric:tabular-nums}
+.pe-samples th{background:rgba(34,211,238,.05);color:#64748b;font-weight:700;text-align:left;padding:5px 7px;letter-spacing:.7px;text-transform:uppercase;font-size:8px;border-bottom:1px solid rgba(34,211,238,.15)}
+.pe-samples td{padding:3px 7px;color:#cbd5e1;border-bottom:1px solid rgba(255,255,255,.02);white-space:nowrap}
 .pe-samples tr:last-child td{border-bottom:0}
-.pe-samples tr.now td{background:rgba(52,211,153,.06);color:var(--green)}
+.pe-samples tr.now td{background:rgba(52,211,153,.08);color:var(--green)}
+.pe-samples tr.fcast td{background:rgba(34,211,238,.04);color:#93c5fd;font-style:italic}
+.pe-samples tr.fcast td.col-time{color:#64748b}
+.pe-samples tr.anom td{background:rgba(248,113,113,.05)}
+.pe-samples tr.foot td{background:rgba(34,211,238,.04);color:var(--cyan);font-weight:700;border-top:1px solid rgba(34,211,238,.18);letter-spacing:.3px}
 .pe-samples td.delta-pos{color:#fca5a5}
 .pe-samples td.delta-neg{color:#93c5fd}
-.pe-samples td.col-time{color:#64748b;width:38%}
-.pe-samples td.col-kw{text-align:right;width:32%;font-weight:700}
-.pe-samples td.col-delta{text-align:right;width:30%}
+.pe-samples td.col-time{color:#64748b;width:22%}
+.pe-samples td.col-rel{color:#475569;width:14%;text-align:right;font-size:9px}
+.pe-samples td.col-kw{text-align:right;width:18%;font-weight:700}
+.pe-samples td.col-delta{text-align:right;width:18%}
+.pe-samples td.col-flag{text-align:center;width:10%;font-size:10px}
+/* Forecast strip — subheader under Power Trace showing peak projection etc */
+.pe-fcast-strip{display:flex;justify-content:space-between;gap:8px;margin-top:4px;padding:6px 10px;background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.15);border-radius:3px;font-family:var(--mono);font-size:9px;letter-spacing:.4px}
+.pe-fcast-strip-item{color:#64748b}
+.pe-fcast-strip-item b{color:var(--cyan);font-weight:700}
+.pe-fcast-strip-item.warn b{color:#fca5a5}
 /* LED-style MEP grid — instead of friendly chips */
 .pe-leds{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:2px}
 .pe-led{display:flex;align-items:center;gap:5px;padding:5px 7px;background:rgba(15,23,42,.4);border:1px solid rgba(34,211,238,.07);border-radius:2px;font-family:var(--mono);font-size:8.5px;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
@@ -958,11 +969,49 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          + '</div>';
     }
 
-    // ── CHART WITH REAL AXES + GRIDLINES + ANOMALY MARKERS ──
+    // ── CHART WITH FORECAST + REAL AXES + GRIDLINES + ANOMALY MARKERS ──
+    // Forecast methodology: EWMA-damped extrapolation anchored on predicted_kw (from BMO sklearn-style model),
+    // blended with recent slope and pulled toward avg6 over the horizon. Not a real ARIMA but honest-enough
+    // for a 2hr look-ahead. Confidence cone = ±σ6hr.
+    var forecast=null, fcastPeak=null, fcastAvg=null;
+    if(sparkData && sparkData.length>3){
+      var fHorizon=8;  // 8 × 15min = 2hr
+      var lastVal = sparkData[sparkData.length-1];
+      // Recent slope over last 4 pts (kW per step)
+      var tail = sparkData.slice(-4);
+      var slope = (tail[tail.length-1]-tail[0]) / (tail.length-1);
+      var anchor = (predicted!=null && predicted>0) ? +predicted : (lastVal + slope);
+      forecast=[];
+      // Step 1: move from lastVal → anchor over 2 steps (ramp-in to model forecast)
+      // Step 2: damp remaining steps toward avg6 with decay
+      for(var fi=0; fi<fHorizon; fi++){
+        var v;
+        if(fi===0){
+          // first forecast point blends recent momentum with BMO model
+          v = 0.6*anchor + 0.3*(lastVal+slope) + 0.1*avg6;
+        } else {
+          // decay toward avg6; preserves anchor's bias but regresses to mean
+          var prev = forecast[fi-1];
+          var decay = 0.25;  // ~half-life of ~3 steps
+          v = prev + (avg6 - prev)*decay + slope*Math.max(0,1-fi*0.25)*0.3;
+        }
+        forecast.push(Math.max(0, v));
+      }
+      fcastPeak = Math.max.apply(null, forecast);
+      fcastAvg  = forecast.reduce(function(a,x){return a+x;},0)/forecast.length;
+    }
+
     if(sparkData && sparkData.length>2){
       var dd=sparkData, nP=dd.length;
+      var fc = forecast || [];
+      var nF = fc.length;
       var lo=Math.min.apply(null,dd), hi=Math.max.apply(null,dd);
-      // Nicer y-scale: round down/up to 10s, 25s, 50s depending on range
+      if(nF){
+        var fLo=Math.min.apply(null,fc), fHi=Math.max.apply(null,fc);
+        if(sigma6!=null){ fLo=Math.min(fLo,fLo-sigma6); fHi=Math.max(fHi,fHi+sigma6); }
+        lo=Math.min(lo,fLo); hi=Math.max(hi,fHi);
+      }
+      // Nicer y-scale
       function niceStep(range){
         var raw = range/4;
         if(raw<5) return 2;
@@ -973,14 +1022,17 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         return Math.ceil(raw/100)*100;
       }
       var pad = (hi-lo)*0.15 || 1;
-      var yMin = Math.max(0, Math.floor((lo-pad*0.3)/niceStep(hi-lo+pad*2))*niceStep(hi-lo+pad*2));
       var step = niceStep(hi-lo+pad*2);
+      var yMin = Math.max(0, Math.floor((lo-pad*0.3)/step)*step);
       var yMax = Math.ceil((hi+pad*0.5)/step)*step;
       var yRange = yMax-yMin || 1;
 
-      var W=360, H=120, ML=32, MR=6, MT=8, MB=20;  // margins leave room for y-axis + x-axis labels
+      var W=360, H=132, ML=32, MR=8, MT=8, MB=22;
       var plotW = W-ML-MR, plotH = H-MT-MB;
-      var stepX = plotW/(nP-1);
+      // Total x domain: history + forecast; each sample is one step
+      var totalSteps = (nP-1) + nF;  // e.g. 23 history steps + 8 forecast = 31
+      var stepX = plotW / (totalSteps || 1);
+      var nowX = ML + (nP-1)*stepX;   // vertical divider position
 
       // Y gridlines + labels
       var gridTicks='', yLabels='';
@@ -990,26 +1042,72 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         yLabels   += '<text x="'+(ML-5)+'" y="'+(gy+3).toFixed(1)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#64748b" text-anchor="end">'+yv+'</text>';
       }
 
-      // X labels (6hr ago / 4hr / 2hr / now)
-      var windowMin=(nP-1)*15;
+      // X labels — past side (6h/4h/2h) and future side (+1h / +2h)
+      var windowMin=(nP-1)*15, futureMin=nF*15;
       var xLabels='';
-      var xTicks=[0, 0.33, 0.66, 1];
-      xTicks.forEach(function(t){
-        var mins = Math.round((1-t)*windowMin);
-        var lbl = mins===0 ? 'now' : (mins>=60 ? (mins/60).toFixed(mins%60===0?0:1)+'h' : mins+'m');
-        var xp = ML + t*plotW;
-        xLabels += '<text x="'+xp.toFixed(1)+'" y="'+(H-5)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#64748b" text-anchor="middle">'+lbl+'</text>';
+      // Past ticks
+      [{frac:0,lbl:windowMin>=60?(windowMin/60).toFixed(windowMin%60===0?0:1)+'h':windowMin+'m'},
+       {frac:0.5,lbl:windowMin>=60?(windowMin/2/60).toFixed(1)+'h':Math.round(windowMin/2)+'m'},
+       {frac:1,lbl:'now'}].forEach(function(t){
+        var xp = ML + t.frac*(nP-1)*stepX;
+        xLabels += '<text x="'+xp.toFixed(1)+'" y="'+(H-6)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#64748b" text-anchor="middle">'+t.lbl+'</text>';
       });
+      // Future ticks
+      if(nF){
+        [{frac:0.5,lbl:'+'+(futureMin/2>=60?(futureMin/2/60).toFixed(0)+'h':futureMin/2+'m')},
+         {frac:1,lbl:'+'+(futureMin>=60?(futureMin/60).toFixed(0)+'h':futureMin+'m')}].forEach(function(t){
+          var xp = nowX + t.frac*nF*stepX;
+          xLabels += '<text x="'+xp.toFixed(1)+'" y="'+(H-6)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="var(--cyan)" style="fill:#22d3ee" text-anchor="middle" opacity="0.85">'+t.lbl+'</text>';
+        });
+      }
 
-      // Line points
+      // History line
       var pts = dd.map(function(v,i){
         var x = ML + i*stepX;
         var y = MT + plotH - ((v-yMin)/yRange)*plotH;
         return x.toFixed(1)+','+y.toFixed(1);
       }).join(' ');
-      var areaPts = (ML)+','+(MT+plotH)+' '+pts+' '+(ML+plotW)+','+(MT+plotH);
+      var areaPts = (ML)+','+(MT+plotH)+' '+pts+' '+nowX.toFixed(1)+','+(MT+plotH);
 
-      // Anomaly dots: mark points that are >1.5σ from avg (visual diagnostic)
+      // Forecast line + confidence cone (if we have forecast + sigma)
+      var fcastLine='', fcastCone='';
+      if(nF){
+        var fcPts = fc.map(function(v,i){
+          var x = nowX + (i+1)*stepX;
+          var y = MT + plotH - ((v-yMin)/yRange)*plotH;
+          return x.toFixed(1)+','+y.toFixed(1);
+        });
+        // Start forecast line from last actual point for continuity
+        var lastX = nowX, lastY = MT + plotH - ((dd[nP-1]-yMin)/yRange)*plotH;
+        var fcAll = lastX.toFixed(1)+','+lastY.toFixed(1)+' '+fcPts.join(' ');
+        fcastLine = '<polyline points="'+fcAll+'" fill="none" stroke="#22d3ee" stroke-width="1.4" stroke-dasharray="3 2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>';
+        // Cone ±σ
+        if(sigma6!=null && sigma6>0){
+          var upper=[lastX.toFixed(1)+','+lastY.toFixed(1)], lower=[lastX.toFixed(1)+','+lastY.toFixed(1)];
+          fc.forEach(function(v,i){
+            var x = nowX + (i+1)*stepX;
+            // Confidence grows with horizon
+            var growth = 1 + i*0.12;
+            var uY = MT + plotH - ((v+sigma6*growth)-yMin)/yRange*plotH;
+            var lY = MT + plotH - ((v-sigma6*growth)-yMin)/yRange*plotH;
+            upper.push(x.toFixed(1)+','+Math.max(MT,uY).toFixed(1));
+            lower.push(x.toFixed(1)+','+Math.min(MT+plotH,lY).toFixed(1));
+          });
+          var conePts = upper.join(' ')+' '+lower.reverse().join(' ');
+          fcastCone = '<polygon points="'+conePts+'" fill="#22d3ee" fill-opacity="0.08" stroke="none"/>';
+        }
+        // Forecast dots
+        fcPts.forEach(function(p,i){
+          var xy=p.split(',');
+          fcastLine += '<circle cx="'+xy[0]+'" cy="'+xy[1]+'" r="1.6" fill="#22d3ee" opacity="'+(0.9-i*0.06).toFixed(2)+'"/>';
+        });
+      }
+
+      // "Now" vertical divider
+      var nowDivider = '<line x1="'+nowX.toFixed(1)+'" x2="'+nowX.toFixed(1)+'" y1="'+MT+'" y2="'+(MT+plotH)+'" stroke="#22d3ee" stroke-width="0.7" stroke-dasharray="1.5 2" opacity="0.55"/>'
+                   + '<text x="'+(nowX+2).toFixed(1)+'" y="'+(MT+7)+'" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#22d3ee" opacity="0.75">⟵ past · forecast ⟶</text>';
+
+      // Anomaly dots (historical)
       var anomalyDots='';
       if(avg6!=null && sigma6!=null && sigma6>0){
         dd.forEach(function(v,i){
@@ -1017,55 +1115,142 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
             var x = ML + i*stepX;
             var y = MT + plotH - ((v-yMin)/yRange)*plotH;
             var col = v>avg6?'#fca5a5':'#93c5fd';
-            anomalyDots += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="2.8" fill="'+col+'" stroke="#0a0e1a" stroke-width="1"/>';
+            anomalyDots += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="2.6" fill="'+col+'" stroke="#0a0e1a" stroke-width="1"/>';
           }
         });
       }
 
-      // Predicted-value reference line (if available)
-      var predLine='';
-      if(predicted!=null && predicted>=yMin && predicted<=yMax){
-        var py = MT + plotH - ((predicted-yMin)/yRange)*plotH;
-        predLine = '<line x1="'+ML+'" x2="'+(W-MR)+'" y1="'+py.toFixed(1)+'" y2="'+py.toFixed(1)+'" stroke="#34d399" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.65"/>'
-                 + '<text x="'+(W-MR-2)+'" y="'+(py-3).toFixed(1)+'" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34d399" text-anchor="end" opacity="0.85">pred '+(+predicted).toFixed(1)+'</text>';
+      // Baseline (avg6) reference line across history
+      var baseLine='';
+      if(avg6!=null && avg6>=yMin && avg6<=yMax){
+        var by = MT + plotH - ((avg6-yMin)/yRange)*plotH;
+        baseLine = '<line x1="'+ML+'" x2="'+nowX.toFixed(1)+'" y1="'+by.toFixed(1)+'" y2="'+by.toFixed(1)+'" stroke="#34d399" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.55"/>'
+                 + '<text x="'+(nowX-2).toFixed(1)+'" y="'+(by-3).toFixed(1)+'" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34d399" text-anchor="end" opacity="0.8">avg '+avg6.toFixed(1)+'</text>';
       }
 
-      h += '<div class="pe-sec"><span>Power Trace</span><span>6hr · 15m poll · '+nP+' pts</span></div>';
+      h += '<div class="pe-sec"><span>Power Trace + Forecast</span><span>'+nP+' actual · '+nF+' proj</span></div>';
       h += '<div class="pe-chart">'
          +   '<div class="pe-chart-tip" id="peChartTip"></div>'
-         +   '<svg class="pe-chart-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" id="peChartSvg">'
+         +   '<svg class="pe-chart-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" id="peChartSvg" style="height:130px">'
          +     '<defs><linearGradient id="peChartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+cc.h+'" stop-opacity=".28"/><stop offset="1" stop-color="'+cc.h+'" stop-opacity="0"/></linearGradient></defs>'
          +     gridTicks
          +     yLabels
          +     xLabels
          +     '<polygon points="'+areaPts+'" fill="url(#peChartGrad)"/>'
          +     '<polyline points="'+pts+'" fill="none" stroke="'+cc.h+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-         +     predLine
+         +     baseLine
+         +     fcastCone
+         +     fcastLine
          +     anomalyDots
+         +     nowDivider
          +     '<line id="peChartGuide" x1="0" y1="'+MT+'" x2="0" y2="'+(MT+plotH)+'" stroke="'+cc.h+'" stroke-width="1" stroke-dasharray="2 2" opacity="0"/>'
          +     '<circle id="peChartDot" cx="0" cy="0" r="3.2" fill="'+cc.h+'" stroke="#0a0e1a" stroke-width="1.2" opacity="0"/>'
          +   '</svg>'
-         +   '<div class="pe-chart-legend"><span>■ load · ■ pred · <span style="color:#fca5a5">●</span> σ&gt;1.5 high · <span style="color:#93c5fd">●</span> σ&gt;1.5 low</span><span>'+Math.round(lo)+'–'+Math.round(hi)+' kW</span></div>'
+         +   '<div class="pe-chart-legend"><span><span style="color:'+cc.h+'">━</span> load · <span style="color:#22d3ee">╌╌</span> forecast · <span style="color:#34d399">╌╌</span> avg · <span style="color:#fca5a5">●</span> σ&gt;1.5</span><span>'+Math.round(lo)+'–'+Math.round(hi)+' kW</span></div>'
          + '</div>';
 
-      // ── RAW SAMPLES TABLE — last 8 points (not shown to Public) ──
-      var samples = dd.slice(-8).reverse();  // newest first
-      var nowMins=0;
-      h += '<div class="pe-sec"><span>Samples</span><span>last 8 · newest first</span></div>';
+      // Forecast summary strip — projection metrics
+      if(nF){
+        var dayKwhProj = dailyKwh;  // already set earlier from live data
+        var h2peakVsAvg = fcastPeak!=null && avg6!=null ? ((fcastPeak/avg6-1)*100).toFixed(0) : '—';
+        var trendArrow = fcastAvg!=null && avg6!=null ? (fcastAvg>avg6*1.03?'▲ rising':(fcastAvg<avg6*0.97?'▼ falling':'→ steady')) : '—';
+        var trendCls = fcastAvg!=null && avg6!=null && fcastAvg>avg6*1.1 ? 'warn' : '';
+        h += '<div class="pe-fcast-strip">'
+           +   '<span class="pe-fcast-strip-item"><b>Next 2hr avg</b> '+(fcastAvg!=null?fcastAvg.toFixed(1):'—')+' kW</span>'
+           +   '<span class="pe-fcast-strip-item"><b>2hr peak</b> '+(fcastPeak!=null?fcastPeak.toFixed(1):'—')+' kW</span>'
+           +   '<span class="pe-fcast-strip-item '+trendCls+'"><b>Trend</b> '+trendArrow+'</span>'
+           + '</div>';
+      }
+
+      // ── RAW SAMPLES TABLE — last 12 + next 4 forecast, newest-first with full detail ──
+      // Columns: HH:MM (absolute) | relative | kW | Δ pred | Δ avg | flag
+      var histSlice = dd.slice(-12);  // oldest → newest
+      // Parse live timestamp — fallback to current time if missing
+      var tBase = liveTs ? new Date(liveTs) : new Date();
+      if(isNaN(tBase.getTime())) tBase = new Date();
+
+      // Per-sample stats
+      function fmtKw(v){ return v>=100 ? Math.round(v).toLocaleString() : (v||0).toFixed(1); }
+      function fmtDelta(v){ return v==null ? '—' : ((v>=0?'+':'')+v.toFixed(1)); }
+      function pad2(n){ return n<10 ? '0'+n : ''+n; }
+      function hhmm(d){ return pad2(d.getHours())+':'+pad2(d.getMinutes()); }
+
+      var histMin=Math.min.apply(null,dd), histMax=Math.max.apply(null,dd);
+      h += '<div class="pe-sec"><span>Samples (raw)</span><span>12 past + 4 proj · 15m cadence</span></div>';
       h += '<div class="pe-samples"><table>'
-         + '<tr><th>Time</th><th style="text-align:right">kW</th><th style="text-align:right">Δ avg</th></tr>';
-      samples.forEach(function(v,i){
+         + '<tr>'
+         +   '<th>Clock</th>'
+         +   '<th style="text-align:right">Offset</th>'
+         +   '<th style="text-align:right">kW</th>'
+         +   '<th style="text-align:right">Δpred</th>'
+         +   '<th style="text-align:right">Δavg</th>'
+         +   '<th style="text-align:center">Flag</th>'
+         + '</tr>';
+
+      // Render newest-first. i=0 is "now" (last hist point)
+      var histRev = histSlice.slice().reverse();  // newest first
+      histRev.forEach(function(v,i){
+        var ts = new Date(tBase.getTime() - i*15*60*1000);
         var mins = i*15;
-        var lbl = mins===0 ? 'now' : ('-'+(mins>=60?(mins/60).toFixed(mins%60===0?0:1)+'h':mins+'m'));
-        var dlt = avg6!=null ? (v-avg6) : null;
-        var dltStr = dlt==null ? '—' : ((dlt>=0?'+':'')+dlt.toFixed(1));
-        var dltCls = dlt==null ? '' : (dlt>0.5?'delta-pos':(dlt<-0.5?'delta-neg':''));
-        h += '<tr'+(i===0?' class="now"':'')+'>'
-           +   '<td class="col-time">'+lbl+'</td>'
-           +   '<td class="col-kw">'+(v>=100?Math.round(v):v.toFixed(1))+'</td>'
-           +   '<td class="col-delta '+dltCls+'">'+dltStr+'</td>'
+        var relLbl = mins===0 ? 'now' : ('-'+(mins>=60?(mins/60).toFixed(mins%60===0?0:1)+'h':mins+'m'));
+        var dltAvg = avg6!=null ? (v-avg6) : null;
+        var dltPred= predicted!=null ? (v-predicted) : null;
+        var dltCls = dltAvg==null ? '' : (dltAvg>0.5?'delta-pos':(dltAvg<-0.5?'delta-neg':''));
+        var dltPCls= dltPred==null ? '' : (dltPred>0.5?'delta-pos':(dltPred<-0.5?'delta-neg':''));
+        var isAnom = (sigma6!=null && sigma6>0 && avg6!=null && Math.abs(v-avg6)>1.5*sigma6);
+        var isNow  = (i===0);
+        var isPeak = (v===histMax);
+        var isMin  = (v===histMin);
+        var flag='';
+        if(isAnom) flag = v>avg6 ? '▲!' : '▼!';
+        else if(isPeak) flag = '▲';
+        else if(isMin) flag = '▼';
+        else flag = '·';
+        var rowCls = [];
+        if(isNow) rowCls.push('now');
+        if(isAnom && !isNow) rowCls.push('anom');
+        h += '<tr'+(rowCls.length?' class="'+rowCls.join(' ')+'"':'')+'>'
+           +   '<td class="col-time">'+hhmm(ts)+'</td>'
+           +   '<td class="col-rel">'+relLbl+'</td>'
+           +   '<td class="col-kw">'+fmtKw(v)+'</td>'
+           +   '<td class="col-delta '+dltPCls+'">'+fmtDelta(dltPred)+'</td>'
+           +   '<td class="col-delta '+dltCls+'">'+fmtDelta(dltAvg)+'</td>'
+           +   '<td class="col-flag">'+flag+'</td>'
            + '</tr>';
       });
+
+      // Forecast rows (first 4 of forecast array, oldest-first inserts under "now")
+      if(forecast && forecast.length){
+        var fcSubset = forecast.slice(0,4);  // next 4 × 15min = 1hr
+        fcSubset.forEach(function(v,i){
+          var ts = new Date(tBase.getTime() + (i+1)*15*60*1000);
+          var mins = (i+1)*15;
+          var relLbl = '+'+(mins>=60?(mins/60).toFixed(mins%60===0?0:1)+'h':mins+'m');
+          var dltAvg = avg6!=null ? (v-avg6) : null;
+          var dltPred= predicted!=null ? (v-predicted) : null;
+          var dltCls = dltAvg==null ? '' : (dltAvg>0.5?'delta-pos':(dltAvg<-0.5?'delta-neg':''));
+          var dltPCls= dltPred==null ? '' : (dltPred>0.5?'delta-pos':(dltPred<-0.5?'delta-neg':''));
+          h += '<tr class="fcast">'
+             +   '<td class="col-time">'+hhmm(ts)+'</td>'
+             +   '<td class="col-rel">'+relLbl+'</td>'
+             +   '<td class="col-kw">'+fmtKw(v)+'</td>'
+             +   '<td class="col-delta '+dltPCls+'">'+fmtDelta(dltPred)+'</td>'
+             +   '<td class="col-delta '+dltCls+'">'+fmtDelta(dltAvg)+'</td>'
+             +   '<td class="col-flag" style="color:#22d3ee">⤴</td>'
+             + '</tr>';
+        });
+      }
+
+      // Footer: min / max / avg over the historical slice
+      var sMin=Math.min.apply(null,histSlice), sMax=Math.max.apply(null,histSlice);
+      var sAvg=histSlice.reduce(function(a,x){return a+x;},0)/histSlice.length;
+      h += '<tr class="foot">'
+         +   '<td colspan="2" style="color:#64748b">12-pt stats</td>'
+         +   '<td class="col-kw" title="avg">'+fmtKw(sAvg)+'</td>'
+         +   '<td class="col-delta" title="min" style="color:#93c5fd">'+fmtKw(sMin)+'</td>'
+         +   '<td class="col-delta" title="max" style="color:#fca5a5">'+fmtKw(sMax)+'</td>'
+         +   '<td class="col-flag" style="color:#64748b">σ'+(sigma6!=null?sigma6.toFixed(1):'—')+'</td>'
+         + '</tr>';
       h += '</table></div>';
     }
 
@@ -1107,51 +1292,76 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     pop.innerHTML = h;
     pop.classList.add('vis');
 
-    // ── Wire Engineer chart hover (uses the same-size SVG coords) ──
+    // ── Wire Engineer chart hover — handles BOTH history and forecast regions ──
     if(sparkData && sparkData.length>2){
       var chart=document.getElementById('peChartSvg');
-      var wrap=chart && chart.parentElement;
       var tip  =document.getElementById('peChartTip');
       var guide=document.getElementById('peChartGuide');
       var dotEl=document.getElementById('peChartDot');
       if(chart && tip && guide && dotEl){
         var dd2=sparkData, nP2=dd2.length;
+        var fc2=forecast||[], nF2=fc2.length;
         var lo2=Math.min.apply(null,dd2), hi2=Math.max.apply(null,dd2);
+        if(nF2){
+          var flo2=Math.min.apply(null,fc2), fhi2=Math.max.apply(null,fc2);
+          if(sigma6!=null){ flo2=flo2-sigma6; fhi2=fhi2+sigma6; }
+          lo2=Math.min(lo2,flo2); hi2=Math.max(hi2,fhi2);
+        }
         function niceStep2(r){if(r<5)return 2;if(r<12)return 5;if(r<25)return 10;if(r<60)return 25;if(r<150)return 50;return Math.ceil(r/100)*100}
         var pad2=(hi2-lo2)*0.15||1;
         var stp2=niceStep2(hi2-lo2+pad2*2);
         var yMin2=Math.max(0,Math.floor((lo2-pad2*0.3)/stp2)*stp2);
         var yMax2=Math.ceil((hi2+pad2*0.5)/stp2)*stp2;
         var yR2=yMax2-yMin2||1;
-        var W2=360,H2=120,ML2=32,MR2=6,MT2=8,MB2=20;
+        var W2=360,H2=132,ML2=32,MR2=8,MT2=8,MB2=22;
         var plotW2=W2-ML2-MR2, plotH2=H2-MT2-MB2;
+        var totalSteps2 = (nP2-1) + nF2;
+        var stepX2 = plotW2/(totalSteps2||1);
+        var nowX2 = ML2 + (nP2-1)*stepX2;
+
         function updC(clientX){
           var rect=chart.getBoundingClientRect();
-          // Map clientX → plot coordinate, taking margins into account
-          var relX = (clientX-rect.left)/rect.width;  // 0..1 in SVG space
+          var relX = (clientX-rect.left)/rect.width;
           var svgX = relX*W2;
-          var plotX = svgX - ML2;
-          var fracInPlot = Math.max(0,Math.min(1, plotX/plotW2));
-          var idx = Math.round(fracInPlot*(nP2-1));
-          var v = dd2[idx];
-          var minsAgo=(nP2-1-idx)*15;
-          var timeLbl = minsAgo===0 ? 'now' : (minsAgo>=60 ? ((minsAgo/60).toFixed(minsAgo%60===0?0:1)+'hr ago') : (minsAgo+'m ago'));
-          var gx = ML2 + (idx/(nP2-1))*plotW2;
+          var stepIdx = Math.round((svgX-ML2)/stepX2);
+          stepIdx = Math.max(0, Math.min(totalSteps2, stepIdx));
+          var isFuture = stepIdx > (nP2-1);
+          var v, timeLbl, flavor;
+          if(isFuture){
+            var fi = stepIdx - (nP2-1) - 1;  // 0-based within forecast
+            if(fi<0) fi=0;
+            if(fi>=nF2) fi=nF2-1;
+            v = fc2[fi];
+            var mins = (fi+1)*15;
+            timeLbl = '+' + (mins>=60 ? ((mins/60).toFixed(mins%60===0?0:1)+'hr') : (mins+'m')) + ' forecast';
+            flavor='future';
+          } else {
+            v = dd2[stepIdx];
+            var minsAgo=(nP2-1-stepIdx)*15;
+            timeLbl = minsAgo===0 ? 'now' : (minsAgo>=60 ? ((minsAgo/60).toFixed(minsAgo%60===0?0:1)+'hr ago') : (minsAgo+'m ago'));
+            flavor='past';
+          }
+          var gx = ML2 + stepIdx*stepX2;
           var gy = MT2 + plotH2 - ((v-yMin2)/yR2)*plotH2;
           guide.setAttribute('x1',gx); guide.setAttribute('x2',gx);
-          guide.setAttribute('opacity','0.7');
+          guide.setAttribute('opacity', isFuture?'0.4':'0.7');
+          guide.setAttribute('stroke', isFuture?'#22d3ee':cc.h);
           dotEl.setAttribute('cx',gx); dotEl.setAttribute('cy',gy);
           dotEl.setAttribute('opacity','1');
-          // Tooltip sits above the plot area inside the wrapper
+          dotEl.setAttribute('fill', isFuture?'#22d3ee':cc.h);
           var tipX=(gx/W2)*rect.width;
-          tipX=Math.max(54,Math.min(rect.width-54,tipX));
+          tipX=Math.max(64,Math.min(rect.width-64,tipX));
           tip.style.left=tipX+'px';
-          tip.style.top = ((gy/H2)*rect.height - 34) + 'px';
+          tip.style.top = ((gy/H2)*rect.height - 36) + 'px';
           var dlt = avg6!=null ? (v-avg6) : null;
+          var dltP = predicted!=null ? (v-predicted) : null;
           tip.innerHTML = '<b>'+(v>=100?Math.round(v):v.toFixed(1))+' kW</b>'
                         + '<div class="pe-chart-tip-sub">'+timeLbl
                         + (dlt!=null?' · Δavg '+(dlt>=0?'+':'')+dlt.toFixed(1):'')
+                        + (dltP!=null && !isFuture?' · Δpred '+(dltP>=0?'+':'')+dltP.toFixed(1):'')
                         + '</div>';
+          tip.style.borderColor = isFuture?'#22d3ee':'var(--cyan)';
+          tip.style.color = isFuture?'#93c5fd':'var(--cyan)';
           tip.classList.add('vis');
         }
         function hideC(){ tip.classList.remove('vis'); guide.setAttribute('opacity','0'); dotEl.setAttribute('opacity','0'); }
