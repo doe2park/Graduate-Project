@@ -176,35 +176,40 @@
   .po-chip { display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);font-size:11.5px;color:#cbd5e1;letter-spacing:.2px; }
   .po-chip .po-num { font-family:var(--mono);color:#f1f5f9;font-weight:600; }
   /* Visual-first extensions: homes icon row, 24hr sparkline, split legend, dot/tub gauges */
-  .po-homes-row { margin-top:12px; line-height:1.25; font-size:14.5px; letter-spacing:.5px; max-height:56px; overflow:hidden; word-break:break-all; }
-  .po-homes-lbl { font-size:11px; color:#94a3b8; margin-top:6px; letter-spacing:.3px; }
-  .po-spark-wrap { margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,.05); }
-  .po-spark-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
-  .po-spark-lbl { font-size:10px; color:#94a3b8; letter-spacing:.8px; text-transform:uppercase; font-weight:700; }
+  .po-homes-row { margin-top:10px; line-height:1.3; font-size:14px; letter-spacing:.3px; max-height:56px; overflow:hidden; overflow-wrap:anywhere; text-align:center; }
+  .po-homes-lbl { font-size:10.5px; color:#94a3b8; margin-top:5px; letter-spacing:.3px; }
+  .po-spark-wrap { margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,.05); }
+  .po-spark-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+  .po-spark-lbl { font-size:9.5px; color:#94a3b8; letter-spacing:.8px; text-transform:uppercase; font-weight:700; }
   .po-spark-peak { font-size:10.5px; color:#FDB515; font-family:var(--mono); }
-  .po-spark { position:relative; height:56px; width:100%; }
+  .po-spark { position:relative; height:62px; width:100%; }
   .po-spark svg { width:100%; height:100%; display:block; }
-  .po-spark-axis { display:flex; justify-content:space-between; margin-top:2px; font-size:9px; color:#64748b; font-family:var(--mono); }
-  .po-split-wrap { margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,.05); }
-  .po-split-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-  .po-split-legend { display:flex; justify-content:space-between; margin-top:8px; font-size:10.5px; color:#cbd5e1; gap:8px; }
-  .po-split-lg { display:inline-flex; align-items:center; gap:5px; flex:1; }
-  .po-split-lg b { color:#f8fafc; font-family:var(--mono); font-weight:700; margin-left:auto; }
+  .po-spark-axis { display:flex; justify-content:space-between; margin-top:3px; font-size:9px; color:#64748b; font-family:var(--mono); }
+  .po-split-wrap { margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,.05); }
+  .po-split-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; }
+  .po-split-legend { display:grid; grid-template-columns:1fr 1fr; margin-top:8px; font-size:10.5px; color:#cbd5e1; gap:6px 10px; }
+  /* swatch | label (flex-grow) | right-stack (% over kW) */
+  .po-split-lg { display:flex; align-items:center; gap:5px; font-size:10.5px; min-width:0; }
+  .po-split-label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .po-split-right { display:flex; flex-direction:column; align-items:flex-end; line-height:1.15; flex-shrink:0; }
+  .po-split-lg b { color:#f8fafc; font-family:var(--mono); font-weight:700; font-size:11px; }
   .po-sw { display:inline-block; width:9px; height:9px; border-radius:2px; flex-shrink:0; }
-  .po-gauges { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,.05); }
+  .po-gauges { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,.05); }
   .po-gauge { text-align:left; }
-  .po-gauge-hdr { font-size:10px; color:#94a3b8; letter-spacing:.8px; text-transform:uppercase; font-weight:700; margin-bottom:6px; }
+  .po-gauge-hdr { font-size:9.5px; color:#94a3b8; letter-spacing:.8px; text-transform:uppercase; font-weight:700; margin-bottom:6px; }
   .po-dots { display:flex; gap:4px; align-items:center; }
   .po-dot { width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.08); transition:background .6s ease, box-shadow .6s ease; }
   .po-dot.on { background:#6ee7b7; box-shadow:0 0 6px rgba(110,231,183,.5); }
-  .po-tubs { font-size:13px; line-height:1.3; letter-spacing:.5px; }
+  .po-tubs { font-size:13px; line-height:1.3; letter-spacing:.3px; overflow-wrap:anywhere; }
   .po-tubs-count { display:block; font-family:var(--mono); color:#38bdf8; font-weight:700; font-size:10.5px; margin-top:3px; }
+  /* Hero tightening — smaller top/bottom padding, remove divider since it's the panel opener after title */
+  .po-hero { padding:10px 0 10px !important; border-top:none !important; }
   /* Subtle live-freshness footer: just a pulsing dot + timestamp, no instructions */
   .po-fresh { margin-top:14px; padding-top:10px; border-top:1px solid rgba(255,255,255,.05); display:flex; align-items:center; justify-content:center; gap:6px; font-size:9.5px; color:#64748b; letter-spacing:.4px; text-transform:uppercase; font-family:var(--mono); }
   .po-fresh-dot { width:6px; height:6px; border-radius:50%; background:#22c55e; box-shadow:0 0 5px rgba(34,197,94,.55); animation:poFreshDot 2s ease-in-out infinite; flex-shrink:0; }
   @keyframes poFreshDot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.45;transform:scale(.85)} }
-  /* kW caption in split legend */
-  .po-split-kw { font-family:var(--mono); color:#94a3b8; font-size:9.5px; margin-left:4px; }
+  /* kW caption in split legend — small muted mono sitting on its own line under the % */
+  .po-split-kw { display:block; font-family:var(--mono); color:#94a3b8; font-size:9px; text-align:right; letter-spacing:.2px; }
   /* Sparkline hover tooltip + guide line */
   .po-spark-tip { position:absolute; top:-34px; background:rgba(10,14,26,.95); border:1px solid rgba(253,181,21,.3); border-radius:5px; padding:4px 8px; font-size:10px; color:#f8fafc; font-family:var(--mono); white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .15s; transform:translateX(-50%); z-index:3; }
   .po-spark-tip.show { opacity:1; }
@@ -266,8 +271,8 @@
       <div class="po-v-split-b" id="poFlowFillB"></div>
     </div>
     <div class="po-split-legend">
-      <span class="po-split-lg"><span class="po-sw" style="background:linear-gradient(90deg,#FDB515,#f59e0b)"></span>🌡 Air comfort <b id="poSplitA">—</b><span class="po-split-kw" id="poSplitAKw">—</span></span>
-      <span class="po-split-lg"><span class="po-sw" style="background:linear-gradient(90deg,#7dd3fc,#38bdf8)"></span>💡 Lights/gear <b id="poSplitB">—</b><span class="po-split-kw" id="poSplitBKw">—</span></span>
+      <span class="po-split-lg"><span class="po-sw" style="background:linear-gradient(90deg,#FDB515,#f59e0b)"></span><span class="po-split-label">🌡 Air comfort</span><span class="po-split-right"><b id="poSplitA">—</b><span class="po-split-kw" id="poSplitAKw">—</span></span></span>
+      <span class="po-split-lg"><span class="po-sw" style="background:linear-gradient(90deg,#7dd3fc,#38bdf8)"></span><span class="po-split-label">💡 Lights/gear</span><span class="po-split-right"><b id="poSplitB">—</b><span class="po-split-kw" id="poSplitBKw">—</span></span></span>
     </div>
   </div>
 
