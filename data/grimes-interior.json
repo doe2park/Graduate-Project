@@ -1,0 +1,72 @@
+{
+  "_schema_version": 1,
+  "_doc": "Manifest for the Grimes Hall interior scan layer in grimes-xr.html. Drop scan files into ../scans/ and edit the fields below. The XR viewer reads this file at runtime and gracefully no-ops if `model.path` is null or the file is missing.",
+
+  "model": {
+    "_doc": "Primary scan asset. Set `path` to the file you dropped under ../scans/. Format is auto-detected from extension if not specified.",
+    "path": null,
+    "format": null,
+    "_format_options": ["glb", "gltf", "ply", "pcd", "splat"],
+    "scale": 1.0,
+    "rotation_deg": { "x": 0, "y": 0, "z": 0 },
+    "position":     { "x": 0, "y": 0, "z": 0 },
+    "_alignment_doc": "If the scan is in a different unit (e.g., feet → meters) or coordinate system (e.g., Z-up → Y-up), tweak scale + rotation_deg here. Default is Y-up meters.",
+    "draco_compressed": false,
+    "point_cloud_size": 0.02,
+    "_point_cloud_size_doc": "Only used for .ply/.pcd. World-units size of each point splat."
+  },
+
+  "lod": {
+    "_doc": "Optional per-floor / per-section files for lazy loading. Leave empty if a single model is fine.",
+    "sections": []
+  },
+
+  "rooms": [
+    {
+      "_doc_example": "One entry per labeled space. Used to populate room-list sidebar and tag hotspots.",
+      "id": "EXAMPLE-101",
+      "name": "Example Room",
+      "floor": 1,
+      "use": "lab",
+      "area_sqft": 0,
+      "occupancy": 0,
+      "_use_options": ["lab", "office", "classroom", "corridor", "mech_room", "restroom", "lounge", "storage", "other"]
+    }
+  ],
+
+  "hotspots": [
+    {
+      "_doc_example": "Place a clickable marker in 3D space. position is in the scan's coordinate system AFTER alignment is applied. Reference sensor IDs from data/building_data.json or campus_energy.json so the panel can show live values.",
+      "id": "EXAMPLE-HOTSPOT-1",
+      "kind": "sensor",
+      "_kind_options": ["sensor", "equipment", "info", "meter"],
+      "label": "Example sensor",
+      "room_id": "EXAMPLE-101",
+      "position": { "x": 0, "y": 1.5, "z": 0 },
+      "data_refs": {
+        "_doc": "Optional pointers — fill any subset. The viewer wires whatever is present.",
+        "meter_id": null,
+        "sensor_id": null,
+        "equipment_id": null
+      },
+      "icon": "dot",
+      "_icon_options": ["dot", "thermometer", "droplet", "bolt", "info", "fan"]
+    }
+  ],
+
+  "sensors": {
+    "_doc": "Optional inline sensor catalog if you don't want to maintain a separate file. Each key is a sensor_id referenced from hotspots[].data_refs.sensor_id.",
+    "_example": {
+      "TEMP-101A": { "kind": "temperature", "unit": "°F", "current": null, "history": [] }
+    }
+  },
+
+  "_drop_in_workflow": [
+    "1. Save your scan file (e.g. grimes-interior.glb) into the ../scans/ folder.",
+    "2. Set `model.path` to './scans/grimes-interior.glb' (path is relative to grimes-xr.html).",
+    "3. If the scan looks misaligned, tweak `model.scale` / `model.rotation_deg` / `model.position`. The viewer logs the bounding box on load.",
+    "4. Add room entries to `rooms[]` so the room-list sidebar populates.",
+    "5. Add hotspot entries to `hotspots[]` to place sensor markers — get coordinates by clicking in the scan with the new 'Pick' tool (toggled via the 🎯 button in the topbar).",
+    "6. If you have BMO meter or sensor IDs, fill data_refs so the click panel pulls live values."
+  ]
+}

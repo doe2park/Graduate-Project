@@ -234,6 +234,8 @@
   <button class="view-btn" id="tourBtn" style="margin-left:4px;border-color:rgba(253,181,21,.3);color:#FDB515" onclick="startTour()">🎬 Tour</button>
   <button class="view-btn" id="flowBtn" style="margin-left:4px;border-color:rgba(45,212,191,.2);color:#2dd4bf" onclick="toggleFlow()">⚡ Flow</button>
   <button class="view-btn" id="publicBtn" style="margin-left:4px;border-color:rgba(147,197,253,.35);color:#93c5fd" onclick="togglePublic()">👥 Public</button>
+  <button class="view-btn" id="interiorBtn" style="margin-left:8px;border-color:rgba(168,85,247,.35);color:#c084fc" title="Toggle interior 360 / LiDAR scan layer">🏛 Interior</button>
+  <button class="view-btn" id="pickBtn" style="margin-left:4px;border-color:rgba(148,163,184,.25);color:#94a3b8;font-size:12px;padding:6px 8px" title="Pick a point in the scan to copy coordinates for grimes-interior.json hotspots">🎯</button>
 </div>
 
 <!-- Public mode overlay: visual-first redesign (hero kW + homes icons + 24hr sparkline + split bar + dot/tub gauges) -->
@@ -441,6 +443,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+import { PCDLoader } from 'three/addons/loaders/PCDLoader.js';
 
 /* ══════════════════════════════════════════
    SYSTEM + SENSOR DATA
@@ -682,6 +686,250 @@ window.addEventListener('keydown', e => {
     console.log(`Building offset: x=${p.x.toFixed(2)}, y=${p.y.toFixed(2)}, z=${p.z.toFixed(2)}`);
   }
 });
+
+/* ══════════════════════════════════════════ INTERIOR SCAN LAYER ══════════════════════════════════════════
+   Scaffolding for incoming 360 / LiDAR / photogrammetry capture of Grimes interior.
+   Reads data/grimes-interior.json at toggle time. Supports .glb / .gltf (GLTFLoader),
+   .ply (PLYLoader, mesh or point cloud), and .pcd (PCDLoader, point cloud).
+   No-ops gracefully if the manifest has no model.path or the file 404s.
+   Hotspots are placed from manifest and clickable for sensor-data overlays.
+============================================================================== */
+const interiorState = {
+  manifest: null,
+  group: null,           // THREE.Group holding the scan + hotspots
+  loaded: false,
+  loading: false,
+  visible: false,
+  pickMode: false,
+  hotspotMeshes: [],     // for raycaster
+};
+const interiorBtn = document.getElementById('interiorBtn');
+const pickBtn = document.getElementById('pickBtn');
+const plyLoader = new PLYLoader();
+const pcdLoader = new PCDLoader();
+
+function detectFormat(path) {
+  if (!path) return null;
+  const m = path.toLowerCase().match(/\.([a-z0-9]+)(?:\?.*)?$/);
+  return m ? m[1] : null;
+}
+
+function makeHotspotMesh(spot) {
+  // Small glowing billboard sphere — readable in 3D, clickable.
+  const colorMap = { sensor:0xa855f7, equipment:0xfbbf24, info:0x60a5fa, meter:0x2dd4bf };
+  const color = colorMap[spot.kind] || 0xa855f7;
+  const geo = new THREE.SphereGeometry(0.08, 16, 12);
+  const mat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.9 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(spot.position.x||0, spot.position.y||0, spot.position.z||0);
+  mesh.userData.hotspot = spot;
+  // Halo
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 16, 12),
+    new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.18, depthWrite:false })
+  );
+  mesh.add(halo);
+  return mesh;
+}
+
+function applyManifestTransform(obj, m) {
+  if (!m) return;
+  if (m.scale && m.scale !== 1) obj.scale.setScalar(m.scale);
+  const r = m.rotation_deg || {};
+  if (r.x) obj.rotation.x = r.x * Math.PI/180;
+  if (r.y) obj.rotation.y = r.y * Math.PI/180;
+  if (r.z) obj.rotation.z = r.z * Math.PI/180;
+  const p = m.position || {};
+  obj.position.set(p.x||0, p.y||0, p.z||0);
+  obj.updateMatrixWorld(true);
+}
+
+function pointCloudFromGeometry(geom, ptSize) {
+  geom.computeBoundingBox();
+  const mat = new THREE.PointsMaterial({
+    size: ptSize || 0.02,
+    vertexColors: !!geom.getAttribute('color'),
+    color: geom.getAttribute('color') ? 0xffffff : 0x9aa6b8,
+    sizeAttenuation: true,
+  });
+  return new THREE.Points(geom, mat);
+}
+
+async function loadInteriorScan() {
+  if (interiorState.loaded || interiorState.loading) return;
+  interiorState.loading = true;
+  interiorBtn.textContent = '⏳ Loading...';
+  interiorBtn.style.opacity = '0.6';
+
+  let manifest;
+  try {
+    const r = await fetch('data/grimes-interior.json', { cache:'no-store' });
+    if (!r.ok) throw new Error('manifest fetch failed: ' + r.status);
+    manifest = await r.json();
+  } catch (e) {
+    console.warn('[interior] No manifest yet:', e.message);
+    showInteriorPlaceholder('Manifest not found at data/grimes-interior.json');
+    return;
+  }
+  interiorState.manifest = manifest;
+  const m = manifest.model || {};
+
+  if (!m.path) {
+    showInteriorPlaceholder('Awaiting scan data — set model.path in data/grimes-interior.json');
+    return;
+  }
+
+  const fmt = (m.format || detectFormat(m.path) || '').toLowerCase();
+  const group = new THREE.Group();
+  group.name = 'interior-scan';
+
+  const onLoaded = (obj) => {
+    group.add(obj);
+    applyManifestTransform(group, m);
+    // Recenter horizontally so the scan lands near the existing model
+    const box = new THREE.Box3().setFromObject(group);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    console.log('[interior] bbox center=', center.toArray().map(v=>v.toFixed(2)), 'size=', size.toArray().map(v=>v.toFixed(2)));
+
+    // Build hotspots
+    interiorState.hotspotMeshes = [];
+    (manifest.hotspots || []).forEach(spot => {
+      // Skip the example doc entry
+      if (spot.id === 'EXAMPLE-HOTSPOT-1') return;
+      const hm = makeHotspotMesh(spot);
+      group.add(hm);
+      interiorState.hotspotMeshes.push(hm);
+    });
+
+    scene.add(group);
+    interiorState.group = group;
+    interiorState.loaded = true;
+    interiorState.visible = true;
+    interiorState.loading = false;
+    interiorBtn.textContent = '🏛 Interior';
+    interiorBtn.style.opacity = '1';
+    interiorBtn.classList.add('active');
+    console.log(`[interior] loaded ${manifest.hotspots?.length||0} hotspots, ${manifest.rooms?.length||0} rooms`);
+  };
+
+  const onErr = (err) => {
+    console.error('[interior] load error:', err);
+    showInteriorPlaceholder('Scan file failed to load — check console & path: ' + m.path);
+  };
+
+  const onProg = (p) => {
+    if (p && p.loaded) interiorBtn.textContent = `⏳ ${(p.loaded/1024/1024).toFixed(1)} MB`;
+  };
+
+  try {
+    if (fmt === 'glb' || fmt === 'gltf') {
+      gltfLoader.load(m.path, (gltf) => onLoaded(gltf.scene), onProg, onErr);
+    } else if (fmt === 'ply') {
+      plyLoader.load(m.path, (geom) => {
+        const obj = geom.index ? new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ color:0x9aa6b8, side:THREE.DoubleSide }))
+                               : pointCloudFromGeometry(geom, m.point_cloud_size);
+        onLoaded(obj);
+      }, onProg, onErr);
+    } else if (fmt === 'pcd') {
+      pcdLoader.load(m.path, (pts) => {
+        if (m.point_cloud_size) pts.material.size = m.point_cloud_size;
+        onLoaded(pts);
+      }, onProg, onErr);
+    } else {
+      showInteriorPlaceholder(`Unsupported format: "${fmt}". Set model.format to one of: glb, gltf, ply, pcd.`);
+    }
+  } catch (e) {
+    onErr(e);
+  }
+}
+
+function showInteriorPlaceholder(msg) {
+  interiorState.loading = false;
+  interiorBtn.textContent = '🏛 Interior (no data)';
+  interiorBtn.style.opacity = '0.7';
+  interiorBtn.classList.remove('active');
+  // Floating toast
+  let t = document.getElementById('interiorToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'interiorToast';
+    t.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(10,14,26,.96);border:1px solid rgba(168,85,247,.4);color:#e2e8f0;padding:10px 16px;border-radius:8px;font-size:12px;z-index:200;max-width:520px;box-shadow:0 8px 24px rgba(0,0,0,.5);font-family:var(--font);line-height:1.5';
+    document.body.appendChild(t);
+  }
+  t.innerHTML = `<b style="color:#c084fc">Interior scan layer</b><br>${msg}<br><span style="color:#64748b;font-size:11px">See <code>scans/README.md</code> for the drop-in workflow.</span>`;
+  t.style.display = 'block';
+  clearTimeout(window.__interiorToastTimer);
+  window.__interiorToastTimer = setTimeout(() => { t.style.display = 'none'; }, 6000);
+}
+
+function toggleInteriorVisibility() {
+  if (!interiorState.group) return;
+  interiorState.visible = !interiorState.visible;
+  interiorState.group.visible = interiorState.visible;
+  interiorBtn.classList.toggle('active', interiorState.visible);
+}
+
+interiorBtn.addEventListener('click', () => {
+  if (!interiorState.loaded) loadInteriorScan();
+  else toggleInteriorVisibility();
+});
+
+// Pick tool — click to print world coords for hotspot authoring
+pickBtn.addEventListener('click', () => {
+  interiorState.pickMode = !interiorState.pickMode;
+  pickBtn.classList.toggle('active', interiorState.pickMode);
+  pickBtn.style.background = interiorState.pickMode ? 'rgba(253,181,21,.2)' : '';
+  if (interiorState.pickMode) {
+    showInteriorPlaceholder('Pick mode ON — click in the 3D view to print coordinates to console (paste into hotspots[].position).');
+  }
+});
+
+// Extend existing click raycaster to handle hotspot clicks + pick mode
+window.__handleInteriorClick = function(intersects, evt) {
+  if (interiorState.pickMode && intersects.length) {
+    const p = intersects[0].point;
+    const coord = { x:+p.x.toFixed(3), y:+p.y.toFixed(3), z:+p.z.toFixed(3) };
+    console.log('[pick]', JSON.stringify(coord));
+    showInteriorPlaceholder(`Coords copied to console: <code>${JSON.stringify(coord)}</code>`);
+    return true;
+  }
+  // Hotspot hit?
+  for (const ix of intersects) {
+    let o = ix.object;
+    while (o && !o.userData.hotspot) o = o.parent;
+    if (o && o.userData.hotspot) {
+      openHotspotPanel(o.userData.hotspot);
+      return true;
+    }
+  }
+  return false;
+};
+
+function openHotspotPanel(spot) {
+  let panel = document.getElementById('hotspotPanel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'hotspotPanel';
+    panel.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--panel);padding:14px 18px;border-radius:12px;backdrop-filter:blur(12px);border:1px solid rgba(168,85,247,.35);z-index:55;min-width:280px;max-width:380px;font-family:var(--font);color:#e2e8f0';
+    document.body.appendChild(panel);
+  }
+  const room = (interiorState.manifest?.rooms || []).find(r => r.id === spot.room_id);
+  const refs = spot.data_refs || {};
+  const refRows = Object.entries(refs)
+    .filter(([k,v]) => v && !k.startsWith('_'))
+    .map(([k,v]) => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:#64748b">${k}</span><span style="font-family:var(--mono);font-weight:600">${v}</span></div>`)
+    .join('');
+  panel.innerHTML = `
+    <button style="position:absolute;top:6px;right:10px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px" onclick="document.getElementById('hotspotPanel').style.display='none'">✕</button>
+    <div style="font-size:10px;color:#a855f7;letter-spacing:.5px;font-weight:600">${(spot.kind||'sensor').toUpperCase()} · ${spot.id}</div>
+    <div style="font-size:15px;font-weight:600;margin:4px 0 8px">${spot.label || spot.id}</div>
+    ${room ? `<div style="font-size:11px;color:#94a3b8;margin-bottom:8px">${room.name} · Floor ${room.floor||'—'} · ${room.use||'—'}</div>` : ''}
+    ${refRows || '<div style="font-size:11px;color:#475569;font-style:italic">No data refs wired yet — fill <code>data_refs</code> in grimes-interior.json</div>'}
+    <div style="font-size:9px;color:#475569;margin-top:8px;text-align:right">live data wiring TBD</div>
+  `;
+  panel.style.display = 'block';
+}
 
 /* ══════════════════════════════════════════ HEATMAP COLORING ══════════════════════════════════════════ */
 function tempToColor(t) {
@@ -1944,6 +2192,13 @@ renderer.domElement.addEventListener('click', e => {
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
+
+  // Interior layer first — pick mode + hotspot clicks intercept before MEP
+  if (interiorState && interiorState.group && interiorState.group.visible) {
+    const iHits = raycaster.intersectObjects([interiorState.group], true);
+    if (window.__handleInteriorClick && window.__handleInteriorClick(iHits, e)) return;
+  }
+
   const hits = raycaster.intersectObjects(allMeshes, false);
 
   if (highlightedMesh) {
