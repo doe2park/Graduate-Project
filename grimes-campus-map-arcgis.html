@@ -617,7 +617,9 @@ function spark(n,base,amp){const r=[];for(let i=0;i<n;i++)r.push(base+Math.sin(i
 
 require(["esri/Map","esri/views/MapView","esri/Graphic","esri/layers/GraphicsLayer","esri/widgets/Locate","esri/widgets/BasemapToggle","esri/geometry/Point"],
 function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
-  const map=new EMap({basemap:'satellite'});
+  // Dark vector basemap matches the SCADA dashboard aesthetic and lets the colored
+  // markers + sonar ripples stand out. User can toggle to satellite via the bottom-left switch.
+  const map=new EMap({basemap:'dark-gray-vector'});
   const view=new MapView({container:'viewDiv',map,center:[-122.2590,37.8715],zoom:16,
     constraints:{minZoom:14,maxZoom:20,snapToZoom:false,rotationEnabled:false},
     ui:{components:['zoom','compass']},popup:{autoOpenEnabled:false}});
@@ -803,7 +805,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   },60);
 
   view.ui.add(new Locate({view}),'top-right');
-  view.ui.add(new BasemapToggle({view,nextBasemap:'hybrid'}),'bottom-left');
+  view.ui.add(new BasemapToggle({view,nextBasemap:'satellite'}),'bottom-left');
 
   // (Grimes-specific pulse + label removed — Grimes now renders identically to other buildings.)
 
