@@ -699,17 +699,20 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var eCol=kwColor(kw,maxKw);
 
       if(isG){
-        // Grimes: thin ring + diamond (ring gets idx so filter/search also hides it)
+        // Grimes: gold "you are here" ring + Engineering icon (slightly larger than standard)
+        // The ring keeps Grimes distinguishable as the focal building; the gear icon
+        // matches its actual category (Engineering) for visual consistency with the rest of the map.
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'simple-marker',color:[0,0,0,0],size:22,
-            outline:{color:[253,181,21,160],width:1.5}},
+          symbol:{type:'simple-marker',color:[0,0,0,0],size:30,
+            outline:{color:[253,181,21,180],width:1.8}},
           attributes:{idx:i,deco:1}
         }));
+        var ringRgbG = eCol ? [eCol[0],eCol[1],eCol[2]] : null;
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'simple-marker',style:'diamond',color:[253,181,21,255],size:10,
-            outline:{color:[255,255,255],width:1.5}},
+          symbol:{type:'picture-marker', url: makeMarkerSvg(b.c, cc.r, 44, ringRgbG),
+                  width: 22, height: 22},
           attributes:{idx:i}
         }));
       } else {
