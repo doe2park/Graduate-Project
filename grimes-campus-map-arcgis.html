@@ -720,7 +720,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         // Brightness still varies subtly with load so high consumers still have visible "presence",
         // but geometric size stays constant so the map doesn't look uneven.
         if (kw > 0) {
-          var glowSize = 26;                    // constant — slightly larger than the 18px icon
+          var glowSize = 20;                    // constant — tight glow just outside the 18px icon
           var glowAlpha = 40 + loadRatio * 70;  // 40-110, only alpha encodes load now
           var glowCol = eCol ? [eCol[0],eCol[1],eCol[2]] : [cc.r[0],cc.r[1],cc.r[2]];
           gL.add(new Graphic({
