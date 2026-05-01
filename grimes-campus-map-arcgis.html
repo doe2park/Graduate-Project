@@ -37,6 +37,9 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .sfl button:hover{border-color:rgba(255,255,255,.12);color:var(--text)}
 .sfl button.on{background:var(--gold);color:var(--navy);border-color:var(--gold);font-weight:600}
 .sfl button .d{width:5px;height:5px;border-radius:50%}
+.sfl button .ci{width:14px;height:14px;flex-shrink:0;display:inline-block;vertical-align:middle}
+.sfl button.on .ci circle{stroke:rgba(0,0,0,.4)}
+.bc-ci{width:18px;height:18px;flex-shrink:0;display:inline-block}
 
 .sl{flex:1;overflow-y:auto;padding:4px 6px}
 .sl::-webkit-scrollbar{width:2px}.sl::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
@@ -75,6 +78,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pp-name{font-size:17px;font-weight:700;color:#fff;padding-right:34px;line-height:1.2;letter-spacing:-.2px}
 .pp-cat{display:inline-flex;align-items:center;gap:5px;margin-top:4px;font-size:11px;color:var(--dim);font-weight:500}
 .pp-cat-dot{width:8px;height:8px;border-radius:50%}
+.pp-cat-ci{width:18px;height:18px;flex-shrink:0;display:inline-block;margin-right:6px;vertical-align:middle}
 .pp-hero{display:flex;align-items:baseline;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)}
 .pp-hero-num{font-family:var(--mono);font-size:36px;font-weight:700;color:var(--gold);line-height:1;letter-spacing:-1px;text-shadow:0 0 16px rgba(253,181,21,.25);font-variant-numeric:tabular-nums}
 .pp-hero-unit{font-size:13px;color:#cbd5e1;font-weight:500}
@@ -660,6 +664,17 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     return 'data:image/svg+xml;utf8,'+encodeURIComponent(svg);
   }
 
+  // Inline SVG (HTML, not data URL) for sidebar list / filter pills / popup chips.
+  // Same visual language as map marker but rendered directly in the DOM.
+  window.makeCategoryIconHtml = function(catKey, cls){
+    var color = (window.C && window.C[catKey]) ? window.C[catKey].r : [148,163,184];
+    var icon  = CATEGORY_ICONS[catKey] || '<circle cx="12" cy="12" r="2.5" fill="#fff"/>';
+    var bg    = 'rgb('+color[0]+','+color[1]+','+color[2]+')';
+    return '<svg class="'+(cls||'ci')+'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="'+bg+'" stroke="rgba(255,255,255,.35)" stroke-width="1"/>'+icon+'</svg>';
+  };
+  // Expose C globally so the helper above can resolve colors after first render
+  window.C = C;
+
   function renderMarkers(energyData){
     gL.removeAll();
     _breathers.length=0;
@@ -736,12 +751,13 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           }
         }
 
-        // Core dot — picture marker with category icon. kW color shows up as the ring around it.
-        var coreSize = 12 + loadRatio * 10; // 12-22 px display size (icon needs room to read)
+        // Core dot — picture marker with category icon. UNIFORM size so icons stay legible at any load.
+        // kW info is encoded via (a) ring stroke color, (b) static halo size, (c) sonar ripples.
+        var coreSize = 18;  // px display size — same for every building
         var ringRgb = eCol ? [eCol[0],eCol[1],eCol[2]] : null;
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'picture-marker', url: makeMarkerSvg(b.c, cc.r, coreSize*2, ringRgb),
+          symbol:{type:'picture-marker', url: makeMarkerSvg(b.c, cc.r, 36, ringRgb),
                   width: coreSize, height: coreSize},
           attributes:{idx:i}
         }));
@@ -1610,7 +1626,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       + '<div class="pp-body">'
       + '<button class="pp-x" onclick="closePopPub()">✕</button>'
       + '<div class="pp-name">'+b.n+'</div>'
-      + '<div class="pp-cat"><span class="pp-cat-dot" style="background:'+cc.h+'"></span>'+(b.a||b.c)+'</div>'
+      + '<div class="pp-cat">'+window.makeCategoryIconHtml(b.c,'pp-cat-ci')+(b.a||b.c)+'</div>'
       + '<span class="pp-pill '+pill.cls+'">'+pill.txt+'</span>'
       + heroHtml
       + meterNote
@@ -1700,7 +1716,13 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   ['All',...CATS].forEach(cat=>{
     const btn=document.createElement('button');
     btn.className=cat==='All'?'on':'';
-    if(cat!=='All'){const d=document.createElement('span');d.className='d';d.style.background=C[cat].h;btn.appendChild(d)}
+    if(cat==='All'){
+      // "All" pill keeps the simple grouping affordance — small dot, no icon
+      const d=document.createElement('span');d.className='d';d.style.background='#94a3b8';btn.appendChild(d);
+    } else {
+      // Category pills get the same icon as the map marker
+      btn.insertAdjacentHTML('beforeend', window.makeCategoryIconHtml(cat,'ci'));
+    }
     btn.appendChild(document.createTextNode(cat));
     btn.onclick=()=>{af=cat;fl.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderList();updVis()};
     fl.appendChild(btn);
@@ -1719,7 +1741,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       if(b.bim)tags+=`<span class="bt bt-b">BIM</span>`;
       if(b.nrg)tags+=`<span class="bt bt-e">Energy</span>`;
       if(b.kw)tags+=`<span class="bt bt-k">⚡${b.kw}kW</span>`;
-      card.innerHTML=`<div class="bc-d" style="background:${cc.h}"></div><div class="bc-i"><div class="bc-n">${b.n}</div><div class="bc-m">${b.a||b.c}</div><div class="bc-t">${tags}</div></div>`;
+      card.innerHTML=`${window.makeCategoryIconHtml(b.c,'bc-ci')}<div class="bc-i"><div class="bc-n">${b.n}</div><div class="bc-m">${b.a||b.c}</div><div class="bc-t">${tags}</div></div>`;
       card.onclick=()=>{sel=b.idx;renderList();
         if(window.innerWidth<=768)document.getElementById('sb').classList.remove('show');
         view.goTo({target:new Point({longitude:b.lng,latitude:b.lat}),zoom:18},{duration:1000,easing:'ease-in-out'}).then(()=>{
