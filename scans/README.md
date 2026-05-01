@@ -20,6 +20,37 @@ Scan deliverables, in order of preference:
 If a vendor hands you `.e57`, `.las`, or a Matterport `.zip`, convert to one of
 the above first. CloudCompare exports `.ply`; Reality Capture exports `.glb`.
 
+## Have a Navisworks (.nwd) file? Convert it first.
+
+Use `convert_nwd_to_glb.py` in the repo root. One-time setup:
+
+```bash
+# 1. Sign up at https://aps.autodesk.com (free)
+# 2. Create an Application → copy Client ID + Client Secret
+# 3. Install dependencies:
+pip install requests
+npm install -g aps-modelderivative-svf-utils   # or: forge-convert-utils
+
+# 4. Set credentials:
+export APS_CLIENT_ID="your-client-id"
+export APS_CLIENT_SECRET="your-client-secret"
+```
+
+Then convert:
+
+```bash
+python convert_nwd_to_glb.py path/to/grimes.nwd
+# Output: scans/grimes-full.glb
+```
+
+The script uploads the .nwd to APS, triggers SVF translation in the cloud
+(~1–10 min depending on file size), then uses the Node tool to extract a
+single .glb. Works with .nwd, .nwc, .rvt, and .ifc as input.
+
+**Save the URN printed at the end** — re-running the script with
+`--skip-upload --urn <URN>` will skip upload+translation and just
+re-extract the .glb (handy if you want to tweak conversion options).
+
 ## Drop-in workflow
 
 1. Copy your scan file here, e.g. `scans/grimes-interior-floor1.glb`.
