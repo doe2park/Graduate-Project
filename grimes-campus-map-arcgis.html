@@ -634,10 +634,36 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   // Rationale: Weiser "Designing Calm Technology" (1995) — ambient motion reveals state without demanding attention.
   // Higher load = faster breath, bigger amplitude.
   var _breathers=[];
+  var _sonars=[];   // sonar ripple rings: {gfx, t0, period, baseSize, maxSize, col, baseAlpha, phaseOffset}
+  var _sonarT0=Date.now();
+
+  // ── Category icons (Lucide-flavored, simplified for 24x24 viewBox, white fill on category color) ──
+  // Used inside picture-marker SVG to make each marker semantically self-describing.
+  var CATEGORY_ICONS = {
+    Engineering:    '<circle cx="12" cy="12" r="3.4" fill="none" stroke="#fff" stroke-width="1.7"/><g stroke="#fff" stroke-width="1.7" stroke-linecap="round"><line x1="12" y1="2.5" x2="12" y2="5.2"/><line x1="12" y1="18.8" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5.2" y2="12"/><line x1="18.8" y1="12" x2="21.5" y2="12"/><line x1="5.2" y1="5.2" x2="7.1" y2="7.1"/><line x1="16.9" y1="16.9" x2="18.8" y2="18.8"/><line x1="18.8" y1="5.2" x2="16.9" y2="7.1"/><line x1="7.1" y1="16.9" x2="5.2" y2="18.8"/></g>',
+    Science:        '<path d="M9.3 3 L14.7 3 L14.7 9 L18.5 16.5 Q19 20 15 20 L9 20 Q5 20 5.5 16.5 L9.3 9 Z" fill="#fff" stroke="#fff" stroke-width="0.6" stroke-linejoin="round"/>',
+    Humanities:     '<path d="M5 20 Q5 17 8 16 Q12 15 15 12 Q19 8 19 4 Q15 4 11 7 Q7 10 6 14 Q5 17 5 20 Z" fill="#fff"/><line x1="5" y1="20" x2="9" y2="16" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>',
+    Libraries:      '<g fill="#fff"><rect x="4.2" y="6" width="15.6" height="3.2" rx="0.5"/><rect x="5.4" y="10.4" width="13.2" height="3.2" rx="0.5"/><rect x="4.2" y="14.8" width="15.6" height="3.2" rx="0.5"/></g>',
+    Professional:   '<rect x="4" y="8" width="16" height="12" rx="1.2" fill="#fff"/><path d="M9 8 L9 5.5 L15 5.5 L15 8" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>',
+    'Student Life': '<path d="M5 8.5 L17 8.5 L17 15.5 Q17 18.8 13.7 18.8 L8.3 18.8 Q5 18.8 5 15.5 Z" fill="#fff"/><path d="M17.5 10.8 Q21 10.8 21 14 Q21 17 17.5 17" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/><path d="M8 6 Q8 4 9.5 4 M11.5 6 Q11.5 4 13 4 M15 6 Q15 4 16 4" stroke="#fff" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.8"/>',
+    Admin:          '<g fill="#fff"><polygon points="2.5,7 12,3 21.5,7"/><rect x="2.5" y="6.5" width="19" height="1.4"/><rect x="4.5" y="9" width="2.5" height="9"/><rect x="10.75" y="9" width="2.5" height="9"/><rect x="17" y="9" width="2.5" height="9"/><rect x="2.5" y="18.5" width="19" height="2"/></g>',
+  };
+
+  function makeMarkerSvg(catKey, color, sizePx, kwColorRgb){
+    var icon = CATEGORY_ICONS[catKey] || '<circle cx="12" cy="12" r="2.5" fill="#fff"/>';
+    var bg   = 'rgb('+color[0]+','+color[1]+','+color[2]+')';
+    var ring = kwColorRgb ? 'rgb('+kwColorRgb[0]+','+kwColorRgb[1]+','+kwColorRgb[2]+')' : 'rgba(255,255,255,0.55)';
+    var svg  = '<svg xmlns="http://www.w3.org/2000/svg" width="'+sizePx+'" height="'+sizePx+'" viewBox="0 0 24 24">'
+             + '<circle cx="12" cy="12" r="10.6" fill="'+bg+'" stroke="'+ring+'" stroke-width="1.6"/>'
+             + icon
+             + '</svg>';
+    return 'data:image/svg+xml;utf8,'+encodeURIComponent(svg);
+  }
 
   function renderMarkers(energyData){
     gL.removeAll();
     _breathers.length=0;
+    _sonars.length=0;
     var maxKw=500;
     if(energyData){
       var vals=Object.values(energyData).map(function(b){return b.kw}).filter(function(v){return v});
@@ -675,34 +701,48 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         // Load intensity (0-1) based on kW
         var loadRatio = kw && maxKw > 0 ? Math.min(1, kw / maxKw) : 0;
 
-        // Outer glow halo — bigger and brighter with more load (STATIC, not animated)
+        // Static outer glow halo — ambient "this building has data" presence (no animation)
         if (kw > 0) {
-          var glowSize = 14 + loadRatio * 16;  // 14-30 px
-          var glowAlpha = 40 + loadRatio * 100; // 40-140
+          var glowSize = 16 + loadRatio * 14;  // 16-30 px
+          var glowAlpha = 35 + loadRatio * 65; // 35-100 (slightly subtler since sonar carries the energy)
           var glowCol = eCol ? [eCol[0],eCol[1],eCol[2]] : [cc.r[0],cc.r[1],cc.r[2]];
-          var glowGfx = new Graphic({
+          gL.add(new Graphic({
             geometry:new Point({longitude:b.lng,latitude:b.lat}),
             symbol:{type:'simple-marker',color:[glowCol[0],glowCol[1],glowCol[2],glowAlpha],size:glowSize,
               outline:{color:[0,0,0,0],width:0}},
-            attributes:{idx:i,deco:1}  // so category filter / search hide the halo along with the core dot
-          });
-          gL.add(glowGfx);
-          // Only enroll in breathing if this is a TOP consumer right now —
-          // makes the pulse carry meaning ("look at me — I'm a top user")
-          // instead of looking like random noise across the map.
+            attributes:{idx:i,deco:1}
+          }));
+
+          // Sonar rings — emanate from top consumers. Two rings 50% out of phase = continuous ripple.
+          // Period scales with load: faster pulse when building is working harder.
           var topIds = window.pubTopIds || [];
           var isTop = topIds.indexOf(b.id) !== -1 || (b.anomaly === true);
           if (isTop) {
-            _breathers.push({gfx:glowGfx,baseSize:glowSize,baseAlpha:glowAlpha,col:glowCol,ratio:Math.max(0.55,loadRatio),phase:Math.random()*Math.PI*2});
+            var period = 2.6 - loadRatio * 1.3;  // 2.6s idle → 1.3s peak
+            var ringBase = 14;
+            var ringMax  = 36 + loadRatio * 14;  // bigger reach when more loaded
+            var ringAlpha = 130 + loadRatio * 90;
+            for (var sIdx=0; sIdx<2; sIdx++){
+              var ringGfx = new Graphic({
+                geometry:new Point({longitude:b.lng,latitude:b.lat}),
+                symbol:{type:'simple-marker',color:[0,0,0,0],size:ringBase,
+                  outline:{color:[glowCol[0],glowCol[1],glowCol[2],0],width:1.4}},
+                attributes:{idx:i,deco:1}
+              });
+              gL.add(ringGfx);
+              _sonars.push({gfx:ringGfx, period:period, baseSize:ringBase, maxSize:ringMax,
+                            col:glowCol, baseAlpha:ringAlpha, phaseOffset:sIdx*0.5});
+            }
           }
         }
 
-        // Core dot — size also scales with load
-        var coreSize = 6 + loadRatio * 6; // 6-12 px
+        // Core dot — picture marker with category icon. kW color shows up as the ring around it.
+        var coreSize = 12 + loadRatio * 10; // 12-22 px display size (icon needs room to read)
+        var ringRgb = eCol ? [eCol[0],eCol[1],eCol[2]] : null;
         gL.add(new Graphic({
           geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'simple-marker',color:[...cc.r,kw?240:140],size:coreSize,
-            outline:{color:eCol?[...eCol,220]:[255,255,255,60],width:eCol?1.5:0.5}},
+          symbol:{type:'picture-marker', url: makeMarkerSvg(b.c, cc.r, coreSize*2, ringRgb),
+                  width: coreSize, height: coreSize},
           attributes:{idx:i}
         }));
       }
@@ -736,27 +776,27 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     return t ? {mean:t.mean, std:t.std, n:t.n, tier: (b.tier1&&b.tier1[key1])?1: (b.tier2&&b.tier2[key2])?2: (b.tier3&&b.tier3[key3])?3:4} : null;
   };
 
-  // ── Breathing tick — mutates glow symbols at ~12 Hz ──
-  var _breathT0=Date.now();
+  // ── Sonar tick — expanding ripple rings on top consumers (~16 Hz) ──
+  // Each ring grows from baseSize → maxSize over `period` seconds while alpha fades to 0,
+  // then loops. Two rings per building offset by 50% phase = continuous ripple cadence.
   setInterval(function(){
-    if(!_breathers.length)return;
-    var t=(Date.now()-_breathT0)/1000;
-    for(var i=0;i<_breathers.length;i++){
-      var br=_breathers[i];
-      // Freq: 0.22 Hz (~4.5s cycle) idle → 0.75 Hz (~1.3s) at full load
-      var freq=0.22+br.ratio*0.53;
-      var s=Math.sin(t*freq*2*Math.PI+br.phase);
-      var amp=0.18+br.ratio*0.38; // 18–56% size swing
-      var newSize=br.baseSize*(1+s*amp);
-      var newAlpha=Math.round(Math.max(20,Math.min(220,br.baseAlpha*(0.75+(s+1)*0.25))));
+    if(!_sonars.length)return;
+    var t=(Date.now()-_sonarT0)/1000;
+    for(var i=0;i<_sonars.length;i++){
+      var s=_sonars[i];
+      var raw=(t/s.period + s.phaseOffset) % 1;  // 0..1
+      var newSize=s.baseSize + (s.maxSize - s.baseSize)*raw;
+      // Alpha fades faster than radius grows so trail isn't muddy
+      var newAlpha=Math.round(Math.max(0, s.baseAlpha * (1 - raw) * (1 - raw)));
       try{
-        var sym=br.gfx.symbol.clone();
+        var sym=s.gfx.symbol.clone();
         sym.size=newSize;
-        sym.color=[br.col[0],br.col[1],br.col[2],newAlpha];
-        br.gfx.symbol=sym;
+        sym.outline={color:[s.col[0],s.col[1],s.col[2],newAlpha], width:1.4};
+        sym.color=[0,0,0,0];
+        s.gfx.symbol=sym;
       }catch(e){/* map may be reloading */}
     }
-  },85);
+  },60);
 
   view.ui.add(new Locate({view}),'top-right');
   view.ui.add(new BasemapToggle({view,nextBasemap:'hybrid'}),'bottom-left');

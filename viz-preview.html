@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Marker Style Preview · Grimes Digital Twin</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#0f1424; --border:rgba(148,163,184,.12);
+    --text:#e2e8f0; --muted:#94a3b8; --dim:#64748b;
+    --cyan:#2dd4bf; --gold:#FDB515; --orange:#f59e0b; --pink:#ec4899;
+    --purple:#a78bfa; --green:#34d399; --red:#fca5a5; --blue:#60a5fa;
+    --mono:'JetBrains Mono','SF Mono',monospace;
+    --font:'Inter','Segoe UI',system-ui,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);padding:32px 40px;min-height:100vh}
+  h1{font-size:22px;font-weight:600;letter-spacing:-.3px;margin-bottom:6px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:32px;line-height:1.5;max-width:720px}
+  .sub b{color:#cbd5e1}
+  h2{font-size:13px;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:1.2px;margin:36px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;display:flex;flex-direction:column;min-height:280px}
+  .card-title{font-size:12px;color:var(--gold);font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:4px}
+  .card-name{font-size:15px;font-weight:600;margin-bottom:6px;color:#fff}
+  .card-desc{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+  .card-stage{flex:1;background:linear-gradient(180deg,rgba(148,163,184,.04),rgba(148,163,184,.01));border-radius:6px;border:1px solid rgba(148,163,184,.06);position:relative;overflow:hidden;min-height:140px;display:flex;align-items:center;justify-content:center}
+  .card-stage svg{width:100%;height:100%;display:block}
+  .card-foot{font-size:10px;color:var(--dim);font-style:italic;margin-top:10px;display:flex;justify-content:space-between}
+  .verdict{padding:3px 7px;border-radius:3px;background:rgba(45,212,191,.1);color:var(--cyan);font-style:normal;font-weight:600;letter-spacing:.3px}
+  .verdict.bigwin{background:rgba(253,181,21,.12);color:var(--gold)}
+  .verdict.calm{background:rgba(148,163,184,.1);color:var(--muted)}
+
+  /* Sonar pulse */
+  @keyframes sonar { 0%{r:6;opacity:.7} 100%{r:34;opacity:0} }
+  .sonar-ring{animation:sonar 2.4s ease-out infinite;transform-origin:center;fill:none;stroke-width:1.2}
+  .sonar-ring.fast{animation-duration:1.1s}
+
+  /* Halo brightness modulation */
+  @keyframes haloBreath { 0%,100%{opacity:.18} 50%{opacity:.55} }
+  .halo-modulate{animation:haloBreath 2.8s ease-in-out infinite}
+  .halo-modulate.fast{animation-duration:1.1s}
+
+  /* Heatmap halo (no animation) */
+
+  /* Trend arrow gentle bob */
+  @keyframes arrowBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1.5px)} }
+  .arrow-up{animation:arrowBob 1.6s ease-in-out infinite}
+
+  /* Measurement pulse */
+  @keyframes measureFlash {
+    0%,90%,100%{opacity:0;r:6}
+    91%{opacity:.9;r:6}
+    96%{opacity:.4;r:14}
+  }
+  .measure-flash{animation:measureFlash 8s linear infinite;fill:none;stroke-width:1.6}
+
+  /* Default pulse for comparison */
+  @keyframes basicPulse { 0%,100%{r:6} 50%{r:9} }
+  .basic-pulse{animation:basicPulse 2s ease-in-out infinite}
+  .basic-pulse.fast{animation-duration:1s}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:10.5px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:50%}
+
+  .footer{margin-top:40px;padding:20px;background:rgba(148,163,184,.04);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--muted);line-height:1.6}
+  .footer b{color:#cbd5e1}
+  .footer code{background:rgba(45,212,191,.08);color:var(--cyan);padding:1px 6px;border-radius:3px;font-family:var(--mono);font-size:11.5px}
+</style>
+</head>
+<body>
+
+<h1>Marker Style Preview</h1>
+<p class="sub">Side-by-side comparison of pulse + category encoding alternatives for the campus map. Each tile is a mock with 4–5 sample buildings; animations match what you'd see on the real map. <b>Pick favorites and let me know — I'll wire chosen styles into <code>grimes-campus-map-arcgis.html</code> and you can roll back per-style if anything feels off.</b></p>
+
+<div class="legend">
+  <span><i style="background:var(--cyan)"></i>Engineering</span>
+  <span><i style="background:var(--orange)"></i>Residential</span>
+  <span><i style="background:var(--pink)"></i>Student Life</span>
+  <span><i style="background:var(--purple)"></i>Academic</span>
+  <span><i style="background:#94a3b8"></i>Admin</span>
+</div>
+
+<!-- ════════════════════════════════════════════ PULSE STYLES ════════════════════════════════════════════ -->
+<h2>Pulse / Aliveness — How buildings show they're "live" and "loaded"</h2>
+<div class="grid">
+
+  <!-- 0. Current (baseline reference) -->
+  <div class="card">
+    <div class="card-title">Current</div>
+    <div class="card-name">Size pulse</div>
+    <div class="card-desc">Marker grows/shrinks. Frequency tied to load (idle = slow, peak = fast). What's on the map now.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <circle cx="60"  cy="70" r="6" fill="var(--cyan)"   class="basic-pulse"/>
+        <circle cx="120" cy="50" r="6" fill="var(--orange)" class="basic-pulse fast"/>
+        <circle cx="180" cy="85" r="6" fill="var(--pink)"   class="basic-pulse"/>
+        <circle cx="230" cy="55" r="6" fill="var(--purple)" class="basic-pulse fast"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Reference</span><span class="verdict calm">Baseline</span></div>
+  </div>
+
+  <!-- A. Sonar -->
+  <div class="card">
+    <div class="card-title">Option A</div>
+    <div class="card-name">Sonar ripples</div>
+    <div class="card-desc">Concentric rings expand outward periodically. Faster ripples = higher load. "Energy emanating" feel.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <circle cx="60"  cy="70" r="6" class="sonar-ring"      stroke="var(--cyan)"/>
+        <circle cx="60"  cy="70" r="6" fill="var(--cyan)"/>
+        <circle cx="120" cy="50" r="6" class="sonar-ring fast" stroke="var(--orange)"/>
+        <circle cx="120" cy="50" r="6" fill="var(--orange)"/>
+        <circle cx="180" cy="85" r="6" class="sonar-ring"      stroke="var(--pink)"/>
+        <circle cx="180" cy="85" r="6" fill="var(--pink)"/>
+        <circle cx="230" cy="55" r="6" class="sonar-ring fast" stroke="var(--purple)"/>
+        <circle cx="230" cy="55" r="6" fill="var(--purple)"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Best for "energetic" feeling</span><span class="verdict">Distinct</span></div>
+  </div>
+
+  <!-- B. Halo brightness modulation -->
+  <div class="card">
+    <div class="card-title">Option B</div>
+    <div class="card-name">Halo brightness</div>
+    <div class="card-desc">Marker stays still; surrounding glow gently breathes in opacity. Subtle, less distracting.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <circle cx="60"  cy="70" r="14" fill="var(--cyan)"   class="halo-modulate"      opacity=".3"/>
+        <circle cx="60"  cy="70" r="6"  fill="var(--cyan)"/>
+        <circle cx="120" cy="50" r="14" fill="var(--orange)" class="halo-modulate fast" opacity=".3"/>
+        <circle cx="120" cy="50" r="6"  fill="var(--orange)"/>
+        <circle cx="180" cy="85" r="14" fill="var(--pink)"   class="halo-modulate"      opacity=".3"/>
+        <circle cx="180" cy="85" r="6"  fill="var(--pink)"/>
+        <circle cx="230" cy="55" r="14" fill="var(--purple)" class="halo-modulate fast" opacity=".3"/>
+        <circle cx="230" cy="55" r="6"  fill="var(--purple)"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Calmest option</span><span class="verdict calm">Subtle</span></div>
+  </div>
+
+  <!-- C. Heatmap halo (static) -->
+  <div class="card">
+    <div class="card-title">Option C</div>
+    <div class="card-name">Heatmap halo</div>
+    <div class="card-desc">No motion. Halo color encodes load — yellow → orange → red. Static but information-dense.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <defs>
+          <radialGradient id="lo"><stop offset="0" stop-color="#fde68a" stop-opacity=".55"/><stop offset="1" stop-color="#fde68a" stop-opacity="0"/></radialGradient>
+          <radialGradient id="md"><stop offset="0" stop-color="#fb923c" stop-opacity=".7"/><stop offset="1"  stop-color="#fb923c" stop-opacity="0"/></radialGradient>
+          <radialGradient id="hi"><stop offset="0" stop-color="#ef4444" stop-opacity=".75"/><stop offset="1" stop-color="#ef4444" stop-opacity="0"/></radialGradient>
+        </defs>
+        <circle cx="60"  cy="70" r="22" fill="url(#lo)"/><circle cx="60"  cy="70" r="5" fill="#fde68a"/>
+        <circle cx="120" cy="50" r="26" fill="url(#hi)"/><circle cx="120" cy="50" r="5" fill="#ef4444"/>
+        <circle cx="180" cy="85" r="22" fill="url(#md)"/><circle cx="180" cy="85" r="5" fill="#fb923c"/>
+        <circle cx="230" cy="55" r="26" fill="url(#hi)"/><circle cx="230" cy="55" r="5" fill="#ef4444"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Where is hot? At a glance.</span><span class="verdict bigwin">Info-dense</span></div>
+  </div>
+
+  <!-- D. Trend arrow -->
+  <div class="card">
+    <div class="card-title">Option D</div>
+    <div class="card-name">Trend arrows</div>
+    <div class="card-desc">Replaces "current load" cue with "where is it heading" — ▲ rising · → steady · ▼ falling.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140" font-family="JetBrains Mono,monospace" font-weight="700" font-size="12">
+        <circle cx="60"  cy="70" r="8" fill="var(--cyan)"/>
+        <text x="60"  y="74" text-anchor="middle" fill="#0a0e1a" class="arrow-up">▲</text>
+        <circle cx="120" cy="50" r="8" fill="var(--orange)"/>
+        <text x="120" y="54" text-anchor="middle" fill="#0a0e1a">→</text>
+        <circle cx="180" cy="85" r="8" fill="var(--pink)"/>
+        <text x="180" y="89" text-anchor="middle" fill="#0a0e1a">▼</text>
+        <circle cx="230" cy="55" r="8" fill="var(--purple)"/>
+        <text x="230" y="59" text-anchor="middle" fill="#0a0e1a" class="arrow-up">▲</text>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Different info entirely</span><span class="verdict">Forecast-aware</span></div>
+  </div>
+
+  <!-- E. Measurement pulse -->
+  <div class="card">
+    <div class="card-title">Option E</div>
+    <div class="card-name">Measurement flash</div>
+    <div class="card-desc">No continuous motion. Marker briefly flashes when new BMO data arrives (every 15min).<br>Means "data is live" not "load is high".</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <circle cx="60"  cy="70" r="6" stroke="var(--cyan)"   class="measure-flash"/>
+        <circle cx="60"  cy="70" r="6" fill="var(--cyan)"/>
+        <circle cx="120" cy="50" r="6" stroke="var(--orange)" class="measure-flash" style="animation-delay:-2s"/>
+        <circle cx="120" cy="50" r="6" fill="var(--orange)"/>
+        <circle cx="180" cy="85" r="6" stroke="var(--pink)"   class="measure-flash" style="animation-delay:-4s"/>
+        <circle cx="180" cy="85" r="6" fill="var(--pink)"/>
+        <circle cx="230" cy="55" r="6" stroke="var(--purple)" class="measure-flash" style="animation-delay:-6s"/>
+        <circle cx="230" cy="55" r="6" fill="var(--purple)"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Wait ~8s for next flash</span><span class="verdict calm">Restrained</span></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ CATEGORY ENCODING ════════════════════════════════════════════ -->
+<h2>Category Encoding — How building type is shown</h2>
+<div class="grid">
+
+  <!-- 0. Current -->
+  <div class="card">
+    <div class="card-title">Current</div>
+    <div class="card-name">Color-only dots</div>
+    <div class="card-desc">One color per category. Simple, but uses up "color budget" that could encode load too. Color-blind unfriendly.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <circle cx="50"  cy="70" r="9" fill="var(--cyan)"/>
+        <circle cx="105" cy="50" r="9" fill="var(--orange)"/>
+        <circle cx="160" cy="85" r="9" fill="var(--pink)"/>
+        <circle cx="215" cy="55" r="9" fill="var(--purple)"/>
+        <circle cx="250" cy="95" r="9" fill="#94a3b8"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Reference</span><span class="verdict calm">Baseline</span></div>
+  </div>
+
+  <!-- A. Icons inside dots -->
+  <div class="card">
+    <div class="card-title">Option A</div>
+    <div class="card-name">Color + icon</div>
+    <div class="card-desc">Color stays, plus a tiny semantic icon — gear (eng), bed (resi), people (student life), book (academic), gov (admin).</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140" font-family="system-ui,sans-serif" font-size="11" font-weight="700">
+        <g><circle cx="50"  cy="70" r="11" fill="var(--cyan)"/>   <text x="50"  y="74" text-anchor="middle" fill="#0a0e1a">⚙</text></g>
+        <g><circle cx="105" cy="50" r="11" fill="var(--orange)"/> <text x="105" y="54" text-anchor="middle" fill="#0a0e1a">🏠</text></g>
+        <g><circle cx="160" cy="85" r="11" fill="var(--pink)"/>   <text x="160" y="89" text-anchor="middle" fill="#0a0e1a">☕</text></g>
+        <g><circle cx="215" cy="55" r="11" fill="var(--purple)"/> <text x="215" y="59" text-anchor="middle" fill="#0a0e1a">📖</text></g>
+        <g><circle cx="250" cy="95" r="11" fill="#94a3b8"/>       <text x="250" y="99" text-anchor="middle" fill="#0a0e1a">🏛</text></g>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Color-blind safe + semantic</span><span class="verdict bigwin">Best ROI</span></div>
+  </div>
+
+  <!-- B. Shape variation -->
+  <div class="card">
+    <div class="card-title">Option B</div>
+    <div class="card-name">Shape per category</div>
+    <div class="card-desc">Same color (gold), shapes differ — circle/hex/square/triangle/diamond. Frees color for load/state.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <circle cx="50" cy="70" r="9" fill="var(--gold)"/>
+        <polygon points="105,42 113,46 113,55 105,59 97,55 97,46" fill="var(--gold)"/>
+        <rect x="153" y="78" width="14" height="14" fill="var(--gold)"/>
+        <polygon points="215,46 223,60 207,60" fill="var(--gold)"/>
+        <polygon points="250,87 258,95 250,103 242,95" fill="var(--gold)"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Print-friendly</span><span class="verdict">Frees color</span></div>
+  </div>
+
+  <!-- C. Footprint polygons -->
+  <div class="card">
+    <div class="card-title">Option C</div>
+    <div class="card-name">Building footprints</div>
+    <div class="card-desc">Replace dots with actual building outlines from ArcGIS, filled by category. "Architectural map" feel.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <path d="M30,55 L80,55 L80,90 L60,90 L60,82 L30,82 Z" fill="var(--cyan)"   fill-opacity=".75" stroke="var(--cyan)" stroke-width="1"/>
+        <rect x="95"  y="40" width="42" height="36" fill="var(--orange)" fill-opacity=".75" stroke="var(--orange)" stroke-width="1"/>
+        <path d="M150,80 L195,80 L195,100 L150,100 Z" fill="var(--pink)" fill-opacity=".75" stroke="var(--pink)" stroke-width="1"/>
+        <polygon points="208,45 245,45 245,75 230,75 230,68 208,68" fill="var(--purple)" fill-opacity=".75" stroke="var(--purple)" stroke-width="1"/>
+        <rect x="252" y="85" width="20" height="22" fill="#94a3b8" fill-opacity=".75" stroke="#94a3b8" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Biggest visual change</span><span class="verdict bigwin">Architectural</span></div>
+  </div>
+
+  <!-- D. Region tint -->
+  <div class="card">
+    <div class="card-title">Option D</div>
+    <div class="card-name">Regional tint + neutral dots</div>
+    <div class="card-desc">Soft category-colored zones cover where each type lives. Markers all neutral — color freed for load/state.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <ellipse cx="65"  cy="70" rx="55" ry="42" fill="var(--cyan)"   fill-opacity=".11"/>
+        <ellipse cx="170" cy="70" rx="60" ry="42" fill="var(--orange)" fill-opacity=".11"/>
+        <ellipse cx="245" cy="80" rx="38" ry="32" fill="#94a3b8"       fill-opacity=".13"/>
+        <circle cx="50"  cy="70" r="6" fill="var(--gold)"/>
+        <circle cx="80"  cy="55" r="6" fill="var(--gold)"/>
+        <circle cx="140" cy="55" r="6" fill="var(--gold)"/>
+        <circle cx="180" cy="80" r="6" fill="var(--gold)"/>
+        <circle cx="245" cy="80" r="6" fill="var(--gold)"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Atmospheric, info-dense</span><span class="verdict bigwin">Frees color</span></div>
+  </div>
+
+  <!-- E. Ring patterns -->
+  <div class="card">
+    <div class="card-title">Option E</div>
+    <div class="card-name">Ring style per category</div>
+    <div class="card-desc">All same fill, ring varies — solid / dashed / double / dotted / thick. Quietly distinguishes without color.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 280 140">
+        <circle cx="50"  cy="70" r="9" fill="var(--gold)" stroke="#fff" stroke-width="1.6"/>
+        <circle cx="105" cy="50" r="9" fill="var(--gold)" stroke="#fff" stroke-width="1.6" stroke-dasharray="2.5 2"/>
+        <circle cx="160" cy="85" r="9" fill="var(--gold)" stroke="#fff" stroke-width="1"/>
+        <circle cx="160" cy="85" r="12" fill="none" stroke="#fff" stroke-width="1"/>
+        <circle cx="215" cy="55" r="9" fill="var(--gold)" stroke="#fff" stroke-width="1.6" stroke-dasharray="1 2"/>
+        <circle cx="250" cy="95" r="9" fill="var(--gold)" stroke="#fff" stroke-width="3"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Quiet, low-contrast</span><span class="verdict calm">Subtle</span></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ COMBINED MOCKUPS ════════════════════════════════════════════ -->
+<h2>Promising Combinations — pulse × category together</h2>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr))">
+
+  <!-- Combo 1 -->
+  <div class="card" style="min-height:240px">
+    <div class="card-title">Combo 1 — Gentle evolution</div>
+    <div class="card-name">Sonar + icons</div>
+    <div class="card-desc">Keeps current vibe. Adds semantic clarity (icons) and more legible aliveness (sonar). Smallest change, low risk.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 360 160" font-family="system-ui,sans-serif" font-size="11" font-weight="700">
+        <g>
+          <circle cx="60"  cy="80" r="6"  class="sonar-ring"      stroke="var(--cyan)"/>
+          <circle cx="60"  cy="80" r="11" fill="var(--cyan)"/>   <text x="60"  y="84" text-anchor="middle" fill="#0a0e1a">⚙</text>
+        </g>
+        <g>
+          <circle cx="140" cy="55" r="6"  class="sonar-ring fast" stroke="var(--orange)"/>
+          <circle cx="140" cy="55" r="11" fill="var(--orange)"/> <text x="140" y="59" text-anchor="middle" fill="#0a0e1a">🏠</text>
+        </g>
+        <g>
+          <circle cx="220" cy="100" r="6" class="sonar-ring"      stroke="var(--pink)"/>
+          <circle cx="220" cy="100" r="11" fill="var(--pink)"/>  <text x="220" y="104" text-anchor="middle" fill="#0a0e1a">☕</text>
+        </g>
+        <g>
+          <circle cx="300" cy="65" r="6"  class="sonar-ring fast" stroke="var(--purple)"/>
+          <circle cx="300" cy="65" r="11" fill="var(--purple)"/> <text x="300" y="69" text-anchor="middle" fill="#0a0e1a">📖</text>
+        </g>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Lowest risk · most familiar</span><span class="verdict">Easy win</span></div>
+  </div>
+
+  <!-- Combo 2 -->
+  <div class="card" style="min-height:240px">
+    <div class="card-title">Combo 2 — Information-dense static</div>
+    <div class="card-name">Heatmap halo + regional tint</div>
+    <div class="card-desc">Drops motion entirely. Color repurposed: halo = load intensity, region tint = category. One frame conveys everything.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 360 160">
+        <defs>
+          <radialGradient id="x_lo"><stop offset="0" stop-color="#fde68a" stop-opacity=".55"/><stop offset="1" stop-color="#fde68a" stop-opacity="0"/></radialGradient>
+          <radialGradient id="x_md"><stop offset="0" stop-color="#fb923c" stop-opacity=".75"/><stop offset="1" stop-color="#fb923c" stop-opacity="0"/></radialGradient>
+          <radialGradient id="x_hi"><stop offset="0" stop-color="#ef4444" stop-opacity=".8"/><stop offset="1"  stop-color="#ef4444" stop-opacity="0"/></radialGradient>
+        </defs>
+        <ellipse cx="80"  cy="80" rx="80" ry="55" fill="var(--cyan)"   fill-opacity=".10"/>
+        <ellipse cx="220" cy="80" rx="80" ry="55" fill="var(--orange)" fill-opacity=".10"/>
+        <ellipse cx="320" cy="90" rx="40" ry="38" fill="#94a3b8"       fill-opacity=".12"/>
+        <circle cx="60"  cy="80"  r="22" fill="url(#x_lo)"/><circle cx="60"  cy="80"  r="5" fill="#fde68a"/>
+        <circle cx="140" cy="55"  r="26" fill="url(#x_hi)"/><circle cx="140" cy="55"  r="5" fill="#ef4444"/>
+        <circle cx="220" cy="100" r="22" fill="url(#x_md)"/><circle cx="220" cy="100" r="5" fill="#fb923c"/>
+        <circle cx="320" cy="65"  r="22" fill="url(#x_md)"/><circle cx="320" cy="65"  r="5" fill="#fb923c"/>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Best for screenshots / slides</span><span class="verdict bigwin">Big change</span></div>
+  </div>
+
+  <!-- Combo 3 -->
+  <div class="card" style="min-height:240px">
+    <div class="card-title">Combo 3 — Architectural</div>
+    <div class="card-name">Footprints + trend arrows</div>
+    <div class="card-desc">Most dramatic shift. Buildings become real shapes, motion encodes direction (rising/steady/falling) instead of magnitude.</div>
+    <div class="card-stage">
+      <svg viewBox="0 0 360 160" font-family="JetBrains Mono,monospace" font-size="13" font-weight="700">
+        <g>
+          <path d="M30,70 L90,70 L90,110 L65,110 L65,100 L30,100 Z" fill="var(--cyan)" fill-opacity=".7" stroke="var(--cyan)" stroke-width="1"/>
+          <text x="60" y="93" text-anchor="middle" fill="#0a0e1a" class="arrow-up">▲</text>
+        </g>
+        <g>
+          <rect x="115" y="50" width="55" height="46" fill="var(--orange)" fill-opacity=".7" stroke="var(--orange)" stroke-width="1"/>
+          <text x="142" y="78" text-anchor="middle" fill="#0a0e1a">→</text>
+        </g>
+        <g>
+          <path d="M195,95 L260,95 L260,125 L195,125 Z" fill="var(--pink)" fill-opacity=".7" stroke="var(--pink)" stroke-width="1"/>
+          <text x="227" y="114" text-anchor="middle" fill="#0a0e1a">▼</text>
+        </g>
+        <g>
+          <polygon points="280,55 330,55 330,90 308,90 308,80 280,80" fill="var(--purple)" fill-opacity=".7" stroke="var(--purple)" stroke-width="1"/>
+          <text x="305" y="76" text-anchor="middle" fill="#0a0e1a" class="arrow-up">▲</text>
+        </g>
+      </svg>
+    </div>
+    <div class="card-foot"><span>Biggest demo impact · most work</span><span class="verdict bigwin">Ambitious</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  <b>How to use this preview:</b> Look through the tiles, pick favorite from each section (Pulse + Category), or pick one of the three Combos. Tell me which by tile name (e.g. "Sonar + Icon", or "Combo 2") and I'll wire it into the real campus map. Easy to revert per-style if anything feels off in context.<br><br>
+  <b>Notes:</b> "Footprints" (Option C) requires fetching real building outlines — most work, most reward. "Trend arrows" (Pulse Option D) needs the forecast slope already computed in showPop, so it's basically free. Everything else is incremental SVG/CSS work, half a day at most for any one option.
+</div>
+
+</body>
+</html>
