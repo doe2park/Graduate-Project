@@ -82,6 +82,12 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pp-homes b{color:#fff;font-family:var(--mono);font-weight:700}
 .pp-meter-note{margin-top:6px;padding:6px 9px;background:rgba(148,163,184,.06);border-left:2px solid rgba(253,181,21,.35);border-radius:3px;font-size:10.5px;color:#94a3b8;line-height:1.4;letter-spacing:.1px}
 .pp-meter-note b{color:#cbd5e1;font-weight:600}
+.pp-vs-typical{margin-top:8px;padding:8px 10px;background:rgba(148,163,184,.05);border-left:2px solid rgba(148,163,184,.4);border-radius:3px;font-size:11.5px;color:#cbd5e1;line-height:1.45;display:flex;align-items:baseline;gap:8px}
+.pp-vs-typical .pp-vs-arrow{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:-.5px}
+.pp-vs-typical .pp-vs-arrow.up{color:#fb923c}
+.pp-vs-typical .pp-vs-arrow.down{color:#34d399}
+.pp-vs-typical .pp-vs-arrow.flat{color:#94a3b8}
+.pp-vs-typical .pp-vs-ctx{color:#64748b;font-size:10px;margin-left:auto;font-style:italic}
 .pp-pill{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:.2px}
 .pp-pill.calm{background:rgba(52,211,153,.12);color:#6ee7b7;border:1px solid rgba(52,211,153,.22)}
 .pp-pill.steady{background:rgba(253,181,21,.1);color:#fbbf24;border:1px solid rgba(253,181,21,.2)}
@@ -707,6 +713,29 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   window.render3DFn=renderMarkers;
   window.currentEnergyData=null;
 
+  // ── Baseline lookup — loaded once. Fed into forecast + Public "vs typical" line ──
+  // 4-tier fallback: (wday,hr) → (weekday|weekend,hr) → hr → building overall.
+  // Built by build_baselines.py from data/archive/*.json sparklines.
+  window.baselines=null;
+  fetch('data/baselines.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.baselines=d;}).catch(function(){});
+
+  window.getBaseline = function(buildingId, dateObj){
+    var b = window.baselines && window.baselines.buildings && window.baselines.buildings[buildingId];
+    if(!b) return null;
+    var wday = dateObj.getDay();           // JS: 0=Sun..6=Sat
+    var wdayMon0 = (wday+6)%7;             // Convert to 0=Mon..6=Sun (matches Python weekday())
+    var hr = dateObj.getHours();
+    var wclass = wdayMon0>=5 ? 'weekend' : 'weekday';
+    var key1 = wdayMon0+','+hr;
+    var key2 = wclass+','+hr;
+    var key3 = String(hr);
+    var t = (b.tier1 && b.tier1[key1])
+         || (b.tier2 && b.tier2[key2])
+         || (b.tier3 && b.tier3[key3])
+         || b.tier4;
+    return t ? {mean:t.mean, std:t.std, n:t.n, tier: (b.tier1&&b.tier1[key1])?1: (b.tier2&&b.tier2[key2])?2: (b.tier3&&b.tier3[key3])?3:4} : null;
+  };
+
   // ── Breathing tick — mutates glow symbols at ~12 Hz ──
   var _breathT0=Date.now();
   setInterval(function(){
@@ -969,31 +998,51 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          + '</div>';
     }
 
-    // ── CHART WITH FORECAST + REAL AXES + GRIDLINES + ANOMALY MARKERS ──
-    // Forecast methodology: EWMA-damped extrapolation anchored on predicted_kw (from BMO sklearn-style model),
-    // blended with recent slope and pulled toward avg6 over the horizon. Not a real ARIMA but honest-enough
-    // for a 2hr look-ahead. Confidence cone = ±σ6hr.
+    // ── CHART WITH BASELINE-AWARE FORECAST + REAL AXES + GRIDLINES + ANOMALY MARKERS ──
+    // Forecast methodology v2 (baseline-aware):
+    //   1. Anchor first 1–2 steps on predicted_kw + recent slope (short-term momentum)
+    //   2. Subsequent steps decay NOT to avg6 (stale, time-blind) but to baseline[building, future_hour]
+    //      — i.e. "what's typical for this building at the actual future moment"
+    //   3. If no baseline available (low-data building or unknown hour), fall back to old avg6 decay
+    //   Also computes baselinePast[] / baselineFuture[] for the chart's ghost line + Public mode.
+    var liveTsForBase = liveTs ? new Date(liveTs) : new Date();
+    var baseFn = function(stepsFromNow){
+      var d = new Date(liveTsForBase.getTime() + stepsFromNow*15*60000);
+      var bl = window.getBaseline ? window.getBaseline(b.id, d) : null;
+      return bl ? bl.mean : null;
+    };
+
+    // Build baseline series spanning past sparkline + future horizon (for chart ghost line)
+    var baselinePast=[], baselineFuture=[];
+    if(window.baselines){
+      var nPast = sparkData ? sparkData.length : 0;
+      for(var pi=0; pi<nPast; pi++){
+        baselinePast.push(baseFn(-(nPast-1-pi)));
+      }
+    }
+
     var forecast=null, fcastPeak=null, fcastAvg=null;
+    var baselineNowVal = baseFn(0);  // typical for THIS hour (used in Public popup)
     if(sparkData && sparkData.length>3){
       var fHorizon=8;  // 8 × 15min = 2hr
       var lastVal = sparkData[sparkData.length-1];
-      // Recent slope over last 4 pts (kW per step)
       var tail = sparkData.slice(-4);
       var slope = (tail[tail.length-1]-tail[0]) / (tail.length-1);
       var anchor = (predicted!=null && predicted>0) ? +predicted : (lastVal + slope);
       forecast=[];
-      // Step 1: move from lastVal → anchor over 2 steps (ramp-in to model forecast)
-      // Step 2: damp remaining steps toward avg6 with decay
       for(var fi=0; fi<fHorizon; fi++){
+        var futureBase = baseFn(fi+1);  // typical at this future step
+        var fallback = (futureBase!=null) ? futureBase : avg6;
+        baselineFuture.push(futureBase);
         var v;
         if(fi===0){
-          // first forecast point blends recent momentum with BMO model
-          v = 0.6*anchor + 0.3*(lastVal+slope) + 0.1*avg6;
+          // First step: weight recent momentum heavily (short-horizon = trust recent data)
+          v = 0.55*anchor + 0.30*(lastVal+slope) + 0.15*fallback;
         } else {
-          // decay toward avg6; preserves anchor's bias but regresses to mean
+          // Decay toward time-of-week baseline (was: avg6). Decay rate stays gentle.
           var prev = forecast[fi-1];
-          var decay = 0.25;  // ~half-life of ~3 steps
-          v = prev + (avg6 - prev)*decay + slope*Math.max(0,1-fi*0.25)*0.3;
+          var decay = 0.30;
+          v = prev + (fallback - prev)*decay + slope*Math.max(0,1-fi*0.25)*0.25;
         }
         forecast.push(Math.max(0, v));
       }
@@ -1128,6 +1177,27 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
                  + '<text x="'+(nowX-2).toFixed(1)+'" y="'+(by-3).toFixed(1)+'" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34d399" text-anchor="end" opacity="0.8">avg '+avg6.toFixed(1)+'</text>';
       }
 
+      // Typical-pattern ghost line (baseline lookup) — spans past + future when data available.
+      // Distinct from avg6 line: avg6 is "your last 6hr average"; typical is "what's normal at THIS hour-of-week".
+      var typicalLine='';
+      var typicalSeries=[];
+      var nPast=dd.length;
+      for(var ti=0; ti<nPast; ti++){
+        var bv = (ti < baselinePast.length) ? baselinePast[ti] : null;
+        if(bv!=null) typicalSeries.push({x: ML + ti*stepX, y: bv});
+      }
+      for(var ti=0; ti<baselineFuture.length; ti++){
+        var bv = baselineFuture[ti];
+        if(bv!=null) typicalSeries.push({x: nowX + (ti+1)*stepX, y: bv});
+      }
+      if(typicalSeries.length>=3){
+        var tpts = typicalSeries.map(function(p){
+          var ay = MT + plotH - ((p.y-yMin)/yRange)*plotH;
+          return p.x.toFixed(1)+','+Math.max(MT,Math.min(MT+plotH,ay)).toFixed(1);
+        }).join(' ');
+        typicalLine = '<polyline points="'+tpts+'" fill="none" stroke="#94a3b8" stroke-width="0.9" stroke-dasharray="2 2.5" opacity="0.65"/>';
+      }
+
       h += '<div class="pe-sec"><span>Power Trace + Forecast</span><span>'+nP+' actual · '+nF+' proj</span></div>';
       h += '<div class="pe-chart">'
          +   '<div class="pe-chart-tip" id="peChartTip"></div>'
@@ -1136,6 +1206,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          +     gridTicks
          +     yLabels
          +     xLabels
+         +     typicalLine
          +     '<polygon points="'+areaPts+'" fill="url(#peChartGrad)"/>'
          +     '<polyline points="'+pts+'" fill="none" stroke="'+cc.h+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
          +     baseLine
@@ -1146,7 +1217,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          +     '<line id="peChartGuide" x1="0" y1="'+MT+'" x2="0" y2="'+(MT+plotH)+'" stroke="'+cc.h+'" stroke-width="1" stroke-dasharray="2 2" opacity="0"/>'
          +     '<circle id="peChartDot" cx="0" cy="0" r="3.2" fill="'+cc.h+'" stroke="#0a0e1a" stroke-width="1.2" opacity="0"/>'
          +   '</svg>'
-         +   '<div class="pe-chart-legend"><span><span style="color:'+cc.h+'">━</span> load · <span style="color:#22d3ee">╌╌</span> forecast · <span style="color:#34d399">╌╌</span> avg · <span style="color:#fca5a5">●</span> σ&gt;1.5</span><span>'+Math.round(lo)+'–'+Math.round(hi)+' kW</span></div>'
+         +   '<div class="pe-chart-legend"><span><span style="color:'+cc.h+'">━</span> load · <span style="color:#22d3ee">╌╌</span> forecast · <span style="color:#94a3b8">╌╌</span> typical · <span style="color:#fca5a5">●</span> σ&gt;1.5</span><span>'+Math.round(lo)+'–'+Math.round(hi)+' kW</span></div>'
          + '</div>';
 
       // Forecast summary strip — projection metrics
@@ -1462,6 +1533,39 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       meterNote='<div class="pp-meter-note">🔌 reading from <b>'+label+'</b>'+(scope?' · '+scope:'')+'</div>';
     }
 
+    // "vs typical" — plain-English comparison to the time-of-week baseline used by Engineer forecast.
+    // Surfaces the same insight in two registers: SCADA ghost line for engineers, single sentence for public.
+    var vsTypical='';
+    if(liveKw!=null && window.getBaseline){
+      var nowDate = liveTs ? new Date(liveTs) : new Date();
+      var bl = window.getBaseline(b.id, nowDate);
+      if(bl && bl.mean>0){
+        var pct = ((liveKw - bl.mean) / bl.mean) * 100;
+        var dayNames=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        var wdayMon0 = (nowDate.getDay()+6)%7;
+        var dayLbl = dayNames[wdayMon0];
+        var hr = nowDate.getHours();
+        var hrLbl = (hr%12||12)+(hr<12?' AM':' PM');
+        var ctx, arrowCls, arrowSym, summary;
+        if(Math.abs(pct)<8){
+          arrowCls='flat'; arrowSym='≈'; summary='right around what\'s usual for a '+dayLbl+' '+hrLbl;
+        } else if(pct>0){
+          arrowCls='up'; arrowSym='+'+Math.round(pct)+'%';
+          summary='above what\'s typical for a '+dayLbl+' '+hrLbl;
+        } else {
+          arrowCls='down'; arrowSym=Math.round(pct)+'%';
+          summary='below what\'s typical for a '+dayLbl+' '+hrLbl;
+        }
+        // Confidence cue based on which tier was used
+        var tierNote = bl.tier===1 ? '' : (bl.tier===2 ? 'broad estimate' : (bl.tier===3 ? 'rough estimate' : 'very rough'));
+        vsTypical = '<div class="pp-vs-typical">'
+          + '<span class="pp-vs-arrow '+arrowCls+'">'+arrowSym+'</span>'
+          + '<span>'+summary+'</span>'
+          + (tierNote ? '<span class="pp-vs-ctx">'+tierNote+'</span>' : '')
+          + '</div>';
+      }
+    }
+
     popPub.innerHTML = '<div class="pp-stripe" style="background:'+cc.h+'"></div>'
       + '<div class="pp-body">'
       + '<button class="pp-x" onclick="closePopPub()">✕</button>'
@@ -1471,6 +1575,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       + heroHtml
       + meterNote
       + homesRow
+      + vsTypical
       + sparkSvg
       + '<div class="pp-actions">'+actions+'</div>'
       + '</div>';
