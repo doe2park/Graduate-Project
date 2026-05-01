@@ -501,8 +501,6 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
     <div class="pub-tip" id="pubTip">💡 Peak hours are typically 2-5 PM. Energy use drops ~40% overnight.</div>
   </div>
   <div id="viewDiv"></div>
-  <div id="grimes-pulse"></div>
-  <div id="grimes-label" onclick="document.querySelector('[data-idx=\\'0\\']')?.click()">◆ Grimes Digital Twin →</div>
   <div id="pop"></div>
   <div id="popPub"></div>
   <div class="ts-legend">
@@ -693,29 +691,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     }
 
     D.forEach(function(b,i){
-      var cc=C[b.c],isG=b.id==='grimes';
+      var cc=C[b.c];
       var live=energyData&&energyData[b.id];
       var kw=(live&&live.kw!==null)?live.kw:(b.kw||null);
       var eCol=kwColor(kw,maxKw);
 
-      if(isG){
-        // Grimes: gold "you are here" ring + Engineering icon (slightly larger than standard)
-        // The ring keeps Grimes distinguishable as the focal building; the gear icon
-        // matches its actual category (Engineering) for visual consistency with the rest of the map.
-        gL.add(new Graphic({
-          geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'simple-marker',color:[0,0,0,0],size:30,
-            outline:{color:[253,181,21,180],width:1.8}},
-          attributes:{idx:i,deco:1}
-        }));
-        var ringRgbG = eCol ? [eCol[0],eCol[1],eCol[2]] : null;
-        gL.add(new Graphic({
-          geometry:new Point({longitude:b.lng,latitude:b.lat}),
-          symbol:{type:'picture-marker', url: makeMarkerSvg(b.c, cc.r, 44, ringRgbG),
-                  width: 22, height: 22},
-          attributes:{idx:i}
-        }));
-      } else {
+      // All buildings (including Grimes) render through the same path now —
+      // unified iconography, no special-case ring or diamond.
+      {
         // Load intensity (0-1) based on kW
         var loadRatio = kw && maxKw > 0 ? Math.min(1, kw / maxKw) : 0;
 
@@ -822,27 +805,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   view.ui.add(new Locate({view}),'top-right');
   view.ui.add(new BasemapToggle({view,nextBasemap:'hybrid'}),'bottom-left');
 
-  // Pulse ring + label follows Grimes on map
-  const gPt=new Point({longitude:D[0].lng,latitude:D[0].lat});
-  const pulseEl=document.getElementById('grimes-pulse');
-  const labelEl=document.getElementById('grimes-label');
-  function updPulse(){
-    var sp=view.toScreen(gPt);
-    if(sp){
-      pulseEl.style.left=sp.x+'px';pulseEl.style.top=sp.y+'px';pulseEl.style.display='block';
-      labelEl.style.left=sp.x+'px';labelEl.style.top=sp.y+'px';labelEl.style.display='block';
-    } else {
-      pulseEl.style.display='none';labelEl.style.display='none';
-    }
-  }
-  view.watch('extent',updPulse);
-  view.watch('zoom',updPulse);
-  view.when(updPulse);
-  // Click label → open Grimes popup
-  labelEl.addEventListener('click',function(){
-    sel=0;renderList();
-    view.goTo({target:gPt,zoom:18},{duration:1000,easing:'ease-in-out'}).then(function(){showPop(D[0])});
-  });
+  // (Grimes-specific pulse + label removed — Grimes now renders identically to other buildings.)
 
   // ─── Expose map controls for chatbot (chat→map actions) ───
   // Chatbot uses this to fly to buildings, filter categories, reset view.
