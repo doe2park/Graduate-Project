@@ -134,18 +134,70 @@ def upload(token: str, bucket: str, src: Path) -> str:
 def trigger_translation(token: str, object_id: str) -> str:
     urn_b64 = base64.urlsafe_b64encode(object_id.encode()).decode().rstrip("=")
     print(f"[4/6] Translate: triggering SVF translation (urn={urn_b64[:24]}...)")
-    r = requests.post(
-        f"{MD_BASE}/designs",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        json={
-            "input":  {"urn": urn_b64},
-            "output": {"formats": [{"type": "svf", "views": ["3d"]}]},
+
+    # Try a sequence of endpoint+body variations. Different APS account vintages
+    # accept slightly different shapes; we try the most modern first.
+    attempts = [
+        # 1. Modern: output.destination.region required, lowercase 'us'
+        {
+            "url":  f"{MD_BASE}/designs",
+            "body": {"input": {"urn": urn_b64},
+                     "output": {"destination": {"region": "us"},
+                                "formats": [{"type": "svf2", "views": ["3d"]}]}},
+            "label": "v2/designs + destination us + svf2",
         },
-        timeout=60,
-    )
-    r.raise_for_status()
-    print(f"      ✓ translation queued")
-    return urn_b64
+        # 2. Same with svf (older)
+        {
+            "url":  f"{MD_BASE}/designs",
+            "body": {"input": {"urn": urn_b64},
+                     "output": {"destination": {"region": "us"},
+                                "formats": [{"type": "svf", "views": ["3d"]}]}},
+            "label": "v2/designs + destination us + svf",
+        },
+        # 3. Without destination (older clients work this way)
+        {
+            "url":  f"{MD_BASE}/designs",
+            "body": {"input": {"urn": urn_b64},
+                     "output": {"formats": [{"type": "svf", "views": ["3d"]}]}},
+            "label": "v2/designs (no destination)",
+        },
+        # 4. Legacy /job endpoint
+        {
+            "url":  f"{MD_BASE}/designs/job",
+            "body": {"input": {"urn": urn_b64},
+                     "output": {"formats": [{"type": "svf", "views": ["3d"]}]}},
+            "label": "v2/designs/job (legacy)",
+        },
+        # 5. Even older /job endpoint
+        {
+            "url":  f"{MD_BASE}/job",
+            "body": {"input": {"urn": urn_b64},
+                     "output": {"formats": [{"type": "svf", "views": ["3d"]}]}},
+            "label": "v2/job (legacy-legacy)",
+        },
+    ]
+
+    headers = {"Authorization": f"Bearer {token}",
+               "Content-Type": "application/json",
+               "x-ads-force": "true"}
+
+    for i, a in enumerate(attempts, 1):
+        print(f"      try {i}/{len(attempts)}: {a['label']}")
+        r = requests.post(a["url"], headers=headers, json=a["body"], timeout=60)
+        if r.ok:
+            print(f"      ✓ HTTP {r.status_code} — translation queued via «{a['label']}»")
+            return urn_b64
+        # Show why it failed (truncated)
+        try:
+            err = r.json()
+            msg = err.get("developerMessage") or err.get("diagnostic") or str(err)[:120]
+        except Exception:
+            msg = r.text[:120]
+        print(f"        ✗ HTTP {r.status_code}: {msg}")
+
+    print("\n      All variations failed. Last response headers:", dict(r.headers))
+    print("      Last response body:", r.text[:1500])
+    sys.exit("translation request failed across all known endpoint shapes")
 
 
 def poll_translation(token: str, urn: str):
@@ -248,7 +300,12 @@ def main():
         if not args.urn:
             sys.exit("--skip-upload requires --urn")
         urn = args.urn
-        print(f"[skip] Reusing URN {urn[:24]}...")
+        print(f"[skip] Reusing URN {urn[:24]}... — will (re)trigger translation")
+        # Decode URN back to object_id so we can re-trigger translation
+        pad = '=' * (-len(urn) % 4)
+        object_id = base64.urlsafe_b64decode(urn + pad).decode()
+        urn = trigger_translation(token, object_id)
+        poll_translation(token, urn)
     else:
         ensure_bucket(token, bucket)
         object_id = upload(token, bucket, src)

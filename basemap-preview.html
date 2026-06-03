@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Basemap Preview · Grimes Digital Twin</title>
+<link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/dark/main.css">
+<script src="https://js.arcgis.com/4.30/"></script>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#0f1424; --border:rgba(148,163,184,.12);
+    --text:#e2e8f0; --muted:#94a3b8; --dim:#64748b;
+    --gold:#FDB515; --cyan:#2dd4bf;
+    --font:'Inter','Segoe UI',system-ui,sans-serif;
+    --mono:'JetBrains Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);padding:28px 36px;min-height:100vh}
+  h1{font-size:22px;font-weight:600;letter-spacing:-.3px;margin-bottom:6px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:24px;line-height:1.5;max-width:760px}
+  .sub b{color:#cbd5e1}
+  .sub code{background:rgba(45,212,191,.08);color:var(--cyan);padding:1px 6px;border-radius:3px;font-family:var(--mono);font-size:11.5px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+  .card.applied{border-color:rgba(253,181,21,.45)}
+  .card-hdr{padding:12px 16px;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--border)}
+  .card-name{font-size:14px;font-weight:600;color:#fff}
+  .card-key{font-family:var(--mono);font-size:10.5px;color:var(--cyan)}
+  .card-desc{font-size:11.5px;color:var(--muted);padding:8px 16px;line-height:1.45;border-bottom:1px solid var(--border);background:rgba(148,163,184,.03)}
+  .card-applied{display:inline-block;font-size:9.5px;color:var(--gold);background:rgba(253,181,21,.12);padding:2px 7px;border-radius:3px;letter-spacing:.4px;font-weight:600;margin-left:8px;vertical-align:middle}
+  .map-container{height:280px;position:relative;background:#000}
+  .map-container > div{width:100%;height:100%}
+
+  .footer{margin-top:32px;padding:18px 22px;background:rgba(148,163,184,.04);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--muted);line-height:1.6}
+  .footer b{color:#cbd5e1}
+  .footer code{background:rgba(45,212,191,.08);color:var(--cyan);padding:1px 6px;border-radius:3px;font-family:var(--mono);font-size:12px}
+
+  /* Make ArcGIS attribution smaller in mini maps */
+  .esri-attribution{font-size:9px!important;padding:2px 6px!important}
+  .esri-attribution__powered-by, .esri-attribution__sources{font-size:9px!important}
+
+  /* Marker SVG (inline reuse from main map) */
+  .legend-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);padding:0 16px 10px}
+  .legend-row .ico{width:16px;height:16px}
+</style>
+</head>
+<body>
+
+<h1>Basemap Preview</h1>
+<p class="sub">Same Grimes/Bechtel area rendered on six different ArcGIS basemaps, each with two sample markers (Engineering + Student Life) so you can compare how the data layer reads against each background. <b>Pick a favorite — I'll swap it into the main map by changing one string in <code>grimes-campus-map-arcgis.html</code>.</b></p>
+
+<div class="grid">
+
+  <div class="card applied">
+    <div class="card-hdr"><div><span class="card-name">Dark Gray Vector</span><span class="card-applied">CURRENTLY APPLIED</span></div><div class="card-key">dark-gray-vector</div></div>
+    <div class="card-desc">Flat dark grayscale, minimal labels. Mapbox-dark / Carto-dark style. Strongest contrast for colored markers, classic dashboard aesthetic.</div>
+    <div class="map-container"><div id="map_dgv"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><div><span class="card-name">Streets Night Vector</span></div><div class="card-key">streets-night-vector</div></div>
+    <div class="card-desc">Dark with road network and POI labels emphasized in warm tones. More navigation-y, more "alive". Slightly busier than dark-gray.</div>
+    <div class="map-container"><div id="map_snv"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><div><span class="card-name">Gray Vector</span></div><div class="card-key">gray-vector</div></div>
+    <div class="card-desc">Light gray, neutral. Print-friendly, looks "academic / report". Markers feel softer here, less SCADA-flavored.</div>
+    <div class="map-container"><div id="map_gv"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><div><span class="card-name">Topo Vector</span></div><div class="card-key">topo-vector</div></div>
+    <div class="card-desc">Topographic with terrain shading + roads. Stronger geographic context (hills, vegetation). Useful when campus terrain matters.</div>
+    <div class="map-container"><div id="map_tv"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><div><span class="card-name">Streets Navigation Vector</span></div><div class="card-key">streets-navigation-vector</div></div>
+    <div class="card-desc">Light, navigation-style with strong road hierarchy. Like Google Maps default. Friendly for non-technical viewers.</div>
+    <div class="map-container"><div id="map_nav"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><div><span class="card-name">Hybrid (Satellite + labels)</span></div><div class="card-key">hybrid</div></div>
+    <div class="card-desc">Satellite imagery with road/place labels overlaid. The original choice. Real building footprints visible but UI tone clashes.</div>
+    <div class="map-container"><div id="map_hyb"></div></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <b>How to use:</b> scroll through each tile and tell me which basemap feels best for the Grimes digital twin. Reply with the <code>card-key</code> string (e.g. "let's go with <code>streets-night-vector</code>") and I'll wire it into the main map. Easy to swap back to satellite via the basemap toggle widget either way.
+</div>
+
+<script>
+require([
+  "esri/Map",
+  "esri/views/MapView",
+  "esri/Graphic",
+  "esri/layers/GraphicsLayer",
+  "esri/geometry/Point"
+], function(EMap, MapView, Graphic, GraphicsLayer, Point){
+
+  const CENTER = [-122.25815, 37.87410];  // Grimes
+  const ZOOM = 16;
+
+  // Sample markers — one Engineering (gold gear), one Student Life (coral cup), one Library (cyan books).
+  // Same SVG icon system as the main map.
+  const ICONS = {
+    Engineering:    {color:[0,50,98],   svg:'<circle cx="12" cy="12" r="3.4" fill="none" stroke="#fff" stroke-width="1.7"/><g stroke="#fff" stroke-width="1.7" stroke-linecap="round"><line x1="12" y1="2.5" x2="12" y2="5.2"/><line x1="12" y1="18.8" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5.2" y2="12"/><line x1="18.8" y1="12" x2="21.5" y2="12"/><line x1="5.2" y1="5.2" x2="7.1" y2="7.1"/><line x1="16.9" y1="16.9" x2="18.8" y2="18.8"/><line x1="18.8" y1="5.2" x2="16.9" y2="7.1"/><line x1="7.1" y1="16.9" x2="5.2" y2="18.8"/></g>'},
+    StudentLife:    {color:[180,40,40], svg:'<path d="M5 8.5 L17 8.5 L17 15.5 Q17 18.8 13.7 18.8 L8.3 18.8 Q5 18.8 5 15.5 Z" fill="#fff"/><path d="M17.5 10.8 Q21 10.8 21 14 Q21 17 17.5 17" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>'},
+    Libraries:      {color:[6,182,212], svg:'<g fill="#fff"><rect x="4.2" y="6" width="15.6" height="3.2" rx="0.5"/><rect x="5.4" y="10.4" width="13.2" height="3.2" rx="0.5"/><rect x="4.2" y="14.8" width="15.6" height="3.2" rx="0.5"/></g>'}
+  };
+
+  function makeIconUrl(catKey){
+    const ic = ICONS[catKey];
+    const bg = `rgb(${ic.color[0]},${ic.color[1]},${ic.color[2]})`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.6" fill="${bg}" stroke="rgba(255,255,255,.7)" stroke-width="1.6"/>${ic.svg}</svg>`;
+    return 'data:image/svg+xml;utf8,'+encodeURIComponent(svg);
+  }
+
+  // Three sample buildings around Grimes
+  const SAMPLES = [
+    {lng:-122.25815, lat:37.87410, cat:'Engineering'},   // Grimes
+    {lng:-122.25862, lat:37.87583, cat:'Engineering'},   // Soda
+    {lng:-122.26015, lat:37.86980, cat:'StudentLife'},   // Chavez
+  ];
+
+  function makeMap(containerId, basemapKey){
+    const map = new EMap({basemap: basemapKey});
+    const view = new MapView({
+      container: containerId,
+      map: map,
+      center: CENTER,
+      zoom: ZOOM,
+      ui: {components: ["attribution"]},
+    });
+    const gL = new GraphicsLayer();
+    map.add(gL);
+    SAMPLES.forEach(s => {
+      // Static halo
+      gL.add(new Graphic({
+        geometry: new Point({longitude:s.lng, latitude:s.lat}),
+        symbol: {type:'simple-marker', color:[ICONS[s.cat].color[0],ICONS[s.cat].color[1],ICONS[s.cat].color[2],90], size:20, outline:{color:[0,0,0,0],width:0}}
+      }));
+      // Picture marker icon
+      gL.add(new Graphic({
+        geometry: new Point({longitude:s.lng, latitude:s.lat}),
+        symbol: {type:'picture-marker', url: makeIconUrl(s.cat), width:18, height:18}
+      }));
+    });
+    return view;
+  }
+
+  makeMap('map_dgv', 'dark-gray-vector');
+  makeMap('map_snv', 'streets-night-vector');
+  makeMap('map_gv',  'gray-vector');
+  makeMap('map_tv',  'topo-vector');
+  makeMap('map_nav', 'streets-navigation-vector');
+  makeMap('map_hyb', 'hybrid');
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,144 @@
+{
+  "_doc": "LEED v4 EAp2/EAc1 energy performance data for UCB Bechtel Engineering Center (Grimes Hall). Extracted from 20240529_Bechtel_LEEDv4MinEnergyPerfCalc.xlsm (Performance_Outputs_Summary). baseline = ASHRAE 90.1-2010 code minimum; proposed = as-designed energy model output (eQuest).",
+  "_source_file": "20240529_Bechtel_LEEDv4MinEnergyPerfCalc.xlsm",
+  "_extracted": "2026-05-22",
+  "building": {
+    "leed_project_id": "1000171106",
+    "name": "UCB Bechtel Engineering Center-Remodel",
+    "rating_system": "LEED v4 BD+C: New Construction",
+    "conditioned_area_sqft": 72108,
+    "unconditioned_area_sqft": 16680,
+    "percent_new_construction": 0.44,
+    "percent_renovation_existing": 0.56
+  },
+  "totals": {
+    "baseline_annual_kwh": 1501425.0,
+    "proposed_annual_kwh": 824544.0,
+    "baseline_peak_kw": 947.1,
+    "proposed_peak_kw": 854.6,
+    "design_savings_pct": 45.1,
+    "eui_proposed_kwh_per_sqft_yr": 11.43,
+    "eui_proposed_kbtu_per_sqft_yr": 39.0
+  },
+  "end_uses": [
+    {
+      "end_use": "Interior lighting",
+      "energy_type": "Electricity",
+      "baseline_kwh": 162547.4,
+      "proposed_kwh": 104862.0,
+      "savings_pct": 35.5,
+      "baseline_kw": 57.0,
+      "proposed_kw": 37.69
+    },
+    {
+      "end_use": "Exterior lighting",
+      "energy_type": "Electricity",
+      "baseline_kwh": 36884.2,
+      "proposed_kwh": 21651.5,
+      "savings_pct": 41.3,
+      "baseline_kw": 7.8,
+      "proposed_kw": 3.81
+    },
+    {
+      "end_use": "Space heating",
+      "energy_type": "Electricity",
+      "baseline_kwh": 868507.5,
+      "proposed_kwh": 146724.6,
+      "savings_pct": 83.1,
+      "baseline_kw": 635.5,
+      "proposed_kw": 496.35
+    },
+    {
+      "end_use": "Space cooling",
+      "energy_type": "Electricity",
+      "baseline_kwh": 92417.8,
+      "proposed_kwh": 57642.2,
+      "savings_pct": 37.6,
+      "baseline_kw": 149.8,
+      "proposed_kw": 128.07
+    },
+    {
+      "end_use": "Pumps",
+      "energy_type": "Electricity",
+      "baseline_kwh": 3153.6,
+      "proposed_kwh": 14347.8,
+      "savings_pct": -355.0,
+      "baseline_kw": 0.4,
+      "proposed_kw": 9.58
+    },
+    {
+      "end_use": "Heat rejection",
+      "energy_type": "Electricity",
+      "baseline_kwh": 5899.0,
+      "proposed_kwh": 4165.9,
+      "savings_pct": 29.4,
+      "baseline_kw": 9.6,
+      "proposed_kw": 9.26
+    },
+    {
+      "end_use": "Fans - interior ventilation",
+      "energy_type": "Electricity",
+      "baseline_kwh": 94301.0,
+      "proposed_kwh": 237435.4,
+      "savings_pct": -151.8,
+      "baseline_kw": 25.5,
+      "proposed_kw": 108.38
+    },
+    {
+      "end_use": "Service water heating",
+      "energy_type": "Electricity",
+      "baseline_kwh": 81113.0,
+      "proposed_kwh": 81113.0,
+      "savings_pct": 0,
+      "baseline_kw": 19.75,
+      "proposed_kw": 19.75
+    },
+    {
+      "end_use": "Receptacle equipment",
+      "energy_type": "Electricity",
+      "baseline_kwh": 121554.5,
+      "proposed_kwh": 121554.5,
+      "savings_pct": -0.0,
+      "baseline_kw": 31.42,
+      "proposed_kw": 31.42
+    },
+    {
+      "end_use": "IT equipment",
+      "energy_type": "Electricity",
+      "baseline_kwh": 29047.4,
+      "proposed_kwh": 29047.4,
+      "savings_pct": -0.0,
+      "baseline_kw": 9.61,
+      "proposed_kw": 9.61
+    },
+    {
+      "end_use": "Elevators and escalators",
+      "energy_type": "Electricity",
+      "baseline_kwh": 6000.0,
+      "proposed_kwh": 6000.0,
+      "savings_pct": 0,
+      "baseline_kw": 0.7,
+      "proposed_kw": 0.67
+    }
+  ],
+  "meter_end_use_map": {
+    "_doc": "Maps BMO meter IDs to LEED end-use categories. M76 = 480/277V mechanical, M77 = 208/120V plug+lighting, M3 = main service.",
+    "76": [
+      "Space heating",
+      "Space cooling",
+      "Pumps",
+      "Heat rejection",
+      "Fans - interior ventilation",
+      "Fans Exhaust"
+    ],
+    "77": [
+      "Interior lighting",
+      "Exterior lighting",
+      "Receptacle equipment",
+      "Service water heating",
+      "IT equipment",
+      "Elevators and escalators"
+    ],
+    "3": "_all_"
+  }
+}

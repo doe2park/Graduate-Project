@@ -86,6 +86,97 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pp-homes b{color:#fff;font-family:var(--mono);font-weight:700}
 .pp-meter-note{margin-top:6px;padding:6px 9px;background:rgba(148,163,184,.06);border-left:2px solid rgba(253,181,21,.35);border-radius:3px;font-size:10.5px;color:#94a3b8;line-height:1.4;letter-spacing:.1px}
 .pp-meter-note b{color:#cbd5e1;font-weight:600}
+.pp-leed{margin-top:10px;padding:10px 12px;background:linear-gradient(180deg,rgba(52,211,153,.06),rgba(52,211,153,.02));border:1px solid rgba(52,211,153,.18);border-radius:4px;font-size:11.5px;color:#cbd5e1;line-height:1.5}
+.pp-leed-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.pp-leed-badge{font-size:9px;font-weight:700;color:#0a0e1a;background:#34d399;padding:2px 7px;border-radius:3px;letter-spacing:.5px}
+.pp-leed-title{font-weight:600;color:#a7f3d0;font-size:11.5px}
+.pp-leed-gap{font-family:var(--mono);font-weight:700;font-size:13px}
+.pp-leed-gap.over{color:#fb923c} .pp-leed-gap.under{color:#34d399} .pp-leed-gap.par{color:#cbd5e1}
+/* "Built on reuse" Public card — earthy terracotta to differentiate from green operational-energy LEED card */
+.pp-lca{margin-top:8px;padding:10px 12px;background:linear-gradient(180deg,rgba(217,119,87,.06),rgba(217,119,87,.02));border:1px solid rgba(217,119,87,.22);border-radius:4px;font-size:11.5px;color:#cbd5e1;line-height:1.5}
+.pp-lca-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.pp-lca-badge{font-size:9px;font-weight:700;color:#0a0e1a;background:#d97757;padding:2px 7px;border-radius:3px;letter-spacing:.5px}
+.pp-lca-title{font-weight:600;color:#fbd0bf;font-size:11.5px}
+.pp-lca-num{font-family:var(--mono);font-weight:700;color:#fbd0bf}
+/* Engineer Material-Reuse bars (legacy, kept for fallback) */
+.pe-mat-row{display:grid;grid-template-columns:80px 1fr 56px;gap:8px;align-items:center;padding:3px 2px;font-size:10.5px}
+.pe-mat-lbl{color:#94a3b8;font-family:var(--mono);font-size:10px}
+.pe-mat-bar{height:8px;background:rgba(148,163,184,.08);border-radius:1px;overflow:hidden;position:relative}
+.pe-mat-bar > div{height:100%;background:linear-gradient(90deg,#d97757,#f4a872);border-radius:1px}
+.pe-mat-pct{font-family:var(--mono);font-weight:700;color:#fbd0bf;font-size:11px;text-align:right}
+.pe-mat-pct.muted{color:#64748b;font-weight:500}
+
+/* === NEW Engineer LCA panel v2 — donut + stacked composition + icon-led element rows === */
+.pe-lca2{display:flex;flex-direction:column;gap:12px}
+.pe-lca2-hero{display:flex;align-items:center;gap:14px;padding:12px;background:linear-gradient(135deg,rgba(217,119,87,.1),rgba(217,119,87,.02));border:1px solid rgba(217,119,87,.22);border-radius:5px}
+.pe-lca2-donut{width:64px;height:64px;flex-shrink:0;position:relative}
+.pe-lca2-donut-pct{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:700 16px/1 'JetBrains Mono',monospace;color:#fbd0bf;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.pe-lca2-hero-text{flex:1;display:flex;flex-direction:column;gap:3px}
+.pe-lca2-hero-lbl{font:600 9px/1.3 'JetBrains Mono',monospace;color:#fbd0bf;letter-spacing:.6px;text-transform:uppercase;opacity:.9}
+.pe-lca2-hero-num{font:700 22px/1 'JetBrains Mono',monospace;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.pe-lca2-hero-band{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;font:600 9px/1 'JetBrains Mono',monospace;color:var(--gold);background:rgba(253,181,21,.1);border:1px solid rgba(253,181,21,.25);padding:3px 7px;border-radius:3px;letter-spacing:.4px;margin-top:2px}
+.pe-lca2-stack{height:22px;background:rgba(148,163,184,.08);border-radius:3px;overflow:hidden;display:flex;font:600 9px/22px 'JetBrains Mono',monospace;position:relative}
+.pe-lca2-stack-kept{background:linear-gradient(90deg,#d97757,#e88662);color:#1f1410;padding:0 8px;letter-spacing:.4px;text-shadow:0 0 4px rgba(255,255,255,.3);display:flex;align-items:center}
+.pe-lca2-stack-new{background:repeating-linear-gradient(45deg,rgba(148,163,184,.15) 0 4px,rgba(148,163,184,.05) 4px 8px);color:#94a3b8;padding:0 8px;letter-spacing:.4px;flex:1;display:flex;align-items:center;justify-content:flex-end}
+.pe-lca2-els{display:flex;flex-direction:column;gap:5px}
+.pe-lca2-el{display:grid;grid-template-columns:20px 70px 1fr 56px;gap:8px;align-items:center;padding:2px 0}
+.pe-lca2-el-ico{width:18px;height:18px;color:#fbd0bf}
+.pe-lca2-el-name{font:500 11px/1 'DM Sans',sans-serif;color:#cbd5e1;letter-spacing:.1px}
+.pe-lca2-el-bar{height:6px;background:rgba(148,163,184,.08);border-radius:1px;overflow:hidden;position:relative}
+.pe-lca2-el-bar > div{height:100%;background:linear-gradient(90deg,#d97757,#f4a872);border-radius:1px;box-shadow:0 0 4px rgba(217,119,87,.4)}
+.pe-lca2-el-pct{font:700 11px/1 'JetBrains Mono',monospace;color:#fbd0bf;text-align:right;font-variant-numeric:tabular-nums}
+.pe-lca2-el-pct.muted{color:#475569;font-weight:500}
+
+/* === NEW Engineer LEED Energy panel v2 — three comparative bars + savings hero === */
+.pe-leed2{display:flex;flex-direction:column;gap:10px}
+.pe-leed2-cmp{display:flex;flex-direction:column;gap:6px;padding:10px 4px;background:rgba(0,0,0,.18);border-radius:4px;border:1px solid rgba(52,211,153,.06)}
+.pe-leed2-row{display:grid;grid-template-columns:62px 1fr 64px;gap:8px;align-items:center;padding:2px 8px;font-size:10.5px}
+.pe-leed2-lbl{font:600 9.5px/1 'JetBrains Mono',monospace;color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
+.pe-leed2-bar{height:14px;background:rgba(148,163,184,.06);border-radius:2px;overflow:hidden;position:relative}
+.pe-leed2-bar > div{height:100%;border-radius:2px;display:flex;align-items:center;padding-right:6px;justify-content:flex-end;font:700 9.5px/14px 'JetBrains Mono',monospace;color:#0a0e1a;letter-spacing:.3px}
+.pe-leed2-bar > div.baseline{background:linear-gradient(90deg,rgba(148,163,184,.5),rgba(148,163,184,.65));color:#0a0e1a}
+.pe-leed2-bar > div.designed{background:linear-gradient(90deg,#FDB515,#fbbf24);color:#1f1408}
+.pe-leed2-bar > div.projected{background:linear-gradient(90deg,#22d3ee,#06b6d4);color:#04222b;box-shadow:0 0 6px rgba(34,211,238,.35)}
+.pe-leed2-val{font:700 10.5px/1 'JetBrains Mono',monospace;color:#cbd5e1;text-align:right;font-variant-numeric:tabular-nums}
+.pe-leed2-saved{display:flex;align-items:baseline;gap:8px;padding:8px 10px;background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(52,211,153,.02));border:1px solid rgba(52,211,153,.22);border-radius:4px}
+.pe-leed2-saved.warn{background:linear-gradient(135deg,rgba(251,146,60,.1),rgba(251,146,60,.02));border-color:rgba(251,146,60,.22)}
+.pe-leed2-saved-num{font:700 22px/1 'JetBrains Mono',monospace;color:#34d399;font-variant-numeric:tabular-nums;letter-spacing:-.8px}
+.pe-leed2-saved.warn .pe-leed2-saved-num{color:#fb923c}
+.pe-leed2-saved-lbl{flex:1;font:500 10.5px/1.3 'DM Sans',sans-serif;color:#a7f3d0;letter-spacing:.1px}
+.pe-leed2-saved.warn .pe-leed2-saved-lbl{color:#fed7aa}
+
+/* === NEW Public LEED card v2 — hero number + comparison bars === */
+.pp-leed2{margin-top:10px;padding:14px;background:linear-gradient(165deg,rgba(52,211,153,.12),rgba(52,211,153,.02));border:1px solid rgba(52,211,153,.28);border-radius:8px;position:relative;overflow:hidden}
+.pp-leed2::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle,rgba(52,211,153,.2),transparent 65%);pointer-events:none}
+.pp-leed2-badge{display:inline-flex;align-items:center;gap:5px;font:700 9px/1 'JetBrains Mono',monospace;color:#0a1612;background:#34d399;padding:4px 9px;border-radius:3px;letter-spacing:.7px;margin-bottom:10px;position:relative;z-index:1}
+.pp-leed2-hero{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;position:relative;z-index:1}
+.pp-leed2-num{font:700 38px/1 'JetBrains Mono',monospace;color:#34d399;font-variant-numeric:tabular-nums;letter-spacing:-1.5px;text-shadow:0 0 18px rgba(52,211,153,.35)}
+.pp-leed2-unit{font:500 12px/1.2 'DM Sans',sans-serif;color:#a7f3d0;flex:1}
+.pp-leed2-cmp{margin-top:10px;display:flex;flex-direction:column;gap:4px;position:relative;z-index:1}
+.pp-leed2-cmp-row{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:9.5px;color:#6b7fa0}
+.pp-leed2-cmp-lbl{font-family:'JetBrains Mono',monospace;letter-spacing:.3px;text-transform:uppercase;font-size:8.5px}
+.pp-leed2-cmp-bar{height:8px;background:rgba(148,163,184,.08);border-radius:2px;overflow:hidden;position:relative}
+.pp-leed2-cmp-bar > div{height:100%;border-radius:2px}
+.pp-leed2-cmp-bar > div.code{background:rgba(148,163,184,.5)}
+.pp-leed2-cmp-bar > div.designed{background:linear-gradient(90deg,#34d399,#10b981)}
+.pp-leed2-status{margin-top:10px;padding:7px 10px;background:rgba(0,0,0,.18);border-radius:4px;font-size:11px;color:#cbd5e1;line-height:1.4;position:relative;z-index:1}
+.pp-leed2-status b{font-family:'JetBrains Mono',monospace;font-weight:700}
+.pp-leed2-status b.under{color:#34d399}
+.pp-leed2-status b.over{color:#fb923c}
+.pp-leed2-status b.par{color:#cbd5e1}
+
+/* === NEW Public LCA card v2 — building cross-section SVG + hero number === */
+.pp-lca2{margin-top:10px;padding:14px;background:linear-gradient(165deg,rgba(217,119,87,.12),rgba(217,119,87,.02));border:1px solid rgba(217,119,87,.28);border-radius:8px;position:relative;overflow:hidden}
+.pp-lca2::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle,rgba(217,119,87,.18),transparent 65%);pointer-events:none}
+.pp-lca2-badge{display:inline-flex;align-items:center;gap:5px;font:700 9px/1 'JetBrains Mono',monospace;color:#1f1410;background:#d97757;padding:4px 9px;border-radius:3px;letter-spacing:.7px;margin-bottom:10px;position:relative;z-index:1}
+.pp-lca2-body{display:flex;gap:14px;align-items:center;position:relative;z-index:1}
+.pp-lca2-svg{flex-shrink:0;width:80px;height:78px}
+.pp-lca2-text{flex:1;display:flex;flex-direction:column;gap:3px}
+.pp-lca2-hero{display:flex;align-items:baseline;gap:6px}
+.pp-lca2-num{font:700 30px/1 'JetBrains Mono',monospace;color:#fbd0bf;font-variant-numeric:tabular-nums;letter-spacing:-1.2px;text-shadow:0 0 14px rgba(217,119,87,.4)}
+.pp-lca2-unit{font:500 11px/1.2 'DM Sans',sans-serif;color:#fbd0bf;opacity:.85;flex:1}
+.pp-lca2-detail{font-size:11px;color:#cbd5e1;line-height:1.4;margin-top:4px}
+.pp-lca2-detail b{color:#fbd0bf;font-family:'JetBrains Mono',monospace;font-weight:700}
 .pp-vs-typical{margin-top:8px;padding:8px 10px;background:rgba(148,163,184,.05);border-left:2px solid rgba(148,163,184,.4);border-radius:3px;font-size:11.5px;color:#cbd5e1;line-height:1.45;display:flex;align-items:baseline;gap:8px}
 .pp-vs-typical .pp-vs-arrow{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:-.5px}
 .pp-vs-typical .pp-vs-arrow.up{color:#fb923c}
@@ -765,6 +856,18 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   window.baselines=null;
   fetch('data/baselines.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.baselines=d;}).catch(function(){});
 
+  // LEED design-intent data (Grimes/Bechtel only) — feeds the "Design Intent vs Actual" panel
+  // and the Public LEED badge. Extracted from the LEED submittal calculator by extract_leed.py.
+  window.leedData=null;
+  fetch('data/bechtel_leed.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.leedData=d;}).catch(function(){});
+
+  // LEED material-reuse / LCA data (Grimes/Bechtel only) — feeds the "Material Reuse" panel
+  // (Engineer) and the "Built on reuse" badge (Public). Extracted from the LCA credit
+  // calculator by extract_lca.py. Represents the embodied-carbon layer of the digital twin —
+  // a complement to the operational-energy LEED data above.
+  window.lcaData=null;
+  fetch('data/bechtel_lca.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.lcaData=d;}).catch(function(){});
+
   window.getBaseline = function(buildingId, dateObj){
     var b = window.baselines && window.baselines.buildings && window.baselines.buildings[buildingId];
     if(!b) return null;
@@ -1361,6 +1464,189 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          + '</div>';
     }
 
+    // ── DESIGN INTENT vs ACTUAL (LEED submittal — Grimes only for now) ──
+    // Surfaces the "performance gap" — modeled annual energy from LEED submittal
+    // vs projected annual energy from current meter reading. Meter-aware:
+    //   M76 → compare to mechanical end-uses (HVAC, pumps, fans, heat rejection)
+    //   M77 → compare to plug+lighting end-uses (lighting, receptacles, water, IT, elevators)
+    //   M3 (main service) → compare to whole-building total
+    // This makes the comparison apples-to-apples: a single sub-meter shouldn't be
+    // compared to the whole-building modeled annual.
+    if(b.id==='grimes' && window.leedData && kw!=null){
+      var leed = window.leedData;
+      var sqft = leed.building.conditioned_area_sqft;
+      var rateKw = avg6!=null ? avg6 : kw;
+      var projAnnualKwh = rateKw * 8760;  // continuous-equivalent
+
+      // Pick which LEED end-uses to sum based on which meter we're reading.
+      // METER_MAP in leedData looks like: { '76': ['Space heating', ...], '77': [...], '3': '_all_' }
+      // Engineer popup uses `meterId` (set at the top of the function from live.meter || b.meter).
+      var meterScope = leed.meter_end_use_map && meterId
+                        ? leed.meter_end_use_map[String(meterId)] : null;
+      var scopedEndUses;
+      var scopeLabel;
+      if(meterScope === '_all_' || meterScope == null){
+        scopedEndUses = leed.end_uses;
+        scopeLabel = 'whole-building';
+      } else {
+        var allow = {};
+        meterScope.forEach(function(n){ allow[n]=true; });
+        scopedEndUses = leed.end_uses.filter(function(eu){ return allow[eu.end_use]; });
+        scopeLabel = meterId==='76' ? 'mechanical scope (M76)' : (meterId==='77' ? 'plug+lighting scope (M77)' : 'meter M'+meterId+' scope');
+      }
+      var designedKwh = scopedEndUses.reduce(function(s,e){return s+e.proposed_kwh;},0);
+      var baselineKwh = scopedEndUses.reduce(function(s,e){return s+e.baseline_kwh;},0);
+      var gapVsDesign = designedKwh ? ((projAnnualKwh - designedKwh) / designedKwh) * 100 : 0;
+      var savingsVsBaseline = baselineKwh ? ((baselineKwh - projAnnualKwh) / baselineKwh) * 100 : 0;
+      var gapCls = gapVsDesign > 5 ? 'warn' : (gapVsDesign < -5 ? 'green' : 'gold');
+      var gapSign = gapVsDesign > 0 ? '+' : '';
+
+      h += '<div class="pe-sec"><span>Design Intent vs Actual</span><span>LEED v4 EAp2 · '+scopeLabel+'</span></div>';
+
+      // === NEW VISUAL: three comparison bars scaled to baseline (the longest).
+      // Makes the "savings story" spatial — bars shrink as efficiency improves.
+      var maxKwh = Math.max(baselineKwh, designedKwh, projAnnualKwh) || 1;
+      var wBase = (baselineKwh / maxKwh) * 100;
+      var wDes  = (designedKwh / maxKwh) * 100;
+      var wProj = (projAnnualKwh / maxKwh) * 100;
+      h += '<div class="pe-leed2">';
+      h +=   '<div class="pe-leed2-cmp">'
+         +     '<div class="pe-leed2-row">'
+         +       '<div class="pe-leed2-lbl">Baseline</div>'
+         +       '<div class="pe-leed2-bar"><div class="baseline" style="width:'+wBase.toFixed(1)+'%">CODE</div></div>'
+         +       '<div class="pe-leed2-val">'+Math.round(baselineKwh/1000).toLocaleString()+' MWh</div>'
+         +     '</div>'
+         +     '<div class="pe-leed2-row">'
+         +       '<div class="pe-leed2-lbl">Designed</div>'
+         +       '<div class="pe-leed2-bar"><div class="designed" style="width:'+wDes.toFixed(1)+'%">eQUEST</div></div>'
+         +       '<div class="pe-leed2-val">'+Math.round(designedKwh/1000).toLocaleString()+' MWh</div>'
+         +     '</div>'
+         +     '<div class="pe-leed2-row">'
+         +       '<div class="pe-leed2-lbl">Projected</div>'
+         +       '<div class="pe-leed2-bar"><div class="projected" style="width:'+wProj.toFixed(1)+'%">LIVE</div></div>'
+         +       '<div class="pe-leed2-val">'+Math.round(projAnnualKwh/1000).toLocaleString()+' MWh</div>'
+         +     '</div>'
+         +   '</div>';
+
+      // Hero savings/gap block — big number + plain-English explanation.
+      var savedClass = gapVsDesign > 5 ? 'warn' : '';
+      var savedSign = gapVsDesign > 0 ? '+' : '';
+      var savedNum = savedSign + gapVsDesign.toFixed(0) + '%';
+      var savedLbl;
+      if(Math.abs(gapVsDesign) < 5){
+        savedLbl = 'tracking right at design intent — current pace matches the eQuest model for this meter scope';
+      } else if(gapVsDesign > 0){
+        savedLbl = 'above design intent right now — running <b>hotter</b> than the eQuest model predicted for this meter scope';
+      } else {
+        savedLbl = 'below design intent right now — running <b>better</b> than the eQuest model predicted for this meter scope';
+      }
+      h +=   '<div class="pe-leed2-saved '+savedClass+'">'
+         +     '<div class="pe-leed2-saved-num">'+savedNum+'</div>'
+         +     '<div class="pe-leed2-saved-lbl">'+savedLbl+'</div>'
+         +   '</div>';
+
+      // Per-end-use breakdown — compact table (abbreviated for less visual weight).
+      var top5 = scopedEndUses.slice().sort(function(a,b){return b.proposed_kwh-a.proposed_kwh;}).slice(0,5);
+      h +=   '<div class="pe-samples"><table>';
+      h +=     '<thead><tr><th>End-use</th><th style="text-align:right">Base</th><th style="text-align:right">Design</th><th style="text-align:right">Saved</th></tr></thead><tbody>';
+      top5.forEach(function(eu){
+        var savCls = eu.savings_pct > 30 ? 'style="color:#34d399"' : (eu.savings_pct < 0 ? 'style="color:#f87171"' : '');
+        h +=     '<tr>'
+             +     '<td>'+eu.end_use+'</td>'
+             +     '<td style="text-align:right">'+Math.round(eu.baseline_kwh/1000)+'</td>'
+             +     '<td style="text-align:right">'+Math.round(eu.proposed_kwh/1000)+'</td>'
+             +     '<td style="text-align:right" '+savCls+'>'+(eu.savings_pct>0?'+':'')+eu.savings_pct.toFixed(0)+'%</td>'
+             +   '</tr>';
+      });
+      h +=     '</tbody></table></div>';
+      h += '</div>';  // /pe-leed2
+
+      // Footnote
+      h += '<div style="font-size:9px;color:#475569;padding:4px 2px 0;font-style:italic;line-height:1.4">'
+         + 'Bars scaled to baseline (longest). Baseline = ASHRAE 90.1-2010 code minimum. Designed = eQuest model. '
+         + 'Projected = current 6hr avg × 8760hr, scoped to end-uses on this meter. Whole-building EUI (designed): '
+         + leed.totals.eui_proposed_kwh_per_sqft_yr + ' kWh/sqft/yr @ ' + sqft.toLocaleString() + ' sqft · LEED proj #' + leed.building.leed_project_id + '.'
+         + '</div>';
+    }
+
+    // ── MATERIAL REUSE (LEED v4.1 MR — Building Life-Cycle Impact Reduction) ──
+    // Embodied-carbon counterpart to the operational-energy LEED panel above.
+    // Bechtel renovation kept ~94% of existing floor structure, full envelope —
+    // a meaningful embodied-carbon story that complements the live energy data.
+    if(b.id==='grimes' && window.lcaData){
+      var lca = window.lcaData;
+      var overallPct = lca.totals.overall_reuse_pct_of_project;
+      var scoreBand = lca.totals.score_band;
+
+      h += '<div class="pe-sec"><span>Material Reuse</span><span>LEED v4.1 MR · proj #'+lca._leed_project_id+'</span></div>';
+
+      // === NEW VISUAL: donut + stacked composition bar + icon-led element rows ===
+      // Donut: circumference for r=26 ≈ 163.4. Filled arc length = (overallPct/100) * 163.4.
+      var donutCirc = 2 * Math.PI * 26;
+      var donutFill = (overallPct / 100) * donutCirc;
+      var newPct = Math.max(0, 100 - overallPct);
+      h += '<div class="pe-lca2">';
+      // --- HERO: donut + headline number + LEED band pill
+      h +=   '<div class="pe-lca2-hero">'
+         +     '<div class="pe-lca2-donut">'
+         +       '<svg viewBox="0 0 64 64" width="64" height="64">'
+         +         '<circle cx="32" cy="32" r="26" fill="none" stroke="rgba(148,163,184,.12)" stroke-width="8"/>'
+         +         '<circle cx="32" cy="32" r="26" fill="none" stroke="url(#lcaGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+donutFill.toFixed(1)+' '+donutCirc.toFixed(1)+'" transform="rotate(-90 32 32)"/>'
+         +         '<defs><linearGradient id="lcaGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d97757"/><stop offset="1" stop-color="#f4a872"/></linearGradient></defs>'
+         +       '</svg>'
+         +       '<div class="pe-lca2-donut-pct">'+overallPct.toFixed(1)+'%</div>'
+         +     '</div>'
+         +     '<div class="pe-lca2-hero-text">'
+         +       '<div class="pe-lca2-hero-lbl">Existing structure reused</div>'
+         +       '<div class="pe-lca2-hero-num">'+Math.round(lca.totals.reused_sqft).toLocaleString()+' <span style="font-size:11px;color:#94a3b8;font-weight:500">/ '+Math.round(lca.totals.project_sqft).toLocaleString()+' sqft</span></div>'
+         +       '<div class="pe-lca2-hero-band">★ LEED '+scoreBand.label.toUpperCase()+' BAND ('+scoreBand.threshold_pct+'%+ threshold)</div>'
+         +     '</div>'
+         +   '</div>';
+      // --- COMPOSITION stacked bar
+      h +=   '<div class="pe-lca2-stack">'
+         +     '<div class="pe-lca2-stack-kept" style="width:'+overallPct.toFixed(1)+'%">★ '+Math.round(overallPct)+'% EXISTING KEPT</div>'
+         +     '<div class="pe-lca2-stack-new">NEW '+Math.round(newPct)+'%</div>'
+         +   '</div>';
+      // --- Per-element rows with SVG icons (wall hatch, floor stack, roof peak, envelope frame)
+      var ICONS = {
+        'Walls':    '<rect x="2" y="3" width="14" height="12" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/><line x1="9" y1="3" x2="9" y2="15" stroke="currentColor" stroke-width="1.4"/>',
+        'Floors':   '<line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="1.4"/>',
+        'Roofs':    '<path d="M2 13 L9 4 L16 13 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
+        'Envelope': '<rect x="2.5" y="2.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="5" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/>',
+      };
+      h +=   '<div class="pe-lca2-els">';
+      lca.elements.forEach(function(el){
+        var pctP = el.reuse_pct_of_project;
+        if(pctP === null) return;
+        var pctK = el.kept_pct_of_existing;
+        var labelShort = el.element.replace(/ \(.+\)/,'');
+        var iconSvg = ICONS[labelShort] || ICONS['Envelope'];  // fallback
+        var barW = Math.max(0, Math.min(100, pctP));
+        var pctStr, pctCls;
+        if(pctK !== null && pctK > 0){
+          pctStr = Math.round(pctK)+'%';
+          pctCls = '';
+        } else {
+          pctStr = 'N/A';
+          pctCls = ' muted';
+        }
+        h +=   '<div class="pe-lca2-el">'
+           +     '<svg class="pe-lca2-el-ico" viewBox="0 0 18 18">'+iconSvg+'</svg>'
+           +     '<div class="pe-lca2-el-name">'+labelShort+'</div>'
+           +     '<div class="pe-lca2-el-bar"><div style="width:'+barW.toFixed(1)+'%"></div></div>'
+           +     '<div class="pe-lca2-el-pct'+pctCls+'">'+pctStr+'</div>'
+           +   '</div>';
+      });
+      h +=   '</div>';
+      h += '</div>';  // /pe-lca2
+
+      h += '<div style="font-size:9px;color:#475569;padding:4px 2px 0;font-style:italic;line-height:1.4">'
+         + 'Donut + bars = % of existing material kept (LEED MR Option 1, Path 1). '
+         + 'Roofs N/A — Bechtel is multi-terraced, floors double as roofs per submittal. '
+         + 'Embodied-carbon proxy: more reuse = less new concrete/steel poured.'
+         + '</div>';
+    }
+
     // ── MEP LED GRID (BIM buildings only) ──
     if(b.bim){
       var meps=[{n:'HVAC',col:'#22d3ee'},{n:'HW',col:'#f87171'},{n:'CW',col:'#60a5fa'},{n:'EL',col:'#fbbf24'},{n:'FP',col:'#f97316'},{n:'SAN',col:'#a78bfa'},{n:'STRM',col:'#34d399'},{n:'VENT',col:'#e879f9'}];
@@ -1559,6 +1845,98 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       meterNote='<div class="pp-meter-note">🔌 reading from <b>'+label+'</b>'+(scope?' · '+scope:'')+'</div>';
     }
 
+    // LEED card v2 (Grimes only) — big hero number + visual baseline-vs-designed bars + status pill.
+    // Same data feeds Engineer panel; this version puts the savings story up front for non-technical viewers.
+    var leedCard='';
+    if(b.id==='grimes' && window.leedData && liveKw!=null){
+      var L = window.leedData;
+      var rateL = liveKw;
+      var projAnnualL = rateL * 8760;
+      var designedL = L.totals.proposed_annual_kwh;
+      var baselineL = L.totals.baseline_annual_kwh;
+      var savingsL = L.totals.design_savings_pct;
+      var gapL = ((projAnnualL - designedL) / designedL) * 100;
+      var gapCls = gapL > 5 ? 'over' : (gapL < -5 ? 'under' : 'par');
+      var statusMsg;
+      if(Math.abs(gapL) < 5){
+        statusMsg = 'Tracking <b class="par">right at</b> design intent right now.';
+      } else if(gapL > 0){
+        statusMsg = 'Tracking <b class="over">'+Math.round(gapL)+'% above</b> design intent right now.';
+      } else {
+        statusMsg = 'Tracking <b class="under">'+Math.round(Math.abs(gapL))+'% below</b> design intent right now — running cleaner than planned.';
+      }
+      // Designed bar scaled to baseline (the longer one) so the "less energy" story reads visually.
+      var wDesigned = baselineL ? (designedL / baselineL) * 100 : 0;
+      leedCard = '<div class="pp-leed2">'
+        + '<div class="pp-leed2-badge">🏆 LEED v4 CERTIFIED · BECHTEL</div>'
+        + '<div class="pp-leed2-hero">'
+        +   '<span class="pp-leed2-num">'+Math.round(savingsL)+'%</span>'
+        +   '<span class="pp-leed2-unit">less energy<br>than code minimum</span>'
+        + '</div>'
+        + '<div class="pp-leed2-cmp">'
+        +   '<div class="pp-leed2-cmp-row"><span class="pp-leed2-cmp-lbl">Code min</span><div class="pp-leed2-cmp-bar"><div class="code" style="width:100%"></div></div></div>'
+        +   '<div class="pp-leed2-cmp-row"><span class="pp-leed2-cmp-lbl">Designed</span><div class="pp-leed2-cmp-bar"><div class="designed" style="width:'+wDesigned.toFixed(1)+'%"></div></div></div>'
+        + '</div>'
+        + '<div class="pp-leed2-status">'+statusMsg+'</div>'
+        + '</div>';
+    }
+
+    // LCA card v2 (Grimes only) — illustrated building cross-section + hero number + 2 supporting facts.
+    // Cross-section visualizes the 70/30 reuse split as terracotta-existing + hatched-gray-new.
+    var lcaCard='';
+    if(b.id==='grimes' && window.lcaData){
+      var Lca = window.lcaData;
+      var overall = Lca.totals.overall_reuse_pct_of_project;
+      var newP = Math.max(0, 100 - overall);
+      // Find top 2 element kept-% (typically Floors 94 + Envelope 98) for the supporting facts line.
+      var sortedKept = Lca.elements
+        .filter(function(el){ return el.kept_pct_of_existing != null && el.kept_pct_of_existing > 0; })
+        .sort(function(a,b){ return b.kept_pct_of_existing - a.kept_pct_of_existing; });
+      var top1 = sortedKept[0], top2 = sortedKept[1];
+      var detailHtml = '';
+      if(top1){
+        detailHtml = '<b>'+Math.round(top1.kept_pct_of_existing)+'%</b> of original '+top1.element.replace(/ \(.+\)/,'').toLowerCase();
+        if(top2){
+          detailHtml += ',<br><b>'+Math.round(top2.kept_pct_of_existing)+'%</b> of '+top2.element.replace(/ \(.+\)/,'').toLowerCase()+' kept';
+        } else {
+          detailHtml += ' kept';
+        }
+      }
+      // Cross-section SVG geometry: 78 tall, terracotta block fills (overall/100)*64 of it from the bottom.
+      var totalH = 64;
+      var keptH = Math.round((overall/100) * totalH);
+      var newH = totalH - keptH;
+      var keptY = 10 + newH;        // terracotta block starts here
+      var newY = 10;                // new block starts at top
+      lcaCard = '<div class="pp-lca2">'
+        + '<div class="pp-lca2-badge">♻ BUILT ON REUSE</div>'
+        + '<div class="pp-lca2-body">'
+        +   '<svg class="pp-lca2-svg" viewBox="0 0 80 78">'
+        +     '<line x1="2" y1="74" x2="78" y2="74" stroke="rgba(148,163,184,.3)" stroke-width="1"/>'
+        +     '<rect x="10" y="'+newY+'" width="60" height="'+newH+'" fill="rgba(148,163,184,.18)" stroke="rgba(148,163,184,.4)" stroke-width="1" stroke-dasharray="2 2"/>'
+        +     (newH > 6 ? '<text x="40" y="'+(newY + newH/2 + 2.5)+'" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="6.5" font-weight="600">NEW '+Math.round(newP)+'%</text>' : '')
+        +     '<rect x="10" y="'+keptY+'" width="60" height="'+keptH+'" fill="#d97757" opacity="0.85"/>'
+        // Floor lines inside the kept block
+        +     '<line x1="10" y1="'+(keptY + keptH/3)+'" x2="70" y2="'+(keptY + keptH/3)+'" stroke="rgba(255,255,255,.25)" stroke-width=".7"/>'
+        +     '<line x1="10" y1="'+(keptY + 2*keptH/3)+'" x2="70" y2="'+(keptY + 2*keptH/3)+'" stroke="rgba(255,255,255,.25)" stroke-width=".7"/>'
+        // Window hints
+        +     '<rect x="16" y="'+(keptY + keptH/3 + 4)+'" width="6" height="4" fill="rgba(255,255,255,.4)"/>'
+        +     '<rect x="28" y="'+(keptY + keptH/3 + 4)+'" width="6" height="4" fill="rgba(255,255,255,.4)"/>'
+        +     '<rect x="40" y="'+(keptY + keptH/3 + 4)+'" width="6" height="4" fill="rgba(255,255,255,.4)"/>'
+        +     '<rect x="52" y="'+(keptY + keptH/3 + 4)+'" width="6" height="4" fill="rgba(255,255,255,.4)"/>'
+        +     '<text x="40" y="'+(74 - 4)+'" text-anchor="middle" fill="#1f1410" font-family="JetBrains Mono,monospace" font-size="6.5" font-weight="700">KEPT '+Math.round(overall)+'%</text>'
+        +   '</svg>'
+        +   '<div class="pp-lca2-text">'
+        +     '<div class="pp-lca2-hero">'
+        +       '<span class="pp-lca2-num">'+Math.round(overall)+'%</span>'
+        +       '<span class="pp-lca2-unit">reused<br>structure</span>'
+        +     '</div>'
+        +     (detailHtml ? '<div class="pp-lca2-detail">'+detailHtml+'</div>' : '')
+        +   '</div>'
+        + '</div>'
+        + '</div>';
+    }
+
     // "vs typical" — plain-English comparison to the time-of-week baseline used by Engineer forecast.
     // Surfaces the same insight in two registers: SCADA ghost line for engineers, single sentence for public.
     var vsTypical='';
@@ -1602,6 +1980,8 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       + meterNote
       + homesRow
       + vsTypical
+      + leedCard
+      + lcaCard
       + sparkSvg
       + '<div class="pp-actions">'+actions+'</div>'
       + '</div>';

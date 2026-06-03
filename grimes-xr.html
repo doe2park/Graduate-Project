@@ -751,9 +751,31 @@ function pointCloudFromGeometry(geom, ptSize) {
     vertexColors: !!geom.getAttribute('color'),
     color: geom.getAttribute('color') ? 0xffffff : 0x9aa6b8,
     sizeAttenuation: true,
+    transparent: true,   // X-ray mode adjusts opacity
+    opacity: 1.0,
+    depthWrite: false,   // prevents point cloud from occluding MEP when transparent
   });
   return new THREE.Points(geom, mat);
 }
+
+// Apply opacity/X-ray to the loaded interior scan (works for both meshes and point clouds)
+function setInteriorOpacity(alpha){
+  if(!interiorState.group) return;
+  interiorState.group.traverse(child => {
+    if(child.material && !child.userData.hotspot){
+      if(Array.isArray(child.material)){
+        child.material.forEach(m => { m.transparent = true; m.opacity = alpha; m.depthWrite = alpha > 0.95; m.needsUpdate = true; });
+      } else {
+        child.material.transparent = true;
+        child.material.opacity = alpha;
+        child.material.depthWrite = alpha > 0.95;
+        child.material.needsUpdate = true;
+      }
+    }
+  });
+}
+// Expose for UI panel below
+window.setInteriorOpacity = setInteriorOpacity;
 
 async function loadInteriorScan() {
   if (interiorState.loaded || interiorState.loading) return;
@@ -884,6 +906,176 @@ pickBtn.addEventListener('click', () => {
     showInteriorPlaceholder('Pick mode ON — click in the 3D view to print coordinates to console (paste into hotspots[].position).');
   }
 });
+
+/* ══════════════════════════════════════════ X-RAY + ALIGNMENT PANEL ══════════════════════════════════════════
+   Floating panel that appears once interior scan is loaded.
+   - Opacity slider (X-ray mode): see MEP behind scanned walls
+   - Position / rotation / scale nudges: dial in alignment without editing JSON
+   - "Copy alignment" button: dumps current transform as JSON snippet you paste into manifest
+============================================================================== */
+function makeAlignPanel(){
+  if(document.getElementById('alignPanel')) return;
+  const p = document.createElement('div');
+  p.id = 'alignPanel';
+  p.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:60;background:rgba(10,14,26,.94);backdrop-filter:blur(12px);border:1px solid rgba(168,85,247,.35);border-radius:10px;padding:12px 14px;color:#e2e8f0;font-family:var(--font);font-size:11px;min-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none';
+  p.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="color:#c084fc;font-weight:700;letter-spacing:.4px;font-size:10.5px">🏛 INTERIOR SCAN</div>
+      <button id="alignClose" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:14px">✕</button>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin-bottom:4px">
+        <span>X-ray opacity</span><span id="alignOpacityVal">100%</span>
+      </div>
+      <input id="alignOpacity" type="range" min="0" max="100" value="100" style="width:100%;accent-color:#c084fc">
+    </div>
+
+    <div style="font-size:10px;color:#64748b;margin:8px 0 4px;text-transform:uppercase;letter-spacing:.4px">Position (m)</div>
+    <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 6px;align-items:center">
+      <span>X</span><span id="alignPx" style="font-family:var(--mono);text-align:right">0.00</span>
+      <button class="alignNudge" data-axis="px" data-dir="-1">−</button><button class="alignNudge" data-axis="px" data-dir="1">+</button>
+      <span>Y</span><span id="alignPy" style="font-family:var(--mono);text-align:right">0.00</span>
+      <button class="alignNudge" data-axis="py" data-dir="-1">−</button><button class="alignNudge" data-axis="py" data-dir="1">+</button>
+      <span>Z</span><span id="alignPz" style="font-family:var(--mono);text-align:right">0.00</span>
+      <button class="alignNudge" data-axis="pz" data-dir="-1">−</button><button class="alignNudge" data-axis="pz" data-dir="1">+</button>
+    </div>
+
+    <div style="font-size:10px;color:#64748b;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px">Rotation (°)</div>
+    <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 6px;align-items:center">
+      <span>X</span><span id="alignRx" style="font-family:var(--mono);text-align:right">0</span>
+      <button class="alignNudge" data-axis="rx" data-dir="-1">−</button><button class="alignNudge" data-axis="rx" data-dir="1">+</button>
+      <span>Y</span><span id="alignRy" style="font-family:var(--mono);text-align:right">0</span>
+      <button class="alignNudge" data-axis="ry" data-dir="-1">−</button><button class="alignNudge" data-axis="ry" data-dir="1">+</button>
+      <span>Z</span><span id="alignRz" style="font-family:var(--mono);text-align:right">0</span>
+      <button class="alignNudge" data-axis="rz" data-dir="-1">−</button><button class="alignNudge" data-axis="rz" data-dir="1">+</button>
+    </div>
+
+    <div style="font-size:10px;color:#64748b;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px">Scale</div>
+    <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 6px;align-items:center">
+      <span style="grid-column:1">×</span><span id="alignSc" style="font-family:var(--mono);text-align:right">1.000</span>
+      <button class="alignNudge" data-axis="sc" data-dir="-1">−</button><button class="alignNudge" data-axis="sc" data-dir="1">+</button>
+    </div>
+
+    <div style="font-size:10px;color:#64748b;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px">Nudge step</div>
+    <div style="display:flex;gap:4px;margin-bottom:8px">
+      <button class="alignStep" data-step="fine">0.01</button>
+      <button class="alignStep on" data-step="med">0.1</button>
+      <button class="alignStep" data-step="coarse">1.0</button>
+      <button class="alignStep" data-step="big">10</button>
+    </div>
+
+    <div style="font-size:10px;color:#64748b;margin:8px 0 4px;text-transform:uppercase;letter-spacing:.4px">Point cloud only</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span style="font-size:10px;color:#94a3b8">Point size</span>
+      <input id="alignPtSize" type="range" min="1" max="50" value="20" style="flex:1;accent-color:#c084fc">
+      <span id="alignPtSizeVal" style="font-family:var(--mono);font-size:10px;min-width:32px;text-align:right">0.020</span>
+    </div>
+
+    <button id="alignCopy" style="width:100%;background:rgba(168,85,247,.18);border:1px solid rgba(168,85,247,.4);color:#c084fc;padding:6px;border-radius:4px;cursor:pointer;font-size:10.5px;font-weight:600;letter-spacing:.4px">📋 COPY ALIGNMENT TO CLIPBOARD</button>
+    <div style="font-size:9.5px;color:#475569;margin-top:6px;font-style:italic;line-height:1.4">Paste into <code>data/grimes-interior.json</code> → <code>model</code> block to persist.</div>
+  `;
+  document.body.appendChild(p);
+
+  // CSS for buttons
+  const css = document.createElement('style');
+  css.textContent = `
+    #alignPanel button.alignNudge{background:rgba(148,163,184,.08);border:1px solid rgba(148,163,184,.25);color:#e2e8f0;width:20px;height:20px;border-radius:3px;cursor:pointer;font-size:11px;line-height:1;padding:0;font-weight:600}
+    #alignPanel button.alignNudge:hover{background:rgba(168,85,247,.2);border-color:rgba(168,85,247,.5)}
+    #alignPanel button.alignStep{flex:1;background:rgba(148,163,184,.08);border:1px solid rgba(148,163,184,.25);color:#94a3b8;padding:3px 4px;border-radius:3px;cursor:pointer;font-size:10px;font-family:var(--mono)}
+    #alignPanel button.alignStep.on{background:rgba(168,85,247,.2);border-color:rgba(168,85,247,.5);color:#c084fc;font-weight:700}
+  `;
+  document.head.appendChild(css);
+
+  document.getElementById('alignClose').onclick = () => p.style.display = 'none';
+  document.getElementById('alignOpacity').oninput = e => {
+    const v = +e.target.value/100;
+    document.getElementById('alignOpacityVal').textContent = e.target.value+'%';
+    setInteriorOpacity(v);
+  };
+  document.getElementById('alignPtSize').oninput = e => {
+    const sz = +e.target.value/1000;
+    document.getElementById('alignPtSizeVal').textContent = sz.toFixed(3);
+    if(interiorState.group){
+      interiorState.group.traverse(c => { if(c.isPoints && c.material) c.material.size = sz; });
+    }
+  };
+
+  let step = 0.1;
+  document.querySelectorAll('#alignPanel .alignStep').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('#alignPanel .alignStep').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      step = {fine:0.01, med:0.1, coarse:1.0, big:10}[b.dataset.step];
+    };
+  });
+
+  function refreshDisplays(){
+    const g = interiorState.group; if(!g) return;
+    document.getElementById('alignPx').textContent = g.position.x.toFixed(2);
+    document.getElementById('alignPy').textContent = g.position.y.toFixed(2);
+    document.getElementById('alignPz').textContent = g.position.z.toFixed(2);
+    document.getElementById('alignRx').textContent = (g.rotation.x*180/Math.PI).toFixed(1);
+    document.getElementById('alignRy').textContent = (g.rotation.y*180/Math.PI).toFixed(1);
+    document.getElementById('alignRz').textContent = (g.rotation.z*180/Math.PI).toFixed(1);
+    document.getElementById('alignSc').textContent = g.scale.x.toFixed(3);
+  }
+  window.__refreshAlignPanel = refreshDisplays;
+
+  document.querySelectorAll('#alignPanel .alignNudge').forEach(b => {
+    b.onclick = () => {
+      const g = interiorState.group; if(!g) return;
+      const axis = b.dataset.axis;
+      const delta = step * +b.dataset.dir;
+      if(axis==='px') g.position.x += delta;
+      else if(axis==='py') g.position.y += delta;
+      else if(axis==='pz') g.position.z += delta;
+      else if(axis==='rx') g.rotation.x += delta*Math.PI/180 * (step>=1?10:1);  // bigger rotation when step is big
+      else if(axis==='ry') g.rotation.y += delta*Math.PI/180 * (step>=1?10:1);
+      else if(axis==='rz') g.rotation.z += delta*Math.PI/180 * (step>=1?10:1);
+      else if(axis==='sc') g.scale.setScalar(Math.max(0.01, g.scale.x + delta*0.1));
+      g.updateMatrixWorld(true);
+      refreshDisplays();
+    };
+  });
+
+  document.getElementById('alignCopy').onclick = () => {
+    const g = interiorState.group; if(!g) return;
+    const snippet = {
+      scale: +g.scale.x.toFixed(4),
+      rotation_deg: {
+        x: +(g.rotation.x*180/Math.PI).toFixed(2),
+        y: +(g.rotation.y*180/Math.PI).toFixed(2),
+        z: +(g.rotation.z*180/Math.PI).toFixed(2),
+      },
+      position: {
+        x: +g.position.x.toFixed(3),
+        y: +g.position.y.toFixed(3),
+        z: +g.position.z.toFixed(3),
+      },
+    };
+    const text = '"model": ' + JSON.stringify(snippet, null, 2).replace(/\n/g,'\n  ');
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('alignCopy');
+      const orig = btn.textContent; btn.textContent = '✓ COPIED';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+  };
+}
+
+// Show the panel when interior scan finishes loading
+const _origShowPanel = window.__refreshAlignPanel;
+function showAlignPanel(){
+  makeAlignPanel();
+  document.getElementById('alignPanel').style.display = 'block';
+  if(window.__refreshAlignPanel) window.__refreshAlignPanel();
+}
+// Hook into the existing load completion
+const _origLoadInterior = loadInteriorScan;
+loadInteriorScan = async function(){
+  await _origLoadInterior();
+  if(interiorState.loaded) setTimeout(showAlignPanel, 200);
+};
 
 // Extend existing click raycaster to handle hotspot clicks + pick mode
 window.__handleInteriorClick = function(intersects, evt) {
