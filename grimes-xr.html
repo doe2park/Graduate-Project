@@ -126,30 +126,65 @@
   }
   /* Detail panel still visible but pushed right so it doesn't sit on the divider */
   body.cupix-compare-on #detailPanel { left: 52vw !important; }
-  /* PostMessage debug panel — small floating console showing Cupix iframe events */
-  #cupixMsgDebug {
+  /* Cupix → BIM sync calibration panel */
+  #cupixSyncPanel {
     position: fixed; right: 14px; top: 70px; z-index: 60;
-    width: 260px; max-height: 200px; overflow: auto;
-    background: rgba(8,12,24,.92); border: 1px solid rgba(34,211,238,.3);
-    border-radius: 6px; padding: 8px 10px; display: none;
-    font: 10px/1.35 'JetBrains Mono', monospace; color: #cbd5e1;
+    width: 250px; background: rgba(8,12,24,.95);
+    border: 1px solid rgba(34,211,238,.3); border-radius: 6px;
+    padding: 10px 12px; display: none;
+    font: 11px/1.4 var(--font); color: #cbd5e1;
   }
-  #cupixMsgDebug.show { display: block; }
-  #cupixMsgDebug .hdr {
-    color: #22d3ee; font-weight: 600; letter-spacing: .4px;
-    text-transform: uppercase; font-size: 9px; margin-bottom: 4px;
-    display: flex; justify-content: space-between;
+  #cupixSyncPanel.show { display: block; }
+  #cupixSyncPanel .hdr {
+    color: #22d3ee; font: 600 10px/1 'JetBrains Mono', monospace;
+    letter-spacing: .4px; text-transform: uppercase;
+    margin-bottom: 8px; padding-bottom: 6px;
+    border-bottom: 1px solid rgba(34,211,238,.15);
+    display: flex; justify-content: space-between; align-items: center;
   }
-  #cupixMsgDebug .hdr button {
+  #cupixSyncPanel .hdr button {
     background: none; border: 0; color: #64748b; cursor: pointer;
-    font-size: 10px; padding: 0;
+    font-size: 12px; padding: 0;
   }
-  #cupixMsgDebug .msg {
-    padding: 2px 0; border-top: 1px solid rgba(148,163,184,.08);
-    word-break: break-all; font-size: 9px; color: #94a3b8;
+  #cupixSyncPanel .stat {
+    display: flex; justify-content: space-between; padding: 2px 0;
+    font: 10px/1.3 'JetBrains Mono', monospace; color: #94a3b8;
   }
-  #cupixMsgDebug .msg b { color: #67e8f9; }
-  #cupixMsgDebug .empty { color: #475569; font-style: italic; font-size: 9px; }
+  #cupixSyncPanel .stat .k { color: #64748b; }
+  #cupixSyncPanel .stat .v { color: #cbd5e1; }
+  #cupixSyncPanel .row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    font-size: 10px; color: #94a3b8;
+  }
+  #cupixSyncPanel .row label { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+  #cupixSyncPanel .row input[type=checkbox] { margin: 0; }
+  #cupixSyncPanel .sec-title {
+    color: #6b7fa0; font: 600 9px/1 'JetBrains Mono', monospace;
+    letter-spacing: .4px; text-transform: uppercase;
+    margin: 10px 0 4px; padding-top: 6px;
+    border-top: 1px solid rgba(148,163,184,.08);
+  }
+  #cupixSyncPanel .slider {
+    display: grid; grid-template-columns: 56px 1fr 36px;
+    align-items: center; gap: 6px; padding: 2px 0;
+    font: 10px/1 'JetBrains Mono', monospace; color: #94a3b8;
+  }
+  #cupixSyncPanel .slider input[type=range] {
+    width: 100%; height: 14px; accent-color: #22d3ee;
+  }
+  #cupixSyncPanel .slider .v { color: #67e8f9; text-align: right; font-size: 9.5px; }
+  #cupixSyncPanel .row button {
+    flex: 1; padding: 4px 8px; font: 600 10px/1.2 var(--font);
+    background: rgba(34,211,238,.1); color: #67e8f9;
+    border: 1px solid rgba(34,211,238,.3); border-radius: 4px;
+    cursor: pointer;
+  }
+  #cupixSyncPanel .row button:hover { background: rgba(34,211,238,.2); }
+  #cupixSyncPanel .hint {
+    font: italic 9px/1.4 var(--font); color: #475569;
+    margin-top: 6px; padding-top: 6px;
+    border-top: 1px solid rgba(148,163,184,.08);
+  }
   #joystickMove { left:24px; } #joystickLook { right:24px; }
   .joystick-knob { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:rgba(45,212,191,.35);border:2px solid var(--cyan);pointer-events:none; }
   .joystick-label { position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:1px; }
@@ -1335,53 +1370,177 @@ function applyCompareLayout(splitOn) {
   toggleCupixMsgDebug(splitOn);
 }
 
-/* ══════════════════════════════════════════ CUPIX postMessage LISTENER (EXPERIMENTAL)
-   Some embeddable apps emit window.postMessage events the parent can listen for
-   (e.g. viewpoint changes, navigation commands). Cupix doesn't publicly document
-   one for shared-view URLs, but we can find out by listening and showing whatever
-   they send in a small debug panel. If a useful pattern shows up (e.g. camera
-   position), we can wire BIM sync on top of it.
+/* ══════════════════════════════════════════ CUPIX AUTO-SYNC
+   Confirmed: Cupix shared-view emits postMessage of the form
+     { responseType: 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE',
+       response: { viewId, cameraParameters: { tm: [16 floats], ... } } }
+   `tm` is a 4×4 transformation matrix (Three.js / OpenGL column-major convention):
+     - tm[12], tm[13], tm[14] = translation (camera position) in Cupix world coords
+     - tm[0..2], tm[4..6], tm[8..10] = rotation basis (3×3 part)
+   We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
+   then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const _cupixMsgLog = [];
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v1';
+const cupixSync = (() => {
+  const defaults = {
+    enabled: true,           // auto-sync on/off
+    syncPos: true,           // sync camera position
+    syncRot: false,          // sync camera rotation (off by default — can be disorienting)
+    offset: { x: 0, y: 0, z: 0 },  // added to Cupix position AFTER scale
+    scale: 1.0,              // Cupix unit → BIM unit (try 1.0 first; adjust if scan is in different units)
+    yRotation: 0,            // degrees, rotates the position around Y to align orientation
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem(CUPIX_SYNC_LS_KEY) || '{}');
+    return Object.assign(defaults, saved, { offset: Object.assign(defaults.offset, saved.offset || {}) });
+  } catch { return defaults; }
+})();
+function saveCupixSync() {
+  try { localStorage.setItem(CUPIX_SYNC_LS_KEY, JSON.stringify(cupixSync)); } catch {}
+}
+window.cupixSync = cupixSync;  // expose for console tinkering
+
+let _lastCupixTm = null;
+let _lastCupixPos = null;
+let _cupixMsgCount = 0;
 let _cupixMsgListenerInstalled = false;
+
 function installCupixMsgListener() {
   if (_cupixMsgListenerInstalled) return;
   window.addEventListener('message', (e) => {
-    // Filter by Cupix origin (avoid noise from other postMessage sources)
     if (!/cupix\.works$/i.test(new URL(e.origin || 'http://x/').hostname || '')) return;
-    let dataStr;
-    try { dataStr = typeof e.data === 'string' ? e.data : JSON.stringify(e.data); }
-    catch { dataStr = String(e.data); }
-    if (dataStr.length > 200) dataStr = dataStr.slice(0,200) + '…';
-    _cupixMsgLog.push({ t: new Date().toLocaleTimeString().slice(0,8), origin: e.origin, data: dataStr });
-    if (_cupixMsgLog.length > 20) _cupixMsgLog.shift();
-    renderCupixMsgDebug();
-    console.log('[cupix-msg]', e.origin, e.data);
+    if (typeof e.data !== 'string') return;
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    _cupixMsgCount++;
+    if (msg.responseType === 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE') {
+      const tm = msg.response?.cameraParameters?.tm;
+      if (Array.isArray(tm) && tm.length === 16) {
+        _lastCupixTm = tm;
+        _lastCupixPos = { x: tm[12], y: tm[13], z: tm[14] };
+        if (cupixSync.enabled && document.body.classList.contains('cupix-compare-on')) {
+          applyCupixToBimCamera(tm);
+        }
+        renderCupixSyncPanel();
+      }
+    }
   });
   _cupixMsgListenerInstalled = true;
 }
+
+function applyCupixToBimCamera(tm) {
+  // Extract position from column-major 4×4 matrix
+  let x = tm[12], y = tm[13], z = tm[14];
+  // Scale (handle unit mismatch e.g. mm↔m or ft↔m)
+  x *= cupixSync.scale; y *= cupixSync.scale; z *= cupixSync.scale;
+  // Y-rotation (azimuth alignment)
+  if (cupixSync.yRotation) {
+    const r = cupixSync.yRotation * Math.PI / 180;
+    const c = Math.cos(r), s = Math.sin(r);
+    const nx = c*x - s*z, nz = s*x + c*z;
+    x = nx; z = nz;
+  }
+  // Translation offset
+  x += cupixSync.offset.x; y += cupixSync.offset.y; z += cupixSync.offset.z;
+  // Apply
+  if (cupixSync.syncPos) {
+    camera.position.set(x, y, z);
+  }
+  if (cupixSync.syncRot) {
+    // Extract upper-left 3×3 rotation, apply to camera
+    const m = new THREE.Matrix4().fromArray(tm);
+    const q = new THREE.Quaternion().setFromRotationMatrix(m);
+    camera.quaternion.copy(q);
+  }
+}
+
 function toggleCupixMsgDebug(show) {
   installCupixMsgListener();
-  let panel = document.getElementById('cupixMsgDebug');
+  let panel = document.getElementById('cupixSyncPanel');
   if (!panel) {
     panel = document.createElement('div');
-    panel.id = 'cupixMsgDebug';
+    panel.id = 'cupixSyncPanel';
     document.body.appendChild(panel);
-    renderCupixMsgDebug();
   }
   panel.classList.toggle('show', !!show);
+  renderCupixSyncPanel();
 }
-function renderCupixMsgDebug() {
-  const panel = document.getElementById('cupixMsgDebug');
+
+function renderCupixSyncPanel() {
+  const panel = document.getElementById('cupixSyncPanel');
   if (!panel) return;
-  const rows = _cupixMsgLog.length
-    ? _cupixMsgLog.slice().reverse().map(m => `<div class="msg"><b>${m.t}</b> ${m.data}</div>`).join('')
-    : '<div class="empty">listening… navigate Cupix on the left to see if it emits any events</div>';
+  const pos = _lastCupixPos;
+  const posStr = pos ? `(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})` : '—';
+  const bim = camera.position;
+  const bimStr = `(${bim.x.toFixed(2)}, ${bim.y.toFixed(2)}, ${bim.z.toFixed(2)})`;
   panel.innerHTML = `
-    <div class="hdr"><span>📡 Cupix postMessage</span><button onclick="document.getElementById('cupixMsgDebug').classList.remove('show')">✕</button></div>
-    ${rows}
+    <div class="hdr">
+      <span>🔗 Cupix → BIM sync</span>
+      <button onclick="document.getElementById('cupixSyncPanel').classList.remove('show')">✕</button>
+    </div>
+    <div class="stat"><span class="k">msgs received</span><span class="v">${_cupixMsgCount}</span></div>
+    <div class="stat"><span class="k">cupix pos</span><span class="v">${posStr}</span></div>
+    <div class="stat"><span class="k">bim camera</span><span class="v">${bimStr}</span></div>
+    <div class="row" style="margin-top:8px">
+      <label><input type="checkbox" id="csEnabled" ${cupixSync.enabled?'checked':''}/> auto-sync</label>
+      <label><input type="checkbox" id="csPos" ${cupixSync.syncPos?'checked':''}/> position</label>
+      <label><input type="checkbox" id="csRot" ${cupixSync.syncRot?'checked':''}/> rotation</label>
+    </div>
+    <div class="sec-title">Calibration</div>
+    <div class="slider"><span class="k">offset X</span><input type="range" id="csOx" min="-50" max="50" step="0.1" value="${cupixSync.offset.x}"/><span class="v" id="csOxV">${cupixSync.offset.x.toFixed(1)}</span></div>
+    <div class="slider"><span class="k">offset Y</span><input type="range" id="csOy" min="-20" max="20" step="0.1" value="${cupixSync.offset.y}"/><span class="v" id="csOyV">${cupixSync.offset.y.toFixed(1)}</span></div>
+    <div class="slider"><span class="k">offset Z</span><input type="range" id="csOz" min="-50" max="50" step="0.1" value="${cupixSync.offset.z}"/><span class="v" id="csOzV">${cupixSync.offset.z.toFixed(1)}</span></div>
+    <div class="slider"><span class="k">scale</span><input type="range" id="csSc" min="0.1" max="10" step="0.05" value="${cupixSync.scale}"/><span class="v" id="csScV">${cupixSync.scale.toFixed(2)}</span></div>
+    <div class="slider"><span class="k">Y rotate °</span><input type="range" id="csYr" min="-180" max="180" step="1" value="${cupixSync.yRotation}"/><span class="v" id="csYrV">${cupixSync.yRotation}°</span></div>
+    <div class="row" style="margin-top:8px;gap:4px">
+      <button onclick="cupixLockHere()" title="Capture current BIM camera position and compute offset that maps Cupix→here">📌 Lock here</button>
+      <button onclick="cupixResetCalib()" title="Reset offset to zero">↺ Reset</button>
+    </div>
+    <div class="hint">After Cupix → BIM stops drifting, click Lock Here. Use ↺ Reset if calibration goes wrong.</div>
   `;
+  // Wire up controls
+  const wire = (id, fn) => { const el = panel.querySelector('#'+id); if (el) el.oninput = () => fn(el); };
+  wire('csEnabled', el => { cupixSync.enabled = el.checked; saveCupixSync(); });
+  wire('csPos',     el => { cupixSync.syncPos = el.checked; saveCupixSync(); });
+  wire('csRot',     el => { cupixSync.syncRot = el.checked; saveCupixSync(); });
+  wire('csOx',      el => { cupixSync.offset.x = +el.value; panel.querySelector('#csOxV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
+  wire('csOy',      el => { cupixSync.offset.y = +el.value; panel.querySelector('#csOyV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
+  wire('csOz',      el => { cupixSync.offset.z = +el.value; panel.querySelector('#csOzV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
+  wire('csSc',      el => { cupixSync.scale    = +el.value; panel.querySelector('#csScV').textContent = (+el.value).toFixed(2); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
+  wire('csYr',      el => { cupixSync.yRotation= +el.value; panel.querySelector('#csYrV').textContent = el.value+'°'; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
 }
+
+// "Lock here": user has navigated Cupix to a known spot. Take where the BIM
+// camera is RIGHT NOW (set manually via floor buttons / WASD) as ground truth,
+// and compute the offset that would map Cupix's reported position to here.
+function cupixLockHere() {
+  if (!_lastCupixPos) { alert('No Cupix camera position received yet. Navigate in Cupix first.'); return; }
+  // Account for current scale + rotation when reversing.
+  let cx = _lastCupixPos.x * cupixSync.scale;
+  let cy = _lastCupixPos.y * cupixSync.scale;
+  let cz = _lastCupixPos.z * cupixSync.scale;
+  if (cupixSync.yRotation) {
+    const r = cupixSync.yRotation * Math.PI / 180;
+    const c = Math.cos(r), s = Math.sin(r);
+    const nx = c*cx - s*cz, nz = s*cx + c*cz;
+    cx = nx; cz = nz;
+  }
+  cupixSync.offset.x = camera.position.x - cx;
+  cupixSync.offset.y = camera.position.y - cy;
+  cupixSync.offset.z = camera.position.z - cz;
+  saveCupixSync();
+  renderCupixSyncPanel();
+}
+function cupixResetCalib() {
+  cupixSync.offset = { x: 0, y: 0, z: 0 };
+  cupixSync.scale = 1.0;
+  cupixSync.yRotation = 0;
+  saveCupixSync();
+  renderCupixSyncPanel();
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm);
+}
+window.cupixLockHere = cupixLockHere;
+window.cupixResetCalib = cupixResetCalib;
 
 /* ══════════════════════════════════════════ HEATMAP COLORING ══════════════════════════════════════════ */
 function tempToColor(t) {
