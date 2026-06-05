@@ -1503,7 +1503,10 @@ function renderCupixSyncPanel() {
       <button onclick="cupixLockHere()" title="Capture current BIM camera position and compute offset that maps Cupix→here">📌 Lock here</button>
       <button onclick="cupixResetCalib()" title="Reset offset to zero">↺ Reset</button>
     </div>
-    <div class="hint">After Cupix → BIM stops drifting, click Lock Here. Use ↺ Reset if calibration goes wrong.</div>
+    <div class="row" style="margin-top:4px;gap:4px">
+      <button onclick="cupixTestSync()" title="Fire a fake Cupix message with a known position to verify the sync pipeline works without depending on Cupix actually emitting">🧪 Test sync (fake msg)</button>
+    </div>
+    <div class="hint">Test sync → BIM camera should jump to (5, 3, 5). If it does, pipeline works. If msgs received also stays 0 when navigating Cupix → Cupix isn't emitting in current mode.</div>
   `;
   // Wire up controls
   const wire = (id, fn) => { const el = panel.querySelector('#'+id); if (el) el.oninput = () => fn(el); };
@@ -1548,6 +1551,30 @@ function cupixResetCalib() {
 }
 window.cupixLockHere = cupixLockHere;
 window.cupixResetCalib = cupixResetCalib;
+
+// Test sync — fires a fake Cupix message with a known tm matrix.
+// Identity rotation + translation (5, 3, 5) at tm[12..14].
+// If BIM camera jumps to (5, 3, 5), the entire postMessage → matrix parse →
+// camera update pipeline works. If it doesn't, sync code itself is broken.
+function cupixTestSync() {
+  installCupixMsgListener();
+  const fakeTm = [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    5, 3, 5, 1  // tm[12], tm[13], tm[14] = position (5, 3, 5)
+  ];
+  const fakeMsg = JSON.stringify({
+    responseType: 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE',
+    response: { viewId: 'test', cameraParameters: { viewMode: 'walk', tm: fakeTm } }
+  });
+  window.dispatchEvent(new MessageEvent('message', {
+    origin: 'https://herrero.cupix.works',
+    data: fakeMsg
+  }));
+  console.log('[cupix-test] fired fake msg. BIM camera should now be at (5, 3, 5). Actual:', camera.position);
+}
+window.cupixTestSync = cupixTestSync;
 
 /* ══════════════════════════════════════════ HEATMAP COLORING ══════════════════════════════════════════ */
 function tempToColor(t) {
