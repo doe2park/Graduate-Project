@@ -1403,23 +1403,37 @@ window.cupixSync = cupixSync;  // expose for console tinkering
 let _lastCupixTm = null;
 let _lastCupixPos = null;
 let _cupixMsgCount = 0;
+let _cupixMsgTypes = {};  // { 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE': 42, ... }
+let _cupixLastRaw = null;  // last raw data, for inspection
 let _cupixMsgListenerInstalled = false;
-// Expose for browser console inspection:
-//   _lastCupixTm  → most recent 4×4 tm array from Cupix
-//   _lastCupixPos → parsed (x,y,z) from tm[12..14]
-//   cupixSync     → calibration state
 Object.defineProperty(window, '_lastCupixTm', { get: () => _lastCupixTm });
 Object.defineProperty(window, '_lastCupixPos', { get: () => _lastCupixPos });
 Object.defineProperty(window, '_cupixMsgCount', { get: () => _cupixMsgCount });
+Object.defineProperty(window, '_cupixMsgTypes', { get: () => _cupixMsgTypes });
+Object.defineProperty(window, '_cupixLastRaw', { get: () => _cupixLastRaw });
 
 function installCupixMsgListener() {
   if (_cupixMsgListenerInstalled) return;
   window.addEventListener('message', (e) => {
-    if (!/cupix\.works$/i.test(new URL(e.origin || 'http://x/').hostname || '')) return;
-    if (typeof e.data !== 'string') return;
-    let msg;
-    try { msg = JSON.parse(e.data); } catch { return; }
+    // Diagnose any cupix-origin message (relaxed filter — count EVERY message, even if not JSON).
+    let host = '';
+    try { host = new URL(e.origin || 'http://x/').hostname; } catch {}
+    if (!/cupix\.works$/i.test(host)) return;
     _cupixMsgCount++;
+    _cupixLastRaw = e.data;
+    // Try to parse — accept string-JSON, plain string, or object
+    let msg = null;
+    if (typeof e.data === 'string') {
+      try { msg = JSON.parse(e.data); } catch { msg = { _raw: e.data }; }
+    } else if (e.data && typeof e.data === 'object') {
+      msg = e.data;
+    } else {
+      msg = { _raw: String(e.data) };
+    }
+    // Track type histogram
+    const type = msg.responseType || msg.type || msg.eventType || msg._raw?.slice?.(0,40) || 'unknown';
+    _cupixMsgTypes[type] = (_cupixMsgTypes[type] || 0) + 1;
+    // Handle camera updates
     if (msg.responseType === 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE') {
       const tm = msg.response?.cameraParameters?.tm;
       if (Array.isArray(tm) && tm.length === 16) {
@@ -1428,11 +1442,12 @@ function installCupixMsgListener() {
         if (cupixSync.enabled && document.body.classList.contains('cupix-compare-on')) {
           applyCupixToBimCamera(tm);
         }
-        renderCupixSyncPanel();
       }
     }
+    renderCupixSyncPanel();
   });
   _cupixMsgListenerInstalled = true;
+  console.log('[cupix-sync] listener installed. window.postMessage events from *.cupix.works will be counted.');
 }
 
 function applyCupixToBimCamera(tm) {
@@ -1480,6 +1495,12 @@ function renderCupixSyncPanel() {
   const posStr = pos ? `(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})` : '—';
   const bim = camera.position;
   const bimStr = `(${bim.x.toFixed(2)}, ${bim.y.toFixed(2)}, ${bim.z.toFixed(2)})`;
+  // Show top message types so we can see what Cupix actually emits
+  const typeRows = Object.entries(_cupixMsgTypes)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([t, n]) => `<div class="stat" style="font-size:8.5px"><span class="k" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px">${t}</span><span class="v">${n}</span></div>`)
+    .join('');
   panel.innerHTML = `
     <div class="hdr">
       <span>🔗 Cupix → BIM sync</span>
@@ -1488,6 +1509,7 @@ function renderCupixSyncPanel() {
     <div class="stat"><span class="k">msgs received</span><span class="v">${_cupixMsgCount}</span></div>
     <div class="stat"><span class="k">cupix pos</span><span class="v">${posStr}</span></div>
     <div class="stat"><span class="k">bim camera</span><span class="v">${bimStr}</span></div>
+    ${typeRows ? '<div class="sec-title" style="margin:6px 0 2px">Top message types</div>'+typeRows : ''}
     <div class="row" style="margin-top:8px">
       <label><input type="checkbox" id="csEnabled" ${cupixSync.enabled?'checked':''}/> auto-sync</label>
       <label><input type="checkbox" id="csPos" ${cupixSync.syncPos?'checked':''}/> position</label>
