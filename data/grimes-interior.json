@@ -34,12 +34,18 @@
     }
   ],
 
+  "cupix": {
+    "_doc": "Cupix 360° panorama integration. When a hotspot has a `cupix_url`, clicking it opens an iframe modal with the Cupix viewer. The `default_url` powers the topbar '📷 360° Tour' button (shown only when set) — leave it pointing at a Cupix shared-view link (path /v2/sv/... with svpl=basic) to make it auto-embeddable.",
+    "default_url": "https://herrero.cupix.works/v2/sv/q7qk7m?svpl=basic&svv=4&qp=08zJcgoXX5UPuxRQfOWAQQ&ql=83000",
+    "_default_url_note": "Currently pointing at Herrero's demo Bechtel project (1st floor scan + BIM overlay). Replace with your own Cupix shared-view URL when your scan is published."
+  },
+
   "hotspots": [
     {
-      "_doc_example": "Place a clickable marker in 3D space. position is in the scan's coordinate system AFTER alignment is applied. Reference sensor IDs from data/building_data.json or campus_energy.json so the panel can show live values.",
+      "_doc_example": "Place a clickable marker in 3D space. position is in the scan's coordinate system AFTER alignment is applied. Reference sensor IDs from data/building_data.json or campus_energy.json so the panel can show live values. Set `cupix_url` to make this hotspot open a 360° panoramic view (uses Cupix shared-view embedding).",
       "id": "EXAMPLE-HOTSPOT-1",
       "kind": "sensor",
-      "_kind_options": ["sensor", "equipment", "info", "meter"],
+      "_kind_options": ["sensor", "equipment", "info", "meter", "cupix"],
       "label": "Example sensor",
       "room_id": "EXAMPLE-101",
       "position": { "x": 0, "y": 1.5, "z": 0 },
@@ -49,8 +55,20 @@
         "sensor_id": null,
         "equipment_id": null
       },
+      "cupix_url": null,
+      "_cupix_url_note": "Optional. If set, the hotspot popup shows a '📷 Walk this room in 360°' button that opens the Cupix viewer in an iframe modal.",
       "icon": "dot",
-      "_icon_options": ["dot", "thermometer", "droplet", "bolt", "info", "fan"]
+      "_icon_options": ["dot", "thermometer", "droplet", "bolt", "info", "fan", "camera"]
+    },
+    {
+      "id": "F1-LOBBY-360",
+      "kind": "cupix",
+      "label": "1st floor entry — Bechtel",
+      "room_id": "F1-LOBBY",
+      "position": { "x": 0, "y": 1.6, "z": 0 },
+      "cupix_url": "https://herrero.cupix.works/v2/sv/q7qk7m?svpl=basic&svv=4&qp=08zJcgoXX5UPuxRQfOWAQQ&ql=83000",
+      "icon": "camera",
+      "_note": "Sample cupix hotspot — points at Herrero's reference project. Replace URL with your own scan when available; duplicate this entry for each room with a 360° pano."
     }
   ],
 

@@ -235,6 +235,7 @@
   <button class="view-btn" id="flowBtn" style="margin-left:4px;border-color:rgba(45,212,191,.2);color:#2dd4bf" onclick="toggleFlow()">⚡ Flow</button>
   <button class="view-btn" id="publicBtn" style="margin-left:4px;border-color:rgba(147,197,253,.35);color:#93c5fd" onclick="togglePublic()">👥 Public</button>
   <button class="view-btn" id="interiorBtn" style="margin-left:8px;border-color:rgba(168,85,247,.35);color:#c084fc" title="Toggle interior 360 / LiDAR scan layer">🏛 Interior</button>
+  <button class="view-btn" id="cupixBtn" style="margin-left:4px;border-color:rgba(34,211,238,.35);color:#22d3ee;display:none" title="Open 360° panorama walk-through (Cupix)" onclick="openCupixDefault()">📷 360°</button>
   <button class="view-btn" id="pickBtn" style="margin-left:4px;border-color:rgba(148,163,184,.25);color:#94a3b8;font-size:12px;padding:6px 8px" title="Pick a point in the scan to copy coordinates for grimes-interior.json hotspots">🎯</button>
 </div>
 
@@ -716,17 +717,21 @@ function detectFormat(path) {
 
 function makeHotspotMesh(spot) {
   // Small glowing billboard sphere — readable in 3D, clickable.
-  const colorMap = { sensor:0xa855f7, equipment:0xfbbf24, info:0x60a5fa, meter:0x2dd4bf };
+  // Cupix hotspots get teal/cyan + larger halo so they stand out as "walkable" 360° views.
+  const colorMap = { sensor:0xa855f7, equipment:0xfbbf24, info:0x60a5fa, meter:0x2dd4bf, cupix:0x22d3ee };
   const color = colorMap[spot.kind] || 0xa855f7;
-  const geo = new THREE.SphereGeometry(0.08, 16, 12);
+  const isCupix = spot.kind === 'cupix' || !!spot.cupix_url;
+  const coreSize = isCupix ? 0.10 : 0.08;
+  const haloSize = isCupix ? 0.22 : 0.16;
+  const geo = new THREE.SphereGeometry(coreSize, 16, 12);
   const mat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.9 });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(spot.position.x||0, spot.position.y||0, spot.position.z||0);
   mesh.userData.hotspot = spot;
-  // Halo
+  // Halo — bigger + brighter for Cupix so it reads as "click to enter"
   const halo = new THREE.Mesh(
-    new THREE.SphereGeometry(0.16, 16, 12),
-    new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.18, depthWrite:false })
+    new THREE.SphereGeometry(haloSize, 16, 12),
+    new THREE.MeshBasicMaterial({ color, transparent:true, opacity: isCupix ? 0.28 : 0.18, depthWrite:false })
   );
   mesh.add(halo);
   return mesh;
@@ -795,6 +800,10 @@ async function loadInteriorScan() {
   }
   interiorState.manifest = manifest;
   const m = manifest.model || {};
+
+  // Show the topbar Cupix button as soon as the manifest loads (even before scan loads),
+  // so 360° walk-through is reachable even when the LiDAR scan isn't there yet.
+  syncCupixTopbar();
 
   if (!m.path) {
     showInteriorPlaceholder('Awaiting scan data — set model.path in data/grimes-interior.json');
@@ -896,6 +905,19 @@ interiorBtn.addEventListener('click', () => {
   if (!interiorState.loaded) loadInteriorScan();
   else toggleInteriorVisibility();
 });
+
+// Prefetch the manifest at startup just to populate interiorState.manifest.cupix
+// so the topbar '📷 360°' button shows up immediately (Cupix doesn't depend on the
+// LiDAR scan being loaded). The full scan is still lazy-loaded when Interior is clicked.
+(async function prefetchCupixDefault(){
+  try {
+    const r = await fetch('data/grimes-interior.json', { cache:'no-store' });
+    if (!r.ok) return;
+    const mf = await r.json();
+    if (!interiorState.manifest) interiorState.manifest = mf;
+    syncCupixTopbar();
+  } catch(e) { /* silent — Cupix is optional */ }
+})();
 
 // Pick tool — click to print world coords for hotspot authoring
 pickBtn.addEventListener('click', () => {
@@ -1112,15 +1134,80 @@ function openHotspotPanel(spot) {
     .filter(([k,v]) => v && !k.startsWith('_'))
     .map(([k,v]) => `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:#64748b">${k}</span><span style="font-family:var(--mono);font-weight:600">${v}</span></div>`)
     .join('');
+  // Cupix integration — when a hotspot has cupix_url, show a prominent button that opens the 360° iframe.
+  const cupixUrl = spot.cupix_url || null;
+  const cupixBtn = cupixUrl
+    ? `<button onclick="openCupixModal('${cupixUrl.replace(/'/g,"\\'")}','${(spot.label||spot.id).replace(/'/g,"\\'")}')"
+         style="width:100%;margin-top:10px;padding:9px 12px;border:1px solid rgba(34,211,238,.5);background:linear-gradient(135deg,rgba(34,211,238,.15),rgba(34,211,238,.05));color:#67e8f9;font:600 12px/1 var(--font);border-radius:8px;cursor:pointer;letter-spacing:.2px;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s"
+         onmouseover="this.style.background='linear-gradient(135deg,rgba(34,211,238,.25),rgba(34,211,238,.1))'"
+         onmouseout="this.style.background='linear-gradient(135deg,rgba(34,211,238,.15),rgba(34,211,238,.05))'">📷 Walk this room in 360°</button>`
+    : '';
+  const kindColor = spot.kind === 'cupix' ? '#22d3ee' : '#a855f7';
   panel.innerHTML = `
     <button style="position:absolute;top:6px;right:10px;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px" onclick="document.getElementById('hotspotPanel').style.display='none'">✕</button>
-    <div style="font-size:10px;color:#a855f7;letter-spacing:.5px;font-weight:600">${(spot.kind||'sensor').toUpperCase()} · ${spot.id}</div>
+    <div style="font-size:10px;color:${kindColor};letter-spacing:.5px;font-weight:600">${(spot.kind||'sensor').toUpperCase()} · ${spot.id}</div>
     <div style="font-size:15px;font-weight:600;margin:4px 0 8px">${spot.label || spot.id}</div>
     ${room ? `<div style="font-size:11px;color:#94a3b8;margin-bottom:8px">${room.name} · Floor ${room.floor||'—'} · ${room.use||'—'}</div>` : ''}
-    ${refRows || '<div style="font-size:11px;color:#475569;font-style:italic">No data refs wired yet — fill <code>data_refs</code> in grimes-interior.json</div>'}
-    <div style="font-size:9px;color:#475569;margin-top:8px;text-align:right">live data wiring TBD</div>
+    ${refRows || (cupixUrl ? '' : '<div style="font-size:11px;color:#475569;font-style:italic">No data refs wired yet — fill <code>data_refs</code> in grimes-interior.json</div>')}
+    ${cupixBtn}
+    ${cupixUrl ? '<div style="font-size:9px;color:#475569;margin-top:6px;text-align:right">360° pano via Cupix · embed iframe</div>' : '<div style="font-size:9px;color:#475569;margin-top:8px;text-align:right">live data wiring TBD</div>'}
   `;
   panel.style.display = 'block';
+}
+
+/* ══════════════════════════════════════════ CUPIX 360° MODAL ══════════════════════════════════════════
+   Opens a Cupix shared-view URL in a full-screen iframe overlay. Cupix `svpl=basic` shared links
+   are publicly embeddable. Modal is reusable — call openCupixModal(url, label) from any hotspot
+   or the topbar 360° Tour button.
+*/
+function openCupixModal(url, label) {
+  let modal = document.getElementById('cupixModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'cupixModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:200;display:none;flex-direction:column;font-family:var(--font);color:#e2e8f0';
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeCupixModal(); });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:rgba(8,12,24,.6);border-bottom:1px solid rgba(34,211,238,.2)">
+      <div style="display:flex;align-items:baseline;gap:10px;min-width:0">
+        <span style="font:600 10px/1 var(--mono);color:#22d3ee;letter-spacing:.6px;text-transform:uppercase">📷 360° walk-through</span>
+        <span style="font:500 13px/1 var(--font);color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label || 'Cupix view'}</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <a href="${url}" target="_blank" rel="noopener" style="padding:6px 12px;border:1px solid rgba(148,163,184,.3);background:rgba(255,255,255,.04);color:#cbd5e1;text-decoration:none;border-radius:6px;font-size:11px;font-weight:500;letter-spacing:.2px">Open in new tab ↗</a>
+        <button onclick="closeCupixModal()" style="padding:6px 14px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#fca5a5;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.2px">✕ Close</button>
+      </div>
+    </div>
+    <iframe src="${url}" style="flex:1;border:0;background:#000" allow="fullscreen; xr-spatial-tracking" allowfullscreen></iframe>
+    <div style="padding:8px 20px;background:rgba(8,12,24,.6);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08)">Cupix shared-view embed · 360° panorama with BIM overlay · ESC or click outside to close</div>
+  `;
+  modal.style.display = 'flex';
+  // ESC key closes modal
+  document.addEventListener('keydown', _cupixEscHandler);
+}
+function closeCupixModal() {
+  const modal = document.getElementById('cupixModal');
+  if (modal) modal.style.display = 'none';
+  document.removeEventListener('keydown', _cupixEscHandler);
+}
+function _cupixEscHandler(e) { if (e.key === 'Escape') closeCupixModal(); }
+
+// Topbar "📷 360°" button — only visible when the manifest declares a default Cupix URL.
+function syncCupixTopbar() {
+  const btn = document.getElementById('cupixBtn');
+  if (!btn) return;
+  const url = interiorState.manifest?.cupix?.default_url;
+  btn.style.display = url ? '' : 'none';
+}
+function openCupixDefault() {
+  const url = interiorState.manifest?.cupix?.default_url;
+  if (!url) {
+    alert('No default Cupix URL set in data/grimes-interior.json → cupix.default_url');
+    return;
+  }
+  openCupixModal(url, 'Bechtel · building tour');
 }
 
 /* ══════════════════════════════════════════ HEATMAP COLORING ══════════════════════════════════════════ */
