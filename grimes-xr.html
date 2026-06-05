@@ -108,13 +108,48 @@
   body.cupix-compare-on #legend,
   body.cupix-compare-on #joystickMove,
   body.cupix-compare-on #ctrlHint,
-  body.cupix-compare-on #floorNav,
   body.cupix-compare-on #anomalyAlert,
   body.cupix-compare-on #pulseLabel,
   body.cupix-compare-on #heatLegend,
   body.cupix-compare-on #alignPanel { display: none !important; }
+  /* floorNav stays visible — it lives on right:14px so it's in the BIM half.
+     Use it as the manual sync UX: read which floor you're on in Cupix's left
+     pane (Level 1, etc.) and click the matching floor button here to fly
+     your BIM camera to the same floor. */
+  body.cupix-compare-on #floorNav { display: flex !important; }
+  body.cupix-compare-on #floorNav::before {
+    content: '↔ MATCH CUPIX';
+    position: absolute; top: -22px; right: 0; font: 600 9px/1 'JetBrains Mono', monospace;
+    color: #22d3ee; letter-spacing: .5px; white-space: nowrap;
+    background: rgba(8,12,24,.85); padding: 4px 6px; border-radius: 3px;
+    border: 1px solid rgba(34,211,238,.25);
+  }
   /* Detail panel still visible but pushed right so it doesn't sit on the divider */
   body.cupix-compare-on #detailPanel { left: 52vw !important; }
+  /* PostMessage debug panel — small floating console showing Cupix iframe events */
+  #cupixMsgDebug {
+    position: fixed; right: 14px; top: 70px; z-index: 60;
+    width: 260px; max-height: 200px; overflow: auto;
+    background: rgba(8,12,24,.92); border: 1px solid rgba(34,211,238,.3);
+    border-radius: 6px; padding: 8px 10px; display: none;
+    font: 10px/1.35 'JetBrains Mono', monospace; color: #cbd5e1;
+  }
+  #cupixMsgDebug.show { display: block; }
+  #cupixMsgDebug .hdr {
+    color: #22d3ee; font-weight: 600; letter-spacing: .4px;
+    text-transform: uppercase; font-size: 9px; margin-bottom: 4px;
+    display: flex; justify-content: space-between;
+  }
+  #cupixMsgDebug .hdr button {
+    background: none; border: 0; color: #64748b; cursor: pointer;
+    font-size: 10px; padding: 0;
+  }
+  #cupixMsgDebug .msg {
+    padding: 2px 0; border-top: 1px solid rgba(148,163,184,.08);
+    word-break: break-all; font-size: 9px; color: #94a3b8;
+  }
+  #cupixMsgDebug .msg b { color: #67e8f9; }
+  #cupixMsgDebug .empty { color: #475569; font-style: italic; font-size: 9px; }
   #joystickMove { left:24px; } #joystickLook { right:24px; }
   .joystick-knob { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:rgba(45,212,191,.35);border:2px solid var(--cyan);pointer-events:none; }
   .joystick-label { position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:1px; }
@@ -1296,6 +1331,56 @@ function applyCompareLayout(splitOn) {
     camera.aspect = window.innerWidth / window.innerHeight;
   }
   camera.updateProjectionMatrix();
+  // Toggle the postMessage debug panel — active only during Compare mode.
+  toggleCupixMsgDebug(splitOn);
+}
+
+/* ══════════════════════════════════════════ CUPIX postMessage LISTENER (EXPERIMENTAL)
+   Some embeddable apps emit window.postMessage events the parent can listen for
+   (e.g. viewpoint changes, navigation commands). Cupix doesn't publicly document
+   one for shared-view URLs, but we can find out by listening and showing whatever
+   they send in a small debug panel. If a useful pattern shows up (e.g. camera
+   position), we can wire BIM sync on top of it.
+============================================================================== */
+const _cupixMsgLog = [];
+let _cupixMsgListenerInstalled = false;
+function installCupixMsgListener() {
+  if (_cupixMsgListenerInstalled) return;
+  window.addEventListener('message', (e) => {
+    // Filter by Cupix origin (avoid noise from other postMessage sources)
+    if (!/cupix\.works$/i.test(new URL(e.origin || 'http://x/').hostname || '')) return;
+    let dataStr;
+    try { dataStr = typeof e.data === 'string' ? e.data : JSON.stringify(e.data); }
+    catch { dataStr = String(e.data); }
+    if (dataStr.length > 200) dataStr = dataStr.slice(0,200) + '…';
+    _cupixMsgLog.push({ t: new Date().toLocaleTimeString().slice(0,8), origin: e.origin, data: dataStr });
+    if (_cupixMsgLog.length > 20) _cupixMsgLog.shift();
+    renderCupixMsgDebug();
+    console.log('[cupix-msg]', e.origin, e.data);
+  });
+  _cupixMsgListenerInstalled = true;
+}
+function toggleCupixMsgDebug(show) {
+  installCupixMsgListener();
+  let panel = document.getElementById('cupixMsgDebug');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'cupixMsgDebug';
+    document.body.appendChild(panel);
+    renderCupixMsgDebug();
+  }
+  panel.classList.toggle('show', !!show);
+}
+function renderCupixMsgDebug() {
+  const panel = document.getElementById('cupixMsgDebug');
+  if (!panel) return;
+  const rows = _cupixMsgLog.length
+    ? _cupixMsgLog.slice().reverse().map(m => `<div class="msg"><b>${m.t}</b> ${m.data}</div>`).join('')
+    : '<div class="empty">listening… navigate Cupix on the left to see if it emits any events</div>';
+  panel.innerHTML = `
+    <div class="hdr"><span>📡 Cupix postMessage</span><button onclick="document.getElementById('cupixMsgDebug').classList.remove('show')">✕</button></div>
+    ${rows}
+  `;
 }
 
 /* ══════════════════════════════════════════ HEATMAP COLORING ══════════════════════════════════════════ */
