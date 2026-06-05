@@ -2434,6 +2434,12 @@ window.endTour = endTour;
 window.toggleFlow = toggleFlow;
 window.mepTogglePlay = mepTogglePlay;
 window.mepOnTimeChange = mepOnTimeChange;
+// Cupix integration handlers — needed because button onclick="" runs in global scope
+// while these are defined inside the module block.
+window.openCupixModal = openCupixModal;
+window.closeCupixModal = closeCupixModal;
+window.openCupixDefault = openCupixDefault;
+window.toggleCupixCompare = toggleCupixCompare;
 
 /* ══════════════════════════════════════════ LEGEND ══════════════════════════════════════════ */
 function buildLegend() {
