@@ -1530,45 +1530,23 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          +     '<div style="font:500 8.5px/1 \'JetBrains Mono\',monospace;color:#475569;text-align:right;padding:2px 8px 0;letter-spacing:.3px">MWh/yr</div>'
          +   '</div>';
 
-      // Hero savings/gap block — big number + plain-English explanation.
+      // Hero savings/gap block — big number + short label.
       var savedClass = gapVsDesign > 5 ? 'warn' : '';
       var savedSign = gapVsDesign > 0 ? '+' : '';
       var savedNum = savedSign + gapVsDesign.toFixed(0) + '%';
       var savedLbl;
       if(Math.abs(gapVsDesign) < 5){
-        savedLbl = 'tracking right at design intent — current pace matches the eQuest model for this meter scope';
+        savedLbl = 'tracking at design intent';
       } else if(gapVsDesign > 0){
-        savedLbl = 'above design intent right now — running <b>hotter</b> than the eQuest model predicted for this meter scope';
+        savedLbl = 'above design intent — running hotter than modeled';
       } else {
-        savedLbl = 'below design intent right now — running <b>better</b> than the eQuest model predicted for this meter scope';
+        savedLbl = 'below design intent — running better than modeled';
       }
       h +=   '<div class="pe-leed2-saved '+savedClass+'">'
          +     '<div class="pe-leed2-saved-num">'+savedNum+'</div>'
          +     '<div class="pe-leed2-saved-lbl">'+savedLbl+'</div>'
          +   '</div>';
-
-      // Per-end-use breakdown — compact table (abbreviated for less visual weight).
-      var top5 = scopedEndUses.slice().sort(function(a,b){return b.proposed_kwh-a.proposed_kwh;}).slice(0,5);
-      h +=   '<div class="pe-samples"><table>';
-      h +=     '<thead><tr><th>End-use</th><th style="text-align:right">Base</th><th style="text-align:right">Design</th><th style="text-align:right">Saved</th></tr></thead><tbody>';
-      top5.forEach(function(eu){
-        var savCls = eu.savings_pct > 30 ? 'style="color:#34d399"' : (eu.savings_pct < 0 ? 'style="color:#f87171"' : '');
-        h +=     '<tr>'
-             +     '<td>'+eu.end_use+'</td>'
-             +     '<td style="text-align:right">'+Math.round(eu.baseline_kwh/1000)+'</td>'
-             +     '<td style="text-align:right">'+Math.round(eu.proposed_kwh/1000)+'</td>'
-             +     '<td style="text-align:right" '+savCls+'>'+(eu.savings_pct>0?'+':'')+eu.savings_pct.toFixed(0)+'%</td>'
-             +   '</tr>';
-      });
-      h +=     '</tbody></table></div>';
       h += '</div>';  // /pe-leed2
-
-      // Footnote
-      h += '<div style="font-size:9px;color:#475569;padding:4px 2px 0;font-style:italic;line-height:1.4">'
-         + 'Bars scaled to baseline (longest). Baseline = ASHRAE 90.1-2010 code minimum. Designed = eQuest model. '
-         + 'Projected = current 6hr avg × 8760hr, scoped to end-uses on this meter. Whole-building EUI (designed): '
-         + leed.totals.eui_proposed_kwh_per_sqft_yr + ' kWh/sqft/yr @ ' + sqft.toLocaleString() + ' sqft · LEED proj #' + leed.building.leed_project_id + '.'
-         + '</div>';
     }
 
     // ── MATERIAL REUSE (LEED v4.1 MR — Building Life-Cycle Impact Reduction) ──
@@ -1577,79 +1555,50 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     // a meaningful embodied-carbon story that complements the live energy data.
     if(b.id==='grimes' && window.lcaData){
       var lca = window.lcaData;
-      var overallPct = lca.totals.overall_reuse_pct_of_project;
+      var overallRounded = Math.round(lca.totals.overall_reuse_pct_of_project);
       var scoreBand = lca.totals.score_band;
 
-      h += '<div class="pe-sec"><span>Material Reuse</span><span>LEED v4.1 MR · proj #'+lca._leed_project_id+'</span></div>';
+      h += '<div class="pe-sec"><span>Material Reuse</span><span>LEED v4.1 MR</span></div>';
 
-      // === NEW VISUAL: donut + stacked composition bar + icon-led element rows ===
-      // Donut: circumference for r=26 ≈ 163.4. Filled arc length = (overallPct/100) * 163.4.
+      // === SIMPLIFIED: donut hero + 3 element bars. Composition stacked bar removed
+      // (duplicated the donut). Roofs N/A row dropped. Footnote dropped. sqft sub-text dropped.
       var donutCirc = 2 * Math.PI * 26;
-      var donutFill = (overallPct / 100) * donutCirc;
-      var newPct = Math.max(0, 100 - overallPct);
+      var donutFill = (overallRounded / 100) * donutCirc;
       h += '<div class="pe-lca2">';
-      // --- HERO: donut + headline number + LEED band pill
       h +=   '<div class="pe-lca2-hero">'
          +     '<div class="pe-lca2-donut">'
          +       '<svg viewBox="0 0 64 64" width="64" height="64">'
          +         '<circle cx="32" cy="32" r="26" fill="none" stroke="rgba(148,163,184,.12)" stroke-width="8"/>'
-         +         '<circle cx="32" cy="32" r="26" fill="none" stroke="url(#lcaGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+donutFill.toFixed(1)+' '+donutCirc.toFixed(1)+'" transform="rotate(-90 32 32)"/>'
-         +         '<defs><linearGradient id="lcaGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d97757"/><stop offset="1" stop-color="#f4a872"/></linearGradient></defs>'
+         +         '<circle cx="32" cy="32" r="26" fill="none" stroke="#d97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+donutFill.toFixed(1)+' '+donutCirc.toFixed(1)+'" transform="rotate(-90 32 32)"/>'
          +       '</svg>'
-         +       '<div class="pe-lca2-donut-pct">'+overallPct.toFixed(1)+'%</div>'
+         +       '<div class="pe-lca2-donut-pct">'+overallRounded+'%</div>'
          +     '</div>'
          +     '<div class="pe-lca2-hero-text">'
          +       '<div class="pe-lca2-hero-lbl">Existing structure reused</div>'
-         +       '<div class="pe-lca2-hero-num">'+Math.round(lca.totals.reused_sqft/1000)+'k <small>/ '+Math.round(lca.totals.project_sqft/1000)+'k sqft</small></div>'
-         +       '<div class="pe-lca2-hero-band">★ LEED '+scoreBand.label.toUpperCase()+' · '+scoreBand.threshold_pct+'%+</div>'
+         +       '<div class="pe-lca2-hero-band">LEED '+scoreBand.label.toUpperCase()+' band</div>'
          +     '</div>'
          +   '</div>';
-      // --- COMPOSITION stacked bar
-      // Composition stacked bar: hide inline labels if bar too narrow (< 25% can't fit text)
-      var keptLabel = overallPct >= 25 ? ('★ '+Math.round(overallPct)+'% KEPT') : (Math.round(overallPct)+'%');
-      var newLabel  = newPct      >= 20 ? ('NEW '+Math.round(newPct)+'%')     : (Math.round(newPct)+'%');
-      h +=   '<div class="pe-lca2-stack">'
-         +     '<div class="pe-lca2-stack-kept" style="width:'+overallPct.toFixed(1)+'%">'+keptLabel+'</div>'
-         +     '<div class="pe-lca2-stack-new">'+newLabel+'</div>'
-         +   '</div>';
-      // --- Per-element rows with SVG icons (wall hatch, floor stack, roof peak, envelope frame)
       var ICONS = {
         'Walls':    '<rect x="2" y="3" width="14" height="12" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/><line x1="9" y1="3" x2="9" y2="15" stroke="currentColor" stroke-width="1.4"/>',
         'Floors':   '<line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="1.4"/>',
-        'Roofs':    '<path d="M2 13 L9 4 L16 13 Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
         'Envelope': '<rect x="2.5" y="2.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="5" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/>',
       };
       h +=   '<div class="pe-lca2-els">';
       lca.elements.forEach(function(el){
-        var pctP = el.reuse_pct_of_project;
-        if(pctP === null) return;
         var pctK = el.kept_pct_of_existing;
+        if(pctK == null || pctK <= 0) return;  // skip Roofs N/A
         var labelShort = el.element.replace(/ \(.+\)/,'');
-        var iconSvg = ICONS[labelShort] || ICONS['Envelope'];  // fallback
-        var barW = Math.max(0, Math.min(100, pctP));
-        var pctStr, pctCls;
-        if(pctK !== null && pctK > 0){
-          pctStr = Math.round(pctK)+'%';
-          pctCls = '';
-        } else {
-          pctStr = 'N/A';
-          pctCls = ' muted';
-        }
+        var iconSvg = ICONS[labelShort];
+        if(!iconSvg) return;
         h +=   '<div class="pe-lca2-el">'
            +     '<svg class="pe-lca2-el-ico" viewBox="0 0 18 18">'+iconSvg+'</svg>'
            +     '<div class="pe-lca2-el-name">'+labelShort+'</div>'
-           +     '<div class="pe-lca2-el-bar"><div style="width:'+barW.toFixed(1)+'%"></div></div>'
-           +     '<div class="pe-lca2-el-pct'+pctCls+'">'+pctStr+'</div>'
+           +     '<div class="pe-lca2-el-bar"><div style="width:'+Math.round(pctK)+'%"></div></div>'
+           +     '<div class="pe-lca2-el-pct">'+Math.round(pctK)+'%</div>'
            +   '</div>';
       });
       h +=   '</div>';
-      h += '</div>';  // /pe-lca2
-
-      h += '<div style="font-size:9px;color:#475569;padding:4px 2px 0;font-style:italic;line-height:1.4">'
-         + 'Donut + bars = % of existing material kept (LEED MR Option 1, Path 1). '
-         + 'Roofs N/A — Bechtel is multi-terraced, floors double as roofs per submittal. '
-         + 'Embodied-carbon proxy: more reuse = less new concrete/steel poured.'
-         + '</div>';
+      h += '</div>';
     }
 
     // ── MEP LED GRID (BIM buildings only) ──
