@@ -3219,7 +3219,16 @@ function vrInput(){const session=renderer.xr.getSession();if(!session)return;con
 let xrFrame = 0;
 renderer.setAnimationLoop(()=>{
   if(renderer.xr.isPresenting){ vrInput(); if(++xrFrame % 5 === 0) xrContinuousRaycast(); }
-  else{updateFP();updateJoy();if(!fpMode)orbitControls.update();}
+  else{
+    updateFP();
+    updateJoy();
+    // Skip OrbitControls.update() when Cupix is driving the camera — otherwise
+    // OrbitControls' internal spherical state keeps overwriting camera.position
+    // every frame, and the auto-sync appears to do nothing.
+    const cupixDriving = document.body.classList.contains('cupix-compare-on')
+                       && window.cupixSync && cupixSync.enabled && cupixSync.syncPos;
+    if(!fpMode && !cupixDriving) orbitControls.update();
+  }
   updateEnergyFlow();
   renderer.render(scene,camera);
 });
