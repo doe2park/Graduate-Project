@@ -1701,15 +1701,17 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   function showPopPub(b){
     const cc=C[b.c]||C.Admin;
     // Pull live kW from current energy data if available (popup may open before live data lands)
-    var liveKw=null, liveSpark=null, liveMeter=null;
+    var liveKw=null, liveSpark=null, liveMeter=null, liveTs=null;
     if(window.currentEnergyData && window.currentEnergyData[b.id]){
       var lb=window.currentEnergyData[b.id];
       if(typeof lb.kw==='number' && lb.kw>0) liveKw=lb.kw;
       if(lb.sparkline && lb.sparkline.length>2) liveSpark=lb.sparkline;
       if(lb.meter) liveMeter=String(lb.meter);
+      if(lb.timestamp) liveTs=lb.timestamp;
     }
     if(liveKw==null && typeof b.kw==='number' && b.kw>0) liveKw=b.kw;
     if(!liveSpark && b.sparkline && b.sparkline.length>2) liveSpark=b.sparkline;
+    if(!liveTs && b.liveTs) liveTs=b.liveTs;
 
     // Activity pill based on live kW vs. typical for this building
     var pill={cls:'off',txt:'No live data'};
