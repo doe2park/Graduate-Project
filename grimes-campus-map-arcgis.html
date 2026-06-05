@@ -120,7 +120,8 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pe-lca2-stack-kept{background:linear-gradient(90deg,#d97757,#e88662);color:#1f1410;padding:0 8px;letter-spacing:.3px;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
 .pe-lca2-stack-new{background:repeating-linear-gradient(45deg,rgba(148,163,184,.15) 0 4px,rgba(148,163,184,.05) 4px 8px);color:#94a3b8;padding:0 8px;letter-spacing:.3px;flex:1;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap;overflow:hidden}
 .pe-lca2-els{display:flex;flex-direction:column;gap:5px}
-.pe-lca2-el{display:grid;grid-template-columns:18px 62px 1fr 48px;gap:8px;align-items:center;padding:2px 0;min-width:0}
+.pe-lca2-el{display:grid;grid-template-columns:16px 56px 1fr 48px;gap:6px;align-items:center;padding:4px 8px;min-width:0;cursor:help;border-radius:3px;transition:background .15s}
+.pe-lca2-el:hover{background:rgba(217,119,87,.08)}
 .pe-lca2-el-ico{width:18px;height:18px;color:#fbd0bf;flex-shrink:0}
 .pe-lca2-el-name{font:500 11px/1 'DM Sans',sans-serif;color:#cbd5e1;letter-spacing:.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pe-lca2-el-bar{height:6px;background:rgba(148,163,184,.08);border-radius:1px;overflow:hidden;position:relative;min-width:0}
@@ -131,7 +132,8 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 /* === NEW Engineer LEED Energy panel v2 — three comparative bars + savings hero === */
 .pe-leed2{display:flex;flex-direction:column;gap:10px;min-width:0}
 .pe-leed2-cmp{display:flex;flex-direction:column;gap:6px;padding:10px 4px;background:rgba(0,0,0,.18);border-radius:4px;border:1px solid rgba(52,211,153,.06)}
-.pe-leed2-row{display:grid;grid-template-columns:60px 1fr 58px;gap:6px;align-items:center;padding:2px 8px;font-size:10.5px;min-width:0}
+.pe-leed2-row{display:grid;grid-template-columns:60px 1fr 58px;gap:6px;align-items:center;padding:4px 8px;font-size:10.5px;min-width:0;cursor:help;border-radius:3px;transition:background .15s}
+.pe-leed2-row:hover{background:rgba(34,211,238,.07)}
 .pe-leed2-lbl{font:600 9.5px/1 'JetBrains Mono',monospace;color:#6b7fa0;letter-spacing:.3px;text-transform:uppercase}
 .pe-leed2-bar{height:14px;background:rgba(148,163,184,.06);border-radius:2px;overflow:hidden;position:relative;min-width:0}
 .pe-leed2-bar > div{height:100%;border-radius:2px}
@@ -1502,49 +1504,45 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var gapCls = gapVsDesign > 5 ? 'warn' : (gapVsDesign < -5 ? 'green' : 'gold');
       var gapSign = gapVsDesign > 0 ? '+' : '';
 
-      h += '<div class="pe-sec"><span>Design Intent vs Actual</span><span>LEED v4 EAp2 · '+scopeLabel+'</span></div>';
+      // Compact: savings % goes into the section header (color-coded), saved hero block dropped.
+      // The 3 bars + the right-side header tag carry the full story without a separate hero block.
+      var headerTag;
+      if(Math.abs(gapVsDesign) < 5){
+        headerTag = '<span style="color:#cbd5e1">tracking at design</span>';
+      } else if(gapVsDesign > 0){
+        headerTag = '<span style="color:#fb923c">+'+Math.round(gapVsDesign)+'% vs design</span>';
+      } else {
+        headerTag = '<span style="color:#34d399">'+Math.round(gapVsDesign)+'% vs design</span>';
+      }
+      h += '<div class="pe-sec"><span>Design Intent vs Actual</span>'+headerTag+'</div>';
 
-      // === NEW VISUAL: three comparison bars scaled to baseline (the longest).
-      // Makes the "savings story" spatial — bars shrink as efficiency improves.
+      // Three comparison bars scaled to baseline. Hover for full context (scope, source, comparison).
       var maxKwh = Math.max(baselineKwh, designedKwh, projAnnualKwh) || 1;
       var wBase = (baselineKwh / maxKwh) * 100;
       var wDes  = (designedKwh / maxKwh) * 100;
       var wProj = (projAnnualKwh / maxKwh) * 100;
+      var savingsModel = baselineKwh ? Math.round((1 - designedKwh/baselineKwh)*100) : 0;
+      var ttBase = 'ASHRAE 90.1-2010 code minimum · '+Math.round(baselineKwh).toLocaleString()+' kWh/yr · '+scopeLabel;
+      var ttDes  = 'eQuest design model · '+Math.round(designedKwh).toLocaleString()+' kWh/yr · '+savingsModel+'% below baseline';
+      var ttProj = 'Live 6hr avg × 8760hr · '+Math.round(projAnnualKwh).toLocaleString()+' kWh/yr · M'+(meterId||'?')+' meter';
       h += '<div class="pe-leed2">';
       h +=   '<div class="pe-leed2-cmp">'
-         +     '<div class="pe-leed2-row">'
+         +     '<div class="pe-leed2-row" title="'+ttBase+'">'
          +       '<div class="pe-leed2-lbl">Baseline</div>'
          +       '<div class="pe-leed2-bar"><div class="baseline" style="width:'+wBase.toFixed(1)+'%"></div></div>'
          +       '<div class="pe-leed2-val">'+Math.round(baselineKwh/1000).toLocaleString()+'</div>'
          +     '</div>'
-         +     '<div class="pe-leed2-row">'
+         +     '<div class="pe-leed2-row" title="'+ttDes+'">'
          +       '<div class="pe-leed2-lbl">Designed</div>'
          +       '<div class="pe-leed2-bar"><div class="designed" style="width:'+wDes.toFixed(1)+'%"></div></div>'
          +       '<div class="pe-leed2-val">'+Math.round(designedKwh/1000).toLocaleString()+'</div>'
          +     '</div>'
-         +     '<div class="pe-leed2-row">'
-         +       '<div class="pe-leed2-lbl">Projected</div>'
+         +     '<div class="pe-leed2-row" title="'+ttProj+'">'
+         +       '<div class="pe-leed2-lbl">Live</div>'
          +       '<div class="pe-leed2-bar"><div class="projected" style="width:'+wProj.toFixed(1)+'%"></div></div>'
          +       '<div class="pe-leed2-val">'+Math.round(projAnnualKwh/1000).toLocaleString()+'</div>'
          +     '</div>'
-         +     '<div style="font:500 8.5px/1 \'JetBrains Mono\',monospace;color:#475569;text-align:right;padding:2px 8px 0;letter-spacing:.3px">MWh/yr</div>'
-         +   '</div>';
-
-      // Hero savings/gap block — big number + short label.
-      var savedClass = gapVsDesign > 5 ? 'warn' : '';
-      var savedSign = gapVsDesign > 0 ? '+' : '';
-      var savedNum = savedSign + gapVsDesign.toFixed(0) + '%';
-      var savedLbl;
-      if(Math.abs(gapVsDesign) < 5){
-        savedLbl = 'tracking at design intent';
-      } else if(gapVsDesign > 0){
-        savedLbl = 'above design intent — running hotter than modeled';
-      } else {
-        savedLbl = 'below design intent — running better than modeled';
-      }
-      h +=   '<div class="pe-leed2-saved '+savedClass+'">'
-         +     '<div class="pe-leed2-saved-num">'+savedNum+'</div>'
-         +     '<div class="pe-leed2-saved-lbl">'+savedLbl+'</div>'
+         +     '<div style="font:500 8.5px/1 \'JetBrains Mono\',monospace;color:#475569;text-align:right;padding:2px 8px 0;letter-spacing:.3px">MWh/yr · hover bars for context</div>'
          +   '</div>';
       h += '</div>';  // /pe-leed2
     }
@@ -1558,46 +1556,30 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var overallRounded = Math.round(lca.totals.overall_reuse_pct_of_project);
       var scoreBand = lca.totals.score_band;
 
-      h += '<div class="pe-sec"><span>Material Reuse</span><span>LEED v4.1 MR</span></div>';
+      // Compact: overall % + LEED band move to section header (right side, terracotta).
+      // Donut hero dropped — it duplicated what the per-element bars already convey.
+      h += '<div class="pe-sec"><span>Material Reuse</span><span style="color:#fbd0bf">'+overallRounded+'% kept · LEED '+scoreBand.label+'</span></div>';
 
-      // === SIMPLIFIED: donut hero + 3 element bars. Composition stacked bar removed
-      // (duplicated the donut). Roofs N/A row dropped. Footnote dropped. sqft sub-text dropped.
-      var donutCirc = 2 * Math.PI * 26;
-      var donutFill = (overallRounded / 100) * donutCirc;
-      h += '<div class="pe-lca2">';
-      h +=   '<div class="pe-lca2-hero">'
-         +     '<div class="pe-lca2-donut">'
-         +       '<svg viewBox="0 0 64 64" width="64" height="64">'
-         +         '<circle cx="32" cy="32" r="26" fill="none" stroke="rgba(148,163,184,.12)" stroke-width="8"/>'
-         +         '<circle cx="32" cy="32" r="26" fill="none" stroke="#d97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+donutFill.toFixed(1)+' '+donutCirc.toFixed(1)+'" transform="rotate(-90 32 32)"/>'
-         +       '</svg>'
-         +       '<div class="pe-lca2-donut-pct">'+overallRounded+'%</div>'
-         +     '</div>'
-         +     '<div class="pe-lca2-hero-text">'
-         +       '<div class="pe-lca2-hero-lbl">Existing structure reused</div>'
-         +       '<div class="pe-lca2-hero-band">LEED '+scoreBand.label.toUpperCase()+' band</div>'
-         +     '</div>'
-         +   '</div>';
       var ICONS = {
         'Walls':    '<rect x="2" y="3" width="14" height="12" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/><line x1="9" y1="3" x2="9" y2="15" stroke="currentColor" stroke-width="1.4"/>',
         'Floors':   '<line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/><line x1="2" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="1.4"/>',
         'Envelope': '<rect x="2.5" y="2.5" width="13" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="5" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/>',
       };
-      h +=   '<div class="pe-lca2-els">';
+      h += '<div class="pe-lca2-els">';
       lca.elements.forEach(function(el){
         var pctK = el.kept_pct_of_existing;
         if(pctK == null || pctK <= 0) return;  // skip Roofs N/A
         var labelShort = el.element.replace(/ \(.+\)/,'');
         var iconSvg = ICONS[labelShort];
         if(!iconSvg) return;
-        h +=   '<div class="pe-lca2-el">'
-           +     '<svg class="pe-lca2-el-ico" viewBox="0 0 18 18">'+iconSvg+'</svg>'
-           +     '<div class="pe-lca2-el-name">'+labelShort+'</div>'
-           +     '<div class="pe-lca2-el-bar"><div style="width:'+Math.round(pctK)+'%"></div></div>'
-           +     '<div class="pe-lca2-el-pct">'+Math.round(pctK)+'%</div>'
-           +   '</div>';
+        var tt = labelShort+' · '+Math.round(el.reused_sqft).toLocaleString()+' of '+Math.round(el.existing_sqft).toLocaleString()+' sqft kept';
+        h += '<div class="pe-lca2-el" title="'+tt+'">'
+           +   '<svg class="pe-lca2-el-ico" viewBox="0 0 18 18">'+iconSvg+'</svg>'
+           +   '<div class="pe-lca2-el-name">'+labelShort+'</div>'
+           +   '<div class="pe-lca2-el-bar"><div style="width:'+Math.round(pctK)+'%"></div></div>'
+           +   '<div class="pe-lca2-el-pct">'+Math.round(pctK)+'%</div>'
+           + '</div>';
       });
-      h +=   '</div>';
       h += '</div>';
     }
 
