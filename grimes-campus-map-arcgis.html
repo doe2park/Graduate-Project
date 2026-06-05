@@ -107,74 +107,75 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .pe-mat-pct.muted{color:#64748b;font-weight:500}
 
 /* === NEW Engineer LCA panel v2 — donut + stacked composition + icon-led element rows === */
-.pe-lca2{display:flex;flex-direction:column;gap:12px}
-.pe-lca2-hero{display:flex;align-items:center;gap:14px;padding:12px;background:linear-gradient(135deg,rgba(217,119,87,.1),rgba(217,119,87,.02));border:1px solid rgba(217,119,87,.22);border-radius:5px}
-.pe-lca2-donut{width:64px;height:64px;flex-shrink:0;position:relative}
-.pe-lca2-donut-pct{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:700 16px/1 'JetBrains Mono',monospace;color:#fbd0bf;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
-.pe-lca2-hero-text{flex:1;display:flex;flex-direction:column;gap:3px}
-.pe-lca2-hero-lbl{font:600 9px/1.3 'JetBrains Mono',monospace;color:#fbd0bf;letter-spacing:.6px;text-transform:uppercase;opacity:.9}
-.pe-lca2-hero-num{font:700 22px/1 'JetBrains Mono',monospace;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
-.pe-lca2-hero-band{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;font:600 9px/1 'JetBrains Mono',monospace;color:var(--gold);background:rgba(253,181,21,.1);border:1px solid rgba(253,181,21,.25);padding:3px 7px;border-radius:3px;letter-spacing:.4px;margin-top:2px}
+.pe-lca2{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pe-lca2-hero{display:flex;align-items:center;gap:12px;padding:10px 12px;background:linear-gradient(135deg,rgba(217,119,87,.1),rgba(217,119,87,.02));border:1px solid rgba(217,119,87,.22);border-radius:5px;min-width:0}
+.pe-lca2-donut{width:56px;height:56px;flex-shrink:0;position:relative}
+.pe-lca2-donut-pct{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:700 14px/1 'JetBrains Mono',monospace;color:#fbd0bf;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.pe-lca2-hero-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.pe-lca2-hero-lbl{font:600 9px/1.3 'JetBrains Mono',monospace;color:#fbd0bf;letter-spacing:.5px;text-transform:uppercase;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pe-lca2-hero-num{font:700 17px/1.05 'JetBrains Mono',monospace;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pe-lca2-hero-num small{font-size:10px;color:#94a3b8;font-weight:500;letter-spacing:0}
+.pe-lca2-hero-band{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;font:600 9px/1 'JetBrains Mono',monospace;color:var(--gold);background:rgba(253,181,21,.1);border:1px solid rgba(253,181,21,.25);padding:3px 6px;border-radius:3px;letter-spacing:.3px;margin-top:1px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .pe-lca2-stack{height:22px;background:rgba(148,163,184,.08);border-radius:3px;overflow:hidden;display:flex;font:600 9px/22px 'JetBrains Mono',monospace;position:relative}
-.pe-lca2-stack-kept{background:linear-gradient(90deg,#d97757,#e88662);color:#1f1410;padding:0 8px;letter-spacing:.4px;text-shadow:0 0 4px rgba(255,255,255,.3);display:flex;align-items:center}
-.pe-lca2-stack-new{background:repeating-linear-gradient(45deg,rgba(148,163,184,.15) 0 4px,rgba(148,163,184,.05) 4px 8px);color:#94a3b8;padding:0 8px;letter-spacing:.4px;flex:1;display:flex;align-items:center;justify-content:flex-end}
+.pe-lca2-stack-kept{background:linear-gradient(90deg,#d97757,#e88662);color:#1f1410;padding:0 8px;letter-spacing:.3px;display:flex;align-items:center;white-space:nowrap;overflow:hidden}
+.pe-lca2-stack-new{background:repeating-linear-gradient(45deg,rgba(148,163,184,.15) 0 4px,rgba(148,163,184,.05) 4px 8px);color:#94a3b8;padding:0 8px;letter-spacing:.3px;flex:1;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap;overflow:hidden}
 .pe-lca2-els{display:flex;flex-direction:column;gap:5px}
-.pe-lca2-el{display:grid;grid-template-columns:20px 70px 1fr 56px;gap:8px;align-items:center;padding:2px 0}
-.pe-lca2-el-ico{width:18px;height:18px;color:#fbd0bf}
-.pe-lca2-el-name{font:500 11px/1 'DM Sans',sans-serif;color:#cbd5e1;letter-spacing:.1px}
-.pe-lca2-el-bar{height:6px;background:rgba(148,163,184,.08);border-radius:1px;overflow:hidden;position:relative}
-.pe-lca2-el-bar > div{height:100%;background:linear-gradient(90deg,#d97757,#f4a872);border-radius:1px;box-shadow:0 0 4px rgba(217,119,87,.4)}
+.pe-lca2-el{display:grid;grid-template-columns:18px 62px 1fr 48px;gap:8px;align-items:center;padding:2px 0;min-width:0}
+.pe-lca2-el-ico{width:18px;height:18px;color:#fbd0bf;flex-shrink:0}
+.pe-lca2-el-name{font:500 11px/1 'DM Sans',sans-serif;color:#cbd5e1;letter-spacing:.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pe-lca2-el-bar{height:6px;background:rgba(148,163,184,.08);border-radius:1px;overflow:hidden;position:relative;min-width:0}
+.pe-lca2-el-bar > div{height:100%;background:linear-gradient(90deg,#d97757,#f4a872);border-radius:1px}
 .pe-lca2-el-pct{font:700 11px/1 'JetBrains Mono',monospace;color:#fbd0bf;text-align:right;font-variant-numeric:tabular-nums}
 .pe-lca2-el-pct.muted{color:#475569;font-weight:500}
 
 /* === NEW Engineer LEED Energy panel v2 — three comparative bars + savings hero === */
-.pe-leed2{display:flex;flex-direction:column;gap:10px}
+.pe-leed2{display:flex;flex-direction:column;gap:10px;min-width:0}
 .pe-leed2-cmp{display:flex;flex-direction:column;gap:6px;padding:10px 4px;background:rgba(0,0,0,.18);border-radius:4px;border:1px solid rgba(52,211,153,.06)}
-.pe-leed2-row{display:grid;grid-template-columns:62px 1fr 64px;gap:8px;align-items:center;padding:2px 8px;font-size:10.5px}
-.pe-leed2-lbl{font:600 9.5px/1 'JetBrains Mono',monospace;color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
-.pe-leed2-bar{height:14px;background:rgba(148,163,184,.06);border-radius:2px;overflow:hidden;position:relative}
-.pe-leed2-bar > div{height:100%;border-radius:2px;display:flex;align-items:center;padding-right:6px;justify-content:flex-end;font:700 9.5px/14px 'JetBrains Mono',monospace;color:#0a0e1a;letter-spacing:.3px}
-.pe-leed2-bar > div.baseline{background:linear-gradient(90deg,rgba(148,163,184,.5),rgba(148,163,184,.65));color:#0a0e1a}
-.pe-leed2-bar > div.designed{background:linear-gradient(90deg,#FDB515,#fbbf24);color:#1f1408}
-.pe-leed2-bar > div.projected{background:linear-gradient(90deg,#22d3ee,#06b6d4);color:#04222b;box-shadow:0 0 6px rgba(34,211,238,.35)}
-.pe-leed2-val{font:700 10.5px/1 'JetBrains Mono',monospace;color:#cbd5e1;text-align:right;font-variant-numeric:tabular-nums}
-.pe-leed2-saved{display:flex;align-items:baseline;gap:8px;padding:8px 10px;background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(52,211,153,.02));border:1px solid rgba(52,211,153,.22);border-radius:4px}
+.pe-leed2-row{display:grid;grid-template-columns:60px 1fr 58px;gap:6px;align-items:center;padding:2px 8px;font-size:10.5px;min-width:0}
+.pe-leed2-lbl{font:600 9.5px/1 'JetBrains Mono',monospace;color:#6b7fa0;letter-spacing:.3px;text-transform:uppercase}
+.pe-leed2-bar{height:14px;background:rgba(148,163,184,.06);border-radius:2px;overflow:hidden;position:relative;min-width:0}
+.pe-leed2-bar > div{height:100%;border-radius:2px}
+.pe-leed2-bar > div.baseline{background:linear-gradient(90deg,rgba(148,163,184,.5),rgba(148,163,184,.65))}
+.pe-leed2-bar > div.designed{background:linear-gradient(90deg,#FDB515,#fbbf24)}
+.pe-leed2-bar > div.projected{background:linear-gradient(90deg,#22d3ee,#06b6d4)}
+.pe-leed2-val{font:700 10.5px/1 'JetBrains Mono',monospace;color:#cbd5e1;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pe-leed2-saved{display:flex;align-items:baseline;gap:10px;padding:8px 10px;background:linear-gradient(135deg,rgba(52,211,153,.1),rgba(52,211,153,.02));border:1px solid rgba(52,211,153,.22);border-radius:4px;min-width:0}
 .pe-leed2-saved.warn{background:linear-gradient(135deg,rgba(251,146,60,.1),rgba(251,146,60,.02));border-color:rgba(251,146,60,.22)}
-.pe-leed2-saved-num{font:700 22px/1 'JetBrains Mono',monospace;color:#34d399;font-variant-numeric:tabular-nums;letter-spacing:-.8px}
+.pe-leed2-saved-num{font:700 20px/1 'JetBrains Mono',monospace;color:#34d399;font-variant-numeric:tabular-nums;letter-spacing:-.8px;flex-shrink:0}
 .pe-leed2-saved.warn .pe-leed2-saved-num{color:#fb923c}
-.pe-leed2-saved-lbl{flex:1;font:500 10.5px/1.3 'DM Sans',sans-serif;color:#a7f3d0;letter-spacing:.1px}
+.pe-leed2-saved-lbl{flex:1;min-width:0;font:500 10.5px/1.35 'DM Sans',sans-serif;color:#a7f3d0;letter-spacing:.1px}
 .pe-leed2-saved.warn .pe-leed2-saved-lbl{color:#fed7aa}
 
 /* === NEW Public LEED card v2 — hero number + comparison bars === */
-.pp-leed2{margin-top:10px;padding:14px;background:linear-gradient(165deg,rgba(52,211,153,.12),rgba(52,211,153,.02));border:1px solid rgba(52,211,153,.28);border-radius:8px;position:relative;overflow:hidden}
-.pp-leed2::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle,rgba(52,211,153,.2),transparent 65%);pointer-events:none}
-.pp-leed2-badge{display:inline-flex;align-items:center;gap:5px;font:700 9px/1 'JetBrains Mono',monospace;color:#0a1612;background:#34d399;padding:4px 9px;border-radius:3px;letter-spacing:.7px;margin-bottom:10px;position:relative;z-index:1}
-.pp-leed2-hero{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;position:relative;z-index:1}
-.pp-leed2-num{font:700 38px/1 'JetBrains Mono',monospace;color:#34d399;font-variant-numeric:tabular-nums;letter-spacing:-1.5px;text-shadow:0 0 18px rgba(52,211,153,.35)}
-.pp-leed2-unit{font:500 12px/1.2 'DM Sans',sans-serif;color:#a7f3d0;flex:1}
-.pp-leed2-cmp{margin-top:10px;display:flex;flex-direction:column;gap:4px;position:relative;z-index:1}
-.pp-leed2-cmp-row{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:9.5px;color:#6b7fa0}
-.pp-leed2-cmp-lbl{font-family:'JetBrains Mono',monospace;letter-spacing:.3px;text-transform:uppercase;font-size:8.5px}
-.pp-leed2-cmp-bar{height:8px;background:rgba(148,163,184,.08);border-radius:2px;overflow:hidden;position:relative}
+.pp-leed2{margin-top:10px;padding:12px 14px;background:linear-gradient(165deg,rgba(52,211,153,.12),rgba(52,211,153,.02));border:1px solid rgba(52,211,153,.28);border-radius:8px;position:relative;overflow:hidden;min-width:0}
+.pp-leed2::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle,rgba(52,211,153,.18),transparent 65%);pointer-events:none}
+.pp-leed2-badge{display:inline-flex;align-items:center;gap:5px;font:700 9px/1 'JetBrains Mono',monospace;color:#0a1612;background:#34d399;padding:4px 8px;border-radius:3px;letter-spacing:.5px;margin-bottom:8px;position:relative;z-index:1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp-leed2-hero{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;position:relative;z-index:1;min-width:0}
+.pp-leed2-num{font:700 34px/1 'JetBrains Mono',monospace;color:#34d399;font-variant-numeric:tabular-nums;letter-spacing:-1.3px;flex-shrink:0}
+.pp-leed2-unit{font:500 12px/1.25 'DM Sans',sans-serif;color:#a7f3d0;flex:1;min-width:0}
+.pp-leed2-cmp{margin-top:8px;display:flex;flex-direction:column;gap:4px;position:relative;z-index:1}
+.pp-leed2-cmp-row{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:9.5px;color:#6b7fa0;min-width:0}
+.pp-leed2-cmp-lbl{font-family:'JetBrains Mono',monospace;letter-spacing:.3px;text-transform:uppercase;font-size:8.5px;white-space:nowrap}
+.pp-leed2-cmp-bar{height:8px;background:rgba(148,163,184,.08);border-radius:2px;overflow:hidden;position:relative;min-width:0}
 .pp-leed2-cmp-bar > div{height:100%;border-radius:2px}
 .pp-leed2-cmp-bar > div.code{background:rgba(148,163,184,.5)}
 .pp-leed2-cmp-bar > div.designed{background:linear-gradient(90deg,#34d399,#10b981)}
-.pp-leed2-status{margin-top:10px;padding:7px 10px;background:rgba(0,0,0,.18);border-radius:4px;font-size:11px;color:#cbd5e1;line-height:1.4;position:relative;z-index:1}
+.pp-leed2-status{margin-top:8px;padding:7px 10px;background:rgba(0,0,0,.18);border-radius:4px;font-size:11px;color:#cbd5e1;line-height:1.4;position:relative;z-index:1}
 .pp-leed2-status b{font-family:'JetBrains Mono',monospace;font-weight:700}
 .pp-leed2-status b.under{color:#34d399}
 .pp-leed2-status b.over{color:#fb923c}
 .pp-leed2-status b.par{color:#cbd5e1}
 
 /* === NEW Public LCA card v2 — building cross-section SVG + hero number === */
-.pp-lca2{margin-top:10px;padding:14px;background:linear-gradient(165deg,rgba(217,119,87,.12),rgba(217,119,87,.02));border:1px solid rgba(217,119,87,.28);border-radius:8px;position:relative;overflow:hidden}
-.pp-lca2::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle,rgba(217,119,87,.18),transparent 65%);pointer-events:none}
-.pp-lca2-badge{display:inline-flex;align-items:center;gap:5px;font:700 9px/1 'JetBrains Mono',monospace;color:#1f1410;background:#d97757;padding:4px 9px;border-radius:3px;letter-spacing:.7px;margin-bottom:10px;position:relative;z-index:1}
-.pp-lca2-body{display:flex;gap:14px;align-items:center;position:relative;z-index:1}
-.pp-lca2-svg{flex-shrink:0;width:80px;height:78px}
-.pp-lca2-text{flex:1;display:flex;flex-direction:column;gap:3px}
-.pp-lca2-hero{display:flex;align-items:baseline;gap:6px}
-.pp-lca2-num{font:700 30px/1 'JetBrains Mono',monospace;color:#fbd0bf;font-variant-numeric:tabular-nums;letter-spacing:-1.2px;text-shadow:0 0 14px rgba(217,119,87,.4)}
-.pp-lca2-unit{font:500 11px/1.2 'DM Sans',sans-serif;color:#fbd0bf;opacity:.85;flex:1}
+.pp-lca2{margin-top:10px;padding:12px 14px;background:linear-gradient(165deg,rgba(217,119,87,.12),rgba(217,119,87,.02));border:1px solid rgba(217,119,87,.28);border-radius:8px;position:relative;overflow:hidden;min-width:0}
+.pp-lca2::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle,rgba(217,119,87,.16),transparent 65%);pointer-events:none}
+.pp-lca2-badge{display:inline-flex;align-items:center;gap:5px;font:700 9px/1 'JetBrains Mono',monospace;color:#1f1410;background:#d97757;padding:4px 8px;border-radius:3px;letter-spacing:.5px;margin-bottom:8px;position:relative;z-index:1;white-space:nowrap}
+.pp-lca2-body{display:flex;gap:12px;align-items:center;position:relative;z-index:1;min-width:0}
+.pp-lca2-svg{flex-shrink:0;width:72px;height:72px}
+.pp-lca2-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.pp-lca2-hero{display:flex;align-items:baseline;gap:6px;min-width:0}
+.pp-lca2-num{font:700 28px/1 'JetBrains Mono',monospace;color:#fbd0bf;font-variant-numeric:tabular-nums;letter-spacing:-1.2px;flex-shrink:0}
+.pp-lca2-unit{font:500 11px/1.2 'DM Sans',sans-serif;color:#fbd0bf;opacity:.85;flex:1;min-width:0}
 .pp-lca2-detail{font-size:11px;color:#cbd5e1;line-height:1.4;margin-top:4px}
 .pp-lca2-detail b{color:#fbd0bf;font-family:'JetBrains Mono',monospace;font-weight:700}
 .pp-vs-typical{margin-top:8px;padding:8px 10px;background:rgba(148,163,184,.05);border-left:2px solid rgba(148,163,184,.4);border-radius:3px;font-size:11.5px;color:#cbd5e1;line-height:1.45;display:flex;align-items:baseline;gap:8px}
@@ -1513,19 +1514,20 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       h +=   '<div class="pe-leed2-cmp">'
          +     '<div class="pe-leed2-row">'
          +       '<div class="pe-leed2-lbl">Baseline</div>'
-         +       '<div class="pe-leed2-bar"><div class="baseline" style="width:'+wBase.toFixed(1)+'%">CODE</div></div>'
-         +       '<div class="pe-leed2-val">'+Math.round(baselineKwh/1000).toLocaleString()+' MWh</div>'
+         +       '<div class="pe-leed2-bar"><div class="baseline" style="width:'+wBase.toFixed(1)+'%"></div></div>'
+         +       '<div class="pe-leed2-val">'+Math.round(baselineKwh/1000).toLocaleString()+'</div>'
          +     '</div>'
          +     '<div class="pe-leed2-row">'
          +       '<div class="pe-leed2-lbl">Designed</div>'
-         +       '<div class="pe-leed2-bar"><div class="designed" style="width:'+wDes.toFixed(1)+'%">eQUEST</div></div>'
-         +       '<div class="pe-leed2-val">'+Math.round(designedKwh/1000).toLocaleString()+' MWh</div>'
+         +       '<div class="pe-leed2-bar"><div class="designed" style="width:'+wDes.toFixed(1)+'%"></div></div>'
+         +       '<div class="pe-leed2-val">'+Math.round(designedKwh/1000).toLocaleString()+'</div>'
          +     '</div>'
          +     '<div class="pe-leed2-row">'
          +       '<div class="pe-leed2-lbl">Projected</div>'
-         +       '<div class="pe-leed2-bar"><div class="projected" style="width:'+wProj.toFixed(1)+'%">LIVE</div></div>'
-         +       '<div class="pe-leed2-val">'+Math.round(projAnnualKwh/1000).toLocaleString()+' MWh</div>'
+         +       '<div class="pe-leed2-bar"><div class="projected" style="width:'+wProj.toFixed(1)+'%"></div></div>'
+         +       '<div class="pe-leed2-val">'+Math.round(projAnnualKwh/1000).toLocaleString()+'</div>'
          +     '</div>'
+         +     '<div style="font:500 8.5px/1 \'JetBrains Mono\',monospace;color:#475569;text-align:right;padding:2px 8px 0;letter-spacing:.3px">MWh/yr</div>'
          +   '</div>';
 
       // Hero savings/gap block — big number + plain-English explanation.
@@ -1598,14 +1600,17 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          +     '</div>'
          +     '<div class="pe-lca2-hero-text">'
          +       '<div class="pe-lca2-hero-lbl">Existing structure reused</div>'
-         +       '<div class="pe-lca2-hero-num">'+Math.round(lca.totals.reused_sqft).toLocaleString()+' <span style="font-size:11px;color:#94a3b8;font-weight:500">/ '+Math.round(lca.totals.project_sqft).toLocaleString()+' sqft</span></div>'
-         +       '<div class="pe-lca2-hero-band">★ LEED '+scoreBand.label.toUpperCase()+' BAND ('+scoreBand.threshold_pct+'%+ threshold)</div>'
+         +       '<div class="pe-lca2-hero-num">'+Math.round(lca.totals.reused_sqft/1000)+'k <small>/ '+Math.round(lca.totals.project_sqft/1000)+'k sqft</small></div>'
+         +       '<div class="pe-lca2-hero-band">★ LEED '+scoreBand.label.toUpperCase()+' · '+scoreBand.threshold_pct+'%+</div>'
          +     '</div>'
          +   '</div>';
       // --- COMPOSITION stacked bar
+      // Composition stacked bar: hide inline labels if bar too narrow (< 25% can't fit text)
+      var keptLabel = overallPct >= 25 ? ('★ '+Math.round(overallPct)+'% KEPT') : (Math.round(overallPct)+'%');
+      var newLabel  = newPct      >= 20 ? ('NEW '+Math.round(newPct)+'%')     : (Math.round(newPct)+'%');
       h +=   '<div class="pe-lca2-stack">'
-         +     '<div class="pe-lca2-stack-kept" style="width:'+overallPct.toFixed(1)+'%">★ '+Math.round(overallPct)+'% EXISTING KEPT</div>'
-         +     '<div class="pe-lca2-stack-new">NEW '+Math.round(newPct)+'%</div>'
+         +     '<div class="pe-lca2-stack-kept" style="width:'+overallPct.toFixed(1)+'%">'+keptLabel+'</div>'
+         +     '<div class="pe-lca2-stack-new">'+newLabel+'</div>'
          +   '</div>';
       // --- Per-element rows with SVG icons (wall hatch, floor stack, roof peak, envelope frame)
       var ICONS = {
