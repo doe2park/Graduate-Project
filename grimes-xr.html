@@ -235,7 +235,8 @@
   <button class="view-btn" id="flowBtn" style="margin-left:4px;border-color:rgba(45,212,191,.2);color:#2dd4bf" onclick="toggleFlow()">⚡ Flow</button>
   <button class="view-btn" id="publicBtn" style="margin-left:4px;border-color:rgba(147,197,253,.35);color:#93c5fd" onclick="togglePublic()">👥 Public</button>
   <button class="view-btn" id="interiorBtn" style="margin-left:8px;border-color:rgba(168,85,247,.35);color:#c084fc" title="Toggle interior 360 / LiDAR scan layer">🏛 Interior</button>
-  <button class="view-btn" id="cupixBtn" style="margin-left:4px;border-color:rgba(34,211,238,.35);color:#22d3ee;display:none" title="Open 360° panorama walk-through (Cupix)" onclick="openCupixDefault()">📷 360°</button>
+  <button class="view-btn" id="cupixBtn" style="margin-left:4px;border-color:rgba(34,211,238,.35);color:#22d3ee;display:none" title="Open 360° panorama walk-through (Cupix) full-screen" onclick="openCupixDefault()">📷 360°</button>
+  <button class="view-btn" id="cupixCompareBtn" style="margin-left:4px;border-color:rgba(34,211,238,.35);color:#22d3ee;display:none" title="Split-screen: Cupix 360° walk on left, your BIM on right (manual navigation on each side)" onclick="toggleCupixCompare()">🪞 Compare</button>
   <button class="view-btn" id="pickBtn" style="margin-left:4px;border-color:rgba(148,163,184,.25);color:#94a3b8;font-size:12px;padding:6px 8px" title="Pick a point in the scan to copy coordinates for grimes-interior.json hotspots">🎯</button>
 </div>
 
@@ -1194,12 +1195,13 @@ function closeCupixModal() {
 }
 function _cupixEscHandler(e) { if (e.key === 'Escape') closeCupixModal(); }
 
-// Topbar "📷 360°" button — only visible when the manifest declares a default Cupix URL.
+// Topbar "📷 360°" + "🪞 Compare" buttons — both depend on manifest.cupix.default_url being set.
 function syncCupixTopbar() {
-  const btn = document.getElementById('cupixBtn');
-  if (!btn) return;
   const url = interiorState.manifest?.cupix?.default_url;
-  btn.style.display = url ? '' : 'none';
+  const btn1 = document.getElementById('cupixBtn');
+  const btn2 = document.getElementById('cupixCompareBtn');
+  if (btn1) btn1.style.display = url ? '' : 'none';
+  if (btn2) btn2.style.display = url ? '' : 'none';
 }
 function openCupixDefault() {
   const url = interiorState.manifest?.cupix?.default_url;
@@ -1208,6 +1210,70 @@ function openCupixDefault() {
     return;
   }
   openCupixModal(url, 'Bechtel · building tour');
+}
+
+/* ══════════════════════════════════════════ CUPIX COMPARE — SPLIT-SCREEN ══════════════════════════════════════════
+   50/50 split: Cupix iframe on the LEFT, your Three.js BIM on the RIGHT.
+   No auto-sync (would need Cupix Web SDK + commercial API access).
+   Each side is navigated independently — but having both visible at once
+   is the same UX as Cupix's built-in "BIM Compare" feature, just with
+   YOUR BIM model on the right side instead of Cupix's auto-generated one.
+   Toggling: button in topbar, or programmatically via window.toggleCupixCompare().
+*/
+function toggleCupixCompare() {
+  const isOn = document.body.classList.toggle('cupix-compare-on');
+  let pane = document.getElementById('cupixComparePane');
+  if (!pane) {
+    pane = document.createElement('div');
+    pane.id = 'cupixComparePane';
+    pane.style.cssText = 'position:fixed;top:0;left:0;width:50vw;height:100vh;z-index:30;background:#000;display:none;flex-direction:column;border-right:2px solid #22d3ee;box-shadow:6px 0 18px rgba(0,0,0,.6)';
+    document.body.appendChild(pane);
+  }
+  // Always re-render contents in case manifest.cupix.default_url changed
+  const url = interiorState.manifest?.cupix?.default_url || '';
+  if (!url && isOn) {
+    document.body.classList.remove('cupix-compare-on');
+    alert('No default Cupix URL set in data/grimes-interior.json → cupix.default_url');
+    return;
+  }
+  pane.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(8,12,24,.92);color:#cbd5e1;font-family:var(--font);font-size:11px;border-bottom:1px solid rgba(34,211,238,.2);flex-shrink:0">
+      <span style="font:600 10px/1 var(--mono);color:#22d3ee;letter-spacing:.5px;text-transform:uppercase">📷 360° walk · Cupix</span>
+      <button onclick="toggleCupixCompare()" style="padding:4px 10px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#fca5a5;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.2px">✕ Exit Compare</button>
+    </div>
+    <iframe src="${url}" style="flex:1;border:0;background:#000;width:100%" allow="fullscreen; xr-spatial-tracking" allowfullscreen></iframe>
+    <div style="padding:6px 14px;background:rgba(8,12,24,.92);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08);flex-shrink:0">← Cupix 360° here · Your BIM on right side → · navigate each independently</div>
+  `;
+  const cmpBtn = document.getElementById('cupixCompareBtn');
+  if (isOn) {
+    pane.style.display = 'flex';
+    if (cmpBtn) { cmpBtn.classList.add('active'); cmpBtn.style.background = 'rgba(34,211,238,.2)'; }
+  } else {
+    pane.style.display = 'none';
+    if (cmpBtn) { cmpBtn.classList.remove('active'); cmpBtn.style.background = ''; }
+  }
+  applyCompareLayout(isOn);
+}
+function applyCompareLayout(splitOn) {
+  const canvas = renderer.domElement;
+  if (splitOn) {
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '50vw';
+    canvas.style.width = '50vw';
+    canvas.style.height = '100vh';
+    renderer.setSize(window.innerWidth/2, window.innerHeight, false);
+    camera.aspect = (window.innerWidth/2) / window.innerHeight;
+  } else {
+    canvas.style.position = '';
+    canvas.style.top = '';
+    canvas.style.left = '';
+    canvas.style.width = '';
+    canvas.style.height = '';
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    camera.aspect = window.innerWidth / window.innerHeight;
+  }
+  camera.updateProjectionMatrix();
 }
 
 /* ══════════════════════════════════════════ HEATMAP COLORING ══════════════════════════════════════════ */
@@ -2885,7 +2951,17 @@ renderer.setAnimationLoop(()=>{
   updateEnergyFlow();
   renderer.render(scene,camera);
 });
-window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+window.addEventListener('resize',()=>{
+  const split = document.body.classList.contains('cupix-compare-on');
+  const w = split ? window.innerWidth/2 : window.innerWidth;
+  camera.aspect = w/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, window.innerHeight, false);
+  if (split) {
+    renderer.domElement.style.width = '50vw';
+    renderer.domElement.style.height = '100vh';
+  }
+});
 </script>
 <script>
 fetch("https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t="+Date.now())
