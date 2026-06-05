@@ -102,6 +102,19 @@
 
   /* ── Joysticks / Floor Nav (same as before) ── */
   .joystick-zone { position:fixed;bottom:20px;z-index:40;width:100px;height:100px;border-radius:50%;background:rgba(45,212,191,.06);border:2px solid rgba(45,212,191,.12);touch-action:none; }
+  /* Cupix Compare split-screen — hide everything that lives on the LEFT half of the screen,
+     because that real-estate is taken by the Cupix iframe pane (#cupixComparePane is at left:0/width:50vw).
+     Things that live in the right half (#dashboard, #joystickLook, #topbar at right) stay visible. */
+  body.cupix-compare-on #legend,
+  body.cupix-compare-on #joystickMove,
+  body.cupix-compare-on #ctrlHint,
+  body.cupix-compare-on #floorNav,
+  body.cupix-compare-on #anomalyAlert,
+  body.cupix-compare-on #pulseLabel,
+  body.cupix-compare-on #heatLegend,
+  body.cupix-compare-on #alignPanel { display: none !important; }
+  /* Detail panel still visible but pushed right so it doesn't sit on the divider */
+  body.cupix-compare-on #detailPanel { left: 52vw !important; }
   #joystickMove { left:24px; } #joystickLook { right:24px; }
   .joystick-knob { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:rgba(45,212,191,.35);border:2px solid var(--cyan);pointer-events:none; }
   .joystick-label { position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:1px; }
@@ -1181,8 +1194,12 @@ function openCupixModal(url, label) {
         <button onclick="closeCupixModal()" style="padding:6px 14px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#fca5a5;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.2px">✕ Close</button>
       </div>
     </div>
-    <iframe src="${url}" style="flex:1;border:0;background:#000" allow="fullscreen; xr-spatial-tracking" allowfullscreen></iframe>
-    <div style="padding:8px 20px;background:rgba(8,12,24,.6);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08)">Cupix shared-view embed · 360° panorama with BIM overlay · ESC or click outside to close</div>
+    <iframe src="${url}"
+            style="flex:1;border:0;background:#000"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock"
+            allow="fullscreen; xr-spatial-tracking"
+            allowfullscreen></iframe>
+    <div style="padding:8px 20px;background:rgba(8,12,24,.6);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08)">Cupix shared-view embed · 360° panorama with BIM overlay · ESC or click outside to close · sandboxed (popups blocked to keep nav in-frame)</div>
   `;
   modal.style.display = 'flex';
   // ESC key closes modal
@@ -1239,10 +1256,17 @@ function toggleCupixCompare() {
   pane.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(8,12,24,.92);color:#cbd5e1;font-family:var(--font);font-size:11px;border-bottom:1px solid rgba(34,211,238,.2);flex-shrink:0">
       <span style="font:600 10px/1 var(--mono);color:#22d3ee;letter-spacing:.5px;text-transform:uppercase">📷 360° walk · Cupix</span>
-      <button onclick="toggleCupixCompare()" style="padding:4px 10px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#fca5a5;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.2px">✕ Exit Compare</button>
+      <div style="display:flex;gap:6px">
+        <a href="${url}" target="_blank" rel="noopener" style="padding:4px 10px;border:1px solid rgba(148,163,184,.3);background:rgba(255,255,255,.04);color:#cbd5e1;text-decoration:none;border-radius:5px;font-size:11px;font-weight:500">Open in new tab ↗</a>
+        <button onclick="toggleCupixCompare()" style="padding:4px 10px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#fca5a5;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.2px">✕ Exit Compare</button>
+      </div>
     </div>
-    <iframe src="${url}" style="flex:1;border:0;background:#000;width:100%" allow="fullscreen; xr-spatial-tracking" allowfullscreen></iframe>
-    <div style="padding:6px 14px;background:rgba(8,12,24,.92);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08);flex-shrink:0">← Cupix 360° here · Your BIM on right side → · navigate each independently</div>
+    <iframe src="${url}"
+            style="flex:1;border:0;background:#000;width:100%"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock"
+            allow="fullscreen; xr-spatial-tracking"
+            allowfullscreen></iframe>
+    <div style="padding:6px 14px;background:rgba(8,12,24,.92);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08);flex-shrink:0">If Cupix shows the project landing instead of the immersive 360°, click "Open in new tab ↗" → in there click the SiteView (360°) button → copy that URL into <span style="color:#67e8f9;font-family:var(--mono)">data/grimes-interior.json → cupix.default_url</span></div>
   `;
   const cmpBtn = document.getElementById('cupixCompareBtn');
   if (isOn) {
