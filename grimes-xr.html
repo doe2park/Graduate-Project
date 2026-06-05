@@ -1196,10 +1196,9 @@ function openCupixModal(url, label) {
     </div>
     <iframe src="${url}"
             style="flex:1;border:0;background:#000"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock"
-            allow="fullscreen; xr-spatial-tracking"
+            allow="fullscreen; xr-spatial-tracking; clipboard-write; autoplay"
             allowfullscreen></iframe>
-    <div style="padding:8px 20px;background:rgba(8,12,24,.6);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08)">Cupix shared-view embed · 360° panorama with BIM overlay · ESC or click outside to close · sandboxed (popups blocked to keep nav in-frame)</div>
+    <div style="padding:8px 20px;background:rgba(8,12,24,.6);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08)">Cupix shared-view embed · 360° panorama with BIM overlay · ESC or click outside to close</div>
   `;
   modal.style.display = 'flex';
   // ESC key closes modal
@@ -1263,10 +1262,9 @@ function toggleCupixCompare() {
     </div>
     <iframe src="${url}"
             style="flex:1;border:0;background:#000;width:100%"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock"
-            allow="fullscreen; xr-spatial-tracking"
+            allow="fullscreen; xr-spatial-tracking; clipboard-write; autoplay"
             allowfullscreen></iframe>
-    <div style="padding:6px 14px;background:rgba(8,12,24,.92);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08);flex-shrink:0">If Cupix shows the project landing instead of the immersive 360°, click "Open in new tab ↗" → in there click the SiteView (360°) button → copy that URL into <span style="color:#67e8f9;font-family:var(--mono)">data/grimes-interior.json → cupix.default_url</span></div>
+    <div style="padding:6px 14px;background:rgba(8,12,24,.92);font-size:10px;color:#64748b;text-align:center;border-top:1px solid rgba(148,163,184,.08);flex-shrink:0">← Cupix 360° here · Your BIM on right side → · navigate each side independently</div>
   `;
   const cmpBtn = document.getElementById('cupixCompareBtn');
   if (isOn) {
