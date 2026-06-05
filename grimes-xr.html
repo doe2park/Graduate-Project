@@ -1552,27 +1552,32 @@ function cupixResetCalib() {
 window.cupixLockHere = cupixLockHere;
 window.cupixResetCalib = cupixResetCalib;
 
-// Test sync — fires a fake Cupix message with a known tm matrix.
-// Identity rotation + translation (5, 3, 5) at tm[12..14].
-// If BIM camera jumps to (5, 3, 5), the entire postMessage → matrix parse →
-// camera update pipeline works. If it doesn't, sync code itself is broken.
+// Test sync — bypasses the message listener entirely and calls
+// applyCupixToBimCamera() directly with a known matrix. Pure pipeline test:
+// if BIM camera lands at (5, 3, 5), camera-update side works; problem
+// (if any) is in the listener / Cupix emit path.
 function cupixTestSync() {
   installCupixMsgListener();
   const fakeTm = [
     1, 0, 0, 0,
     0, 1, 0, 0,
     0, 0, 1, 0,
-    5, 3, 5, 1  // tm[12], tm[13], tm[14] = position (5, 3, 5)
+    5, 3, 5, 1
   ];
-  const fakeMsg = JSON.stringify({
-    responseType: 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE',
-    response: { viewId: 'test', cameraParameters: { viewMode: 'walk', tm: fakeTm } }
-  });
-  window.dispatchEvent(new MessageEvent('message', {
-    origin: 'https://herrero.cupix.works',
-    data: fakeMsg
-  }));
-  console.log('[cupix-test] fired fake msg. BIM camera should now be at (5, 3, 5). Actual:', camera.position);
+  const before = camera.position.clone();
+  _lastCupixTm = fakeTm;
+  _lastCupixPos = { x: fakeTm[12], y: fakeTm[13], z: fakeTm[14] };
+  _cupixMsgCount++;
+  applyCupixToBimCamera(fakeTm);
+  const after = camera.position.clone();
+  renderCupixSyncPanel();
+  const moved = before.distanceTo(after) > 0.01;
+  console.log('[cupix-test] before:', before, '→ after:', after, '· moved?', moved);
+  if (!moved) {
+    console.warn('[cupix-test] camera did NOT move. Possible causes: cupixSync.enabled=false, cupixSync.syncPos=false, OrbitControls overriding, or render loop not honoring the skip gate.');
+  } else {
+    console.log('[cupix-test] ✓ pipeline OK. If real Cupix msgs not arriving, problem is Cupix not emitting in current view mode.');
+  }
 }
 window.cupixTestSync = cupixTestSync;
 
