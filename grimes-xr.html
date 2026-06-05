@@ -1404,6 +1404,13 @@ let _lastCupixTm = null;
 let _lastCupixPos = null;
 let _cupixMsgCount = 0;
 let _cupixMsgListenerInstalled = false;
+// Expose for browser console inspection:
+//   _lastCupixTm  → most recent 4×4 tm array from Cupix
+//   _lastCupixPos → parsed (x,y,z) from tm[12..14]
+//   cupixSync     → calibration state
+Object.defineProperty(window, '_lastCupixTm', { get: () => _lastCupixTm });
+Object.defineProperty(window, '_lastCupixPos', { get: () => _lastCupixPos });
+Object.defineProperty(window, '_cupixMsgCount', { get: () => _cupixMsgCount });
 
 function installCupixMsgListener() {
   if (_cupixMsgListenerInstalled) return;
@@ -1616,12 +1623,15 @@ function applyViewMode() {
   });
 }
 
-// View mode buttons
+// View mode buttons — only fires for buttons with data-mode (System / Temp / Flow / Energy).
+// New action buttons (Compare / 360° / Interior / Pick / Tour etc.) have their own onclick
+// handlers and no data-mode, so we guard here to avoid setting viewMode = undefined which
+// would crash applyViewMode() on the next setInterval tick.
 document.getElementById('topbar').addEventListener('click', e => {
   const btn = e.target.closest('.view-btn');
-  if (!btn) return;
+  if (!btn || !btn.dataset.mode) return;
   viewMode = btn.dataset.mode;
-  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('.view-btn[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
   applyViewMode();
 });
 
