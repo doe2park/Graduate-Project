@@ -1380,14 +1380,15 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v1';
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v2';
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
     syncPos: true,           // sync camera position
     syncRot: false,          // sync camera rotation (off by default — can be disorienting)
-    offset: { x: 0, y: 0, z: 0 },  // added to Cupix position AFTER scale
-    scale: 1.0,              // Cupix unit → BIM unit (try 1.0 first; adjust if scan is in different units)
+    swapYZ: true,            // Cupix is Z-up, Three.js is Y-up → swap Y and Z (typical default)
+    offset: { x: 0, y: 0, z: 0 },  // added to Cupix position AFTER scale + swap
+    scale: 1.0,              // Cupix unit → BIM unit
     yRotation: 0,            // degrees, rotates the position around Y to align orientation
   };
   try {
@@ -1438,7 +1439,8 @@ function installCupixMsgListener() {
       const tm = msg.response?.cameraParameters?.tm;
       if (Array.isArray(tm) && tm.length === 16) {
         _lastCupixTm = tm;
-        _lastCupixPos = { x: tm[12], y: tm[13], z: tm[14] };
+        // Row-major: position is column 4 of each row → tm[3], tm[7], tm[11].
+        _lastCupixPos = { x: tm[3], y: tm[7], z: tm[11] };
         if (cupixSync.enabled && document.body.classList.contains('cupix-compare-on')) {
           applyCupixToBimCamera(tm);
         }
@@ -1451,26 +1453,37 @@ function installCupixMsgListener() {
 }
 
 function applyCupixToBimCamera(tm) {
-  // Extract position from column-major 4×4 matrix
-  let x = tm[12], y = tm[13], z = tm[14];
-  // Scale (handle unit mismatch e.g. mm↔m or ft↔m)
+  // Cupix uses ROW-MAJOR 4×4 — tm[r*4 + c], so translation column is tm[3], tm[7], tm[11].
+  // (Column-major like Three.js would put translation at tm[12], tm[13], tm[14]; we confirmed
+  //  by inspection that Cupix's last 4 entries are always [0,0,0,1] = the bottom row.)
+  let x = tm[3], y = tm[7], z = tm[11];
+  // Cupix is Z-up, Three.js is Y-up → swap Y↔Z (most common case).
+  if (cupixSync.swapYZ) {
+    const tmpY = y; y = z; z = tmpY;
+  }
+  // Scale
   x *= cupixSync.scale; y *= cupixSync.scale; z *= cupixSync.scale;
-  // Y-rotation (azimuth alignment)
+  // Y-rotation (azimuth alignment around vertical)
   if (cupixSync.yRotation) {
     const r = cupixSync.yRotation * Math.PI / 180;
     const c = Math.cos(r), s = Math.sin(r);
     const nx = c*x - s*z, nz = s*x + c*z;
     x = nx; z = nz;
   }
-  // Translation offset
+  // Translation offset (applied in BIM coords)
   x += cupixSync.offset.x; y += cupixSync.offset.y; z += cupixSync.offset.z;
-  // Apply
   if (cupixSync.syncPos) {
     camera.position.set(x, y, z);
   }
   if (cupixSync.syncRot) {
-    // Extract upper-left 3×3 rotation, apply to camera
-    const m = new THREE.Matrix4().fromArray(tm);
+    // Row-major input → use Matrix4.set() (which takes row-major arguments) instead of fromArray.
+    const m = new THREE.Matrix4();
+    m.set(
+      tm[0], tm[1], tm[2], tm[3],
+      tm[4], tm[5], tm[6], tm[7],
+      tm[8], tm[9], tm[10], tm[11],
+      tm[12], tm[13], tm[14], tm[15]
+    );
     const q = new THREE.Quaternion().setFromRotationMatrix(m);
     camera.quaternion.copy(q);
   }
@@ -1515,6 +1528,9 @@ function renderCupixSyncPanel() {
       <label><input type="checkbox" id="csPos" ${cupixSync.syncPos?'checked':''}/> position</label>
       <label><input type="checkbox" id="csRot" ${cupixSync.syncRot?'checked':''}/> rotation</label>
     </div>
+    <div class="row" style="margin-top:4px">
+      <label title="Cupix is Z-up, Three.js is Y-up — swap by default"><input type="checkbox" id="csYZ" ${cupixSync.swapYZ?'checked':''}/> swap Y↔Z (Z-up → Y-up)</label>
+    </div>
     <div class="sec-title">Calibration</div>
     <div class="slider"><span class="k">offset X</span><input type="range" id="csOx" min="-50" max="50" step="0.1" value="${cupixSync.offset.x}"/><span class="v" id="csOxV">${cupixSync.offset.x.toFixed(1)}</span></div>
     <div class="slider"><span class="k">offset Y</span><input type="range" id="csOy" min="-20" max="20" step="0.1" value="${cupixSync.offset.y}"/><span class="v" id="csOyV">${cupixSync.offset.y.toFixed(1)}</span></div>
@@ -1535,6 +1551,7 @@ function renderCupixSyncPanel() {
   wire('csEnabled', el => { cupixSync.enabled = el.checked; saveCupixSync(); });
   wire('csPos',     el => { cupixSync.syncPos = el.checked; saveCupixSync(); });
   wire('csRot',     el => { cupixSync.syncRot = el.checked; saveCupixSync(); });
+  wire('csYZ',      el => { cupixSync.swapYZ = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
   wire('csOx',      el => { cupixSync.offset.x = +el.value; panel.querySelector('#csOxV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
   wire('csOy',      el => { cupixSync.offset.y = +el.value; panel.querySelector('#csOyV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
   wire('csOz',      el => { cupixSync.offset.z = +el.value; panel.querySelector('#csOzV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
@@ -1547,10 +1564,11 @@ function renderCupixSyncPanel() {
 // and compute the offset that would map Cupix's reported position to here.
 function cupixLockHere() {
   if (!_lastCupixPos) { alert('No Cupix camera position received yet. Navigate in Cupix first.'); return; }
-  // Account for current scale + rotation when reversing.
-  let cx = _lastCupixPos.x * cupixSync.scale;
-  let cy = _lastCupixPos.y * cupixSync.scale;
-  let cz = _lastCupixPos.z * cupixSync.scale;
+  // Reverse the same transform stack: start with raw Cupix pos, apply swap → scale → rotation,
+  // then offset = current BIM camera - transformed Cupix pos.
+  let cx = _lastCupixPos.x, cy = _lastCupixPos.y, cz = _lastCupixPos.z;
+  if (cupixSync.swapYZ) { const t = cy; cy = cz; cz = t; }
+  cx *= cupixSync.scale; cy *= cupixSync.scale; cz *= cupixSync.scale;
   if (cupixSync.yRotation) {
     const r = cupixSync.yRotation * Math.PI / 180;
     const c = Math.cos(r), s = Math.sin(r);
@@ -1580,15 +1598,16 @@ window.cupixResetCalib = cupixResetCalib;
 // (if any) is in the listener / Cupix emit path.
 function cupixTestSync() {
   installCupixMsgListener();
+  // Row-major identity rotation + translation (5, 3, 5) — position at tm[3], tm[7], tm[11].
   const fakeTm = [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    5, 3, 5, 1
+    1, 0, 0, 5,
+    0, 1, 0, 3,
+    0, 0, 1, 5,
+    0, 0, 0, 1
   ];
   const before = camera.position.clone();
   _lastCupixTm = fakeTm;
-  _lastCupixPos = { x: fakeTm[12], y: fakeTm[13], z: fakeTm[14] };
+  _lastCupixPos = { x: fakeTm[3], y: fakeTm[7], z: fakeTm[11] };
   _cupixMsgCount++;
   applyCupixToBimCamera(fakeTm);
   const after = camera.position.clone();
