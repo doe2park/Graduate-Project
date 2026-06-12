@@ -1330,7 +1330,7 @@ function toggleCupixCompare() {
         <button onclick="toggleCupixCompare()" style="padding:4px 10px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#fca5a5;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.2px">✕ Exit Compare</button>
       </div>
     </div>
-    <iframe src="${url}"
+    <iframe id="cupixCompareFrame" src="${url}"
             style="flex:1;border:0;background:#000;width:100%"
             allow="fullscreen; xr-spatial-tracking; clipboard-write; autoplay"
             allowfullscreen></iframe>
@@ -1340,9 +1340,11 @@ function toggleCupixCompare() {
   if (isOn) {
     pane.style.display = 'flex';
     if (cmpBtn) { cmpBtn.classList.add('active'); cmpBtn.style.background = 'rgba(34,211,238,.2)'; }
+    startCupixPolling();
   } else {
     pane.style.display = 'none';
     if (cmpBtn) { cmpBtn.classList.remove('active'); cmpBtn.style.background = ''; }
+    stopCupixPolling();
   }
   applyCompareLayout(isOn);
 }
@@ -1414,9 +1416,16 @@ let _cupixMsgListenerInstalled = false;
 
 // Find a 16-number array under a key named 'tm', up to 4 levels deep.
 // Cupix wraps cameraParameters differently per message type — search instead of hard-coding paths.
+// Two shapes exist in the wild (both confirmed in the official siteview-api docs):
+//   tm: [16 floats]                  — spontaneous VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE
+//   tm: { elements: [16 floats] }    — GET_CAMERA_PARAMETERS response (THREE.Matrix4 dump)
 function _findCupixTm(o, depth = 0) {
   if (!o || typeof o !== 'object' || depth > 4) return null;
-  if (Array.isArray(o.tm) && o.tm.length === 16 && o.tm.every(n => typeof n === 'number')) return o.tm;
+  const t = o.tm;
+  if (t) {
+    if (Array.isArray(t) && t.length === 16 && t.every(n => typeof n === 'number')) return t;
+    if (Array.isArray(t.elements) && t.elements.length === 16 && t.elements.every(n => typeof n === 'number')) return t.elements;
+  }
   for (const k in o) {
     const v = o[k];
     if (!v || typeof v !== 'object') continue;
@@ -1426,6 +1435,51 @@ function _findCupixTm(o, depth = 0) {
   }
   return null;
 }
+
+// Normalize a 16-float matrix to ROW-major (position at [3,7,11]).
+// THREE.Matrix4.elements (the { elements } shape) is COLUMN-major — translation at
+// [12,13,14] and bottom row at [3,7,11,15]. Detect by where the translation lives.
+function _normalizeTm(tm) {
+  const colMajor = tm[3] === 0 && tm[7] === 0 && tm[11] === 0 && (tm[12] !== 0 || tm[13] !== 0 || tm[14] !== 0);
+  if (!colMajor) return tm;
+  return [ tm[0], tm[4], tm[8],  tm[12],
+           tm[1], tm[5], tm[9],  tm[13],
+           tm[2], tm[6], tm[10], tm[14],
+           tm[3], tm[7], tm[11], tm[15] ];
+}
+
+/* ── Official CupixWorks SiteView embed API (github.com/cupixrnd/siteview-api, MIT) ──
+   Requests are postMessages of shape { operationType, header:'CUPIXWORKS_API', uuid, timestamp }.
+   We handshake with APP_API_START, then poll GET_CAMERA_PARAMETERS while Compare is on.
+   Polling sidesteps the walk-mode limitation where spontaneous rotation events keep
+   reporting the pano anchor — a poll returns the camera tm even after viewpoint changes. */
+let _cupixApiUuid = 1;
+let _cupixPollTimer = null;
+let _cupixPollCount = 0;
+function cupixApiSend(operationType, operationArgs) {
+  const f = document.getElementById('cupixCompareFrame');
+  const w = f && f.contentWindow;
+  if (!w) return false;
+  const msg = { operationType, header: 'CUPIXWORKS_API', uuid: String(_cupixApiUuid++), timestamp: Date.now() };
+  if (operationArgs) msg.operationArgs = operationArgs;
+  try { w.postMessage(msg, '*'); } catch { return false; }
+  return true;
+}
+function startCupixPolling() {
+  stopCupixPolling();
+  installCupixMsgListener();
+  cupixApiSend('APP_API_START');
+  _cupixPollTimer = setInterval(() => {
+    if (!document.body.classList.contains('cupix-compare-on')) { stopCupixPolling(); return; }
+    // Re-handshake until the first tm arrives (iframe app may not have been ready yet).
+    if (_cupixTmMsgCount === 0) cupixApiSend('APP_API_START');
+    if (cupixApiSend('GET_CAMERA_PARAMETERS')) { _cupixPollCount++; renderCupixSyncPanel(); }
+  }, 500);
+}
+function stopCupixPolling() {
+  if (_cupixPollTimer) { clearInterval(_cupixPollTimer); _cupixPollTimer = null; }
+}
+window.cupixApiSend = cupixApiSend;  // console access for experimenting (e.g. GET_PANO_ALL)
 Object.defineProperty(window, '_lastCupixTm', { get: () => _lastCupixTm });
 Object.defineProperty(window, '_lastCupixPos', { get: () => _lastCupixPos });
 Object.defineProperty(window, '_cupixMsgCount', { get: () => _cupixMsgCount });
@@ -1458,8 +1512,9 @@ function installCupixMsgListener() {
     _cupixMsgTypes[type] = (_cupixMsgTypes[type] || 0) + 1;
     // Handle camera updates — accept a 16-float `tm` ANYWHERE in the message (recursive
     // search), so viewpoint-change / pano-move messages with a different shape still work.
-    const tm = _findCupixTm(msg);
+    let tm = _findCupixTm(msg);
     if (Array.isArray(tm) && tm.length === 16) {
+      tm = _normalizeTm(tm);
       _cupixTmMsgCount++;
       _lastCupixTm = tm;
       // Row-major: position is column 4 of each row → tm[3], tm[7], tm[11].
@@ -1555,31 +1610,46 @@ function toggleCupixMsgDebug(show) {
   renderCupixSyncPanel();
 }
 
-function renderCupixSyncPanel() {
+function renderCupixSyncPanel(rebuild = false) {
   const panel = document.getElementById('cupixSyncPanel');
   if (!panel) return;
+  if (rebuild || !panel.dataset.built) { buildCupixSyncPanel(panel); panel.dataset.built = '1'; }
+  // Update ONLY the stat readouts in place — a full innerHTML rebuild on every message
+  // (~4/sec) wipes checkbox clicks and slider drags mid-interaction.
+  const set = (id, v) => { const el = panel.querySelector('#'+id); if (el) el.textContent = v; };
+  set('csStatMsgs', _cupixMsgCount);
+  set('csStatTm', _cupixTmMsgCount);
+  set('csStatApply', _cupixApplyCount);
+  set('csStatPoll', _cupixPollTimer ? 'on · ' + _cupixPollCount : 'off');
+  const skipRow = panel.querySelector('#csStatSkipRow');
+  if (skipRow) { skipRow.style.display = _cupixSkipReason ? '' : 'none'; set('csStatSkip', _cupixSkipReason); }
   const pos = _lastCupixPos;
-  const posStr = pos ? `(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})` : '—';
+  set('csStatPos', pos ? `(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})` : '—');
   const bim = camera.position;
-  const bimStr = `(${bim.x.toFixed(2)}, ${bim.y.toFixed(2)}, ${bim.z.toFixed(2)})`;
-  // Show top message types so we can see what Cupix actually emits
-  const typeRows = Object.entries(_cupixMsgTypes)
+  set('csStatBim', `(${bim.x.toFixed(2)}, ${bim.y.toFixed(2)}, ${bim.z.toFixed(2)})`);
+  const tr = panel.querySelector('#csTypeRows');
+  if (tr) tr.innerHTML = Object.entries(_cupixMsgTypes)
     .sort((a,b) => b[1] - a[1])
     .slice(0, 3)
     .map(([t, n]) => `<div class="stat" style="font-size:8.5px"><span class="k" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px">${t}</span><span class="v">${n}</span></div>`)
     .join('');
+}
+
+function buildCupixSyncPanel(panel) {
   panel.innerHTML = `
     <div class="hdr">
       <span>🔗 Cupix → BIM sync</span>
       <button onclick="document.getElementById('cupixSyncPanel').classList.remove('show')">✕</button>
     </div>
-    <div class="stat"><span class="k">msgs received</span><span class="v">${_cupixMsgCount}</span></div>
-    <div class="stat"><span class="k">with camera tm</span><span class="v">${_cupixTmMsgCount}</span></div>
-    <div class="stat"><span class="k">applied to BIM</span><span class="v">${_cupixApplyCount}</span></div>
-    ${_cupixSkipReason ? `<div class="stat"><span class="k" style="color:#fbbf24">⚠ not applying</span><span class="v" style="color:#fbbf24">${_cupixSkipReason}</span></div>` : ''}
-    <div class="stat"><span class="k">cupix pos</span><span class="v">${posStr}</span></div>
-    <div class="stat"><span class="k">bim camera</span><span class="v">${bimStr}</span></div>
-    ${typeRows ? '<div class="sec-title" style="margin:6px 0 2px">Top message types</div>'+typeRows : ''}
+    <div class="stat"><span class="k">msgs received</span><span class="v" id="csStatMsgs">0</span></div>
+    <div class="stat"><span class="k">with camera tm</span><span class="v" id="csStatTm">0</span></div>
+    <div class="stat"><span class="k">applied to BIM</span><span class="v" id="csStatApply">0</span></div>
+    <div class="stat"><span class="k">camera poll</span><span class="v" id="csStatPoll">off</span></div>
+    <div class="stat" id="csStatSkipRow" style="display:none"><span class="k" style="color:#fbbf24">⚠ not applying</span><span class="v" id="csStatSkip" style="color:#fbbf24"></span></div>
+    <div class="stat"><span class="k">cupix pos</span><span class="v" id="csStatPos">—</span></div>
+    <div class="stat"><span class="k">bim camera</span><span class="v" id="csStatBim">—</span></div>
+    <div class="sec-title" style="margin:6px 0 2px">Top message types</div>
+    <div id="csTypeRows"></div>
     <div class="row" style="margin-top:8px">
       <label><input type="checkbox" id="csEnabled" ${cupixSync.enabled?'checked':''}/> auto-sync</label>
       <label><input type="checkbox" id="csPos" ${cupixSync.syncPos?'checked':''}/> position</label>
@@ -1655,7 +1725,7 @@ function cupixLockHere() {
   cupixSync.offset.y = camera.position.y - cy;
   cupixSync.offset.z = camera.position.z - cz;
   saveCupixSync();
-  renderCupixSyncPanel();
+  renderCupixSyncPanel(true);  // rebuild so sliders show the new yaw/offset
   console.log('[cupix-lock] yaw=' + cupixSync.yRotation + '° offset=', cupixSync.offset);
 }
 function cupixResetCalib() {
@@ -1663,7 +1733,7 @@ function cupixResetCalib() {
   cupixSync.scale = 1.0;
   cupixSync.yRotation = 0;
   saveCupixSync();
-  renderCupixSyncPanel();
+  renderCupixSyncPanel(true);
   if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm);
 }
 window.cupixLockHere = cupixLockHere;
