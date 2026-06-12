@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v8';  // v8: verified preset is the default; no auto-refit
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v9';  // v9: proper-rotation preset + two-step lock
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1806,10 +1806,16 @@ function _applyCalib(c) {
 // camera landed in the right corridor and tracked Cupix navigation. Treat it as ground
 // truth — automatic re-fitting kept regressing, so ⟳ Align simply restores this preset
 // and 📌 Lock here remains the way to fine-tune from a known-good state.
+// Proper-rotation (flipZ) variant of the verified preset: same position at the verified
+// spot — cupix (18.88,−25.77,1.48) still maps to bim ≈ (−8.4, 9.0, 4.3) — but TURN
+// DIRECTION now matches (mirror conversion reverses rotation sense, which made manual
+// aiming impossible). yaw 180−82.5, offset recomputed for the flipped Z.
 const CUPIX_PRESET = {
-  swapYZ: true, flipZ: false, scale: 0.3048, yaw: 82.5,
-  offset: { x: -16.9, y: 8.5, z: 9.0 },
+  swapYZ: true, flipZ: true, scale: 0.3048, yaw: 97.5,
+  offset: { x: -15.4, y: 8.5, z: 11.0 },
 };
+// Previous mirror-based preset, kept for console rollback:
+// window.cupixSmartCalibrate.MIRROR = {swapYZ:true,flipZ:false,scale:0.3048,yaw:82.5,offset:{x:-16.9,y:8.5,z:9.0}}
 function cupixSmartCalibrate() {
   _applyCalib(Object.assign({}, CUPIX_PRESET, { offset: Object.assign({}, CUPIX_PRESET.offset) }));
   console.log('[align] verified preset restored:', JSON.stringify(CUPIX_PRESET));
@@ -2102,11 +2108,13 @@ function buildCupixSyncPanel(panel) {
     <div class="slider"><span class="k">scale</span><input type="range" id="csSc" min="0.1" max="10" step="0.05" value="${cupixSync.scale}"/><span class="v" id="csScV">${cupixSync.scale.toFixed(2)}</span></div>
     <div class="slider"><span class="k">Y rotate °</span><input type="range" id="csYr" min="-180" max="180" step="1" value="${cupixSync.yRotation}"/><span class="v" id="csYrV">${cupixSync.yRotation}°</span></div>
     <div class="row" style="margin-top:8px;gap:4px">
-      <button onclick="cupixSmartCalibrate()" title="Align to the Cupix BIM coordinate system (same source model) — analytic transform, verified against pano positions">⟳ Align</button>
-      <button onclick="cupixLockHere()" title="Fine-tune: stand in Cupix, fly BIM camera to the same spot facing the same way, then click">📌 Lock here</button>
+      <button onclick="cupixSmartCalibrate()" title="Restore the verified calibration preset">⟳ Align</button>
+      <button onclick="cupixLockHere()" style="${_lockArmed ? 'border-color:rgba(74,222,128,.5);color:#4ade80;background:rgba(74,222,128,.12)' : ''}" title="${_lockArmed ? 'Sync is FROZEN — aim the BIM at exactly what Cupix shows, then click to confirm' : 'Step 1: freezes sync so you can aim the BIM freely. Step 2: confirm to calibrate from your aim'}">${_lockArmed ? '✓ Confirm lock' : '📌 Lock here'}</button>
       <button onclick="cupixResetCalib()" title="Clear calibration">↺ Reset</button>
     </div>
-    <div class="hint">⟳ Align matches the BIM-native Cupix coordinates automatically. If anything is still off, stand in Cupix → fly BIM camera to the same spot facing the same way → 📌 Lock here.</div>
+    <div class="hint">${_lockArmed
+      ? 'Sync frozen. Aim the BIM camera (drag / WASD) at exactly what the Cupix side shows — same spot, same direction — then click ✓ Confirm lock.'
+      : '⟳ Align restores the verified preset. To fine-tune: stand somewhere recognizable in Cupix → 📌 Lock here (freezes sync) → aim the BIM to match → ✓ Confirm.'}</div>
   `;
   // Wire up controls
   const wire = (id, fn) => { const el = panel.querySelector('#'+id); if (el) el.oninput = () => fn(el); };
@@ -2129,8 +2137,21 @@ function buildCupixSyncPanel(panel) {
 //            camera's view direction (so "where you look" matches)
 //   offset — current BIM camera − yaw-rotated/scaled Cupix position
 // Scale is left alone (both systems are in meters; tweak slider only if needed).
+let _lockArmed = false;
 function cupixLockHere() {
   if (!_lastCupixPos) { alert('No Cupix camera position received yet. Navigate in Cupix first.'); return; }
+  // TWO-STEP: with auto-sync running, both views rotate together, so the user can never
+  // aim the BIM independently. Step 1 (📌 Lock): FREEZE sync so the BIM is free to aim.
+  // Step 2 (✓ Confirm): solve yaw+offset from the aimed pose, then resume sync.
+  if (!_lockArmed) {
+    _lockArmed = true;
+    cupixSync.enabled = false;  // freeze — user now aims the BIM at what Cupix shows
+    saveCupixSync();
+    renderCupixSyncPanel(true);
+    return;
+  }
+  _lockArmed = false;
+  cupixSync.enabled = true;
   // 1) Solve yaw from view directions (needs the rotation part of tm).
   if (_lastCupixTm) {
     const qc = cupixRotationToBim(_lastCupixTm, /*applyYaw*/ false);
