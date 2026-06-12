@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v10';  // v10: level-based metric calibration
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v11';  // v11: camera-convention auto-detection
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1391,6 +1391,8 @@ const cupixSync = (() => {
     swapYZ: true,            // Cupix is Z-up, Three.js is Y-up → swap Y and Z
     flipZ: false,            // negate Z after swap → proper rotation (Rx-90) instead of mirror
     flipFwd: false,          // 180° flip of camera forward — toggle if synced view looks BACKWARD
+    camFix: 'none',          // camera-local convention fix (auto-detected): Cupix's camera
+                             // matrix may define forward/up on different axes than Three.js
     offset: { x: 0, y: 0, z: 0 },  // added to Cupix position AFTER scale + swap
     scale: 1.0,              // Cupix unit → BIM unit
     yRotation: 0,            // degrees, rotates the position around Y to align orientation
@@ -1895,6 +1897,8 @@ function cupixSmartCalibrate() {
     yaw: Math.round((((best.yaw + 540) % 360) - 180) * 10) / 10,
     offset: { x: Math.round(best.ox * 100) / 100, y: Math.round(bestFloor.oy * 100) / 100, z: Math.round(best.oz * 100) / 100 },
   });
+  // Finally, fix the camera-local convention (the "view is pitched 90°" symptom).
+  cupixDetectCamFix();
 }
 window.cupixSmartCalibrate = cupixSmartCalibrate;
 
@@ -1973,6 +1977,8 @@ function installCupixMsgListener() {
       tm = _normalizeTm(tm);
       _cupixTmMsgCount++;
       _lastCupixTm = tm;
+      _cupixTmHist.push(tm);
+      if (_cupixTmHist.length > 60) _cupixTmHist.shift();
       // Row-major: position is column 4 of each row → tm[3], tm[7], tm[11].
       _lastCupixPos = { x: tm[3], y: tm[7], z: tm[11] };
       if (!cupixSync.enabled) {
@@ -2094,6 +2100,46 @@ function applyCupixToBimCamera(tm, force = false) {
 //   swapYZ → conjugate by S (S swaps Y/Z; S·R·S is a proper rotation since det cancels)
 //   flipFwd → post-multiply 180° about local X (fixes cameras that report +Z forward)
 //   yaw    → pre-multiply the calibration Y-rotation (world-space azimuth alignment)
+// Camera-local convention candidates — Cupix's tm may define the camera's forward/up
+// axes differently from Three.js (-Z fwd, +Y up). The right one is auto-detected by
+// cupixDetectCamFix() from live samples: the fix that keeps the camera's up vector
+// pointing at the sky (people look around mostly level) wins.
+const _camFixMats = {
+  none:  () => new THREE.Matrix4(),
+  rx90:  () => new THREE.Matrix4().makeRotationX(Math.PI / 2),
+  rxm90: () => new THREE.Matrix4().makeRotationX(-Math.PI / 2),
+  rx180: () => new THREE.Matrix4().makeRotationX(Math.PI),
+  rz90:  () => new THREE.Matrix4().makeRotationZ(Math.PI / 2),
+  rzm90: () => new THREE.Matrix4().makeRotationZ(-Math.PI / 2),
+};
+let _cupixTmHist = [];
+function cupixDetectCamFix() {
+  if (_cupixTmHist.length < 10) {
+    console.warn('[camfix] not enough rotation samples — look around in Cupix, then ⟳ Align again');
+    return;
+  }
+  const savedFix = cupixSync.camFix;
+  let best = { score: -1e9, key: savedFix || 'none' };
+  for (const key of Object.keys(_camFixMats)) {
+    cupixSync.camFix = key;
+    let up = 0, fwdY = 0;
+    for (const tm of _cupixTmHist) {
+      const q = cupixRotationToBim(tm, false);
+      up += new THREE.Vector3(0, 1, 0).applyQuaternion(q).y;
+      fwdY += Math.abs(new THREE.Vector3(0, 0, -1).applyQuaternion(q).y);
+    }
+    const n = _cupixTmHist.length;
+    const sc = up / n - 0.5 * (fwdY / n);
+    console.log('[camfix]', key, '· up', (up / n).toFixed(2), '· |fwd.y|', (fwdY / n).toFixed(2), '· score', sc.toFixed(2));
+    if (sc > best.score) best = { score: sc, key };
+  }
+  cupixSync.camFix = best.key;
+  saveCupixSync();
+  console.log('[camfix] ✓ selected', best.key);
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
+}
+window.cupixDetectCamFix = cupixDetectCamFix;
+
 function cupixRotationToBim(tm, applyYaw) {
   const m = new THREE.Matrix4();
   // Row-major input → Matrix4.set() takes row-major arguments. Zero out translation.
@@ -2117,6 +2163,9 @@ function cupixRotationToBim(tm, applyYaw) {
   }
   if (cupixSync.flipFwd) {
     m.multiply(new THREE.Matrix4().makeRotationX(Math.PI));
+  }
+  if (cupixSync.camFix && cupixSync.camFix !== 'none' && _camFixMats[cupixSync.camFix]) {
+    m.multiply(_camFixMats[cupixSync.camFix]());
   }
   if (applyYaw && cupixSync.yRotation) {
     m.premultiply(new THREE.Matrix4().makeRotationY(cupixSync.yRotation * Math.PI / 180));
