@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v5';  // v5: analytic BIM-native alignment (flipZ era)
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v6';  // v6: fit searches scale+handedness (scan-local meter coords confirmed)
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1663,8 +1663,6 @@ function cupixFitAlign() {
     if (!cupixApiSend('GET_PANO_ALL')) alert('Open 🪞 Compare first (Cupix iframe not loaded).');
     return;
   }
-  const pts = _cupixPanos.map(p => cupixPreToBim(p.position[0], p.position[1], p.position[2]));
-  const cp = pts.reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(pts.length);
   const bbox = new THREE.Box3();
   allMeshes.forEach(m => bbox.expandByObject(m));
   if (buildingLoaded && buildingModel) bbox.expandByObject(buildingModel);
@@ -1672,20 +1670,35 @@ function cupixFitAlign() {
   const cb = bbox.getCenter(new THREE.Vector3());
   const cell = 2.0;
   const occ = _bimOccupancy(cell);
-  let best = { score: -1, yaw: 0, ox: 0, oy: 0, oz: 0 };
-  // Coarse: every 5° of yaw × centroid-matched offset ± 4m
-  for (let yaw = 0; yaw < 360; yaw += 5) {
-    const r = yaw * Math.PI / 180, c0 = Math.cos(r), s0 = Math.sin(r);
-    const bx = cb.x - (c0 * cp.x + s0 * cp.z);
-    const bz = cb.z - (-s0 * cp.x + c0 * cp.z);
-    const by = cb.y - cp.y;
-    for (let dx = -4; dx <= 4; dx += 2)
-      for (let dz = -4; dz <= 4; dz += 2)
-        for (let dy = -4; dy <= 4; dy += 2) {
-          const sc = _fitScore(pts, occ, cell, yaw, bx + dx, by + dy, bz + dz);
-          if (sc > best.score) best = { score: sc, yaw, ox: bx + dx, oy: by + dy, oz: bz + dz };
-        }
+  // Scale and handedness are SEARCH VARIABLES, not assumptions: Cupix may report
+  // scan-local meters (z≈1.5 eye height) or project feet depending on the project.
+  // Subsample panos for the coarse stage to keep the 4-variant search fast.
+  const mkRaw = flip => _cupixPanos.map(p =>
+    new THREE.Vector3(p.position[0], p.position[2], flip ? -p.position[1] : p.position[1]));
+  let best = { score: -1, yaw: 0, ox: 0, oy: 0, oz: 0, scale: 1, flip: true };
+  for (const flip of [true, false]) {
+    const raw = mkRaw(flip);
+    for (const s of [1.0, 0.3048]) {
+      const all = raw.map(v => v.clone().multiplyScalar(s));
+      const pts = all.length > 300 ? all.filter((_, i) => i % Math.ceil(all.length / 300) === 0) : all;
+      const cp = pts.reduce((a, v) => a.clone().add(v), new THREE.Vector3()).divideScalar(pts.length);
+      // Coarse: every 5° of yaw × centroid-matched offset ± 4m
+      for (let yaw = 0; yaw < 360; yaw += 5) {
+        const r = yaw * Math.PI / 180, c0 = Math.cos(r), s0 = Math.sin(r);
+        const bx = cb.x - (c0 * cp.x + s0 * cp.z);
+        const bz = cb.z - (-s0 * cp.x + c0 * cp.z);
+        const by = cb.y - cp.y;
+        for (let dx = -4; dx <= 4; dx += 2)
+          for (let dz = -4; dz <= 4; dz += 2)
+            for (let dy = -10; dy <= 10; dy += 2) {  // wide: a single-floor scan's centroid sits far from the building's mid-height
+              const sc = _fitScore(pts, occ, cell, yaw, bx + dx, by + dy, bz + dz);
+              if (sc > best.score) best = { score: sc, yaw, ox: bx + dx, oy: by + dy, oz: bz + dz, scale: s, flip };
+            }
+      }
+    }
   }
+  console.log('[fit-align] coarse winner: scale', best.scale, 'flipZ', best.flip, 'yaw', best.yaw, 'score', (best.score * 100).toFixed(0) + '%');
+  const pts = mkRaw(best.flip).map(v => v.multiplyScalar(best.scale));
   // Fine: ±4° / ±1.5m around the coarse winner
   const b0 = Object.assign({}, best);
   for (let yaw = b0.yaw - 4; yaw <= b0.yaw + 4; yaw += 1)
@@ -1719,6 +1732,9 @@ function cupixFitAlign() {
     if (best.score <= b1.score + 1e-9) break;  // converged
   }
   best.score = _fitScore(pts, occ, cell, best.yaw, best.ox, best.oy, best.oz);  // report as plain hit-rate
+  cupixSync.swapYZ = true;
+  cupixSync.flipZ = best.flip;
+  cupixSync.scale = best.scale;
   cupixSync.yRotation = Math.round((((best.yaw + 540) % 360) - 180) * 10) / 10;
   cupixSync.offset.x = Math.round(best.ox * 100) / 100;
   cupixSync.offset.y = Math.round(best.oy * 100) / 100;
