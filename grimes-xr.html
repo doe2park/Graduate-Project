@@ -1405,14 +1405,35 @@ window.cupixSync = cupixSync;  // expose for console tinkering
 let _lastCupixTm = null;
 let _lastCupixPos = null;
 let _cupixMsgCount = 0;
+let _cupixTmMsgCount = 0;   // messages that actually carried a 16-float tm
+let _cupixApplyCount = 0;   // how many times we drove the BIM camera
+let _cupixSkipReason = '';  // why the last tm was NOT applied ('' = applied)
 let _cupixMsgTypes = {};  // { 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE': 42, ... }
 let _cupixLastRaw = null;  // last raw data, for inspection
 let _cupixMsgListenerInstalled = false;
+
+// Find a 16-number array under a key named 'tm', up to 4 levels deep.
+// Cupix wraps cameraParameters differently per message type — search instead of hard-coding paths.
+function _findCupixTm(o, depth = 0) {
+  if (!o || typeof o !== 'object' || depth > 4) return null;
+  if (Array.isArray(o.tm) && o.tm.length === 16 && o.tm.every(n => typeof n === 'number')) return o.tm;
+  for (const k in o) {
+    const v = o[k];
+    if (!v || typeof v !== 'object') continue;
+    if (Array.isArray(v) && v.length > 64) continue;  // skip big data arrays
+    const r = _findCupixTm(v, depth + 1);
+    if (r) return r;
+  }
+  return null;
+}
 Object.defineProperty(window, '_lastCupixTm', { get: () => _lastCupixTm });
 Object.defineProperty(window, '_lastCupixPos', { get: () => _lastCupixPos });
 Object.defineProperty(window, '_cupixMsgCount', { get: () => _cupixMsgCount });
 Object.defineProperty(window, '_cupixMsgTypes', { get: () => _cupixMsgTypes });
 Object.defineProperty(window, '_cupixLastRaw', { get: () => _cupixLastRaw });
+Object.defineProperty(window, '_cupixTmMsgCount', { get: () => _cupixTmMsgCount });
+Object.defineProperty(window, '_cupixApplyCount', { get: () => _cupixApplyCount });
+Object.defineProperty(window, '_cupixSkipReason', { get: () => _cupixSkipReason });
 
 function installCupixMsgListener() {
   if (_cupixMsgListenerInstalled) return;
@@ -1435,16 +1456,22 @@ function installCupixMsgListener() {
     // Track type histogram
     const type = msg.responseType || msg.type || msg.eventType || msg._raw?.slice?.(0,40) || 'unknown';
     _cupixMsgTypes[type] = (_cupixMsgTypes[type] || 0) + 1;
-    // Handle camera updates — accept tm from ANY message type that carries cameraParameters.
-    // (Rotation messages are VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE; viewpoint-change /
-    //  pano-move messages may use a different responseType but carry the same tm shape.)
-    const tm = msg.response?.cameraParameters?.tm || msg.cameraParameters?.tm;
+    // Handle camera updates — accept a 16-float `tm` ANYWHERE in the message (recursive
+    // search), so viewpoint-change / pano-move messages with a different shape still work.
+    const tm = _findCupixTm(msg);
     if (Array.isArray(tm) && tm.length === 16) {
+      _cupixTmMsgCount++;
       _lastCupixTm = tm;
       // Row-major: position is column 4 of each row → tm[3], tm[7], tm[11].
       _lastCupixPos = { x: tm[3], y: tm[7], z: tm[11] };
-      if (cupixSync.enabled && document.body.classList.contains('cupix-compare-on')) {
+      if (!cupixSync.enabled) {
+        _cupixSkipReason = 'auto-sync unchecked';
+      } else if (!document.body.classList.contains('cupix-compare-on')) {
+        _cupixSkipReason = 'Compare mode is OFF — sync only drives BIM in 🪞 Compare';
+      } else {
         applyCupixToBimCamera(tm);
+        _cupixApplyCount++;
+        _cupixSkipReason = '';
       }
     }
     renderCupixSyncPanel();
@@ -1547,6 +1574,9 @@ function renderCupixSyncPanel() {
       <button onclick="document.getElementById('cupixSyncPanel').classList.remove('show')">✕</button>
     </div>
     <div class="stat"><span class="k">msgs received</span><span class="v">${_cupixMsgCount}</span></div>
+    <div class="stat"><span class="k">with camera tm</span><span class="v">${_cupixTmMsgCount}</span></div>
+    <div class="stat"><span class="k">applied to BIM</span><span class="v">${_cupixApplyCount}</span></div>
+    ${_cupixSkipReason ? `<div class="stat"><span class="k" style="color:#fbbf24">⚠ not applying</span><span class="v" style="color:#fbbf24">${_cupixSkipReason}</span></div>` : ''}
     <div class="stat"><span class="k">cupix pos</span><span class="v">${posStr}</span></div>
     <div class="stat"><span class="k">bim camera</span><span class="v">${bimStr}</span></div>
     ${typeRows ? '<div class="sec-title" style="margin:6px 0 2px">Top message types</div>'+typeRows : ''}
