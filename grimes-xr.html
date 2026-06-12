@@ -1474,6 +1474,9 @@ function startCupixPolling() {
     if (!document.body.classList.contains('cupix-compare-on')) { stopCupixPolling(); return; }
     // Re-handshake until the first tm arrives (iframe app may not have been ready yet).
     if (_cupixTmMsgCount === 0) cupixApiSend('APP_API_START');
+    // Re-request the pano list while anything is waiting on it — a single early request
+    // can race the APP_API_START handshake and get silently dropped.
+    if (!_cupixPanos && (_smartPending || _fitPending || _panoDotsPending || _autoAlignPending)) cupixApiSend('GET_PANO_ALL');
     if (cupixApiSend('GET_CAMERA_PARAMETERS')) { _cupixPollCount++; renderCupixSyncPanel(); }
     // Self-calibrate: if the API is alive and no calibration exists yet, run the
     // analytic BIM-native alignment once (occupancy search only as its fallback).
@@ -1986,6 +1989,11 @@ function applyCupixToBimCamera(tm, force = false) {
   if (!force && cupixUserOverride()) return;  // user is hand-driving the BIM — don't fight them
   // Cupix uses ROW-MAJOR 4×4 — tm[r*4 + c], so translation column is tm[3], tm[7], tm[11].
   const p = cupixPointToBim(tm[3], tm[7], tm[11]);
+  if (!isFinite(p.x + p.y + p.z)) {
+    _cupixSkipReason = 'calibration produced NaN — click ⟳ Align';
+    renderCupixSyncPanel();
+    return false;
+  }
   if (cupixSync.syncPos) {
     // Void guard: never park the camera in empty space far outside the model —
     // a bad calibration must show a panel warning, not a black screen.
@@ -3894,6 +3902,14 @@ function vrInput(){const session=renderer.xr.getSession();if(!session)return;con
 /* ══════════════════════════════════════════ RENDER ══════════════════════════════════════════ */
 let xrFrame = 0;
 renderer.setAnimationLoop(()=>{
+  // NaN recovery: if anything ever corrupts the camera, reset instead of rendering nothing.
+  if (!isFinite(camera.position.x + camera.position.y + camera.position.z) ||
+      !isFinite(camera.quaternion.x + camera.quaternion.y + camera.quaternion.z + camera.quaternion.w)) {
+    console.warn('[xr] camera state NaN — resetting view');
+    camera.position.set(0, 6, 0);
+    camera.quaternion.set(0, 0, 0, 1);
+    orbitControls.target.set(0, 6, -5);
+  }
   if(renderer.xr.isPresenting){ vrInput(); if(++xrFrame % 5 === 0) xrContinuousRaycast(); }
   else{
     updateFP();
