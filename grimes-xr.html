@@ -1574,6 +1574,7 @@ function _applyAutoAlign() {
   cupixSync.offset.z = _autoAlignCb.z - rz;
   saveCupixSync();
   renderCupixSyncPanel(true);
+  refreshCupixPanoDots();
   if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
 }
 
@@ -1584,6 +1585,45 @@ function cupixNextOrientation() {
 }
 window.cupixAutoAlign = cupixAutoAlign;
 window.cupixNextOrientation = cupixNextOrientation;
+
+/* ── PANO DOT OVERLAY — visual proof the calibration is right ──
+   Renders every Cupix pano position as a cyan dot inside the BIM, plus a magenta arrow
+   at the LIVE Cupix camera pose. Orbit the model from outside: if the dots trace the
+   building's corridors and the arrow walks along them as you move in Cupix, the
+   alignment is correct. If the dot cloud sits rotated/offset, it shows exactly how. */
+let _panoDotsGroup = null;
+let _cupixCamArrow = null;
+let _panoDotsPending = false;
+function cupixTogglePanoDots() {
+  if (_panoDotsGroup) {
+    scene.remove(_panoDotsGroup);
+    _panoDotsGroup = null; _cupixCamArrow = null;
+    return;
+  }
+  if (!_cupixPanos) {
+    _panoDotsPending = true;
+    if (!cupixApiSend('GET_PANO_ALL')) alert('Open 🪞 Compare first (Cupix iframe not loaded).');
+    return;  // listener re-invokes when the pano list arrives
+  }
+  _panoDotsGroup = new THREE.Group();
+  const geo = new THREE.SphereGeometry(0.18, 8, 8);
+  const mat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.85, depthWrite: false });
+  _cupixPanos.forEach(p => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(cupixPointToBim(p.position[0], p.position[1], p.position[2]));
+    _panoDotsGroup.add(m);
+  });
+  _cupixCamArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(), 2.2, 0xf472b6, 0.7, 0.35);
+  if (_lastCupixPos) _cupixCamArrow.position.copy(cupixPointToBim(_lastCupixPos.x, _lastCupixPos.y, _lastCupixPos.z));
+  _panoDotsGroup.add(_cupixCamArrow);
+  scene.add(_panoDotsGroup);
+}
+// Rebuild dots after any calibration change so they always reflect the live transform.
+function refreshCupixPanoDots() {
+  if (!_panoDotsGroup) return;
+  cupixTogglePanoDots(); cupixTogglePanoDots();
+}
+window.cupixTogglePanoDots = cupixTogglePanoDots;
 Object.defineProperty(window, '_lastCupixTm', { get: () => _lastCupixTm });
 Object.defineProperty(window, '_lastCupixPos', { get: () => _lastCupixPos });
 Object.defineProperty(window, '_cupixMsgCount', { get: () => _cupixMsgCount });
@@ -1632,13 +1672,20 @@ function installCupixMsgListener() {
         _cupixApplyCount++;
         _cupixSkipReason = '';
       }
+      // Live Cupix pose arrow (independent of camera sync, so it moves even during override)
+      if (_cupixCamArrow) {
+        _cupixCamArrow.position.copy(cupixPointToBim(tm[3], tm[7], tm[11]));
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cupixRotationToBim(tm, true));
+        _cupixCamArrow.setDirection(fwd);
+      }
     }
-    // Capture pano list (GET_PANO_ALL response) for auto-align
+    // Capture pano list (GET_PANO_ALL response) for auto-align / dot overlay
     const panos = _findCupixPanos(msg);
     if (panos) {
       _cupixPanos = panos;
       console.log('[cupix-sync] received', panos.length, 'pano positions');
       if (_autoAlignPending) { _autoAlignPending = false; cupixAutoAlign(); }
+      if (_panoDotsPending) { _panoDotsPending = false; cupixTogglePanoDots(); }
     }
     renderCupixSyncPanel();
   });
@@ -1657,30 +1704,29 @@ window.addEventListener('keydown', e => {
   if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowLeft','ArrowRight'].includes(e.code)) _bumpCupixUserDrive();
 });
 
+// The ONE place a Cupix world point becomes a BIM point: swap → scale → yaw → offset.
+// Used by camera sync, Lock-here, and the pano-dot overlay so they can never disagree.
+function cupixPointToBim(px, py, pz) {
+  let x = px, y = py, z = pz;
+  if (cupixSync.swapYZ) { const t = y; y = z; z = t; }
+  x *= cupixSync.scale; y *= cupixSync.scale; z *= cupixSync.scale;
+  if (cupixSync.yRotation) {
+    const r = cupixSync.yRotation * Math.PI / 180;
+    const c = Math.cos(r), s = Math.sin(r);
+    const nx = c*x + s*z, nz = -s*x + c*z;  // Three.js Ry(θ) convention
+    x = nx; z = nz;
+  }
+  return new THREE.Vector3(x + cupixSync.offset.x, y + cupixSync.offset.y, z + cupixSync.offset.z);
+}
+
 function applyCupixToBimCamera(tm, force = false) {
   if (!force && cupixUserOverride()) return;  // user is hand-driving the BIM — don't fight them
   // Cupix uses ROW-MAJOR 4×4 — tm[r*4 + c], so translation column is tm[3], tm[7], tm[11].
   // (Column-major like Three.js would put translation at tm[12], tm[13], tm[14]; we confirmed
   //  by inspection that Cupix's last 4 entries are always [0,0,0,1] = the bottom row.)
-  let x = tm[3], y = tm[7], z = tm[11];
-  // Cupix is Z-up, Three.js is Y-up → swap Y↔Z (most common case).
-  if (cupixSync.swapYZ) {
-    const tmpY = y; y = z; z = tmpY;
-  }
-  // Scale
-  x *= cupixSync.scale; y *= cupixSync.scale; z *= cupixSync.scale;
-  // Y-rotation (azimuth alignment around vertical) — Three.js Ry(θ) convention,
-  // MUST match cupixRotationToBim's makeRotationY and cupixLockHere's solve.
-  if (cupixSync.yRotation) {
-    const r = cupixSync.yRotation * Math.PI / 180;
-    const c = Math.cos(r), s = Math.sin(r);
-    const nx = c*x + s*z, nz = -s*x + c*z;
-    x = nx; z = nz;
-  }
-  // Translation offset (applied in BIM coords)
-  x += cupixSync.offset.x; y += cupixSync.offset.y; z += cupixSync.offset.z;
+  const p = cupixPointToBim(tm[3], tm[7], tm[11]);
   if (cupixSync.syncPos) {
-    camera.position.set(x, y, z);
+    camera.position.copy(p);
   }
   if (cupixSync.syncRot) {
     const q = cupixRotationToBim(tm, /*applyYaw*/ true);
@@ -1799,6 +1845,7 @@ function buildCupixSyncPanel(panel) {
     <div class="row" style="margin-top:8px;gap:4px">
       <button onclick="cupixAutoAlign()" title="Automatic calibration: fetches all Cupix pano positions and aligns their centroid + main axis to the BIM model — no manual flying needed">🎯 Auto-align</button>
       <button onclick="cupixNextOrientation()" title="Auto-align orientation is ambiguous by 90° — click to try the next of 4 candidates until the views agree">↻ 90°</button>
+      <button onclick="cupixTogglePanoDots()" title="Show every Cupix pano as a cyan dot inside the BIM + a magenta arrow at the live Cupix camera. If dots trace the corridors, calibration is correct">📍 Dots</button>
     </div>
     <div class="row" style="margin-top:4px;gap:4px">
       <button onclick="cupixLockHere()" title="One-click fine calibration: park BIM camera at the same spot you're standing in Cupix, facing the same direction, then click — computes yaw + offset">📌 Lock here</button>
@@ -1814,13 +1861,13 @@ function buildCupixSyncPanel(panel) {
   wire('csEnabled', el => { cupixSync.enabled = el.checked; saveCupixSync(); });
   wire('csPos',     el => { cupixSync.syncPos = el.checked; saveCupixSync(); });
   wire('csRot',     el => { cupixSync.syncRot = el.checked; saveCupixSync(); });
-  wire('csYZ',      el => { cupixSync.swapYZ = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
-  wire('csFF',      el => { cupixSync.flipFwd = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
-  wire('csOx',      el => { cupixSync.offset.x = +el.value; panel.querySelector('#csOxV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
-  wire('csOy',      el => { cupixSync.offset.y = +el.value; panel.querySelector('#csOyV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
-  wire('csOz',      el => { cupixSync.offset.z = +el.value; panel.querySelector('#csOzV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
-  wire('csSc',      el => { cupixSync.scale    = +el.value; panel.querySelector('#csScV').textContent = (+el.value).toFixed(2); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
-  wire('csYr',      el => { cupixSync.yRotation= +el.value; panel.querySelector('#csYrV').textContent = el.value+'°'; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
+  wire('csYZ',      el => { cupixSync.swapYZ = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); refreshCupixPanoDots(); });
+  wire('csFF',      el => { cupixSync.flipFwd = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); refreshCupixPanoDots(); });
+  wire('csOx',      el => { cupixSync.offset.x = +el.value; panel.querySelector('#csOxV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); refreshCupixPanoDots(); });
+  wire('csOy',      el => { cupixSync.offset.y = +el.value; panel.querySelector('#csOyV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); refreshCupixPanoDots(); });
+  wire('csOz',      el => { cupixSync.offset.z = +el.value; panel.querySelector('#csOzV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); refreshCupixPanoDots(); });
+  wire('csSc',      el => { cupixSync.scale    = +el.value; panel.querySelector('#csScV').textContent = (+el.value).toFixed(2); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); refreshCupixPanoDots(); });
+  wire('csYr',      el => { cupixSync.yRotation= +el.value; panel.querySelector('#csYrV').textContent = el.value+'°'; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); refreshCupixPanoDots(); });
 }
 
 // "Lock here": one-click calibration. User has navigated Cupix to a known spot AND
@@ -1861,6 +1908,7 @@ function cupixLockHere() {
   cupixSync.offset.z = camera.position.z - cz;
   saveCupixSync();
   renderCupixSyncPanel(true);  // rebuild so sliders show the new yaw/offset
+  refreshCupixPanoDots();
   console.log('[cupix-lock] yaw=' + cupixSync.yRotation + '° offset=', cupixSync.offset);
 }
 function cupixResetCalib() {
@@ -1869,6 +1917,7 @@ function cupixResetCalib() {
   cupixSync.yRotation = 0;
   saveCupixSync();
   renderCupixSyncPanel(true);
+  refreshCupixPanoDots();
   if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
 }
 window.cupixLockHere = cupixLockHere;
