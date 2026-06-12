@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v3';
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v4';  // v4: discard pre-scale-detection calibrations
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1538,6 +1538,19 @@ function cupixAutoAlign() {
   const phiP = 0.5 * Math.atan2(2 * sxz, sxx - szz) * 180 / Math.PI;  // pano major axis angle
   const size = bbox.getSize(new THREE.Vector3());
   const phiB = size.x >= size.z ? 0 : 90;                              // BIM long axis angle
+  // Unit detection: if the pano-cloud span is ~3.28× LARGER than the building, the Cupix
+  // project is in feet → convert. (Panos are inside the building, so their span can never
+  // legitimately exceed the building span.)
+  const phiR = phiP * Math.PI / 180, ux = Math.cos(phiR), uz = Math.sin(phiR);
+  let dMin = Infinity, dMax = -Infinity;
+  pts.forEach(v => { const d = (v.x - cp.x) * ux + (v.z - cp.z) * uz; if (d < dMin) dMin = d; if (d > dMax) dMax = d; });
+  const panoSpan = dMax - dMin, bimSpan = Math.max(size.x, size.z);
+  if (panoSpan > 1 && bimSpan / panoSpan < 0.8) {
+    const f = 0.3048;  // ft → m
+    cupixSync.scale = f;
+    cp.multiplyScalar(f);  // centroid must live in the same scaled frame the live transform uses
+    console.log('[auto-align] pano span', panoSpan.toFixed(1), '≫ BIM span', bimSpan.toFixed(1), '→ Cupix is in feet, scale =', f);
+  }
   // Axis angles transform as φ_post = φ_pre − yaw, so yaw = φ_pre − φ_post.
   // (Verified numerically: phiP − phiB recovers a known ground-truth yaw exactly.)
   _autoAlignBase = phiP - phiB;
@@ -1561,7 +1574,7 @@ function _applyAutoAlign() {
   cupixSync.offset.z = _autoAlignCb.z - rz;
   saveCupixSync();
   renderCupixSyncPanel(true);
-  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm);
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
 }
 
 function cupixNextOrientation() {
@@ -1633,7 +1646,19 @@ function installCupixMsgListener() {
   console.log('[cupix-sync] listener installed. window.postMessage events from *.cupix.works will be counted.');
 }
 
-function applyCupixToBimCamera(tm) {
+/* User-override: grabbing the BIM (orbit drag, wheel, WASD, joystick) pauses sync so the
+   camera doesn't get yanked back by the 2Hz poll. Sync resumes 2.5s after the last input. */
+let _cupixUserUntil = 0;
+function _bumpCupixUserDrive() { _cupixUserUntil = Date.now() + 2500; }
+function cupixUserOverride() { return Date.now() < _cupixUserUntil; }
+renderer.domElement.addEventListener('pointerdown', _bumpCupixUserDrive);
+renderer.domElement.addEventListener('wheel', _bumpCupixUserDrive, { passive: true });
+window.addEventListener('keydown', e => {
+  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowLeft','ArrowRight'].includes(e.code)) _bumpCupixUserDrive();
+});
+
+function applyCupixToBimCamera(tm, force = false) {
+  if (!force && cupixUserOverride()) return;  // user is hand-driving the BIM — don't fight them
   // Cupix uses ROW-MAJOR 4×4 — tm[r*4 + c], so translation column is tm[3], tm[7], tm[11].
   // (Column-major like Three.js would put translation at tm[12], tm[13], tm[14]; we confirmed
   //  by inspection that Cupix's last 4 entries are always [0,0,0,1] = the bottom row.)
@@ -1661,6 +1686,11 @@ function applyCupixToBimCamera(tm) {
     const q = cupixRotationToBim(tm, /*applyYaw*/ true);
     camera.quaternion.copy(q);
   }
+  // Keep OrbitControls' pivot just ahead of the synced camera. Without this, the moment
+  // the user grabs the model, OrbitControls re-orients the camera around its STALE target
+  // ("snaps to a fixed spot and shows nothing").
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  orbitControls.target.copy(camera.position).addScaledVector(fwd, 3);
 }
 
 // Convert the 3×3 rotation part of a Cupix row-major tm into a Three.js (Y-up, BIM)
@@ -1703,6 +1733,9 @@ function toggleCupixMsgDebug(show) {
     panel = document.createElement('div');
     panel.id = 'cupixSyncPanel';
     document.body.appendChild(panel);
+    // Interacting with the panel (sliders, about-to-click Lock) also pauses sync,
+    // so a hand-parked camera isn't yanked away mid-calibration.
+    panel.addEventListener('pointerdown', _bumpCupixUserDrive);
   }
   panel.classList.toggle('show', !!show);
   renderCupixSyncPanel();
@@ -1781,13 +1814,13 @@ function buildCupixSyncPanel(panel) {
   wire('csEnabled', el => { cupixSync.enabled = el.checked; saveCupixSync(); });
   wire('csPos',     el => { cupixSync.syncPos = el.checked; saveCupixSync(); });
   wire('csRot',     el => { cupixSync.syncRot = el.checked; saveCupixSync(); });
-  wire('csYZ',      el => { cupixSync.swapYZ = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
-  wire('csFF',      el => { cupixSync.flipFwd = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
-  wire('csOx',      el => { cupixSync.offset.x = +el.value; panel.querySelector('#csOxV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
-  wire('csOy',      el => { cupixSync.offset.y = +el.value; panel.querySelector('#csOyV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
-  wire('csOz',      el => { cupixSync.offset.z = +el.value; panel.querySelector('#csOzV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
-  wire('csSc',      el => { cupixSync.scale    = +el.value; panel.querySelector('#csScV').textContent = (+el.value).toFixed(2); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
-  wire('csYr',      el => { cupixSync.yRotation= +el.value; panel.querySelector('#csYrV').textContent = el.value+'°'; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm); });
+  wire('csYZ',      el => { cupixSync.swapYZ = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
+  wire('csFF',      el => { cupixSync.flipFwd = el.checked; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
+  wire('csOx',      el => { cupixSync.offset.x = +el.value; panel.querySelector('#csOxV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
+  wire('csOy',      el => { cupixSync.offset.y = +el.value; panel.querySelector('#csOyV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
+  wire('csOz',      el => { cupixSync.offset.z = +el.value; panel.querySelector('#csOzV').textContent = (+el.value).toFixed(1); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
+  wire('csSc',      el => { cupixSync.scale    = +el.value; panel.querySelector('#csScV').textContent = (+el.value).toFixed(2); saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
+  wire('csYr',      el => { cupixSync.yRotation= +el.value; panel.querySelector('#csYrV').textContent = el.value+'°'; saveCupixSync(); if(_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true); });
 }
 
 // "Lock here": one-click calibration. User has navigated Cupix to a known spot AND
@@ -1836,7 +1869,7 @@ function cupixResetCalib() {
   cupixSync.yRotation = 0;
   saveCupixSync();
   renderCupixSyncPanel(true);
-  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm);
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
 }
 window.cupixLockHere = cupixLockHere;
 window.cupixResetCalib = cupixResetCalib;
@@ -1858,7 +1891,7 @@ function cupixTestSync() {
   _lastCupixTm = fakeTm;
   _lastCupixPos = { x: fakeTm[3], y: fakeTm[7], z: fakeTm[11] };
   _cupixMsgCount++;
-  applyCupixToBimCamera(fakeTm);
+  applyCupixToBimCamera(fakeTm, true);
   const after = camera.position.clone();
   renderCupixSyncPanel();
   const moved = before.distanceTo(after) > 0.01;
@@ -3558,7 +3591,8 @@ renderer.setAnimationLoop(()=>{
     // OrbitControls' internal spherical state keeps overwriting camera.position
     // every frame, and the auto-sync appears to do nothing.
     const cupixDriving = document.body.classList.contains('cupix-compare-on')
-                       && window.cupixSync && cupixSync.enabled && (cupixSync.syncPos || cupixSync.syncRot);
+                       && window.cupixSync && cupixSync.enabled && (cupixSync.syncPos || cupixSync.syncRot)
+                       && !cupixUserOverride();  // manual input pauses sync → orbit works normally
     if(!fpMode && !cupixDriving) orbitControls.update();
   }
   updateEnergyFlow();
