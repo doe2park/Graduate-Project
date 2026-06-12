@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v6';  // v6: fit searches scale+handedness (scan-local meter coords confirmed)
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v7';  // v7: scale decided from span, Y offset from floor semantics
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1670,34 +1670,48 @@ function cupixFitAlign() {
   const cb = bbox.getCenter(new THREE.Vector3());
   const cell = 2.0;
   const occ = _bimOccupancy(cell);
-  // Scale and handedness are SEARCH VARIABLES, not assumptions: Cupix may report
-  // scan-local meters (z≈1.5 eye height) or project feet depending on the project.
-  // Subsample panos for the coarse stage to keep the 4-variant search fast.
   const mkRaw = flip => _cupixPanos.map(p =>
     new THREE.Vector3(p.position[0], p.position[2], flip ? -p.position[1] : p.position[1]));
-  let best = { score: -1, yaw: 0, ox: 0, oy: 0, oz: 0, scale: 1, flip: true };
+  // SCALE is decided from data, never searched — a hit-rate objective would otherwise
+  // favor SHRINKING the cloud into one dense pocket (degenerate optimum, seen in prod).
+  // Rule: walked-scan footprint is roughly half the building diagonal.
+  const raw0 = mkRaw(true);
+  let xMin = 1/0, xMax = -1/0, zMin = 1/0, zMax = -1/0;
+  raw0.forEach(v => { xMin = Math.min(xMin, v.x); xMax = Math.max(xMax, v.x); zMin = Math.min(zMin, v.z); zMax = Math.max(zMax, v.z); });
+  const panoSpan = Math.hypot(xMax - xMin, zMax - zMin);
+  const bimSize = bbox.getSize(new THREE.Vector3());
+  const bimSpan = Math.hypot(bimSize.x, bimSize.z);
+  let scale = 1.0, scaleErr = Infinity;
+  for (const s of [1.0, 0.3048]) {
+    const err = Math.abs(Math.log((panoSpan * s) / (0.5 * bimSpan)));
+    if (err < scaleErr) { scaleErr = err; scale = s; }
+  }
+  // VERTICAL offset comes from floor semantics, not blind search: eye height is ~1.6m
+  // above a floor, so the only sane offsets put the pano median at a floor's walk height.
+  const floorEyeY = [1.6, 5.6, 9.6, 13.6, 17.6];  // B1/L1/L2/L3/SRV (floorYRanges start + 1.6)
+  let best = { score: -1, yaw: 0, ox: 0, oy: 0, oz: 0, scale, flip: true };
   for (const flip of [true, false]) {
-    const raw = mkRaw(flip);
-    for (const s of [1.0, 0.3048]) {
-      const all = raw.map(v => v.clone().multiplyScalar(s));
-      const pts = all.length > 300 ? all.filter((_, i) => i % Math.ceil(all.length / 300) === 0) : all;
-      const cp = pts.reduce((a, v) => a.clone().add(v), new THREE.Vector3()).divideScalar(pts.length);
-      // Coarse: every 5° of yaw × centroid-matched offset ± 4m
-      for (let yaw = 0; yaw < 360; yaw += 5) {
-        const r = yaw * Math.PI / 180, c0 = Math.cos(r), s0 = Math.sin(r);
-        const bx = cb.x - (c0 * cp.x + s0 * cp.z);
-        const bz = cb.z - (-s0 * cp.x + c0 * cp.z);
-        const by = cb.y - cp.y;
-        for (let dx = -4; dx <= 4; dx += 2)
-          for (let dz = -4; dz <= 4; dz += 2)
-            for (let dy = -10; dy <= 10; dy += 2) {  // wide: a single-floor scan's centroid sits far from the building's mid-height
-              const sc = _fitScore(pts, occ, cell, yaw, bx + dx, by + dy, bz + dz);
-              if (sc > best.score) best = { score: sc, yaw, ox: bx + dx, oy: by + dy, oz: bz + dz, scale: s, flip };
-            }
-      }
+    const all = mkRaw(flip).map(v => v.multiplyScalar(scale));
+    const pts = all.length > 300 ? all.filter((_, i) => i % Math.ceil(all.length / 300) === 0) : all;
+    const cp = pts.reduce((a, v) => a.clone().add(v), new THREE.Vector3()).divideScalar(pts.length);
+    const ys = pts.map(v => v.y).sort((a, b) => a - b);
+    const medY = ys[ys.length >> 1];
+    const oyCands = floorEyeY.map(f => f - medY);
+    // Coarse: every 5° of yaw × centroid-matched XZ offset ±4m × per-floor Y offsets
+    for (let yaw = 0; yaw < 360; yaw += 5) {
+      const r = yaw * Math.PI / 180, c0 = Math.cos(r), s0 = Math.sin(r);
+      const bx = cb.x - (c0 * cp.x + s0 * cp.z);
+      const bz = cb.z - (-s0 * cp.x + c0 * cp.z);
+      for (let dx = -4; dx <= 4; dx += 2)
+        for (let dz = -4; dz <= 4; dz += 2)
+          for (const oy of oyCands) {
+            const sc = _fitScore(pts, occ, cell, yaw, bx + dx, oy, bz + dz);
+            if (sc > best.score) best = { score: sc, yaw, ox: bx + dx, oy, oz: bz + dz, scale, flip };
+          }
     }
   }
-  console.log('[fit-align] coarse winner: scale', best.scale, 'flipZ', best.flip, 'yaw', best.yaw, 'score', (best.score * 100).toFixed(0) + '%');
+  console.log('[fit-align] coarse: scale', scale, '(panoSpan', panoSpan.toFixed(1), 'vs bimSpan', bimSpan.toFixed(1) + ')',
+    'flipZ', best.flip, 'yaw', best.yaw, 'oy', best.oy.toFixed(2), 'score', (best.score * 100).toFixed(0) + '%');
   const pts = mkRaw(best.flip).map(v => v.multiplyScalar(best.scale));
   // Fine: ±4° / ±1.5m around the coarse winner
   const b0 = Object.assign({}, best);
