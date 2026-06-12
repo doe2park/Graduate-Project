@@ -2180,6 +2180,34 @@ async function _pollRemoteCalib() {
 }
 setInterval(_pollRemoteCalib, 10000);
 
+// 📋 Copy everything needed for OFFLINE exact calibration: pano cloud, level list,
+// recent camera matrices, current calib state and the BIM bounds. ~10-60KB of JSON.
+function cupixCopyDebug() {
+  const r2 = n => Math.round(n * 100) / 100;
+  const bb = _bimBbox();
+  const payload = {
+    v: 1,
+    calib: cupixSync,
+    stats: { msgs: _cupixMsgCount, tm: _cupixTmMsgCount, applied: _cupixApplyCount },
+    levels: _cupixLevels,
+    panoCount: _cupixPanos ? _cupixPanos.length : 0,
+    panos: (_cupixPanos || []).map(p => p.position.map(r2)),
+    tmSamples: _cupixTmHist.slice(-8).map(tm => tm.map(n => Math.round(n * 10000) / 10000)),
+    lastPos: _lastCupixPos,
+    camera: { p: camera.position.toArray().map(r2), q: camera.quaternion.toArray().map(n => r2(n)) },
+    bimBbox: bb.isEmpty() ? null : { min: bb.min.toArray().map(r2), max: bb.max.toArray().map(r2) },
+    buildingLoaded: buildingLoaded,
+  };
+  // Request fresh data too, so a second click (if needed) has everything
+  if (!_cupixPanos) cupixApiSend('GET_PANO_ALL');
+  if (!_cupixLevels) cupixApiSend('GET_LEVEL_ALL');
+  const txt = JSON.stringify(payload);
+  (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
+    .then(() => alert('Debug data copied (' + (txt.length / 1024).toFixed(0) + ' KB) — paste it to Claude.'))
+    .catch(() => { prompt('Copy this manually:', txt); });
+}
+window.cupixCopyDebug = cupixCopyDebug;
+
 // Axis-conversion matrix used for POSITIONS (swap, optional flipZ).
 function _axisConvMatrix() {
   if (!cupixSync.swapYZ) return new THREE.Matrix4();
@@ -2293,6 +2321,7 @@ function buildCupixSyncPanel(panel) {
       <button onclick="cupixLockHere()" style="${_lockArmed ? 'border-color:rgba(74,222,128,.5);color:#4ade80;background:rgba(74,222,128,.12)' : ''}" title="${_lockArmed ? 'Sync is FROZEN — aim the BIM at exactly what Cupix shows, then click to confirm' : 'Step 1: freezes sync so you can aim the BIM freely. Step 2: confirm to calibrate from your aim'}">${_lockArmed ? '✓ Confirm lock' : '📌 Lock here'}</button>
       <button onclick="cupixFlipPitch()" title="Use when looking UP in Cupix pitches the BIM DOWN — flips world handedness and re-solves from your last lock automatically">↕ U/D</button>
       <button onclick="cupixResetCalib()" title="Clear calibration">↺ Reset</button>
+      <button onclick="cupixCopyDebug()" title="Copy raw calibration data (pano positions, levels, camera samples) to the clipboard — paste it to Claude for offline exact fitting">📋 Debug</button>
     </div>
     <div class="hint">${_lockArmed
       ? 'Sync frozen. Aim the BIM camera (drag / WASD) at exactly what the Cupix side shows — same spot, same direction — then click ✓ Confirm lock.'
