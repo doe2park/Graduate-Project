@@ -2244,9 +2244,13 @@ function cupixRotationToBim(tm, applyYaw) {
   const m = _worldRotMatrix(applyYaw).multiply(_tmRotPart(tm));
   if (Array.isArray(cupixSync.camMat) && cupixSync.camMat.length === 16) {
     m.multiply(new THREE.Matrix4().fromArray(cupixSync.camMat));
-  } else {
+  } else if (!cupixSync.flipZ) {
+    // legacy mirror mode kept its conjugation behavior
     m.multiply(_axisConvMatrix().invert());
   }
+  // flipZ (proper rotation) + no camMat → C = identity. CONFIRMED from live tm data:
+  // Cupix camera columns are right-handed GL axes (X right, up ~+Z_world, fwd −Z_local),
+  // so no camera-convention correction is needed under the proper world conversion.
   return new THREE.Quaternion().setFromRotationMatrix(m);
 }
 
