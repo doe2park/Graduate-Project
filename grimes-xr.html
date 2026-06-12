@@ -2152,6 +2152,34 @@ function cupixDetectCamFix() {
 }
 window.cupixDetectCamFix = cupixDetectCamFix;
 
+/* ── REMOTE CALIBRATION CHANNEL ──
+   While Compare is on, poll data/cupix_calib.json every 10s. This lets calibration be
+   tuned by pushing a JSON file to the repo — no UI interaction needed on this machine.
+   Skipped while the user is mid-lock. */
+let _remoteCalibVersion = null;
+async function _pollRemoteCalib() {
+  if (!document.body.classList.contains('cupix-compare-on') || _lockArmed) return;
+  try {
+    const r = await fetch('data/cupix_calib.json?ts=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || j.version === undefined || j.version === _remoteCalibVersion) return;
+    _remoteCalibVersion = j.version;
+    if (j.calib) {
+      const off = Object.assign({}, cupixSync.offset, j.calib.offset || {});
+      Object.assign(cupixSync, j.calib);
+      cupixSync.offset = off;
+      saveCupixSync();
+      renderCupixSyncPanel(true);
+      refreshCupixPanoDots();
+      if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
+      console.log('[remote-calib] applied version', j.version, JSON.stringify(j.calib));
+    }
+    if (j.showDots !== undefined && j.showDots !== !!_panoDotsGroup) cupixTogglePanoDots();
+  } catch {}
+}
+setInterval(_pollRemoteCalib, 10000);
+
 // Axis-conversion matrix used for POSITIONS (swap, optional flipZ).
 function _axisConvMatrix() {
   if (!cupixSync.swapYZ) return new THREE.Matrix4();
