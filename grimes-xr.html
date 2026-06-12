@@ -1770,10 +1770,14 @@ function _applyCalib(c) {
   if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
 }
 function cupixSmartCalibrate() {
+  // The analytic transform needs NO pano data — apply it immediately so a sane
+  // calibration always exists (never leave the camera flying to raw coordinates).
   if (!_cupixPanos) {
+    _applyCalib(Object.assign({ scale: 0.3048 }, CUPIX_ANALYTIC));
+    console.log('[smart-calibrate] analytic ft transform applied; waiting for pano list to validate');
     _smartPending = true;
-    if (!cupixApiSend('GET_PANO_ALL')) alert('Open 🪞 Compare first (Cupix iframe not loaded).');
-    return;
+    cupixApiSend('GET_PANO_ALL');
+    return;  // listener re-invokes for validation when panos arrive
   }
   const cell = 2.0;
   const occ = _bimOccupancy(cell);
@@ -1880,9 +1884,8 @@ function installCupixMsgListener() {
       } else if (!document.body.classList.contains('cupix-compare-on')) {
         _cupixSkipReason = 'Compare mode is OFF — sync only drives BIM in 🪞 Compare';
       } else {
-        applyCupixToBimCamera(tm);
-        _cupixApplyCount++;
-        _cupixSkipReason = '';
+        const blocked = applyCupixToBimCamera(tm) === false;  // false = void guard fired
+        if (!blocked) { _cupixApplyCount++; _cupixSkipReason = ''; }
       }
       // Live Cupix pose arrow (independent of camera sync, so it moves even during override)
       if (_cupixCamArrow) {
@@ -1939,13 +1942,32 @@ function cupixPointToBim(px, py, pz) {
   return new THREE.Vector3(x + cupixSync.offset.x, y + cupixSync.offset.y, z + cupixSync.offset.z);
 }
 
+let _bimBboxCache = null;
+function _bimBbox() {
+  if (!_bimBboxCache || _bimBboxCache.isEmpty()) {
+    const b = new THREE.Box3();
+    allMeshes.forEach(m => b.expandByObject(m));
+    _bimBboxCache = b;
+  }
+  return _bimBboxCache;
+}
+
 function applyCupixToBimCamera(tm, force = false) {
   if (!force && cupixUserOverride()) return;  // user is hand-driving the BIM — don't fight them
   // Cupix uses ROW-MAJOR 4×4 — tm[r*4 + c], so translation column is tm[3], tm[7], tm[11].
-  // (Column-major like Three.js would put translation at tm[12], tm[13], tm[14]; we confirmed
-  //  by inspection that Cupix's last 4 entries are always [0,0,0,1] = the bottom row.)
   const p = cupixPointToBim(tm[3], tm[7], tm[11]);
   if (cupixSync.syncPos) {
+    // Void guard: never park the camera in empty space far outside the model —
+    // a bad calibration must show a panel warning, not a black screen.
+    const bb = _bimBbox(), M = 40;
+    if (!bb.isEmpty() && (
+        p.x < bb.min.x - M || p.x > bb.max.x + M ||
+        p.y < bb.min.y - M || p.y > bb.max.y + M ||
+        p.z < bb.min.z - M || p.z > bb.max.z + M)) {
+      _cupixSkipReason = `target (${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(0)}) outside model — calibration wrong, click ⟳ Align`;
+      renderCupixSyncPanel();
+      return false;
+    }
     camera.position.copy(p);
   }
   if (cupixSync.syncRot) {
