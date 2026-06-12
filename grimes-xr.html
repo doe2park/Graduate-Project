@@ -1382,13 +1382,14 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v4';  // v4: discard pre-scale-detection calibrations
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v5';  // v5: analytic BIM-native alignment (flipZ era)
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
     syncPos: true,           // sync camera position
     syncRot: true,           // sync camera rotation (the whole point of "see what Cupix sees")
-    swapYZ: true,            // Cupix is Z-up, Three.js is Y-up → swap Y and Z (typical default)
+    swapYZ: true,            // Cupix is Z-up, Three.js is Y-up → swap Y and Z
+    flipZ: false,            // negate Z after swap → proper rotation (Rx-90) instead of mirror
     flipFwd: false,          // 180° flip of camera forward — toggle if synced view looks BACKWARD
     offset: { x: 0, y: 0, z: 0 },  // added to Cupix position AFTER scale + swap
     scale: 1.0,              // Cupix unit → BIM unit
@@ -1474,11 +1475,12 @@ function startCupixPolling() {
     // Re-handshake until the first tm arrives (iframe app may not have been ready yet).
     if (_cupixTmMsgCount === 0) cupixApiSend('APP_API_START');
     if (cupixApiSend('GET_CAMERA_PARAMETERS')) { _cupixPollCount++; renderCupixSyncPanel(); }
-    // Self-calibrate: if the API is alive and no calibration exists yet, auto-align once.
+    // Self-calibrate: if the API is alive and no calibration exists yet, run the
+    // analytic BIM-native alignment once (occupancy search only as its fallback).
     if (!_autoAlignTriggered && _cupixTmMsgCount > 0 &&
         cupixSync.yRotation === 0 && !cupixSync.offset.x && !cupixSync.offset.y && !cupixSync.offset.z) {
       _autoAlignTriggered = true;
-      cupixAutoAlign();
+      cupixSmartCalibrate();
     }
   }, 500);
 }
@@ -1520,12 +1522,8 @@ function cupixAutoAlign() {
     if (!cupixApiSend('GET_PANO_ALL')) alert('Open 🪞 Compare first (Cupix iframe not loaded).');
     return;  // listener re-invokes when the pano list arrives
   }
-  // Pano cloud → BIM frame (swap + scale, no yaw yet)
-  const pts = _cupixPanos.map(p => {
-    let [x, y, z] = p.position;
-    if (cupixSync.swapYZ) { const t = y; y = z; z = t; }
-    return new THREE.Vector3(x * cupixSync.scale, y * cupixSync.scale, z * cupixSync.scale);
-  });
+  // Pano cloud → BIM frame (swap + flipZ + scale, no yaw yet)
+  const pts = _cupixPanos.map(p => cupixPreToBim(p.position[0], p.position[1], p.position[2]));
   const cp = pts.reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(pts.length);
   // BIM bounds from the loaded MEP meshes
   const bbox = new THREE.Box3();
@@ -1665,11 +1663,7 @@ function cupixFitAlign() {
     if (!cupixApiSend('GET_PANO_ALL')) alert('Open 🪞 Compare first (Cupix iframe not loaded).');
     return;
   }
-  const pts = _cupixPanos.map(p => {
-    let [x, y, z] = p.position;
-    if (cupixSync.swapYZ) { const t = y; y = z; z = t; }
-    return new THREE.Vector3(x * cupixSync.scale, y * cupixSync.scale, z * cupixSync.scale);
-  });
+  const pts = _cupixPanos.map(p => cupixPreToBim(p.position[0], p.position[1], p.position[2]));
   const cp = pts.reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(pts.length);
   const bbox = new THREE.Box3();
   allMeshes.forEach(m => bbox.expandByObject(m));
@@ -1736,6 +1730,73 @@ function cupixFitAlign() {
   console.log('[fit-align] score', (best.score * 100).toFixed(0) + '%', 'yaw', cupixSync.yRotation, 'offset', cupixSync.offset);
 }
 window.cupixFitAlign = cupixFitAlign;
+
+/* ── SMART CALIBRATE — analytic BIM-native alignment first, search as fallback ──
+   The Cupix project has the SAME Bechtel BIM registered, so Cupix world coordinates ARE
+   the source model's project coordinates (feet, Z-up, elevation ~315ft base — confirmed
+   by inspecting grimes-mep-compressed.glb, which preserves them). Our viewer's MEP glb
+   was recentered during export, and the building overlay placement code defines exactly
+   how source coords map into the viewer. Replicating that math (see scripts/notes):
+     p_view = Rx(−90°)·(0.3048·p_src − srcCenter·0.3048) + mepCenterAdjust
+   collapses to: swap+flipZ, scale 0.3048, yaw 0, offset (−30.04, −96.04, 30.28).
+   We verify this against the pano cloud occupancy before trusting it. */
+const CUPIX_ANALYTIC = {
+  swapYZ: true, flipZ: true, yaw: 0,
+  offset: { x: -30.036, y: -96.043, z: 30.283 },  // derived from glb bboxes, see commit msg
+};
+let _smartPending = false;
+function _scoreCandidate(cand, occ, cell) {
+  let hit = 0;
+  for (const p of _cupixPanos) {
+    let [x, y, z] = p.position;
+    if (cand.swapYZ) { const t = y; y = z; z = t; }
+    if (cand.flipZ) z = -z;
+    x = x * cand.scale + cand.offset.x;
+    y = y * cand.scale + cand.offset.y;
+    z = z * cand.scale + cand.offset.z;
+    if (occ.has(Math.round(x / cell) + '|' + Math.round(y / cell) + '|' + Math.round(z / cell))) hit++;
+  }
+  return hit / _cupixPanos.length;
+}
+function _applyCalib(c) {
+  cupixSync.swapYZ = c.swapYZ;
+  cupixSync.flipZ = !!c.flipZ;
+  cupixSync.scale = c.scale;
+  cupixSync.yRotation = c.yaw || 0;
+  cupixSync.offset = Object.assign({}, c.offset);
+  saveCupixSync();
+  renderCupixSyncPanel(true);
+  refreshCupixPanoDots();
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
+}
+function cupixSmartCalibrate() {
+  if (!_cupixPanos) {
+    _smartPending = true;
+    if (!cupixApiSend('GET_PANO_ALL')) alert('Open 🪞 Compare first (Cupix iframe not loaded).');
+    return;
+  }
+  const cell = 2.0;
+  const occ = _bimOccupancy(cell);
+  // Cupix may report source feet or pre-converted meters — same offsets either way.
+  const candidates = [
+    Object.assign({ scale: 0.3048 }, CUPIX_ANALYTIC),
+    Object.assign({ scale: 1.0 }, CUPIX_ANALYTIC),
+  ];
+  let best = null;
+  for (const cand of candidates) {
+    const sc = _scoreCandidate(cand, occ, cell);
+    console.log('[smart-calibrate] analytic candidate scale', cand.scale, '→', (sc * 100).toFixed(0) + '%');
+    if (!best || sc > best.score) best = { cand, score: sc };
+  }
+  _applyCalib(best.cand);
+  if (best.score >= 0.6) {
+    console.log('[smart-calibrate] ✓ BIM-native alignment locked (yaw 0, analytic offset), score', (best.score * 100).toFixed(0) + '%');
+  } else {
+    console.warn('[smart-calibrate] analytic alignment only scored', (best.score * 100).toFixed(0) + '% — refining with occupancy search');
+    cupixFitAlign();
+  }
+}
+window.cupixSmartCalibrate = cupixSmartCalibrate;
 
 /* ── PANO DOT OVERLAY — visual proof the calibration is right ──
    Renders every Cupix pano position as a cyan dot inside the BIM, plus a magenta arrow
@@ -1838,6 +1899,7 @@ function installCupixMsgListener() {
       if (_autoAlignPending) { _autoAlignPending = false; cupixAutoAlign(); }
       if (_panoDotsPending) { _panoDotsPending = false; cupixTogglePanoDots(); }
       if (_fitPending) { _fitPending = false; cupixFitAlign(); }
+      if (_smartPending) { _smartPending = false; cupixSmartCalibrate(); }
     }
     renderCupixSyncPanel();
   });
@@ -1856,12 +1918,18 @@ window.addEventListener('keydown', e => {
   if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowLeft','ArrowRight'].includes(e.code)) _bumpCupixUserDrive();
 });
 
-// The ONE place a Cupix world point becomes a BIM point: swap → scale → yaw → offset.
-// Used by camera sync, Lock-here, and the pano-dot overlay so they can never disagree.
-function cupixPointToBim(px, py, pz) {
+// The ONE place a Cupix world point becomes a BIM point: swap → flipZ → scale → yaw → offset.
+// Used by camera sync, Lock-here, auto-calibration and the pano-dot overlay so they can
+// never disagree. cupixPreToBim is the axis-convention part (everything except yaw+offset).
+function cupixPreToBim(px, py, pz) {
   let x = px, y = py, z = pz;
   if (cupixSync.swapYZ) { const t = y; y = z; z = t; }
-  x *= cupixSync.scale; y *= cupixSync.scale; z *= cupixSync.scale;
+  if (cupixSync.flipZ) z = -z;  // swap+flipZ together = proper rotation Rx(-90°): (x,y,z)→(x,z,−y)
+  return new THREE.Vector3(x * cupixSync.scale, y * cupixSync.scale, z * cupixSync.scale);
+}
+function cupixPointToBim(px, py, pz) {
+  const v = cupixPreToBim(px, py, pz);
+  let { x, y, z } = v;
   if (cupixSync.yRotation) {
     const r = cupixSync.yRotation * Math.PI / 180;
     const c = Math.cos(r), s = Math.sin(r);
@@ -1906,14 +1974,16 @@ function cupixRotationToBim(tm, applyYaw) {
     0, 0, 0, 1
   );
   if (cupixSync.swapYZ) {
-    // S·R·S with S = [[1,0,0],[0,0,1],[0,1,0]] (its own inverse).
-    const S = new THREE.Matrix4().set(
+    // Conjugate by the SAME axis conversion used for points: M·R·M⁻¹.
+    // swap only = mirror (own inverse); swap+flipZ = proper rotation Rx(−90°).
+    const M = new THREE.Matrix4().set(
       1, 0, 0, 0,
       0, 0, 1, 0,
-      0, 1, 0, 0,
+      0, (cupixSync.flipZ ? -1 : 1), 0, 0,
       0, 0, 0, 1
     );
-    m.premultiply(S).multiply(S);
+    const Minv = M.clone().invert();
+    m.premultiply(M).multiply(Minv);
   }
   if (cupixSync.flipFwd) {
     m.multiply(new THREE.Matrix4().makeRotationX(Math.PI));
@@ -1984,10 +2054,6 @@ function buildCupixSyncPanel(panel) {
       <label><input type="checkbox" id="csPos" ${cupixSync.syncPos?'checked':''}/> position</label>
       <label><input type="checkbox" id="csRot" ${cupixSync.syncRot?'checked':''}/> rotation</label>
     </div>
-    <div class="row" style="margin-top:4px">
-      <label title="Cupix is Z-up, Three.js is Y-up — swap by default"><input type="checkbox" id="csYZ" ${cupixSync.swapYZ?'checked':''}/> swap Y↔Z (Z-up → Y-up)</label>
-      <label title="Toggle if the synced BIM view faces the OPPOSITE direction of the Cupix view"><input type="checkbox" id="csFF" ${cupixSync.flipFwd?'checked':''}/> flip fwd</label>
-    </div>
     <div class="sec-title">Calibration</div>
     <div class="slider"><span class="k">offset X</span><input type="range" id="csOx" min="-50" max="50" step="0.1" value="${cupixSync.offset.x}"/><span class="v" id="csOxV">${cupixSync.offset.x.toFixed(1)}</span></div>
     <div class="slider"><span class="k">offset Y</span><input type="range" id="csOy" min="-20" max="20" step="0.1" value="${cupixSync.offset.y}"/><span class="v" id="csOyV">${cupixSync.offset.y.toFixed(1)}</span></div>
@@ -1995,19 +2061,11 @@ function buildCupixSyncPanel(panel) {
     <div class="slider"><span class="k">scale</span><input type="range" id="csSc" min="0.1" max="10" step="0.05" value="${cupixSync.scale}"/><span class="v" id="csScV">${cupixSync.scale.toFixed(2)}</span></div>
     <div class="slider"><span class="k">Y rotate °</span><input type="range" id="csYr" min="-180" max="180" step="1" value="${cupixSync.yRotation}"/><span class="v" id="csYrV">${cupixSync.yRotation}°</span></div>
     <div class="row" style="margin-top:8px;gap:4px">
-      <button onclick="cupixAutoAlign()" title="Automatic calibration: fetches all Cupix pano positions and aligns their centroid + main axis to the BIM model — no manual flying needed">🎯 Auto-align</button>
-      <button onclick="cupixNextOrientation()" title="Auto-align orientation is ambiguous by 90° — click to try the next of 4 candidates until the views agree">↻ 90°</button>
-      <button onclick="cupixTogglePanoDots()" title="Show every Cupix pano as a cyan dot inside the BIM + a magenta arrow at the live Cupix camera. If dots trace the corridors, calibration is correct">📍 Dots</button>
-      <button onclick="cupixFitAlign()" title="Global best-fit: searches all yaws and nearby offsets for the transform that puts the most pano points inside the BIM geometry. Load the Building overlay first for best results">🧲 Fit</button>
+      <button onclick="cupixSmartCalibrate()" title="Align to the Cupix BIM coordinate system (same source model) — analytic transform, verified against pano positions">⟳ Align</button>
+      <button onclick="cupixLockHere()" title="Fine-tune: stand in Cupix, fly BIM camera to the same spot facing the same way, then click">📌 Lock here</button>
+      <button onclick="cupixResetCalib()" title="Clear calibration">↺ Reset</button>
     </div>
-    <div class="row" style="margin-top:4px;gap:4px">
-      <button onclick="cupixLockHere()" title="One-click fine calibration: park BIM camera at the same spot you're standing in Cupix, facing the same direction, then click — computes yaw + offset">📌 Lock here</button>
-      <button onclick="cupixResetCalib()" title="Reset offset to zero">↺ Reset</button>
-    </div>
-    <div class="row" style="margin-top:4px;gap:4px">
-      <button onclick="cupixTestSync()" title="Fire a fake Cupix message with a known position to verify the sync pipeline works without depending on Cupix actually emitting">🧪 Test sync (fake msg)</button>
-    </div>
-    <div class="hint">🎯 Auto-align first. If the view is rotated, ↻ 90° until it matches. For exact fit: stand in Cupix → fly BIM camera to the same spot facing the same way → 📌 Lock here. Backward view → toggle "flip fwd".</div>
+    <div class="hint">⟳ Align matches the BIM-native Cupix coordinates automatically. If anything is still off, stand in Cupix → fly BIM camera to the same spot facing the same way → 📌 Lock here.</div>
   `;
   // Wire up controls
   const wire = (id, fn) => { const el = panel.querySelector('#'+id); if (el) el.oninput = () => fn(el); };
@@ -2045,11 +2103,10 @@ function cupixLockHere() {
       cupixSync.yRotation = Math.round(deg * 10) / 10;
     }
   }
-  // 2) Solve offset: forward-transform raw Cupix pos with swap → scale → (new) yaw,
+  // 2) Solve offset: forward-transform raw Cupix pos with swap → flipZ → scale → (new) yaw,
   //    then offset = current BIM camera − transformed Cupix pos.
-  let cx = _lastCupixPos.x, cy = _lastCupixPos.y, cz = _lastCupixPos.z;
-  if (cupixSync.swapYZ) { const t = cy; cy = cz; cz = t; }
-  cx *= cupixSync.scale; cy *= cupixSync.scale; cz *= cupixSync.scale;
+  const pre = cupixPreToBim(_lastCupixPos.x, _lastCupixPos.y, _lastCupixPos.z);
+  let cx = pre.x, cy = pre.y, cz = pre.z;
   if (cupixSync.yRotation) {
     const r = cupixSync.yRotation * Math.PI / 180;
     const c = Math.cos(r), s = Math.sin(r);
