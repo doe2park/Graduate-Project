@@ -1558,6 +1558,8 @@ function cupixAutoAlign() {
   _autoAlignCp = cp; _autoAlignCb = cb;
   _applyAutoAlign();
   console.log('[auto-align]', pts.length, 'panos · centroid', cp, '→', cb, '· base yaw', _autoAlignBase.toFixed(1));
+  // Centroid+PCA is only a seed — refine with the occupancy-based global search.
+  cupixFitAlign();
 }
 
 function _applyAutoAlign() {
@@ -1585,6 +1587,155 @@ function cupixNextOrientation() {
 }
 window.cupixAutoAlign = cupixAutoAlign;
 window.cupixNextOrientation = cupixNextOrientation;
+
+/* ── FIT-ALIGN — occupancy-based global search ──
+   Centroid+PCA gets close; this gets it RIGHT. Build a coarse 3D occupancy grid from the
+   BIM geometry (building overlay if loaded, plus MEP), then search yaw 0–360° and a local
+   offset neighborhood for the transform that puts the most pano points inside occupied
+   space. Panos were captured walking the corridors, so the true alignment maximizes hits. */
+let _fitPending = false;
+function _bimOccupancy(cell) {
+  const set = new Set();
+  const key = (x, y, z) => Math.round(x / cell) + '|' + Math.round(y / cell) + '|' + Math.round(z / cell);
+  const meshes = [];
+  if (buildingLoaded && buildingModel) buildingModel.traverse(o => { if (o.isMesh) meshes.push(o); });
+  allMeshes.forEach(m => meshes.push(m));
+  const v = new THREE.Vector3();
+  meshes.forEach(m => {
+    m.updateWorldMatrix(true, false);
+    const pos = m.geometry && m.geometry.getAttribute('position');
+    if (!pos) return;
+    const stride = Math.max(1, Math.floor(pos.count / 4000));
+    for (let i = 0; i < pos.count; i += stride) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      set.add(key(v.x, v.y, v.z));
+    }
+  });
+  // Dilate: panos float in corridor air ~1.5m above floors, MEP hangs overhead —
+  // accept neighbors, with extra reach downward.
+  const dil = new Set(set);
+  for (const k of set) {
+    const [a, b, c] = k.split('|').map(Number);
+    [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0],[0,-1,0],[0,-2,0]]
+      .forEach(d => dil.add((a + d[0]) + '|' + (b + d[1]) + '|' + (c + d[2])));
+  }
+  return dil;
+}
+function _fitScore(pts, occ, cell, yawDeg, ox, oy, oz) {
+  const r = yawDeg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  let hit = 0;
+  for (const v of pts) {
+    const x = c * v.x + s * v.z + ox, z = -s * v.x + c * v.z + oz, y = v.y + oy;
+    if (occ.has(Math.round(x / cell) + '|' + Math.round(y / cell) + '|' + Math.round(z / cell))) hit++;
+  }
+  return hit / pts.length;
+}
+// Plan-view (XZ) occupancy — Y collapsed. Fine cells keep a yaw/offset gradient alive
+// even where the 3D grid saturates, without being confused by floor-height mismatch.
+function _bimOccupancy2D(cell) {
+  const set = new Set();
+  const meshes = [];
+  if (buildingLoaded && buildingModel) buildingModel.traverse(o => { if (o.isMesh) meshes.push(o); });
+  allMeshes.forEach(m => meshes.push(m));
+  const v = new THREE.Vector3();
+  meshes.forEach(m => {
+    m.updateWorldMatrix(true, false);
+    const pos = m.geometry && m.geometry.getAttribute('position');
+    if (!pos) return;
+    const stride = Math.max(1, Math.floor(pos.count / 4000));
+    for (let i = 0; i < pos.count; i += stride) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      set.add(Math.round(v.x / cell) + '|' + Math.round(v.z / cell));
+    }
+  });
+  return set;
+}
+function _fitScore2D(pts, occ, cell, yawDeg, ox, oz) {
+  const r = yawDeg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  let hit = 0;
+  for (const v of pts) {
+    const x = c * v.x + s * v.z + ox, z = -s * v.x + c * v.z + oz;
+    if (occ.has(Math.round(x / cell) + '|' + Math.round(z / cell))) hit++;
+  }
+  return hit / pts.length;
+}
+function cupixFitAlign() {
+  if (!_cupixPanos) {
+    _fitPending = true;
+    if (!cupixApiSend('GET_PANO_ALL')) alert('Open 🪞 Compare first (Cupix iframe not loaded).');
+    return;
+  }
+  const pts = _cupixPanos.map(p => {
+    let [x, y, z] = p.position;
+    if (cupixSync.swapYZ) { const t = y; y = z; z = t; }
+    return new THREE.Vector3(x * cupixSync.scale, y * cupixSync.scale, z * cupixSync.scale);
+  });
+  const cp = pts.reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(pts.length);
+  const bbox = new THREE.Box3();
+  allMeshes.forEach(m => bbox.expandByObject(m));
+  if (buildingLoaded && buildingModel) bbox.expandByObject(buildingModel);
+  if (bbox.isEmpty()) { alert('BIM not loaded yet.'); return; }
+  const cb = bbox.getCenter(new THREE.Vector3());
+  const cell = 2.0;
+  const occ = _bimOccupancy(cell);
+  let best = { score: -1, yaw: 0, ox: 0, oy: 0, oz: 0 };
+  // Coarse: every 5° of yaw × centroid-matched offset ± 4m
+  for (let yaw = 0; yaw < 360; yaw += 5) {
+    const r = yaw * Math.PI / 180, c0 = Math.cos(r), s0 = Math.sin(r);
+    const bx = cb.x - (c0 * cp.x + s0 * cp.z);
+    const bz = cb.z - (-s0 * cp.x + c0 * cp.z);
+    const by = cb.y - cp.y;
+    for (let dx = -4; dx <= 4; dx += 2)
+      for (let dz = -4; dz <= 4; dz += 2)
+        for (let dy = -4; dy <= 4; dy += 2) {
+          const sc = _fitScore(pts, occ, cell, yaw, bx + dx, by + dy, bz + dz);
+          if (sc > best.score) best = { score: sc, yaw, ox: bx + dx, oy: by + dy, oz: bz + dz };
+        }
+  }
+  // Fine: ±4° / ±1.5m around the coarse winner
+  const b0 = Object.assign({}, best);
+  for (let yaw = b0.yaw - 4; yaw <= b0.yaw + 4; yaw += 1)
+    for (let dx = -1.5; dx <= 1.5; dx += 0.5)
+      for (let dz = -1.5; dz <= 1.5; dz += 0.5)
+        for (let dy = -1.5; dy <= 1.5; dy += 0.5) {
+          const sc = _fitScore(pts, occ, cell, yaw, b0.ox + dx, b0.oy + dy, b0.oz + dz);
+          if (sc > best.score) best = { score: sc, yaw, ox: b0.ox + dx, oy: b0.oy + dy, oz: b0.oz + dz };
+        }
+  // Polish: the dilated 2m grid saturates (many transforms tie at 100%), so refine with a
+  // multi-resolution score that keeps a gradient: 3D 1m grid + plan-view (XZ) grids at
+  // 1m and 0.5m. The fine plan grids punish small yaw errors at the corridor ends.
+  // Hill-climb: re-center on each winner until no improvement (max 4 rounds).
+  const occ1 = _bimOccupancy(1.0);
+  const occP1 = _bimOccupancy2D(1.0);
+  const occP05 = _bimOccupancy2D(0.5);
+  const polishScore = (yaw, ox, oy, oz) =>
+    _fitScore(pts, occ1, 1.0, yaw, ox, oy, oz)
+    + 2 * _fitScore2D(pts, occP1, 1.0, yaw, ox, oz)
+    + 4 * _fitScore2D(pts, occP05, 0.5, yaw, ox, oz);
+  best.score = polishScore(best.yaw, best.ox, best.oy, best.oz);
+  for (let round = 0; round < 4; round++) {
+    const b1 = Object.assign({}, best);
+    for (let yaw = b1.yaw - 3; yaw <= b1.yaw + 3; yaw += 0.5)
+      for (let dx = -1.5; dx <= 1.5; dx += 0.25)
+        for (let dz = -1.5; dz <= 1.5; dz += 0.25)
+          for (let dy = -1; dy <= 1; dy += 0.5) {
+            const sc = polishScore(yaw, b1.ox + dx, b1.oy + dy, b1.oz + dz);
+            if (sc > best.score) best = { score: sc, yaw, ox: b1.ox + dx, oy: b1.oy + dy, oz: b1.oz + dz };
+          }
+    if (best.score <= b1.score + 1e-9) break;  // converged
+  }
+  best.score = _fitScore(pts, occ, cell, best.yaw, best.ox, best.oy, best.oz);  // report as plain hit-rate
+  cupixSync.yRotation = Math.round((((best.yaw + 540) % 360) - 180) * 10) / 10;
+  cupixSync.offset.x = Math.round(best.ox * 100) / 100;
+  cupixSync.offset.y = Math.round(best.oy * 100) / 100;
+  cupixSync.offset.z = Math.round(best.oz * 100) / 100;
+  saveCupixSync();
+  renderCupixSyncPanel(true);
+  refreshCupixPanoDots();
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
+  console.log('[fit-align] score', (best.score * 100).toFixed(0) + '%', 'yaw', cupixSync.yRotation, 'offset', cupixSync.offset);
+}
+window.cupixFitAlign = cupixFitAlign;
 
 /* ── PANO DOT OVERLAY — visual proof the calibration is right ──
    Renders every Cupix pano position as a cyan dot inside the BIM, plus a magenta arrow
@@ -1686,6 +1837,7 @@ function installCupixMsgListener() {
       console.log('[cupix-sync] received', panos.length, 'pano positions');
       if (_autoAlignPending) { _autoAlignPending = false; cupixAutoAlign(); }
       if (_panoDotsPending) { _panoDotsPending = false; cupixTogglePanoDots(); }
+      if (_fitPending) { _fitPending = false; cupixFitAlign(); }
     }
     renderCupixSyncPanel();
   });
@@ -1846,6 +1998,7 @@ function buildCupixSyncPanel(panel) {
       <button onclick="cupixAutoAlign()" title="Automatic calibration: fetches all Cupix pano positions and aligns their centroid + main axis to the BIM model — no manual flying needed">🎯 Auto-align</button>
       <button onclick="cupixNextOrientation()" title="Auto-align orientation is ambiguous by 90° — click to try the next of 4 candidates until the views agree">↻ 90°</button>
       <button onclick="cupixTogglePanoDots()" title="Show every Cupix pano as a cyan dot inside the BIM + a magenta arrow at the live Cupix camera. If dots trace the corridors, calibration is correct">📍 Dots</button>
+      <button onclick="cupixFitAlign()" title="Global best-fit: searches all yaws and nearby offsets for the transform that puts the most pano points inside the BIM geometry. Load the Building overlay first for best results">🧲 Fit</button>
     </div>
     <div class="row" style="margin-top:4px;gap:4px">
       <button onclick="cupixLockHere()" title="One-click fine calibration: park BIM camera at the same spot you're standing in Cupix, facing the same direction, then click — computes yaw + offset">📌 Lock here</button>
