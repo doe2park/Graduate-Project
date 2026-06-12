@@ -180,6 +180,13 @@
     cursor: pointer;
   }
   #cupixSyncPanel .row button:hover { background: rgba(34,211,238,.2); }
+  #cupixSyncPanel details { margin-top: 6px; }
+  #cupixSyncPanel summary {
+    cursor: pointer; font: 600 9px/1 var(--mono); color: #64748b;
+    text-transform: uppercase; letter-spacing: .5px; padding: 2px 0;
+    list-style-position: inside;
+  }
+  #cupixSyncPanel summary:hover { color: #94a3b8; }
   #cupixSyncPanel .hint {
     font: italic 9px/1.4 var(--font); color: #475569;
     margin-top: 6px; padding-top: 6px;
@@ -2300,36 +2307,37 @@ function buildCupixSyncPanel(panel) {
       <span>🔗 Cupix → BIM sync</span>
       <button onclick="document.getElementById('cupixSyncPanel').classList.remove('show')">✕</button>
     </div>
-    <div class="stat"><span class="k">msgs received</span><span class="v" id="csStatMsgs">0</span></div>
-    <div class="stat"><span class="k">with camera tm</span><span class="v" id="csStatTm">0</span></div>
-    <div class="stat"><span class="k">applied to BIM</span><span class="v" id="csStatApply">0</span></div>
-    <div class="stat"><span class="k">camera poll</span><span class="v" id="csStatPoll">off</span></div>
-    <div class="stat" id="csStatSkipRow" style="display:none"><span class="k" style="color:#fbbf24">⚠ not applying</span><span class="v" id="csStatSkip" style="color:#fbbf24"></span></div>
-    <div class="stat"><span class="k">cupix pos</span><span class="v" id="csStatPos">—</span></div>
-    <div class="stat"><span class="k">bim camera</span><span class="v" id="csStatBim">—</span></div>
-    <div class="sec-title" style="margin:6px 0 2px">Top message types</div>
-    <div id="csTypeRows"></div>
-    <div class="row" style="margin-top:8px">
+    <div class="stat"><span class="k">status</span><span class="v"><span id="csStatApply">0</span> applied · poll <span id="csStatPoll">off</span></span></div>
+    <div class="stat" id="csStatSkipRow" style="display:none"><span class="k" style="color:#fbbf24">⚠</span><span class="v" id="csStatSkip" style="color:#fbbf24"></span></div>
+    <div class="stat"><span class="k">cupix</span><span class="v" id="csStatPos">—</span></div>
+    <div class="stat"><span class="k">bim</span><span class="v" id="csStatBim">—</span></div>
+    <div class="row" style="margin-top:6px">
       <label><input type="checkbox" id="csEnabled" ${cupixSync.enabled?'checked':''}/> auto-sync</label>
       <label><input type="checkbox" id="csPos" ${cupixSync.syncPos?'checked':''}/> position</label>
       <label><input type="checkbox" id="csRot" ${cupixSync.syncRot?'checked':''}/> rotation</label>
     </div>
-    <div class="sec-title">Calibration</div>
-    <div class="slider"><span class="k">offset X</span><input type="range" id="csOx" min="-50" max="50" step="0.1" value="${cupixSync.offset.x}"/><span class="v" id="csOxV">${cupixSync.offset.x.toFixed(1)}</span></div>
-    <div class="slider"><span class="k">offset Y</span><input type="range" id="csOy" min="-20" max="20" step="0.1" value="${cupixSync.offset.y}"/><span class="v" id="csOyV">${cupixSync.offset.y.toFixed(1)}</span></div>
-    <div class="slider"><span class="k">offset Z</span><input type="range" id="csOz" min="-50" max="50" step="0.1" value="${cupixSync.offset.z}"/><span class="v" id="csOzV">${cupixSync.offset.z.toFixed(1)}</span></div>
-    <div class="slider"><span class="k">scale</span><input type="range" id="csSc" min="0.1" max="10" step="0.05" value="${cupixSync.scale}"/><span class="v" id="csScV">${cupixSync.scale.toFixed(2)}</span></div>
-    <div class="slider"><span class="k">Y rotate °</span><input type="range" id="csYr" min="-180" max="180" step="1" value="${cupixSync.yRotation}"/><span class="v" id="csYrV">${cupixSync.yRotation}°</span></div>
-    <div class="row" style="margin-top:8px;gap:4px">
-      <button onclick="cupixSmartCalibrate()" title="Restore the verified calibration preset">⟳ Align</button>
-      <button onclick="cupixLockHere()" style="${_lockArmed ? 'border-color:rgba(74,222,128,.5);color:#4ade80;background:rgba(74,222,128,.12)' : ''}" title="${_lockArmed ? 'Sync is FROZEN — aim the BIM at exactly what Cupix shows, then click to confirm' : 'Step 1: freezes sync so you can aim the BIM freely. Step 2: confirm to calibrate from your aim'}">${_lockArmed ? '✓ Confirm lock' : '📌 Lock here'}</button>
-      <button onclick="cupixFlipPitch()" title="Use when looking UP in Cupix pitches the BIM DOWN — flips world handedness and re-solves from your last lock automatically">↕ U/D</button>
-      <button onclick="cupixResetCalib()" title="Clear calibration">↺ Reset</button>
-      <button onclick="cupixCopyDebug()" title="Copy raw calibration data (pano positions, levels, camera samples) to the clipboard — paste it to Claude for offline exact fitting">📋 Debug</button>
+    <div class="row" style="margin-top:6px;gap:4px">
+      <button onclick="cupixSmartCalibrate()" title="Restore the computed calibration">⟳ Align</button>
+      <button onclick="cupixLockHere()" style="${_lockArmed ? 'border-color:rgba(74,222,128,.5);color:#4ade80;background:rgba(74,222,128,.12)' : ''}" title="${_lockArmed ? 'Sync is FROZEN — aim the BIM at exactly what Cupix shows, then click to confirm' : 'Freezes sync so you can aim the BIM freely, then confirm to calibrate from your aim'}">${_lockArmed ? '✓ Confirm lock' : '📌 Lock here'}</button>
+      <button onclick="cupixFlipPitch()" title="Looking UP in Cupix pitches the BIM DOWN → click once">↕</button>
+      <button onclick="cupixResetCalib()" title="Clear calibration">↺</button>
+      <button onclick="cupixCopyDebug()" title="Copy raw calibration data to clipboard (for Claude)">📋</button>
     </div>
-    <div class="hint">${_lockArmed
-      ? 'Sync frozen. Aim the BIM camera (drag / WASD) at exactly what the Cupix side shows — same spot, same direction — then click ✓ Confirm lock.'
-      : '⟳ Align restores the verified preset. To fine-tune: stand somewhere recognizable in Cupix → 📌 Lock here (freezes sync) → aim the BIM to match → ✓ Confirm.'}</div>
+    ${_lockArmed ? '<div class="hint">Sync frozen. Aim the BIM camera (drag / WASD) at exactly what the Cupix side shows — same spot, same direction — then ✓ Confirm lock.</div>' : ''}
+    <details>
+      <summary>Calibration</summary>
+      <div class="slider"><span class="k">offset X</span><input type="range" id="csOx" min="-50" max="50" step="0.1" value="${cupixSync.offset.x}"/><span class="v" id="csOxV">${cupixSync.offset.x.toFixed(1)}</span></div>
+      <div class="slider"><span class="k">offset Y</span><input type="range" id="csOy" min="-20" max="20" step="0.1" value="${cupixSync.offset.y}"/><span class="v" id="csOyV">${cupixSync.offset.y.toFixed(1)}</span></div>
+      <div class="slider"><span class="k">offset Z</span><input type="range" id="csOz" min="-50" max="50" step="0.1" value="${cupixSync.offset.z}"/><span class="v" id="csOzV">${cupixSync.offset.z.toFixed(1)}</span></div>
+      <div class="slider"><span class="k">scale</span><input type="range" id="csSc" min="0.1" max="10" step="0.05" value="${cupixSync.scale}"/><span class="v" id="csScV">${cupixSync.scale.toFixed(2)}</span></div>
+      <div class="slider"><span class="k">Y rotate °</span><input type="range" id="csYr" min="-180" max="180" step="1" value="${cupixSync.yRotation}"/><span class="v" id="csYrV">${cupixSync.yRotation}°</span></div>
+    </details>
+    <details>
+      <summary>Diagnostics</summary>
+      <div class="stat"><span class="k">msgs received</span><span class="v" id="csStatMsgs">0</span></div>
+      <div class="stat"><span class="k">with camera tm</span><span class="v" id="csStatTm">0</span></div>
+      <div id="csTypeRows"></div>
+    </details>
   `;
   // Wire up controls
   const wire = (id, fn) => { const el = panel.querySelector('#'+id); if (el) el.oninput = () => fn(el); };
@@ -3748,8 +3756,12 @@ document.getElementById('dpClose').addEventListener('click', () => {
 
 renderer.domElement.addEventListener('click', e => {
   if (e.target !== renderer.domElement) return;
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  // NDC from the CANVAS rect, not the window — in Compare mode the canvas occupies
+  // only the right half, so window-based coordinates made every ray miss (clicks
+  // appeared dead). Correct in fullscreen too.
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
 
   // Interior layer first — pick mode + hotspot clicks intercept before MEP
