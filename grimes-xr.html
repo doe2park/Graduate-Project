@@ -1474,12 +1474,103 @@ function startCupixPolling() {
     // Re-handshake until the first tm arrives (iframe app may not have been ready yet).
     if (_cupixTmMsgCount === 0) cupixApiSend('APP_API_START');
     if (cupixApiSend('GET_CAMERA_PARAMETERS')) { _cupixPollCount++; renderCupixSyncPanel(); }
+    // Self-calibrate: if the API is alive and no calibration exists yet, auto-align once.
+    if (!_autoAlignTriggered && _cupixTmMsgCount > 0 &&
+        cupixSync.yRotation === 0 && !cupixSync.offset.x && !cupixSync.offset.y && !cupixSync.offset.z) {
+      _autoAlignTriggered = true;
+      cupixAutoAlign();
+    }
   }, 500);
 }
 function stopCupixPolling() {
   if (_cupixPollTimer) { clearInterval(_cupixPollTimer); _cupixPollTimer = null; }
 }
 window.cupixApiSend = cupixApiSend;  // console access for experimenting (e.g. GET_PANO_ALL)
+
+/* ── AUTO-ALIGN — calibration without manual flying ──
+   Ask Cupix for ALL pano positions (GET_PANO_ALL), then align that point cloud to the
+   BIM: centroid → centroid for the offset, horizontal PCA major axis vs BIM bbox long
+   axis for yaw. Yaw has a 4-fold ambiguity (±long axis), so ↻ 90° cycles candidates
+   while keeping the centroids matched — click until the views agree, then fine-tune
+   with 📌 Lock here if needed. */
+let _cupixPanos = null;          // [{position:[x,y,z]}, ...] raw Cupix coords
+let _autoAlignPending = false;
+let _autoAlignTriggered = false; // self-calibration ran this session
+let _autoAlignBase = 0;          // base yaw candidate (deg)
+let _autoAlignIdx = 0;           // which 90° candidate is active
+let _autoAlignCp = null;         // pano centroid (swapped+scaled, pre-yaw)
+let _autoAlignCb = null;         // BIM bbox centroid
+
+function _findCupixPanos(o, depth = 0) {
+  if (!o || typeof o !== 'object' || depth > 4) return null;
+  if (Array.isArray(o.panos) && o.panos.length &&
+      o.panos.every(p => p && Array.isArray(p.position) && p.position.length === 3)) return o.panos;
+  for (const k in o) {
+    const v = o[k];
+    if (!v || typeof v !== 'object') continue;
+    const r = _findCupixPanos(v, depth + 1);
+    if (r) return r;
+  }
+  return null;
+}
+
+function cupixAutoAlign() {
+  if (!_cupixPanos) {
+    _autoAlignPending = true;
+    if (!cupixApiSend('GET_PANO_ALL')) alert('Open 🪞 Compare first (Cupix iframe not loaded).');
+    return;  // listener re-invokes when the pano list arrives
+  }
+  // Pano cloud → BIM frame (swap + scale, no yaw yet)
+  const pts = _cupixPanos.map(p => {
+    let [x, y, z] = p.position;
+    if (cupixSync.swapYZ) { const t = y; y = z; z = t; }
+    return new THREE.Vector3(x * cupixSync.scale, y * cupixSync.scale, z * cupixSync.scale);
+  });
+  const cp = pts.reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(pts.length);
+  // BIM bounds from the loaded MEP meshes
+  const bbox = new THREE.Box3();
+  allMeshes.forEach(m => bbox.expandByObject(m));
+  if (bbox.isEmpty()) { alert('BIM not loaded yet.'); return; }
+  const cb = bbox.getCenter(new THREE.Vector3());
+  // Yaw: pano-cloud horizontal PCA major axis vs BIM bbox long axis
+  let sxx = 0, szz = 0, sxz = 0;
+  pts.forEach(v => { const dx = v.x - cp.x, dz = v.z - cp.z; sxx += dx*dx; szz += dz*dz; sxz += dx*dz; });
+  const phiP = 0.5 * Math.atan2(2 * sxz, sxx - szz) * 180 / Math.PI;  // pano major axis angle
+  const size = bbox.getSize(new THREE.Vector3());
+  const phiB = size.x >= size.z ? 0 : 90;                              // BIM long axis angle
+  // Axis angles transform as φ_post = φ_pre − yaw, so yaw = φ_pre − φ_post.
+  // (Verified numerically: phiP − phiB recovers a known ground-truth yaw exactly.)
+  _autoAlignBase = phiP - phiB;
+  _autoAlignIdx = 0;
+  _autoAlignCp = cp; _autoAlignCb = cb;
+  _applyAutoAlign();
+  console.log('[auto-align]', pts.length, 'panos · centroid', cp, '→', cb, '· base yaw', _autoAlignBase.toFixed(1));
+}
+
+function _applyAutoAlign() {
+  if (!_autoAlignCp) return;
+  let yaw = _autoAlignBase + _autoAlignIdx * 90;
+  yaw = ((yaw + 540) % 360) - 180;
+  cupixSync.yRotation = Math.round(yaw * 10) / 10;
+  // offset so the rotated pano centroid lands on the BIM centroid
+  const r = yaw * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  const rx = c * _autoAlignCp.x + s * _autoAlignCp.z;
+  const rz = -s * _autoAlignCp.x + c * _autoAlignCp.z;
+  cupixSync.offset.x = _autoAlignCb.x - rx;
+  cupixSync.offset.y = _autoAlignCb.y - _autoAlignCp.y;
+  cupixSync.offset.z = _autoAlignCb.z - rz;
+  saveCupixSync();
+  renderCupixSyncPanel(true);
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm);
+}
+
+function cupixNextOrientation() {
+  if (!_autoAlignCp) { cupixAutoAlign(); return; }
+  _autoAlignIdx = (_autoAlignIdx + 1) % 4;
+  _applyAutoAlign();
+}
+window.cupixAutoAlign = cupixAutoAlign;
+window.cupixNextOrientation = cupixNextOrientation;
 Object.defineProperty(window, '_lastCupixTm', { get: () => _lastCupixTm });
 Object.defineProperty(window, '_lastCupixPos', { get: () => _lastCupixPos });
 Object.defineProperty(window, '_cupixMsgCount', { get: () => _cupixMsgCount });
@@ -1528,6 +1619,13 @@ function installCupixMsgListener() {
         _cupixApplyCount++;
         _cupixSkipReason = '';
       }
+    }
+    // Capture pano list (GET_PANO_ALL response) for auto-align
+    const panos = _findCupixPanos(msg);
+    if (panos) {
+      _cupixPanos = panos;
+      console.log('[cupix-sync] received', panos.length, 'pano positions');
+      if (_autoAlignPending) { _autoAlignPending = false; cupixAutoAlign(); }
     }
     renderCupixSyncPanel();
   });
@@ -1666,13 +1764,17 @@ function buildCupixSyncPanel(panel) {
     <div class="slider"><span class="k">scale</span><input type="range" id="csSc" min="0.1" max="10" step="0.05" value="${cupixSync.scale}"/><span class="v" id="csScV">${cupixSync.scale.toFixed(2)}</span></div>
     <div class="slider"><span class="k">Y rotate °</span><input type="range" id="csYr" min="-180" max="180" step="1" value="${cupixSync.yRotation}"/><span class="v" id="csYrV">${cupixSync.yRotation}°</span></div>
     <div class="row" style="margin-top:8px;gap:4px">
-      <button onclick="cupixLockHere()" title="One-click calibration: park BIM camera at the same spot you're standing in Cupix, facing the same direction, then click — computes yaw + offset">📌 Lock here</button>
+      <button onclick="cupixAutoAlign()" title="Automatic calibration: fetches all Cupix pano positions and aligns their centroid + main axis to the BIM model — no manual flying needed">🎯 Auto-align</button>
+      <button onclick="cupixNextOrientation()" title="Auto-align orientation is ambiguous by 90° — click to try the next of 4 candidates until the views agree">↻ 90°</button>
+    </div>
+    <div class="row" style="margin-top:4px;gap:4px">
+      <button onclick="cupixLockHere()" title="One-click fine calibration: park BIM camera at the same spot you're standing in Cupix, facing the same direction, then click — computes yaw + offset">📌 Lock here</button>
       <button onclick="cupixResetCalib()" title="Reset offset to zero">↺ Reset</button>
     </div>
     <div class="row" style="margin-top:4px;gap:4px">
       <button onclick="cupixTestSync()" title="Fire a fake Cupix message with a known position to verify the sync pipeline works without depending on Cupix actually emitting">🧪 Test sync (fake msg)</button>
     </div>
-    <div class="hint">Calibrate: stand somewhere in Cupix → fly BIM camera to the same spot, facing the same way → 📌 Lock here. If the synced view faces backward, toggle "flip fwd" and lock again.</div>
+    <div class="hint">🎯 Auto-align first. If the view is rotated, ↻ 90° until it matches. For exact fit: stand in Cupix → fly BIM camera to the same spot facing the same way → 📌 Lock here. Backward view → toggle "flip fwd".</div>
   `;
   // Wire up controls
   const wire = (id, fn) => { const el = panel.querySelector('#'+id); if (el) el.oninput = () => fn(el); };
