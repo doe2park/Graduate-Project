@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v11';  // v11: camera-convention auto-detection
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v12';  // v12: algebraic camera-convention solve at Lock
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1391,8 +1391,9 @@ const cupixSync = (() => {
     swapYZ: true,            // Cupix is Z-up, Three.js is Y-up → swap Y and Z
     flipZ: false,            // negate Z after swap → proper rotation (Rx-90) instead of mirror
     flipFwd: false,          // 180° flip of camera forward — toggle if synced view looks BACKWARD
-    camFix: 'none',          // camera-local convention fix (auto-detected): Cupix's camera
-                             // matrix may define forward/up on different axes than Three.js
+    camFix: 'none',          // (legacy, unused once camMat is solved)
+    camMat: null,            // EXACT camera-convention matrix, solved algebraically at Lock:
+                             // C = (W·R_lock)⁻¹ · T_lock — absorbs any axis convention
     offset: { x: 0, y: 0, z: 0 },  // added to Cupix position AFTER scale + swap
     scale: 1.0,              // Cupix unit → BIM unit
     yRotation: 0,            // degrees, rotates the position around Y to align orientation
@@ -1897,8 +1898,9 @@ function cupixSmartCalibrate() {
     yaw: Math.round((((best.yaw + 540) % 360) - 180) * 10) / 10,
     offset: { x: Math.round(best.ox * 100) / 100, y: Math.round(bestFloor.oy * 100) / 100, z: Math.round(best.oz * 100) / 100 },
   });
-  // Finally, fix the camera-local convention (the "view is pitched 90°" symptom).
-  cupixDetectCamFix();
+  // If the user has locked before, re-solve the exact camera-convention matrix under
+  // the new world transform so their rotation alignment survives recalibration.
+  if (cupixSync.anchor) { _solveCamMatFromAnchor(cupixSync.anchor); saveCupixSync(); }
 }
 window.cupixSmartCalibrate = cupixSmartCalibrate;
 
@@ -2141,35 +2143,44 @@ function cupixDetectCamFix() {
 }
 window.cupixDetectCamFix = cupixDetectCamFix;
 
-function cupixRotationToBim(tm, applyYaw) {
-  const m = new THREE.Matrix4();
-  // Row-major input → Matrix4.set() takes row-major arguments. Zero out translation.
-  m.set(
+// Axis-conversion matrix used for POSITIONS (swap, optional flipZ).
+function _axisConvMatrix() {
+  if (!cupixSync.swapYZ) return new THREE.Matrix4();
+  return new THREE.Matrix4().set(
+    1, 0, 0, 0,
+    0, 0, 1, 0,
+    0, (cupixSync.flipZ ? -1 : 1), 0, 0,
+    0, 0, 0, 1
+  );
+}
+// World transform rotation part: W = Ry(yaw) · AxisConv.
+function _worldRotMatrix(applyYaw) {
+  const W = _axisConvMatrix();
+  if (applyYaw && cupixSync.yRotation) {
+    W.premultiply(new THREE.Matrix4().makeRotationY(cupixSync.yRotation * Math.PI / 180));
+  }
+  return W;
+}
+function _tmRotPart(tm) {
+  return new THREE.Matrix4().set(
     tm[0], tm[1], tm[2], 0,
     tm[4], tm[5], tm[6], 0,
     tm[8], tm[9], tm[10], 0,
     0, 0, 0, 1
   );
-  if (cupixSync.swapYZ) {
-    // Conjugate by the SAME axis conversion used for points: M·R·M⁻¹.
-    // swap only = mirror (own inverse); swap+flipZ = proper rotation Rx(−90°).
-    const M = new THREE.Matrix4().set(
-      1, 0, 0, 0,
-      0, 0, 1, 0,
-      0, (cupixSync.flipZ ? -1 : 1), 0, 0,
-      0, 0, 0, 1
-    );
-    const Minv = M.clone().invert();
-    m.premultiply(M).multiply(Minv);
-  }
-  if (cupixSync.flipFwd) {
-    m.multiply(new THREE.Matrix4().makeRotationX(Math.PI));
-  }
-  if (cupixSync.camFix && cupixSync.camFix !== 'none' && _camFixMats[cupixSync.camFix]) {
-    m.multiply(_camFixMats[cupixSync.camFix]());
-  }
-  if (applyYaw && cupixSync.yRotation) {
-    m.premultiply(new THREE.Matrix4().makeRotationY(cupixSync.yRotation * Math.PI / 180));
+}
+// ROTATION conversion — no guessed conventions: T(t) = W · R_cupix(t) · C.
+// C (camera-convention matrix) is solved ALGEBRAICALLY at Lock confirm:
+//   C = (W · R_lock)⁻¹ · T_lock
+// which makes the BIM view EXACTLY equal the user's aim at the lock pose and
+// rigidly track every Cupix rotation afterwards. Before the first lock, C falls
+// back to AxisConv⁻¹ (equivalent to the old conjugation behavior).
+function cupixRotationToBim(tm, applyYaw) {
+  const m = _worldRotMatrix(applyYaw).multiply(_tmRotPart(tm));
+  if (Array.isArray(cupixSync.camMat) && cupixSync.camMat.length === 16) {
+    m.multiply(new THREE.Matrix4().fromArray(cupixSync.camMat));
+  } else {
+    m.multiply(_axisConvMatrix().invert());
   }
   return new THREE.Quaternion().setFromRotationMatrix(m);
 }
@@ -2297,6 +2308,19 @@ function _solveYawOffsetFromAnchor(a) {
   cupixSync.offset.x = a.cam.x - cx;
   cupixSync.offset.y = a.cam.y - cy;
   cupixSync.offset.z = a.cam.z - cz;
+  // 3) Solve the camera-convention matrix exactly under the (possibly new) yaw.
+  _solveCamMatFromAnchor(a);
+}
+
+// C = (W·R_lock)⁻¹ · T_lock — after this, the BIM view at the lock pose equals the
+// user's aim BY CONSTRUCTION, and rigidly tracks every Cupix rotation afterwards.
+function _solveCamMatFromAnchor(a) {
+  if (!a || !a.tm || !Array.isArray(a.quat)) return;
+  const W = _worldRotMatrix(true);
+  const T = new THREE.Matrix4().makeRotationFromQuaternion(
+    new THREE.Quaternion(a.quat[0], a.quat[1], a.quat[2], a.quat[3]));
+  const C = new THREE.Matrix4().multiplyMatrices(W, _tmRotPart(a.tm)).invert().multiply(T);
+  cupixSync.camMat = Array.from(C.elements);
 }
 
 // "Up/down is mirrored": looking UP in Cupix pitches the BIM DOWN. That's the world
@@ -2337,6 +2361,7 @@ function cupixLockHere() {
     pos: { x: _lastCupixPos.x, y: _lastCupixPos.y, z: _lastCupixPos.z },
     cam: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
     fwd: { x: fbNow.x, y: fbNow.y, z: fbNow.z },
+    quat: [camera.quaternion.x, camera.quaternion.y, camera.quaternion.z, camera.quaternion.w],
   };
   _solveYawOffsetFromAnchor(cupixSync.anchor);
   saveCupixSync();
