@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v7';  // v7: scale decided from span, Y offset from floor semantics
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v8';  // v8: verified preset is the default; no auto-refit
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1802,36 +1802,17 @@ function _applyCalib(c) {
   refreshCupixPanoDots();
   if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
 }
+// The calibration the user VISUALLY confirmed working (session of 2026-06-12 morning):
+// camera landed in the right corridor and tracked Cupix navigation. Treat it as ground
+// truth — automatic re-fitting kept regressing, so ⟳ Align simply restores this preset
+// and 📌 Lock here remains the way to fine-tune from a known-good state.
+const CUPIX_PRESET = {
+  swapYZ: true, flipZ: false, scale: 0.3048, yaw: 82.5,
+  offset: { x: -16.9, y: 8.5, z: 9.0 },
+};
 function cupixSmartCalibrate() {
-  // The analytic transform needs NO pano data — apply it immediately so a sane
-  // calibration always exists (never leave the camera flying to raw coordinates).
-  if (!_cupixPanos) {
-    _applyCalib(Object.assign({ scale: 0.3048 }, CUPIX_ANALYTIC));
-    console.log('[smart-calibrate] analytic ft transform applied; waiting for pano list to validate');
-    _smartPending = true;
-    cupixApiSend('GET_PANO_ALL');
-    return;  // listener re-invokes for validation when panos arrive
-  }
-  const cell = 2.0;
-  const occ = _bimOccupancy(cell);
-  // Cupix may report source feet or pre-converted meters — same offsets either way.
-  const candidates = [
-    Object.assign({ scale: 0.3048 }, CUPIX_ANALYTIC),
-    Object.assign({ scale: 1.0 }, CUPIX_ANALYTIC),
-  ];
-  let best = null;
-  for (const cand of candidates) {
-    const sc = _scoreCandidate(cand, occ, cell);
-    console.log('[smart-calibrate] analytic candidate scale', cand.scale, '→', (sc * 100).toFixed(0) + '%');
-    if (!best || sc > best.score) best = { cand, score: sc };
-  }
-  _applyCalib(best.cand);
-  if (best.score >= 0.6) {
-    console.log('[smart-calibrate] ✓ BIM-native alignment locked (yaw 0, analytic offset), score', (best.score * 100).toFixed(0) + '%');
-  } else {
-    console.warn('[smart-calibrate] analytic alignment only scored', (best.score * 100).toFixed(0) + '% — refining with occupancy search');
-    cupixFitAlign();
-  }
+  _applyCalib(Object.assign({}, CUPIX_PRESET, { offset: Object.assign({}, CUPIX_PRESET.offset) }));
+  console.log('[align] verified preset restored:', JSON.stringify(CUPIX_PRESET));
 }
 window.cupixSmartCalibrate = cupixSmartCalibrate;
 
