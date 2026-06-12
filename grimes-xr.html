@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v12';  // v12: algebraic camera-convention solve at Lock
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v13';  // v13: real Revit level elevations from NWD
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1694,8 +1694,8 @@ function cupixFitAlign() {
     if (err < scaleErr) { scaleErr = err; scale = s; }
   }
   // VERTICAL offset comes from floor semantics, not blind search: eye height is ~1.6m
-  // above a floor, so the only sane offsets put the pano median at a floor's walk height.
-  const floorEyeY = [1.6, 5.6, 9.6, 13.6, 17.6];  // B1/L1/L2/L3/SRV (floorYRanges start + 1.6)
+  // above a floor. Walk heights from the REAL Revit level elevations (see smart calibrate).
+  const floorEyeY = [3.1, 3.9, 7.7, 12.0, 16.8];  // LOWER/MEZZ/L1/L2/L3 + 1.6m eye
   let best = { score: -1, yaw: 0, ox: 0, oy: 0, oz: 0, scale, flip: true };
   for (const flip of [true, false]) {
     const all = mkRaw(flip).map(v => v.multiplyScalar(scale));
@@ -1878,18 +1878,27 @@ function cupixSmartCalibrate() {
         if (sc > best.score) best = { score: sc, yaw, ox: b0.ox + dx, oz: b0.oz + dz, flip: b0.flip };
       }
 
-  // Vertical: rank viewer floors by 3D occupancy at the fitted yaw/XZ.
+  // Vertical: EXACT Revit level elevations extracted from the original NWD
+  // (data/bechtel_nwd_properties.json — LOWER −20ft, LOWER −15ft, MEZZ −12.5ft,
+  //  L01 0ft, L02 +14ft, L03 +30ft, ROOF +45ft). The MEP glb floor (y=0) sits at
+  //  the −20ft LOWER-LOWER level (total height 20.2m matches −20..+45ft+parapet),
+  //  so viewer_y = revit_m + 6.096.
+  const BIM_LEVELS = [
+    { key: 'LOWER', y: 1.524,  rx: /low|b1|base|^0/ },
+    { key: 'MEZZ',  y: 2.286,  rx: /mezz/ },
+    { key: 'L1',    y: 6.096,  rx: /(level|lvl|^)\s*0?1$|ground|first|main/ },
+    { key: 'L2',    y: 10.363, rx: /(level|lvl|^)\s*0?2$|terrace|second/ },
+    { key: 'L3',    y: 15.240, rx: /(level|lvl|^)\s*0?3$|upper|third/ },
+    { key: 'ROOF',  y: 19.812, rx: /roof/ },
+  ];
   const occ3 = _bimOccupancy(2.0);
-  const floorStarts = { B1: 0, L1: 4, L2: 8, L3: 12, SRV: 16 };
-  const nm = (cur.name || '').toLowerCase().replace(/\s+/g, '');
-  const nameGuess =
-    /b1|base/.test(nm) ? 'B1' : /1/.test(nm) ? 'L1' : /2/.test(nm) ? 'L2' : /3/.test(nm) ? 'L3' : null;
+  const nm = (cur.name || '').toLowerCase().trim();
   let bestFloor = { score: -1, oy: 0, key: null };
-  for (const [key, start] of Object.entries(floorStarts)) {
-    const oy = start - cur.elevation;
+  for (const L of BIM_LEVELS) {
+    const oy = L.y - cur.elevation;  // pano z (= cupix floor elev + eye) lands at L.y + eye
     let sc = _fitScore(ptsF, occ3, 2.0, best.yaw, best.ox, oy, best.oz);
-    if (key === nameGuess) sc += 0.05;  // small prior for the name match
-    if (sc > bestFloor.score) bestFloor = { score: sc, oy, key };
+    if (L.rx.test(nm)) sc += 0.15;  // strong prior: Cupix level name matches this BIM level
+    if (sc > bestFloor.score) bestFloor = { score: sc, oy, key: L.key };
   }
   console.log('[align] plan fit: flipZ', best.flip, 'yaw', best.yaw.toFixed(1), 'score', (best.score * 100 / 3).toFixed(0) + '%',
     '· floor', bestFloor.key, '(oy', bestFloor.oy.toFixed(2) + ')');
