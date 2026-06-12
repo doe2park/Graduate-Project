@@ -2111,6 +2111,7 @@ const _camFixMats = {
   rx180: () => new THREE.Matrix4().makeRotationX(Math.PI),
   rz90:  () => new THREE.Matrix4().makeRotationZ(Math.PI / 2),
   rzm90: () => new THREE.Matrix4().makeRotationZ(-Math.PI / 2),
+  rz180: () => new THREE.Matrix4().makeRotationZ(Math.PI),  // upside-down roll
 };
 let _cupixTmHist = [];
 function cupixDetectCamFix() {
@@ -2242,6 +2243,7 @@ function buildCupixSyncPanel(panel) {
     <div class="row" style="margin-top:8px;gap:4px">
       <button onclick="cupixSmartCalibrate()" title="Restore the verified calibration preset">⟳ Align</button>
       <button onclick="cupixLockHere()" style="${_lockArmed ? 'border-color:rgba(74,222,128,.5);color:#4ade80;background:rgba(74,222,128,.12)' : ''}" title="${_lockArmed ? 'Sync is FROZEN — aim the BIM at exactly what Cupix shows, then click to confirm' : 'Step 1: freezes sync so you can aim the BIM freely. Step 2: confirm to calibrate from your aim'}">${_lockArmed ? '✓ Confirm lock' : '📌 Lock here'}</button>
+      <button onclick="cupixFlipPitch()" title="Use when looking UP in Cupix pitches the BIM DOWN — flips world handedness and re-solves from your last lock automatically">↕ U/D</button>
       <button onclick="cupixResetCalib()" title="Clear calibration">↺ Reset</button>
     </div>
     <div class="hint">${_lockArmed
@@ -2269,6 +2271,48 @@ function buildCupixSyncPanel(panel) {
 //            camera's view direction (so "where you look" matches)
 //   offset — current BIM camera − yaw-rotated/scaled Cupix position
 // Scale is left alone (both systems are in meters; tweak slider only if needed).
+// Solve yaw + offset from a stored anchor (cupix raw pose ↔ aimed BIM pose),
+// under the CURRENT axis convention (swap/flipZ/camFix). Used by Lock confirm
+// and by handedness toggles so the user never has to re-aim.
+function _solveYawOffsetFromAnchor(a) {
+  if (a.tm) {
+    const qc = cupixRotationToBim(a.tm, /*applyYaw*/ false);
+    const fc = new THREE.Vector3(0, 0, -1).applyQuaternion(qc);
+    const fb = new THREE.Vector3(a.fwd.x, a.fwd.y, a.fwd.z);
+    // Horizontal headings: φ = atan2(x, z); Ry(θ) maps φ → φ+θ, so θ = φ(BIM) − φ(Cupix).
+    if (Math.hypot(fc.x, fc.z) > 1e-3 && Math.hypot(fb.x, fb.z) > 1e-3) {
+      let deg = (Math.atan2(fb.x, fb.z) - Math.atan2(fc.x, fc.z)) * 180 / Math.PI;
+      deg = ((deg + 540) % 360) - 180;
+      cupixSync.yRotation = Math.round(deg * 10) / 10;
+    }
+  }
+  const pre = cupixPreToBim(a.pos.x, a.pos.y, a.pos.z);
+  let cx = pre.x, cy = pre.y, cz = pre.z;
+  if (cupixSync.yRotation) {
+    const r = cupixSync.yRotation * Math.PI / 180;
+    const c = Math.cos(r), s = Math.sin(r);
+    const nx = c * cx + s * cz, nz = -s * cx + c * cz;  // Ry(θ), Three.js convention
+    cx = nx; cz = nz;
+  }
+  cupixSync.offset.x = a.cam.x - cx;
+  cupixSync.offset.y = a.cam.y - cy;
+  cupixSync.offset.z = a.cam.z - cz;
+}
+
+// "Up/down is mirrored": looking UP in Cupix pitches the BIM DOWN. That's the world
+// handedness (mirror vs proper rotation) — unfixable by yaw, so flip it and re-solve
+// yaw+offset from the saved lock anchor.
+function cupixFlipPitch() {
+  cupixSync.flipZ = !cupixSync.flipZ;
+  if (cupixSync.anchor && cupixSync.anchor.pos) _solveYawOffsetFromAnchor(cupixSync.anchor);
+  saveCupixSync();
+  renderCupixSyncPanel(true);
+  refreshCupixPanoDots();
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
+  console.log('[flip-pitch] flipZ →', cupixSync.flipZ, '· yaw', cupixSync.yRotation, '· offset', cupixSync.offset);
+}
+window.cupixFlipPitch = cupixFlipPitch;
+
 let _lockArmed = false;
 function cupixLockHere() {
   if (!_lastCupixPos) { alert('No Cupix camera position received yet. Navigate in Cupix first.'); return; }
@@ -2284,32 +2328,17 @@ function cupixLockHere() {
   }
   _lockArmed = false;
   cupixSync.enabled = true;
-  // 1) Solve yaw from view directions (needs the rotation part of tm).
-  if (_lastCupixTm) {
-    const qc = cupixRotationToBim(_lastCupixTm, /*applyYaw*/ false);
-    const fc = new THREE.Vector3(0, 0, -1).applyQuaternion(qc);   // Cupix forward, BIM frame, pre-yaw
-    const fb = new THREE.Vector3();
-    camera.getWorldDirection(fb);                                  // BIM camera forward (ground truth)
-    // Horizontal headings: φ = atan2(x, z); Ry(θ) maps φ → φ+θ, so θ = φ(BIM) − φ(Cupix).
-    if (Math.hypot(fc.x, fc.z) > 1e-3 && Math.hypot(fb.x, fb.z) > 1e-3) {
-      let deg = (Math.atan2(fb.x, fb.z) - Math.atan2(fc.x, fc.z)) * 180 / Math.PI;
-      deg = ((deg + 540) % 360) - 180;  // normalize to [-180, 180]
-      cupixSync.yRotation = Math.round(deg * 10) / 10;
-    }
-  }
-  // 2) Solve offset: forward-transform raw Cupix pos with swap → flipZ → scale → (new) yaw,
-  //    then offset = current BIM camera − transformed Cupix pos.
-  const pre = cupixPreToBim(_lastCupixPos.x, _lastCupixPos.y, _lastCupixPos.z);
-  let cx = pre.x, cy = pre.y, cz = pre.z;
-  if (cupixSync.yRotation) {
-    const r = cupixSync.yRotation * Math.PI / 180;
-    const c = Math.cos(r), s = Math.sin(r);
-    const nx = c*cx + s*cz, nz = -s*cx + c*cz;  // Ry(θ), Three.js convention
-    cx = nx; cz = nz;
-  }
-  cupixSync.offset.x = camera.position.x - cx;
-  cupixSync.offset.y = camera.position.y - cy;
-  cupixSync.offset.z = camera.position.z - cz;
+  // Store the lock ANCHOR (raw Cupix pose + aimed BIM pose) so handedness/convention
+  // changes can re-solve yaw+offset later without asking the user to lock again.
+  const fbNow = new THREE.Vector3();
+  camera.getWorldDirection(fbNow);
+  cupixSync.anchor = {
+    tm: _lastCupixTm ? _lastCupixTm.slice() : null,
+    pos: { x: _lastCupixPos.x, y: _lastCupixPos.y, z: _lastCupixPos.z },
+    cam: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+    fwd: { x: fbNow.x, y: fbNow.y, z: fbNow.z },
+  };
+  _solveYawOffsetFromAnchor(cupixSync.anchor);
   saveCupixSync();
   renderCupixSyncPanel(true);  // rebuild so sliders show the new yaw/offset
   refreshCupixPanoDots();
