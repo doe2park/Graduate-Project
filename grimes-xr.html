@@ -1382,7 +1382,7 @@ function applyCompareLayout(splitOn) {
    We parse this, apply a user-tweakable calibration (offset / scale / Y rotation),
    then push to the Three.js camera. Calibration persists in localStorage.
 ============================================================================== */
-const CUPIX_SYNC_LS_KEY = 'cupixSync.v9';  // v9: proper-rotation preset + two-step lock
+const CUPIX_SYNC_LS_KEY = 'cupixSync.v10';  // v10: level-based metric calibration
 const cupixSync = (() => {
   const defaults = {
     enabled: true,           // auto-sync on/off
@@ -1474,9 +1474,10 @@ function startCupixPolling() {
     if (!document.body.classList.contains('cupix-compare-on')) { stopCupixPolling(); return; }
     // Re-handshake until the first tm arrives (iframe app may not have been ready yet).
     if (_cupixTmMsgCount === 0) cupixApiSend('APP_API_START');
-    // Re-request the pano list while anything is waiting on it — a single early request
+    // Re-request data while anything is waiting on it — a single early request
     // can race the APP_API_START handshake and get silently dropped.
     if (!_cupixPanos && (_smartPending || _fitPending || _panoDotsPending || _autoAlignPending)) cupixApiSend('GET_PANO_ALL');
+    if (!_cupixLevels && _smartPending) cupixApiSend('GET_LEVEL_ALL');
     if (cupixApiSend('GET_CAMERA_PARAMETERS')) { _cupixPollCount++; renderCupixSyncPanel(); }
     // Self-calibrate: if the API is alive and no calibration exists yet, run the
     // analytic BIM-native alignment once (occupancy search only as its fallback).
@@ -1802,23 +1803,98 @@ function _applyCalib(c) {
   refreshCupixPanoDots();
   if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
 }
-// The calibration the user VISUALLY confirmed working (session of 2026-06-12 morning):
-// camera landed in the right corridor and tracked Cupix navigation. Treat it as ground
-// truth — automatic re-fitting kept regressing, so ⟳ Align simply restores this preset
-// and 📌 Lock here remains the way to fine-tune from a known-good state.
-// Proper-rotation (flipZ) variant of the verified preset: same position at the verified
-// spot — cupix (18.88,−25.77,1.48) still maps to bim ≈ (−8.4, 9.0, 4.3) — but TURN
-// DIRECTION now matches (mirror conversion reverses rotation sense, which made manual
-// aiming impossible). yaw 180−82.5, offset recomputed for the flipped Z.
-const CUPIX_PRESET = {
-  swapYZ: true, flipZ: true, scale: 0.3048, yaw: 97.5,
-  offset: { x: -15.4, y: 8.5, z: 11.0 },
-};
-// Previous mirror-based preset, kept for console rollback:
-// window.cupixSmartCalibrate.MIRROR = {swapYZ:true,flipZ:false,scale:0.3048,yaw:82.5,offset:{x:-16.9,y:8.5,z:9.0}}
+/* ── LEVEL-BASED CALIBRATION — built on facts, not guesses ──
+   FACT 1 (official API docs): GET_LEVEL_ALL elevations/heights are IN METERS, so the
+   Cupix world is metric → scale = 1, full stop. (The old 0.3048 preset only *looked*
+   right because a shrunken cloud barely moves while you walk.)
+   FACT 2: vertical alignment is solvable exactly — Cupix level elevation ↔ viewer floor
+   band start. Floor choice is ranked by 3D occupancy (name match gets a small prior).
+   That leaves only yaw + XZ offset, fitted in plan view where nothing can degenerate. */
+let _cupixLevels = null;
+function _findCupixLevels(o, depth = 0) {
+  if (!o || typeof o !== 'object' || depth > 4) return null;
+  if (Array.isArray(o.levels) && o.levels.length && o.levels.every(L => L && typeof L.elevation === 'number')) return o.levels;
+  for (const k in o) {
+    const v = o[k];
+    if (!v || typeof v !== 'object') continue;
+    const r = _findCupixLevels(v, depth + 1);
+    if (r) return r;
+  }
+  return null;
+}
 function cupixSmartCalibrate() {
-  _applyCalib(Object.assign({}, CUPIX_PRESET, { offset: Object.assign({}, CUPIX_PRESET.offset) }));
-  console.log('[align] verified preset restored:', JSON.stringify(CUPIX_PRESET));
+  let missing = false;
+  if (!_cupixPanos) { cupixApiSend('GET_PANO_ALL'); missing = true; }
+  if (!_cupixLevels) { cupixApiSend('GET_LEVEL_ALL'); missing = true; }
+  if (missing) { _smartPending = true; return; }  // poll loop retries; listener re-invokes
+  _smartPending = false;
+
+  const bbox = new THREE.Box3();
+  allMeshes.forEach(m => bbox.expandByObject(m));
+  if (buildingLoaded && buildingModel) bbox.expandByObject(buildingModel);
+  if (bbox.isEmpty()) { console.warn('[align] BIM not loaded yet'); return; }
+  const cb = bbox.getCenter(new THREE.Vector3());
+
+  // Which Cupix level was scanned? The one containing the pano median height.
+  const zs = _cupixPanos.map(p => p.position[2]).sort((a, b) => a - b);
+  const medZ = zs[zs.length >> 1];
+  const lvs = _cupixLevels.slice().sort((a, b) => a.elevation - b.elevation);
+  let cur = lvs[0];
+  for (const L of lvs) if (medZ >= L.elevation - 0.5) cur = L;
+  console.log('[align] scan level:', cur.name, 'elev', cur.elevation, '· pano medZ', medZ.toFixed(2));
+
+  // Horizontal fit: yaw × XZ only (scale=1, Y handled separately) in PLAN view.
+  const mkRaw = flip => _cupixPanos.map(p =>
+    new THREE.Vector3(p.position[0], p.position[2], flip ? -p.position[1] : p.position[1]));
+  const occP1 = _bimOccupancy2D(1.0), occP05 = _bimOccupancy2D(0.5);
+  const planScore = (pts, yaw, ox, oz) =>
+    _fitScore2D(pts, occP1, 1.0, yaw, ox, oz) + 2 * _fitScore2D(pts, occP05, 0.5, yaw, ox, oz);
+  let best = { score: -1, yaw: 0, ox: 0, oz: 0, flip: true };
+  for (const flip of [true, false]) {
+    const all = mkRaw(flip);
+    const pts = all.length > 300 ? all.filter((_, i) => i % Math.ceil(all.length / 300) === 0) : all;
+    const cp = pts.reduce((a, v) => a.clone().add(v), new THREE.Vector3()).divideScalar(pts.length);
+    for (let yaw = 0; yaw < 360; yaw += 3) {
+      const r = yaw * Math.PI / 180, c0 = Math.cos(r), s0 = Math.sin(r);
+      const bx = cb.x - (c0 * cp.x + s0 * cp.z);
+      const bz = cb.z - (-s0 * cp.x + c0 * cp.z);
+      for (let dx = -6; dx <= 6; dx += 1.5)
+        for (let dz = -6; dz <= 6; dz += 1.5) {
+          const sc = planScore(pts, yaw, bx + dx, bz + dz);
+          if (sc > best.score) best = { score: sc, yaw, ox: bx + dx, oz: bz + dz, flip };
+        }
+    }
+  }
+  // Fine pass
+  const b0 = Object.assign({}, best);
+  const ptsF = mkRaw(b0.flip);
+  for (let yaw = b0.yaw - 3; yaw <= b0.yaw + 3; yaw += 0.5)
+    for (let dx = -1.25; dx <= 1.25; dx += 0.25)
+      for (let dz = -1.25; dz <= 1.25; dz += 0.25) {
+        const sc = planScore(ptsF, yaw, b0.ox + dx, b0.oz + dz);
+        if (sc > best.score) best = { score: sc, yaw, ox: b0.ox + dx, oz: b0.oz + dz, flip: b0.flip };
+      }
+
+  // Vertical: rank viewer floors by 3D occupancy at the fitted yaw/XZ.
+  const occ3 = _bimOccupancy(2.0);
+  const floorStarts = { B1: 0, L1: 4, L2: 8, L3: 12, SRV: 16 };
+  const nm = (cur.name || '').toLowerCase().replace(/\s+/g, '');
+  const nameGuess =
+    /b1|base/.test(nm) ? 'B1' : /1/.test(nm) ? 'L1' : /2/.test(nm) ? 'L2' : /3/.test(nm) ? 'L3' : null;
+  let bestFloor = { score: -1, oy: 0, key: null };
+  for (const [key, start] of Object.entries(floorStarts)) {
+    const oy = start - cur.elevation;
+    let sc = _fitScore(ptsF, occ3, 2.0, best.yaw, best.ox, oy, best.oz);
+    if (key === nameGuess) sc += 0.05;  // small prior for the name match
+    if (sc > bestFloor.score) bestFloor = { score: sc, oy, key };
+  }
+  console.log('[align] plan fit: flipZ', best.flip, 'yaw', best.yaw.toFixed(1), 'score', (best.score * 100 / 3).toFixed(0) + '%',
+    '· floor', bestFloor.key, '(oy', bestFloor.oy.toFixed(2) + ')');
+  _applyCalib({
+    swapYZ: true, flipZ: best.flip, scale: 1.0,
+    yaw: Math.round((((best.yaw + 540) % 360) - 180) * 10) / 10,
+    offset: { x: Math.round(best.ox * 100) / 100, y: Math.round(bestFloor.oy * 100) / 100, z: Math.round(best.oz * 100) / 100 },
+  });
 }
 window.cupixSmartCalibrate = cupixSmartCalibrate;
 
@@ -1922,6 +1998,13 @@ function installCupixMsgListener() {
       if (_autoAlignPending) { _autoAlignPending = false; cupixAutoAlign(); }
       if (_panoDotsPending) { _panoDotsPending = false; cupixTogglePanoDots(); }
       if (_fitPending) { _fitPending = false; cupixFitAlign(); }
+      if (_smartPending) { _smartPending = false; cupixSmartCalibrate(); }
+    }
+    // Capture level list (GET_LEVEL_ALL response) for vertical calibration
+    const levels = _findCupixLevels(msg);
+    if (levels) {
+      _cupixLevels = levels;
+      console.log('[cupix-sync] received', levels.length, 'levels:', levels.map(L => L.name + '@' + L.elevation).join(', '));
       if (_smartPending) { _smartPending = false; cupixSmartCalibrate(); }
     }
     renderCupixSyncPanel();
