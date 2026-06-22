@@ -100,7 +100,10 @@ body.compare-on #syncPanel{display:block}
     <label><input type="checkbox" id="syncOn" checked> auto-sync</label>
     <label><input type="checkbox" id="syncRot"> rotation</label>
   </div>
-  <div class="hint">Both viewers use the same URN → coordinates match natively. No calibration needed.</div>
+  <div class="row" style="margin-top:6px">
+    <button onclick="testSync()" style="flex:1;padding:4px 8px;border:1px solid rgba(34,211,238,.3);background:rgba(34,211,238,.08);color:#67e8f9;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">🧪 Test sync (fake msg)</button>
+  </div>
+  <div class="hint">If <b>msgs</b> stays 0 while you click in Cupix → Cupix iframe isn't emitting (might need to enter walk mode). If msgs grows but APS camera doesn't move → click Test sync to verify the apply path.</div>
 </div>
 
 <script>
@@ -201,16 +204,23 @@ window.toggleCompare = toggleCompare;
 let msgCount = 0;
 let lastTm = null;
 
+// Relaxed listener — count EVERY message from cupix.works regardless of format.
+// (Earlier strict filter on string + JSON.parse silently dropped any non-JSON
+// or object payloads, so counter never moved.)
 window.addEventListener('message', (e) => {
   let host = '';
   try { host = new URL(e.origin || 'http://x').hostname; } catch {}
   if (!/cupix\.works$/i.test(host)) return;
-  if (typeof e.data !== 'string') return;
-  let msg;
-  try { msg = JSON.parse(e.data); } catch { return; }
   msgCount++;
   document.getElementById('msgCount').textContent = msgCount + ' msgs';
-
+  // Try to parse — accept JSON string, plain string, or object
+  let msg = null;
+  if (typeof e.data === 'string') {
+    try { msg = JSON.parse(e.data); } catch { /* leave null */ }
+  } else if (e.data && typeof e.data === 'object') {
+    msg = e.data;
+  }
+  if (!msg) return;
   if (msg.responseType === 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE') {
     const tm = msg.response?.cameraParameters?.tm;
     if (!Array.isArray(tm) || tm.length !== 16) return;
@@ -223,6 +233,27 @@ window.addEventListener('message', (e) => {
     applyCupixToAps(tm);
   }
 });
+
+// Test sync — fires a fake tm so we can verify the apply path independently of
+// whether Cupix is emitting. If clicking this jumps the APS camera, the pipeline
+// works and the issue is upstream (Cupix not sending).
+window.testSync = () => {
+  // Pick a sensible location — translate by 10m in each axis from current camera.
+  const cam = apsViewer && apsViewer.getCamera().position;
+  if (!cam) { console.warn('viewer not ready'); return; }
+  const fakeTm = [
+    1, 0, 0, cam.x + 5,
+    0, 1, 0, cam.y + 3,
+    0, 0, 1, cam.z + 5,
+    0, 0, 0, 1
+  ];
+  console.log('[test] before:', cam.x.toFixed(2), cam.y.toFixed(2), cam.z.toFixed(2));
+  applyCupixToAps(fakeTm);
+  setTimeout(() => {
+    const n = apsViewer.getCamera().position;
+    console.log('[test] after:', n.x.toFixed(2), n.y.toFixed(2), n.z.toFixed(2));
+  }, 100);
+};
 
 function applyCupixToAps(tm) {
   if (!apsViewer || !apsViewer.navigation) {
