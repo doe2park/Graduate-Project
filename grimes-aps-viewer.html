@@ -101,17 +101,26 @@ body.compare-on #syncPanel{display:block}
     <label><input type="checkbox" id="syncRot"> rotation</label>
   </div>
   <div class="row" style="margin-top:4px">
+    <label style="flex:1">unit scale (m→?): <input type="number" id="unitScale" value="3.2808" step="0.0001" style="width:60px;background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 4px;border-radius:3px;font:11px var(--mono)"></label>
+  </div>
+  <div class="row" style="margin-top:4px">
     <label><input type="checkbox" id="useOffset"> subtract globalOffset</label>
   </div>
   <div class="row" style="margin-top:4px">
     <label><input type="checkbox" id="swapYZ"> swap Y↔Z (Z-up → Y-up)</label>
     <label><input type="checkbox" id="flipZ"> flip Z sign</label>
   </div>
+  <div class="hint" style="font-size:9.5px;color:#6b7fa0">scale 3.28 = meters→feet (US BIM default) · 1.0 = no conversion · 0.3048 = feet→meters</div>
   <div class="row" style="margin-top:6px">
-    <button onclick="testSync()" style="flex:1;padding:4px 8px;border:1px solid rgba(34,211,238,.3);background:rgba(34,211,238,.08);color:#67e8f9;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">🧪 Test sync (fake msg)</button>
+    <button onclick="testSync()" style="flex:1;padding:4px 8px;border:1px solid rgba(34,211,238,.3);background:rgba(34,211,238,.08);color:#67e8f9;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">🧪 Test sync</button>
     <button onclick="apsViewer.navigation.fitBounds(true, apsViewer.model.getBoundingBox())" style="flex:1;padding:4px 8px;border:1px solid rgba(148,163,184,.3);background:rgba(255,255,255,.04);color:#cbd5e1;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">⌂ Fit view</button>
   </div>
-  <div class="hint">Try toggling combinations. The right one is whichever puts the APS camera inside the building. Console logs every 30th sync.</div>
+  <div class="row" style="margin-top:4px">
+    <button onclick="lockHere()" style="flex:2;padding:4px 8px;border:1px solid rgba(253,181,21,.3);background:rgba(253,181,21,.08);color:#fbbf24;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">📌 Lock anchor (manual)</button>
+    <button onclick="clearAnchor()" style="flex:1;padding:4px 8px;border:1px solid rgba(148,163,184,.3);background:rgba(255,255,255,.04);color:#cbd5e1;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">↺ Clear</button>
+  </div>
+  <div class="stat"><span class="k">anchor</span><span class="v" id="anchorVal">0, 0, 0</span></div>
+  <div class="hint">Default <b>scale=3.28</b> assumes Cupix meters → APS feet (most common). If still off: try toggles, or as last resort park APS camera where Cupix shows + click Lock anchor.</div>
 </div>
 
 <script>
@@ -279,22 +288,71 @@ window.testSync = () => {
   }, 100);
 };
 
-// Apply a configurable transform: optional Y/Z swap, optional Z flip,
-// optional globalOffset subtraction. User toggles to find what works.
+// User-calibrated anchor offset (added to Cupix coords to map them into APS Viewer space).
+// Persisted to localStorage. Set by clicking 📌 Lock Here after manually
+// positioning APS camera where Cupix is currently pointing.
+const ANCHOR_LS_KEY = 'apsCupixAnchor.v1';
+let cupixAnchor = { x: 0, y: 0, z: 0 };
+try {
+  const saved = JSON.parse(localStorage.getItem(ANCHOR_LS_KEY) || '{}');
+  if (typeof saved.x === 'number') cupixAnchor = saved;
+} catch {}
+
 function transformCupixToAps(cx, cy, cz) {
   let x = cx, y = cy, z = cz;
+  // STEP 1: unit conversion (Cupix meters → APS feet, typical for US BIM)
+  const scale = parseFloat(document.getElementById('unitScale').value) || 1.0;
+  x *= scale; y *= scale; z *= scale;
+  // STEP 2: optional axis swap (most NWD are Z-up, default off)
   if (document.getElementById('swapYZ').checked) {
-    // Z-up Cupix → Y-up APS: (x, y, z) → (x, z, -y)
     const ty = z, tz = -y;
     y = ty; z = tz;
   }
   if (document.getElementById('flipZ').checked) z = -z;
+  // STEP 3: optional globalOffset subtraction (depends on how APS shifted model)
   if (document.getElementById('useOffset').checked) {
     const off = window.__apsGlobalOffset || { x: 0, y: 0, z: 0 };
     x -= off.x; y -= off.y; z -= off.z;
   }
+  // STEP 4: user-calibrated anchor (last resort fallback)
+  x += cupixAnchor.x;
+  y += cupixAnchor.y;
+  z += cupixAnchor.z;
   return [x, y, z];
 }
+
+// Capture the offset that maps current Cupix pos → current APS camera pos.
+// User has to manually drive the APS camera (orbit/pan) to where Cupix is
+// pointing first, then click Lock Here.
+window.lockHere = () => {
+  if (!lastTm) { alert('No Cupix message received yet. Navigate Cupix first.'); return; }
+  const cam = apsViewer.getCamera().position;
+  // Transform raw Cupix pos through swap/flip/offset (everything BUT anchor)
+  const prevAnchor = { ...cupixAnchor };
+  cupixAnchor = { x: 0, y: 0, z: 0 };
+  const [tx, ty, tz] = transformCupixToAps(lastTm[3], lastTm[7], lastTm[11]);
+  cupixAnchor = prevAnchor;  // restore so we don't double-apply
+
+  // anchor = where APS camera is - where transformed Cupix lands
+  cupixAnchor = {
+    x: cam.x - tx,
+    y: cam.y - ty,
+    z: cam.z - tz,
+  };
+  localStorage.setItem(ANCHOR_LS_KEY, JSON.stringify(cupixAnchor));
+  document.getElementById('anchorVal').textContent =
+    `${cupixAnchor.x.toFixed(1)}, ${cupixAnchor.y.toFixed(1)}, ${cupixAnchor.z.toFixed(1)}`;
+  console.log('[lockHere] anchor set:', cupixAnchor);
+  // Re-apply with new anchor so sync immediately reflects
+  if (lastTm) applyCupixToAps(lastTm);
+};
+
+window.clearAnchor = () => {
+  cupixAnchor = { x: 0, y: 0, z: 0 };
+  localStorage.removeItem(ANCHOR_LS_KEY);
+  document.getElementById('anchorVal').textContent = '0, 0, 0';
+  if (lastTm) applyCupixToAps(lastTm);
+};
 
 function applyCupixToAps(tm) {
   if (!apsViewer || !apsViewer.navigation) return;
@@ -348,6 +406,12 @@ function applyCupixToAps(tm) {
 // Expose for browser-console debugging
 window.__lastCupixTm = () => lastTm;
 window.__cupixMsgCount = () => msgCount;
+
+// Initial anchor display
+window.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('anchorVal');
+  if (el) el.textContent = `${cupixAnchor.x.toFixed(1)}, ${cupixAnchor.y.toFixed(1)}, ${cupixAnchor.z.toFixed(1)}`;
+});
 </script>
 
 </body>
