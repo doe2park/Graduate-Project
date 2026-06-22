@@ -100,10 +100,18 @@ body.compare-on #syncPanel{display:block}
     <label><input type="checkbox" id="syncOn" checked> auto-sync</label>
     <label><input type="checkbox" id="syncRot"> rotation</label>
   </div>
+  <div class="row" style="margin-top:4px">
+    <label><input type="checkbox" id="useOffset"> subtract globalOffset</label>
+  </div>
+  <div class="row" style="margin-top:4px">
+    <label><input type="checkbox" id="swapYZ"> swap Y↔Z (Z-up → Y-up)</label>
+    <label><input type="checkbox" id="flipZ"> flip Z sign</label>
+  </div>
   <div class="row" style="margin-top:6px">
     <button onclick="testSync()" style="flex:1;padding:4px 8px;border:1px solid rgba(34,211,238,.3);background:rgba(34,211,238,.08);color:#67e8f9;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">🧪 Test sync (fake msg)</button>
+    <button onclick="apsViewer.navigation.fitBounds(true, apsViewer.model.getBoundingBox())" style="flex:1;padding:4px 8px;border:1px solid rgba(148,163,184,.3);background:rgba(255,255,255,.04);color:#cbd5e1;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">⌂ Fit view</button>
   </div>
-  <div class="hint">If <b>msgs</b> stays 0 while you click in Cupix → Cupix iframe isn't emitting (might need to enter walk mode). If msgs grows but APS camera doesn't move → click Test sync to verify the apply path.</div>
+  <div class="hint">Try toggling combinations. The right one is whichever puts the APS camera inside the building. Console logs every 30th sync.</div>
 </div>
 
 <script>
@@ -162,17 +170,23 @@ Autodesk.Viewing.Initializer(initOptions, () => {
     const defaultModel = doc.getRoot().getDefaultGeometry();
     apsViewer.loadDocumentNode(doc, defaultModel).then(() => {
       hideLoading();
-      // CRITICAL: APS Viewer applies a globalOffset to large-coord models for
-      // floating point precision. To align with Cupix (which sends absolute
-      // world coords), we need to subtract this offset.
       const model = apsViewer.model;
       const off = model && model.getGlobalOffset ? model.getGlobalOffset() : null;
-      window.__apsGlobalOffset = off;
+      window.__apsGlobalOffset = off || { x: 0, y: 0, z: 0 };
       const bbox = model && model.getBoundingBox ? model.getBoundingBox() : null;
+      // Explicitly log x/y/z so they don't show up as "Object" in console
       console.log('[aps-viewer] model loaded.');
-      console.log('  globalOffset:', off);
-      console.log('  boundingBox min:', bbox && bbox.min, 'max:', bbox && bbox.max);
-      console.log('  → Cupix positions will be shifted by -globalOffset before applying.');
+      if (off) console.log('  globalOffset: x=' + off.x.toFixed(2) + '  y=' + off.y.toFixed(2) + '  z=' + off.z.toFixed(2));
+      if (bbox) {
+        console.log('  bbox.min: x=' + bbox.min.x.toFixed(2) + '  y=' + bbox.min.y.toFixed(2) + '  z=' + bbox.min.z.toFixed(2));
+        console.log('  bbox.max: x=' + bbox.max.x.toFixed(2) + '  y=' + bbox.max.y.toFixed(2) + '  z=' + bbox.max.z.toFixed(2));
+        const size = { x: bbox.max.x - bbox.min.x, y: bbox.max.y - bbox.min.y, z: bbox.max.z - bbox.min.z };
+        console.log('  bbox.size: x=' + size.x.toFixed(2) + '  y=' + size.y.toFixed(2) + '  z=' + size.z.toFixed(2),
+                    '  → tallest axis = ' + (size.y > size.z ? 'Y (Y-up world)' : 'Z (Z-up world)'));
+      }
+      // Read the up vector currently used
+      const upVec = apsViewer.navigation.getWorldUpVector();
+      console.log('  world up vector: x=' + upVec.x.toFixed(2) + '  y=' + upVec.y.toFixed(2) + '  z=' + upVec.z.toFixed(2));
     });
   }, (errCode, errMsg) => {
     showError('Document load failed: ' + errMsg + ' (code ' + errCode + ')');
@@ -265,27 +279,46 @@ window.testSync = () => {
   }, 100);
 };
 
+// Apply a configurable transform: optional Y/Z swap, optional Z flip,
+// optional globalOffset subtraction. User toggles to find what works.
+function transformCupixToAps(cx, cy, cz) {
+  let x = cx, y = cy, z = cz;
+  if (document.getElementById('swapYZ').checked) {
+    // Z-up Cupix → Y-up APS: (x, y, z) → (x, z, -y)
+    const ty = z, tz = -y;
+    y = ty; z = tz;
+  }
+  if (document.getElementById('flipZ').checked) z = -z;
+  if (document.getElementById('useOffset').checked) {
+    const off = window.__apsGlobalOffset || { x: 0, y: 0, z: 0 };
+    x -= off.x; y -= off.y; z -= off.z;
+  }
+  return [x, y, z];
+}
+
 function applyCupixToAps(tm) {
   if (!apsViewer || !apsViewer.navigation) return;
   const camPos = apsViewer.getCamera().position;
   const VecCtor = camPos.constructor;
   const dist = 10;
 
-  // Subtract globalOffset to convert from absolute world coords (Cupix) to
-  // APS Viewer's shifted internal coords. If offset is null/zero, no harm.
-  const off = window.__apsGlobalOffset || { x: 0, y: 0, z: 0 };
-
-  const px = tm[3]  - off.x;
-  const py = tm[7]  - off.y;
-  const pz = tm[11] - off.z;
+  // Transform Cupix position
+  const [px, py, pz] = transformCupixToAps(tm[3], tm[7], tm[11]);
+  // Transform forward vector (no offset for direction vectors, but swap/flip apply)
+  // Camera looks toward -row2, so forward = -tm[8..10] in Cupix space
+  const fwdC = [-tm[8], -tm[9], -tm[10]];
+  let [fx, fy, fz] = fwdC;
+  if (document.getElementById('swapYZ').checked) { const ty = fz, tz = -fy; fy = ty; fz = tz; }
+  if (document.getElementById('flipZ').checked) fz = -fz;
+  // Up: row 1 (tm[4..6])
+  const upC = [tm[4], tm[5], tm[6]];
+  let [ux, uy, uz] = upC;
+  if (document.getElementById('swapYZ').checked) { const ty = uz, tz = -uy; uy = ty; uz = tz; }
+  if (document.getElementById('flipZ').checked) uz = -uz;
 
   const pos = new VecCtor(px, py, pz);
-  const target = new VecCtor(
-    px - tm[8]  * dist,
-    py - tm[9]  * dist,
-    pz - tm[10] * dist
-  );
-  const up = new VecCtor(tm[4], tm[5], tm[6]);
+  const target = new VecCtor(px + fx * dist, py + fy * dist, pz + fz * dist);
+  const up = new VecCtor(ux, uy, uz);
 
   try {
     apsViewer.navigation.setRequestTransition(false);
@@ -306,8 +339,9 @@ function applyCupixToAps(tm) {
     `${camNow.x.toFixed(1)}, ${camNow.y.toFixed(1)}, ${camNow.z.toFixed(1)}`;
   if (msgCount % 30 === 1) {
     console.log('[sync] cupix raw:', tm[3].toFixed(2), tm[7].toFixed(2), tm[11].toFixed(2),
-                '· offset-adjusted pos:', pos.x.toFixed(2), pos.y.toFixed(2), pos.z.toFixed(2),
-                '· target:', target.x.toFixed(2), target.y.toFixed(2), target.z.toFixed(2));
+                '→ transformed pos:', pos.x.toFixed(2), pos.y.toFixed(2), pos.z.toFixed(2),
+                '· target:', target.x.toFixed(2), target.y.toFixed(2), target.z.toFixed(2),
+                '· toggles:', {offset:document.getElementById('useOffset').checked, swap:document.getElementById('swapYZ').checked, flipZ:document.getElementById('flipZ').checked});
   }
 }
 
