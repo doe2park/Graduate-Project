@@ -162,7 +162,17 @@ Autodesk.Viewing.Initializer(initOptions, () => {
     const defaultModel = doc.getRoot().getDefaultGeometry();
     apsViewer.loadDocumentNode(doc, defaultModel).then(() => {
       hideLoading();
-      console.log('[aps-viewer] model loaded, ready for camera control');
+      // CRITICAL: APS Viewer applies a globalOffset to large-coord models for
+      // floating point precision. To align with Cupix (which sends absolute
+      // world coords), we need to subtract this offset.
+      const model = apsViewer.model;
+      const off = model && model.getGlobalOffset ? model.getGlobalOffset() : null;
+      window.__apsGlobalOffset = off;
+      const bbox = model && model.getBoundingBox ? model.getBoundingBox() : null;
+      console.log('[aps-viewer] model loaded.');
+      console.log('  globalOffset:', off);
+      console.log('  boundingBox min:', bbox && bbox.min, 'max:', bbox && bbox.max);
+      console.log('  → Cupix positions will be shifted by -globalOffset before applying.');
     });
   }, (errCode, errMsg) => {
     showError('Document load failed: ' + errMsg + ' (code ' + errCode + ')');
@@ -256,27 +266,24 @@ window.testSync = () => {
 };
 
 function applyCupixToAps(tm) {
-  if (!apsViewer || !apsViewer.navigation) {
-    console.warn('[sync] viewer not ready');
-    return;
-  }
-  // Get THREE.Vector3 constructor from the viewer's existing camera —
-  // works regardless of where Autodesk hid THREE in this version.
+  if (!apsViewer || !apsViewer.navigation) return;
   const camPos = apsViewer.getCamera().position;
   const VecCtor = camPos.constructor;
-
-  // Cupix tm is a row-major camera-to-world matrix:
-  //   row 0 (tm[0..2])  = camera X (right) in world coords
-  //   row 1 (tm[4..6])  = camera Y (up)    in world coords
-  //   row 2 (tm[8..10]) = camera Z (BACK)  in world coords — camera looks toward -Z
-  //   translation       = tm[3], tm[7], tm[11]
-  // So world-space forward = -row2, and target = pos + dist * forward = pos - dist * row2.
   const dist = 10;
-  const pos = new VecCtor(tm[3], tm[7], tm[11]);
+
+  // Subtract globalOffset to convert from absolute world coords (Cupix) to
+  // APS Viewer's shifted internal coords. If offset is null/zero, no harm.
+  const off = window.__apsGlobalOffset || { x: 0, y: 0, z: 0 };
+
+  const px = tm[3]  - off.x;
+  const py = tm[7]  - off.y;
+  const pz = tm[11] - off.z;
+
+  const pos = new VecCtor(px, py, pz);
   const target = new VecCtor(
-    tm[3] - tm[8]  * dist,
-    tm[7] - tm[9]  * dist,
-    tm[11] - tm[10] * dist
+    px - tm[8]  * dist,
+    py - tm[9]  * dist,
+    pz - tm[10] * dist
   );
   const up = new VecCtor(tm[4], tm[5], tm[6]);
 
@@ -298,9 +305,9 @@ function applyCupixToAps(tm) {
   document.getElementById('apsPos').textContent =
     `${camNow.x.toFixed(1)}, ${camNow.y.toFixed(1)}, ${camNow.z.toFixed(1)}`;
   if (msgCount % 30 === 1) {
-    console.log('[sync] pos:', pos.x.toFixed(2), pos.y.toFixed(2), pos.z.toFixed(2),
-                '· target:', target.x.toFixed(2), target.y.toFixed(2), target.z.toFixed(2),
-                '· up:', up.x.toFixed(2), up.y.toFixed(2), up.z.toFixed(2));
+    console.log('[sync] cupix raw:', tm[3].toFixed(2), tm[7].toFixed(2), tm[11].toFixed(2),
+                '· offset-adjusted pos:', pos.x.toFixed(2), pos.y.toFixed(2), pos.z.toFixed(2),
+                '· target:', target.x.toFixed(2), target.y.toFixed(2), target.z.toFixed(2));
   }
 }
 
