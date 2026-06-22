@@ -30,7 +30,7 @@
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -126,9 +126,48 @@ function json(data, status = 200) {
   });
 }
 
+// APS (Autodesk Platform Services) token endpoint — issues a viewer-scoped
+// access token so the browser can load URN-based BIM models in Forge Viewer
+// without exposing the client secret. Server-side 2-legged OAuth.
+//
+// Requires Cloudflare Worker env vars:
+//   APS_CLIENT_ID
+//   APS_CLIENT_SECRET
+//
+// Browser usage:
+//   fetch('https://<worker-domain>/aps-token').then(r => r.json())
+//   → { access_token, expires_in, token_type }
+async function handleApsToken(env) {
+  if (!env.APS_CLIENT_ID || !env.APS_CLIENT_SECRET) {
+    return json({ error: 'APS credentials not configured. Set APS_CLIENT_ID + APS_CLIENT_SECRET in Cloudflare worker env.' }, 500);
+  }
+  const basic = btoa(`${env.APS_CLIENT_ID}:${env.APS_CLIENT_SECRET}`);
+  const r = await fetch('https://developer.api.autodesk.com/authentication/v2/token', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${basic}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials&scope=viewables:read data:read',
+  });
+  const data = await r.json();
+  return new Response(JSON.stringify(data), {
+    status: r.status,
+    headers: { 'content-type': 'application/json; charset=utf-8', ...CORS },
+  });
+}
+
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+
+    // GET /aps-token — issue an APS viewer access token (server-side OAuth)
+    if (request.method === 'GET' && url.pathname === '/aps-token') {
+      return handleApsToken(env);
+    }
+
     if (request.method !== 'POST') return new Response('POST only', { status: 405, headers: CORS });
 
     let body;

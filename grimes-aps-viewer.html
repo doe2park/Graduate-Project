@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UC Berkeley · Bechtel Full BIM (APS Viewer)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- Autodesk Forge Viewer SDK (v7) — the same SDK Cupix uses internally for its BIM Compare mode -->
+<link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.min.css">
+<script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.min.js"></script>
+<style>
+:root{
+  --gold:#FDB515;--bg:#060a12;--text:#e0e7f1;--dim:#6b7fa0;--faint:#3a4a66;
+  --cyan:#22d3ee;--green:#34d399;--red:#f87171;
+  --border:rgba(255,255,255,.08);
+  --mono:'JetBrains Mono',monospace;--font:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden}
+
+/* TOPBAR */
+#topbar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(8,12,24,.94);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:14px;z-index:100;font-size:13px}
+#topbar a.back{color:var(--cyan);text-decoration:none;font:500 12px/1 var(--font);display:flex;align-items:center;gap:5px}
+#topbar a.back:hover{color:#67e8f9}
+.tb-title{font-weight:600;color:#fff;letter-spacing:-.2px}
+.tb-sub{font:500 10.5px/1 var(--mono);color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
+.tb-spacer{flex:1}
+.tb-btn{padding:5px 11px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:#cbd5e1;border-radius:5px;cursor:pointer;font:500 11.5px/1 var(--font);transition:all .15s}
+.tb-btn:hover{border-color:rgba(34,211,238,.3);color:#67e8f9}
+.tb-btn.active{background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.4);color:#67e8f9}
+
+/* MAIN AREA */
+#main{position:fixed;top:48px;left:0;right:0;bottom:0;display:flex}
+#cupixPane{display:none;flex:1;height:100%;background:#000;border-right:2px solid var(--cyan);flex-direction:column}
+#cupixPane.show{display:flex}
+#cupixHdr{padding:7px 12px;background:rgba(8,12,24,.85);border-bottom:1px solid rgba(34,211,238,.2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;font-size:11px}
+#cupixHdr span{font:600 10px/1 var(--mono);color:var(--cyan);letter-spacing:.5px;text-transform:uppercase}
+#cupixFrame{flex:1;border:0;background:#000;width:100%}
+#apsContainer{flex:1;height:100%;position:relative;background:#1e1e1e}
+body.compare-on #apsContainer{flex:1}  /* split 50/50 with cupix */
+
+/* LOADING / ERROR OVERLAY */
+#loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#cbd5e1;z-index:10;pointer-events:none}
+#loading .spinner{width:42px;height:42px;border:3px solid rgba(34,211,238,.15);border-top-color:var(--cyan);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading .msg{font:500 13px/1.4 var(--font);color:#94a3b8}
+#loading .sub{font:500 10.5px/1.4 var(--mono);color:#475569;margin-top:6px;letter-spacing:.3px}
+#loading.error .spinner{border-top-color:var(--red);animation:none}
+#loading.error .msg{color:#fca5a5}
+
+/* SYNC STATUS PANEL (bottom-right, shown only in compare mode) */
+#syncPanel{position:fixed;right:14px;bottom:14px;z-index:60;width:230px;background:rgba(8,12,24,.95);border:1px solid rgba(34,211,238,.3);border-radius:6px;padding:9px 12px;display:none;font:11px/1.4 var(--font);color:#cbd5e1}
+body.compare-on #syncPanel{display:block}
+#syncPanel .hdr{font:600 10px/1 var(--mono);color:var(--cyan);letter-spacing:.4px;text-transform:uppercase;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(34,211,238,.15);display:flex;justify-content:space-between}
+#syncPanel .stat{display:flex;justify-content:space-between;font:10px/1.3 var(--mono);color:#94a3b8;padding:2px 0}
+#syncPanel .stat .k{color:#64748b}
+#syncPanel .stat .v{color:#cbd5e1}
+#syncPanel .row{display:flex;gap:8px;margin-top:6px;font-size:10px}
+#syncPanel .row label{display:flex;align-items:center;gap:4px;cursor:pointer;color:#94a3b8}
+#syncPanel .hint{font:italic 9.5px/1.4 var(--font);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <a href="grimes-campus-map-arcgis.html" class="back">◂ Campus</a>
+  <span class="tb-title">Bechtel · Full BIM</span>
+  <span class="tb-sub">APS Viewer · NWD-native</span>
+  <span class="tb-spacer"></span>
+  <button class="tb-btn" id="compareBtn" onclick="toggleCompare()">🪞 Cupix Compare</button>
+  <a class="tb-btn" href="grimes-xr.html" style="text-decoration:none">▸ MEP View (Three.js)</a>
+</div>
+
+<div id="main">
+  <div id="cupixPane">
+    <div id="cupixHdr">
+      <span>📷 360° walk · Cupix</span>
+      <button class="tb-btn" onclick="toggleCompare()" style="padding:3px 9px;font-size:10px">✕ Exit</button>
+    </div>
+    <iframe id="cupixFrame" allow="fullscreen; xr-spatial-tracking" allowfullscreen></iframe>
+  </div>
+  <div id="apsContainer">
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="msg">Loading Bechtel BIM via APS Viewer…</div>
+      <div class="sub">first load downloads ~10 MB of geometry</div>
+    </div>
+  </div>
+</div>
+
+<!-- Cupix → APS Viewer sync status -->
+<div id="syncPanel">
+  <div class="hdr">
+    <span>🔗 Cupix → APS</span>
+    <span id="msgCount" style="color:#67e8f9">0 msgs</span>
+  </div>
+  <div class="stat"><span class="k">cupix pos</span><span class="v" id="cupixPos">—</span></div>
+  <div class="stat"><span class="k">aps camera</span><span class="v" id="apsPos">—</span></div>
+  <div class="row">
+    <label><input type="checkbox" id="syncOn" checked> auto-sync</label>
+    <label><input type="checkbox" id="syncRot"> rotation</label>
+  </div>
+  <div class="hint">Both viewers use the same URN → coordinates match natively. No calibration needed.</div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────────────────
+const URN = 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Z3JpbWVzLXR3aW4tYXRhNnc3Z2hzdGFxeHd5ajV0YTIvQUxMJTIwLSUyMFVDQkJFJTIwLSUyMENPTUJJTkVELm53ZA';
+const TOKEN_URL = 'https://campus-chatbot.ucb-dt.workers.dev/aps-token';
+const CUPIX_URL = 'https://herrero.cupix.works/v2/sv/q7qk7m?svpl=basic&svv=4&qp=2QtKby0x5DjQCH1Yrdk5rr&ql=83000';
+
+// ─────────────────────────────────────────────────────────────────────────
+// APS VIEWER INIT
+// ─────────────────────────────────────────────────────────────────────────
+let apsViewer = null;
+
+async function getAccessToken(onTokenReady) {
+  try {
+    const r = await fetch(TOKEN_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    if (!data.access_token) throw new Error('no access_token in response: ' + JSON.stringify(data));
+    onTokenReady(data.access_token, data.expires_in || 3600);
+  } catch (e) {
+    showError('Token fetch failed: ' + e.message);
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('loading');
+  el.classList.add('error');
+  el.innerHTML = `<div class="spinner"></div><div class="msg">${msg}</div><div class="sub">check Cloudflare worker /aps-token endpoint</div>`;
+}
+
+function hideLoading() {
+  const el = document.getElementById('loading');
+  if (el) el.style.display = 'none';
+}
+
+const initOptions = {
+  env: 'AutodeskProduction',
+  api: 'derivativeV2',
+  getAccessToken,
+};
+
+Autodesk.Viewing.Initializer(initOptions, () => {
+  const container = document.getElementById('apsContainer');
+  apsViewer = new Autodesk.Viewing.GuiViewer3D(container);
+  const startCode = apsViewer.start();
+  if (startCode > 0) {
+    showError('Viewer failed to start (code ' + startCode + ')');
+    return;
+  }
+  window.apsViewer = apsViewer;
+
+  Autodesk.Viewing.Document.load('urn:' + URN, (doc) => {
+    const defaultModel = doc.getRoot().getDefaultGeometry();
+    apsViewer.loadDocumentNode(doc, defaultModel).then(() => {
+      hideLoading();
+      console.log('[aps-viewer] model loaded, ready for camera control');
+    });
+  }, (errCode, errMsg) => {
+    showError('Document load failed: ' + errMsg + ' (code ' + errCode + ')');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// COMPARE MODE TOGGLE
+// ─────────────────────────────────────────────────────────────────────────
+function toggleCompare() {
+  const on = document.body.classList.toggle('compare-on');
+  const pane = document.getElementById('cupixPane');
+  const btn = document.getElementById('compareBtn');
+  const frame = document.getElementById('cupixFrame');
+  if (on) {
+    pane.classList.add('show');
+    if (!frame.src) frame.src = CUPIX_URL;  // lazy-load iframe only when needed
+    btn.classList.add('active');
+  } else {
+    pane.classList.remove('show');
+    btn.classList.remove('active');
+  }
+  // Tell viewer to resize after layout change
+  setTimeout(() => apsViewer && apsViewer.resize(), 100);
+}
+window.toggleCompare = toggleCompare;
+
+// ─────────────────────────────────────────────────────────────────────────
+// CUPIX → APS VIEWER CAMERA SYNC
+//
+// Cupix emits VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE with a row-major 4×4
+// transformation matrix `tm`. Position is at tm[3],tm[7],tm[11]; the third
+// row (tm[8..10]) is the camera's forward (Z) basis in world space.
+//
+// CRITICAL ADVANTAGE: APS Viewer loads the SAME BIM (same URN) that Cupix's
+// internal BIM Compare uses. So Cupix's reported coordinates land directly
+// in APS Viewer's world space — no calibration, no Y/Z swap, no offset.
+// ─────────────────────────────────────────────────────────────────────────
+let msgCount = 0;
+let lastTm = null;
+
+window.addEventListener('message', (e) => {
+  let host = '';
+  try { host = new URL(e.origin || 'http://x').hostname; } catch {}
+  if (!/cupix\.works$/i.test(host)) return;
+  if (typeof e.data !== 'string') return;
+  let msg;
+  try { msg = JSON.parse(e.data); } catch { return; }
+  msgCount++;
+  document.getElementById('msgCount').textContent = msgCount + ' msgs';
+
+  if (msg.responseType === 'VIEW_ACTIVE_CAMERA_ROTATED_RESPONSE') {
+    const tm = msg.response?.cameraParameters?.tm;
+    if (!Array.isArray(tm) || tm.length !== 16) return;
+    lastTm = tm;
+    const px = tm[3], py = tm[7], pz = tm[11];
+    document.getElementById('cupixPos').textContent = `${px.toFixed(1)}, ${py.toFixed(1)}, ${pz.toFixed(1)}`;
+    if (!apsViewer || !apsViewer.navigation) return;
+    const syncOn = document.getElementById('syncOn').checked;
+    if (!syncOn) return;
+    applyCupixToAps(tm);
+  }
+});
+
+function applyCupixToAps(tm) {
+  // Forge Viewer / Three.js use Y-up; the BIM as loaded into APS is in its
+  // native Z-up coord system, so Cupix's tm — also in BIM native coords —
+  // applies directly. (Confirmed: both Cupix and APS Viewer load the
+  // same NWD URN, so their world coords are identical.)
+  const THREE = Autodesk.Viewing.Private.THREE || window.THREE;
+  if (!THREE) { console.warn('THREE not available on Autodesk namespace'); return; }
+  const pos = new THREE.Vector3(tm[3], tm[7], tm[11]);
+  const forward = new THREE.Vector3(tm[8], tm[9], tm[10]).normalize();
+  const up = new THREE.Vector3(tm[4], tm[5], tm[6]).normalize();
+  const target = pos.clone().add(forward.multiplyScalar(10));
+  apsViewer.navigation.setPosition(pos);
+  apsViewer.navigation.setTarget(target);
+  if (document.getElementById('syncRot').checked) {
+    apsViewer.navigation.setCameraUpVector(up);
+  }
+  // Show updated APS camera position
+  const cam = apsViewer.getCamera().position;
+  document.getElementById('apsPos').textContent = `${cam.x.toFixed(1)}, ${cam.y.toFixed(1)}, ${cam.z.toFixed(1)}`;
+}
+
+// Expose for browser-console debugging
+window.__lastCupixTm = () => lastTm;
+window.__cupixMsgCount = () => msgCount;
+</script>
+
+</body>
+</html>
