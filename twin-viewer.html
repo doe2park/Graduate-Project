@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Digital Twin — generic viewer</title>
+<style>
+  :root { --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+          --mono: ui-monospace, "SF Mono", Menlo, monospace; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0a0e1a; color: #cbd5e1; font-family: var(--font); overflow: hidden; }
+  #c { position: fixed; inset: 0; display: block; }
+  #top { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px;
+         padding: 10px 16px; background: linear-gradient(180deg, rgba(8,12,24,.92), rgba(8,12,24,0));
+         z-index: 5; pointer-events: none; }
+  #top h1 { font-size: 14px; font-weight: 600; margin: 0; color: #e2e8f0; }
+  #top .tag { font: 600 9px/1 var(--mono); letter-spacing: .5px; text-transform: uppercase; color: #22d3ee;
+              border: 1px solid rgba(34,211,238,.35); border-radius: 4px; padding: 3px 6px; }
+  #top .sub { font-size: 11px; color: #64748b; }
+  #legend { position: fixed; left: 16px; bottom: 16px; z-index: 5; background: rgba(8,12,24,.82);
+            border: 1px solid rgba(148,163,184,.14); border-radius: 8px; padding: 8px 10px; backdrop-filter: blur(6px); }
+  #legend .lh { font: 600 9px/1 var(--mono); letter-spacing: .5px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+  #legend .li { display: flex; align-items: center; gap: 7px; font-size: 11px; padding: 2px 4px; cursor: pointer; border-radius: 4px; }
+  #legend .li:hover { background: rgba(148,163,184,.08); }
+  #legend .sw { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+  #panel { position: fixed; right: 16px; top: 56px; width: 280px; z-index: 6; background: rgba(8,12,24,.92);
+           border: 1px solid rgba(34,211,238,.25); border-radius: 10px; padding: 0; display: none;
+           box-shadow: 0 10px 30px rgba(0,0,0,.5); backdrop-filter: blur(8px); }
+  #panel.show { display: block; }
+  #panel .ph { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px;
+               border-bottom: 1px solid rgba(148,163,184,.12); }
+  #panel .ph .nm { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+  #panel .ph .ty { font: 500 9px/1 var(--mono); color: #22d3ee; text-transform: uppercase; letter-spacing: .4px; margin-top: 3px; }
+  #panel .ph button { background: none; border: 0; color: #64748b; font-size: 15px; cursor: pointer; }
+  #panel .pb { padding: 12px 14px; }
+  .pt { margin-bottom: 12px; }
+  .pt:last-child { margin-bottom: 0; }
+  .pt .ptk { font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; align-items: baseline; }
+  .pt .ptv { font: 700 22px/1 var(--font); color: #67e8f9; }
+  .pt .ptu { font-size: 11px; color: #64748b; font-weight: 400; margin-left: 2px; }
+  .pt svg { display: block; margin-top: 5px; }
+  .feeders { font-size: 10px; color: #475569; margin-top: 2px; }
+  .empty { font-size: 11px; color: #64748b; font-style: italic; }
+  #hint { position: fixed; right: 16px; bottom: 16px; z-index: 5; font-size: 11px; color: #475569; }
+  #err { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 9;
+         background: rgba(10,14,26,.95); color: #fca5a5; font-size: 13px; padding: 40px; text-align: center; }
+</style>
+<script src="twin/twin-resolver.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="top">
+  <span class="tag">Digital Twin</span>
+  <h1 id="bname">Loading…</h1>
+  <span class="sub" id="bsub"></span>
+</div>
+<div id="legend"><div class="lh">Systems</div><div id="legendItems"></div></div>
+<div id="panel">
+  <div class="ph"><div><div class="nm" id="pnm"></div><div class="ty" id="pty"></div></div>
+       <button onclick="document.getElementById('panel').classList.remove('show')">✕</button></div>
+  <div class="pb" id="pb"></div>
+</div>
+<div id="hint">Click any system in the model →</div>
+<div id="err"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const params = new URLSearchParams(location.search);
+const buildingId = params.get('building') || 'grimes';
+const fetchJson = url => fetch(url, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(url + ' → ' + r.status); return r.json(); });
+const fail = msg => { const e = document.getElementById('err'); e.textContent = msg; e.style.display = 'flex'; };
+
+// Distinct hues per system, assigned by binding order — purely presentational.
+const PALETTE = [0x22d3ee, 0xf59e0b, 0x34d399, 0xef4444, 0xa855f7, 0x60a5fa, 0xfbbf24, 0x94a3b8, 0xec4899, 0x10b981];
+const hex = n => '#' + n.toString(16).padStart(6, '0');
+
+let pkg, scene, camera, renderer, controls, raycaster, pointer;
+const meshByNode = {}, colorByNode = {};
+
+init();
+
+async function init() {
+  try {
+    pkg = await TwinResolver.loadPackage('buildings/' + buildingId + '/manifest.json', fetchJson);
+  } catch (e) { fail('Could not load twin package for "' + buildingId + '": ' + e.message); return; }
+
+  document.getElementById('bname').textContent = pkg.manifest.name;
+  document.getElementById('bsub').textContent = 'data-driven from buildings/' + buildingId + '/  ·  ' +
+    Object.keys(pkg.binding.nodes).length + ' systems  ·  Brick-bound';
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0e1a);
+  scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x202830, 1.1));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(20, 40, 25); scene.add(dir);
+
+  const canvas = document.getElementById('c');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+
+  camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 2000);
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+
+  raycaster = new THREE.Raycaster();
+  pointer = new THREE.Vector2();
+
+  const loader = new GLTFLoader();
+  loader.load(pkg.manifest.model.path, gltf => {
+    const root = gltf.scene;
+    scene.add(root);
+    let i = 0;
+    const bound = pkg.binding.nodes;
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      const nodeName = o.name;
+      const isBound = nodeName in bound;
+      const col = isBound ? PALETTE[i++ % PALETTE.length] : 0x33415c;
+      if (isBound) { meshByNode[nodeName] = o; colorByNode[nodeName] = col; }
+      o.material = new THREE.MeshStandardMaterial({ color: col, metalness: 0.2, roughness: 0.7,
+        transparent: true, opacity: isBound ? 0.92 : 0.5 });
+    });
+    frameModel(root);
+    buildLegend();
+  }, undefined, err => fail('Could not load model: ' + pkg.manifest.model.path + ' (' + err.message + ')'));
+
+  canvas.addEventListener('click', onClick);
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  animate();
+}
+
+function frameModel(root) {
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+  const r = Math.max(size.x, size.y, size.z);
+  controls.target.copy(center);
+  camera.position.set(center.x + r * 0.9, center.y + r * 0.7, center.z + r * 1.3);
+  camera.near = r / 100; camera.far = r * 20; camera.updateProjectionMatrix();
+}
+
+function buildLegend() {
+  const el = document.getElementById('legendItems');
+  el.innerHTML = '';
+  Object.keys(meshByNode).forEach(n => {
+    const div = document.createElement('div');
+    div.className = 'li';
+    div.innerHTML = '<span class="sw" style="background:' + hex(colorByNode[n]) + '"></span>' + n;
+    div.onclick = () => selectNode(n);
+    el.appendChild(div);
+  });
+}
+
+function onClick(ev) {
+  pointer.x = (ev.clientX / innerWidth) * 2 - 1;
+  pointer.y = -(ev.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(Object.values(meshByNode), false);
+  if (hits.length) selectNode(hits[0].object.name);
+}
+
+async function selectNode(nodeName) {
+  // Highlight
+  Object.entries(meshByNode).forEach(([n, m]) => {
+    m.material.emissive = new THREE.Color(n === nodeName ? colorByNode[n] : 0x000000);
+    m.material.emissiveIntensity = n === nodeName ? 0.5 : 0;
+    m.material.opacity = n === nodeName ? 1 : 0.35;
+  });
+  const r = TwinResolver.resolveNode(pkg, nodeName);
+  document.getElementById('pnm').textContent = r.label || nodeName;
+  document.getElementById('pty').textContent = (r.type || '').replace('brick:', '').replace(/_/g, ' ');
+  const pb = document.getElementById('pb');
+  document.getElementById('panel').classList.add('show');
+
+  if (!r.bound || !r.points.length) {
+    pb.innerHTML = '<div class="empty">No live data point bound to this system yet.</div>' +
+      (r.feeders && r.feeders.length ? '<div class="feeders">fed by: ' + r.feeders.join(', ') + '</div>' : '');
+    return;
+  }
+  pb.innerHTML = '<div class="empty">Reading live values…</div>';
+  const vals = await TwinResolver.fetchValues(pkg, r.points, fetchJson);
+  pb.innerHTML = r.points.map(p => {
+    const v = vals[p.ref];
+    if (!v || v.value == null) return '';
+    return '<div class="pt"><div class="ptk"><span>' + (v.name || p.ref) + '</span><span>' +
+      (v.ts || '') + '</span></div><div class="ptv">' + (+v.value).toFixed(1) +
+      '<span class="ptu">' + (v.unit || 'kW') + '</span></div>' + spark(v.series) + '</div>';
+  }).join('') || '<div class="empty">No readings available.</div>';
+}
+
+function spark(series) {
+  if (!series || series.length < 2) return '';
+  const w = 252, h = 34, vals = series.map(s => s.v);
+  const mn = Math.min(...vals), mx = Math.max(...vals), rng = (mx - mn) || 1;
+  const pts = vals.map((v, i) => (i / (vals.length - 1) * w).toFixed(1) + ',' + (h - (v - mn) / rng * h).toFixed(1)).join(' ');
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' +
+    '<polyline fill="none" stroke="#22d3ee" stroke-width="1.4" points="' + pts + '"/></svg>';
+}
+
+function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+</script>
+</body>
+</html>

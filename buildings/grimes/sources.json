@@ -1,0 +1,19 @@
+{
+  "_schema": "twin-sources/1",
+  "_doc": "Adapter config: a Brick point's externalReference -> a live data stream. Swap the adapter to retarget BMS/BACnet/CSV without touching geometry or semantics.",
+  "adapters": {
+    "bmo": {
+      "type": "bmo-json",
+      "url": "data/building_data.json",
+      "_doc": "Reads meters[<id>].latest.kw (instant) and meters[<id>].timeseries_kw ([{t,v}]) for the sparkline.",
+      "metersAt": "meters",
+      "valueAt": "latest.kw",
+      "seriesAt": "timeseries_kw"
+    }
+  },
+  "points": {
+    "bmo:meter:3:kw":  { "adapter": "bmo", "meter": "3",  "unit": "kW" },
+    "bmo:meter:76:kw": { "adapter": "bmo", "meter": "76", "unit": "kW" },
+    "bmo:meter:77:kw": { "adapter": "bmo", "meter": "77", "unit": "kW" }
+  }
+}

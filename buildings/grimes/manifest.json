@@ -1,0 +1,27 @@
+{
+  "_schema": "twin-manifest/1",
+  "id": "grimes",
+  "name": "Grimes Engineering Center",
+  "aka": "Bechtel Engineering Center",
+  "campus": "UC Berkeley",
+  "location": { "lat": 37.87305, "lon": -122.25861 },
+  "trueNorthDeg": 0,
+  "units": "meters",
+  "model": {
+    "path": "grimes-mep-only.glb",
+    "_note": "Existing asset at repo root. System-tier: 8 discipline meshes (see binding.json).",
+    "upAxis": "Y"
+  },
+  "levels": [
+    { "key": "LOWER", "name": "Lower Level", "viewerY": 1.524 },
+    { "key": "MEZZ",  "name": "Mezzanine",   "viewerY": 2.286 },
+    { "key": "L1",    "name": "Level 1",      "viewerY": 6.096 },
+    { "key": "L2",    "name": "Level 2",      "viewerY": 10.363 },
+    { "key": "L3",    "name": "Level 3",      "viewerY": 15.240 },
+    { "key": "ROOF",  "name": "Roof",         "viewerY": 19.812 }
+  ],
+  "data": { "brick": "buildings/grimes/model.brick.json",
+            "binding": "buildings/grimes/binding.json",
+            "sources": "buildings/grimes/sources.json" },
+  "cupix": { "default_url": "https://herrero.cupix.works/v2/sv/q7qk7m?svpl=basic&svv=4&qp=2QtKby0x5DjQCH1Yrdk5rr&ql=83000" }
+}

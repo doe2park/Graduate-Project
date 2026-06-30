@@ -2325,6 +2325,12 @@ function buildCupixSyncPanel(panel) {
       <button onclick="cupixCopyDebug()" title="Copy raw calibration data to clipboard (for Claude)">📋</button>
     </div>
     ${_lockArmed ? '<div class="hint">Sync frozen. Aim the BIM camera (drag / WASD) at exactly what the Cupix side shows — same spot, same direction — then ✓ Confirm lock.</div>' : ''}
+    <div class="row" style="margin-top:4px;gap:4px">
+      <button onclick="cupix2ptCalibrate()" style="${_cupix2pt.stage ? 'border-color:rgba(103,232,249,.6);color:#67e8f9;background:rgba(34,211,238,.14)' : ''}" title="EXACT calibration from two far-apart spots — measures scale, ends the feet/meter drift">${_cupix2pt.stage === 0 ? '\u{1F4D0} 2-pt calibrate' : _cupix2pt.stage === 1 ? '\u2460 Set point A' : '\u2461 Set B & solve'}</button>
+      ${_cupix2pt.stage ? '<button onclick="cupix2ptCancel()" title="Cancel 2-point calibration">\u2715 cancel</button>' : ''}
+    </div>
+    ${_cupix2pt.stage === 1 ? '<div class="hint">Sync frozen. In Cupix go to a clear landmark, aim the BIM at that SAME spot, then click \u2460 Set point A.</div>' : ''}
+    ${_cupix2pt.stage === 2 ? '<div class="hint">Now go to a SECOND spot far away (another room), aim the BIM there, then click \u2461 to solve scale + rotation + offset.</div>' : ''}
     <details>
       <summary>Calibration</summary>
       <div class="slider"><span class="k">offset X</span><input type="range" id="csOx" min="-50" max="50" step="0.1" value="${cupixSync.offset.x}"/><span class="v" id="csOxV">${cupixSync.offset.x.toFixed(1)}</span></div>
@@ -2459,6 +2465,61 @@ function cupixResetCalib() {
 }
 window.cupixLockHere = cupixLockHere;
 window.cupixResetCalib = cupixResetCalib;
+
+/* ── 2-POINT EXACT CALIBRATION — measure scale, never guess ──
+   The feet-vs-meters ambiguity that makes "walking drift" is UNSOLVABLE from one point.
+   Two correspondences (Cupix spot <-> BIM spot, far apart) fix scale + yaw + offset
+   exactly via a 2D similarity (Umeyama) solve. Flow:
+     click 1: freezes auto-sync so the BIM can be aimed independently
+     click 2 (= Set A): captures Cupix pos <-> the BIM spot you parked on
+     click 3 (= Set B & solve): captures a 2nd far spot, solves, resumes sync. */
+let _cupix2pt = { stage: 0, a: null };
+function _cupixRawSwapped(p) {            // axis swap/flip only, NO scale
+  let x = p.x, y = p.y, z = p.z;
+  if (cupixSync.swapYZ) { const t = y; y = z; z = t; }
+  if (cupixSync.flipZ) z = -z;
+  return { x, y, z };
+}
+function cupix2ptCalibrate() {
+  if (!_lastCupixPos) { alert('No Cupix camera position yet — navigate in Cupix first.'); return; }
+  if (_cupix2pt.stage === 0) {           // arm: freeze sync so BIM is aimable
+    _cupix2pt = { stage: 1, a: null };
+    cupixSync.enabled = false; saveCupixSync(); renderCupixSyncPanel(true); return;
+  }
+  if (_cupix2pt.stage === 1) {           // capture A
+    _cupix2pt.a = { c: { x:_lastCupixPos.x, y:_lastCupixPos.y, z:_lastCupixPos.z },
+                    b: { x:camera.position.x, y:camera.position.y, z:camera.position.z } };
+    _cupix2pt.stage = 2; renderCupixSyncPanel(true); return;
+  }
+  // stage 2: capture B and solve
+  const A = _cupix2pt.a;
+  const B = { c: { x:_lastCupixPos.x, y:_lastCupixPos.y, z:_lastCupixPos.z },
+              b: { x:camera.position.x, y:camera.position.y, z:camera.position.z } };
+  const ua = _cupixRawSwapped(A.c), ub = _cupixRawSwapped(B.c);
+  const dux = ub.x - ua.x, duz = ub.z - ua.z, dbx = B.b.x - A.b.x, dbz = B.b.z - A.b.z;
+  const duLen = Math.hypot(dux, duz), dbLen = Math.hypot(dbx, dbz);
+  if (duLen < 1e-3 || dbLen < 1e-3) { alert('The two points are too close. Pick spots far apart (different rooms) and click again.'); return; }
+  const scale = dbLen / duLen;
+  let yaw = (Math.atan2(dbx, dbz) - Math.atan2(dux, duz)) * 180 / Math.PI;  // phi = atan2(x,z), Ry maps phi->phi+yaw
+  yaw = ((yaw + 540) % 360) - 180;
+  const r = yaw * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  const rot = u => ({ x: c*(scale*u.x) + s*(scale*u.z), z: -s*(scale*u.x) + c*(scale*u.z) });
+  const ra = rot(ua), rb = rot(ub);
+  const offX = ((A.b.x - ra.x) + (B.b.x - rb.x)) / 2;
+  const offZ = ((A.b.z - ra.z) + (B.b.z - rb.z)) / 2;
+  const offY = ((A.b.y - scale*ua.y) + (B.b.y - scale*ub.y)) / 2;
+  cupixSync.scale = Math.round(scale * 1e4) / 1e4;
+  cupixSync.yRotation = Math.round(yaw * 10) / 10;
+  cupixSync.offset = { x: Math.round(offX*100)/100, y: Math.round(offY*100)/100, z: Math.round(offZ*100)/100 };
+  _cupix2pt = { stage: 0, a: null };
+  cupixSync.enabled = true; saveCupixSync(); renderCupixSyncPanel(true); refreshCupixPanoDots();
+  if (_lastCupixTm) applyCupixToBimCamera(_lastCupixTm, true);
+  console.log('[2pt] scale', cupixSync.scale, 'yaw', cupixSync.yRotation, 'offset', cupixSync.offset);
+  alert('2-point calibration solved.\n\nscale = ' + cupixSync.scale + '   (1.0 = meters, ~0.30 = feet)\nyaw = ' + cupixSync.yRotation + 'deg\n\nNow walk in Cupix — the BIM should track 1:1.');
+}
+function cupix2ptCancel() { _cupix2pt = { stage: 0, a: null }; cupixSync.enabled = true; saveCupixSync(); renderCupixSyncPanel(true); }
+window.cupix2ptCalibrate = cupix2ptCalibrate;
+window.cupix2ptCancel = cupix2ptCancel;
 
 // Test sync — bypasses the message listener entirely and calls
 // applyCupixToBimCamera() directly with a known matrix. Pure pipeline test:

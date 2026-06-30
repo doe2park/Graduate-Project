@@ -1,0 +1,28 @@
+{
+  "_schema": "twin-brick/1",
+  "_doc": "Compact Brick-Schema model (system tier). Classes/relations mirror Brick (brick:hasPoint, brick:feeds, brick:isPartOf). Replaces the hard-coded EQUIPMENT[] in grimes-bim-iot/protoys.html. externalReference links a point to a live stream resolved by sources.json.",
+  "prefix": { "grimes": "https://digitaltwin.berkeley.edu/grimes#", "brick": "https://brickschema.org/schema/Brick#" },
+  "entities": {
+    "grimes:Grimes": { "type": "brick:Building", "label": "Grimes Engineering Center" },
+
+    "grimes:Meter.RoofElectric": { "type": "brick:Electrical_Meter", "label": "Roof Electric",
+      "isPartOf": "grimes:Grimes", "hasPoint": ["grimes:Meter.RoofElectric.kw"] },
+    "grimes:Meter.Mechanical":   { "type": "brick:Electrical_Meter", "label": "480/277V Electric (mechanical)",
+      "isPartOf": "grimes:Grimes", "hasPoint": ["grimes:Meter.Mechanical.kw"] },
+    "grimes:Meter.PlugLighting": { "type": "brick:Electrical_Meter", "label": "208/120V Electric (plug + lighting)",
+      "isPartOf": "grimes:Grimes", "hasPoint": ["grimes:Meter.PlugLighting.kw"] },
+
+    "grimes:Meter.RoofElectric.kw": { "type": "brick:Electrical_Power_Sensor", "hasUnit": "brick:Kilowatt", "externalReference": "bmo:meter:3:kw" },
+    "grimes:Meter.Mechanical.kw":   { "type": "brick:Electrical_Power_Sensor", "hasUnit": "brick:Kilowatt", "externalReference": "bmo:meter:76:kw" },
+    "grimes:Meter.PlugLighting.kw": { "type": "brick:Electrical_Power_Sensor", "hasUnit": "brick:Kilowatt", "externalReference": "bmo:meter:77:kw" },
+
+    "grimes:Sys.HVAC_Duct":      { "type": "brick:HVAC_System",            "label": "HVAC Ductwork (air distribution)", "isPartOf": "grimes:Grimes", "isFedBy": ["grimes:Meter.Mechanical", "grimes:Meter.RoofElectric"] },
+    "grimes:Sys.HVAC_Equipment": { "type": "brick:Air_Handling_Unit",      "label": "HVAC Equipment (AHU / fans)",       "isPartOf": "grimes:Grimes", "isFedBy": ["grimes:Meter.Mechanical", "grimes:Meter.RoofElectric"] },
+    "grimes:Sys.Diffusers":      { "type": "brick:Terminal_Unit",          "label": "Air Diffusers / terminals",         "isPartOf": "grimes:Grimes", "isFedBy": ["grimes:Meter.Mechanical"] },
+    "grimes:Sys.Pumps_Valves":   { "type": "brick:Pump",                   "label": "Pumps & Valves (hydronic)",         "isPartOf": "grimes:Grimes", "isFedBy": ["grimes:Meter.Mechanical"] },
+    "grimes:Sys.Piping":         { "type": "brick:Water_System",           "label": "Hydronic Piping",                   "isPartOf": "grimes:Grimes", "isFedBy": ["grimes:Meter.Mechanical"] },
+    "grimes:Sys.Conduit":        { "type": "brick:Electrical_System",      "label": "Electrical Conduit / distribution", "isPartOf": "grimes:Grimes", "isFedBy": ["grimes:Meter.PlugLighting", "grimes:Meter.RoofElectric"] },
+    "grimes:Sys.Electrical":     { "type": "brick:Electrical_System",      "label": "Electrical (plug + lighting)",      "isPartOf": "grimes:Grimes", "isFedBy": ["grimes:Meter.PlugLighting"] },
+    "grimes:Sys.Sprinkler":      { "type": "brick:Fire_Safety_System",     "label": "Fire Sprinkler",                    "isPartOf": "grimes:Grimes", "isFedBy": [] }
+  }
+}
