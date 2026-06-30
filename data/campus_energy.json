@@ -1,26 +1,49 @@
 {
-  "generated_at": "2026-06-30 13:28:43",
+  "generated_at": "2026-06-30 16:04:20",
   "update_interval_min": 15,
   "buildings_total": 38,
   "buildings_online": 25,
-  "total_kw": 1754.5,
-  "total_daily_kwh": 42108,
-  "total_daily_cost": 6316.2,
-  "total_daily_co2_kg": 8842.7,
-  "anomaly_count": 0,
-  "anomalies": {},
+  "total_kw": 1932.3,
+  "total_daily_kwh": 46375,
+  "total_daily_cost": 6956.28,
+  "total_daily_co2_kg": 9738.8,
+  "anomaly_count": 3,
+  "anomalies": {
+    "grimes": {
+      "type": "high",
+      "current": 40.4,
+      "avg": 21.8,
+      "ratio": 1.85
+    },
+    "stanley": {
+      "type": "high",
+      "current": 40.4,
+      "avg": 21.8,
+      "ratio": 1.85
+    },
+    "latimer": {
+      "type": "high",
+      "current": 13.0,
+      "avg": 7.8,
+      "ratio": 1.68
+    }
+  },
   "buildings": {
     "grimes": {
       "name": "Grimes Engineering Center",
-      "kw": 10.3,
+      "kw": 40.4,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000C5A",
       "meter": "3",
-      "predicted_kw": 7.3,
-      "anomaly": null,
+      "predicted_kw": 20.8,
+      "anomaly": {
+        "type": "high",
+        "current": 40.4,
+        "avg": 21.8,
+        "ratio": 1.85
+      },
       "sparkline": [
-        5.2,
         5.2,
         5.2,
         50.4,
@@ -43,17 +66,18 @@
         6.7,
         5.1,
         5.0,
-        10.3
+        10.3,
+        40.4
       ],
-      "est_daily_kwh": 247,
-      "est_daily_cost": 37.08,
-      "est_daily_co2_kg": 51.9
+      "est_daily_kwh": 970,
+      "est_daily_cost": 145.44,
+      "est_daily_co2_kg": 203.6
     },
     "cory": {
       "name": "Cory Hall",
       "kw": null,
       "status": "offline",
-      "timestamp": "2026-06-30 06:16:37",
+      "timestamp": "2026-06-30 09:01:37",
       "mac": "001EC6001885",
       "meter": null,
       "predicted_kw": null,
@@ -79,15 +103,14 @@
     },
     "davis": {
       "name": "Davis Hall",
-      "kw": 189.0,
+      "kw": 215.0,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000C58",
       "meter": "76",
-      "predicted_kw": 185.9,
+      "predicted_kw": 197.7,
       "anomaly": null,
       "sparkline": [
-        186.0,
         180.0,
         184.0,
         171.0,
@@ -110,17 +133,18 @@
         189.0,
         178.0,
         186.0,
-        189.0
+        189.0,
+        215.0
       ],
-      "est_daily_kwh": 4536,
-      "est_daily_cost": 680.4,
-      "est_daily_co2_kg": 952.6
+      "est_daily_kwh": 5160,
+      "est_daily_cost": 774.0,
+      "est_daily_co2_kg": 1083.6
     },
     "etch": {
       "name": "Etcheverry Hall",
       "kw": null,
       "status": "offline",
-      "timestamp": "2026-06-30 06:15:18",
+      "timestamp": "2026-06-30 09:00:19",
       "mac": "001EC600077E",
       "meter": null,
       "predicted_kw": 12.1,
@@ -157,15 +181,14 @@
     },
     "hmm": {
       "name": "Hearst Memorial Mining",
-      "kw": 439.2,
+      "kw": 462.7,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000450",
       "meter": "76",
-      "predicted_kw": 439.2,
+      "predicted_kw": 446.3,
       "anomaly": null,
       "sparkline": [
-        415.2,
         416.1,
         424.7,
         440.7,
@@ -188,23 +211,23 @@
         480.9,
         426.6,
         433.8,
-        439.2
+        439.2,
+        462.7
       ],
-      "est_daily_kwh": 10541,
-      "est_daily_cost": 1581.12,
-      "est_daily_co2_kg": 2213.6
+      "est_daily_kwh": 11105,
+      "est_daily_cost": 1665.72,
+      "est_daily_co2_kg": 2332.0
     },
     "hesse": {
       "name": "Hesse & O'Brien Hall",
-      "kw": 110.1,
+      "kw": 116.6,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC600077D",
       "meter": "76",
-      "predicted_kw": 109.1,
+      "predicted_kw": 112.1,
       "anomaly": null,
       "sparkline": [
-        106.0,
         106.5,
         107.7,
         98.3,
@@ -227,11 +250,12 @@
         109.7,
         109.3,
         107.4,
-        110.1
+        110.1,
+        116.6
       ],
-      "est_daily_kwh": 2642,
-      "est_daily_cost": 396.36,
-      "est_daily_co2_kg": 554.9
+      "est_daily_kwh": 2798,
+      "est_daily_cost": 419.76,
+      "est_daily_co2_kg": 587.7
     },
     "sutardja": {
       "name": "Sutardja Dai Hall",
@@ -249,15 +273,14 @@
     },
     "mclaughlin": {
       "name": "McLaughlin Hall",
-      "kw": 20.4,
+      "kw": 27.6,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000495",
       "meter": "76",
-      "predicted_kw": 20.6,
+      "predicted_kw": 23.1,
       "anomaly": null,
       "sparkline": [
-        20.2,
         19.8,
         20.3,
         20.1,
@@ -280,23 +303,28 @@
         25.3,
         21.1,
         18.9,
-        20.4
+        20.4,
+        27.6
       ],
-      "est_daily_kwh": 490,
-      "est_daily_cost": 73.44,
-      "est_daily_co2_kg": 102.8
+      "est_daily_kwh": 662,
+      "est_daily_cost": 99.36,
+      "est_daily_co2_kg": 139.1
     },
     "stanley": {
       "name": "Stanley Hall",
-      "kw": 10.3,
+      "kw": 40.4,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000C5A",
       "meter": "3",
-      "predicted_kw": 7.3,
-      "anomaly": null,
+      "predicted_kw": 20.8,
+      "anomaly": {
+        "type": "high",
+        "current": 40.4,
+        "avg": 21.8,
+        "ratio": 1.85
+      },
       "sparkline": [
-        5.2,
         5.2,
         5.2,
         50.4,
@@ -319,11 +347,12 @@
         6.7,
         5.1,
         5.0,
-        10.3
+        10.3,
+        40.4
       ],
-      "est_daily_kwh": 247,
-      "est_daily_cost": 37.08,
-      "est_daily_co2_kg": 51.9
+      "est_daily_kwh": 970,
+      "est_daily_cost": 145.44,
+      "est_daily_co2_kg": 203.6
     },
     "tan": {
       "name": "Tan Hall",
@@ -341,15 +370,19 @@
     },
     "latimer": {
       "name": "Latimer & Pimentel Hall",
-      "kw": 6.0,
+      "kw": 13.0,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:01",
+      "timestamp": "2026-06-30 09:00:01",
       "mac": "0050C230ECE6",
       "meter": "77",
-      "predicted_kw": 6.0,
-      "anomaly": null,
+      "predicted_kw": 8.8,
+      "anomaly": {
+        "type": "high",
+        "current": 13.0,
+        "avg": 7.8,
+        "ratio": 1.68
+      },
       "sparkline": [
-        6.0,
         6.0,
         6.0,
         6.0,
@@ -372,23 +405,23 @@
         6.0,
         6.0,
         6.0,
-        6.0
+        6.0,
+        13.0
       ],
-      "est_daily_kwh": 144,
-      "est_daily_cost": 21.6,
-      "est_daily_co2_kg": 30.2
+      "est_daily_kwh": 312,
+      "est_daily_cost": 46.8,
+      "est_daily_co2_kg": 65.5
     },
     "birge": {
       "name": "Birge Hall",
-      "kw": 2.7,
+      "kw": 2.8,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6001C55",
       "meter": "3",
-      "predicted_kw": 1.7,
+      "predicted_kw": 2.3,
       "anomaly": null,
       "sparkline": [
-        0.9,
         0.9,
         0.9,
         0.9,
@@ -411,23 +444,23 @@
         0.9,
         0.9,
         1.2,
-        2.7
+        2.7,
+        2.8
       ],
-      "est_daily_kwh": 65,
-      "est_daily_cost": 9.72,
-      "est_daily_co2_kg": 13.6
+      "est_daily_kwh": 67,
+      "est_daily_cost": 10.08,
+      "est_daily_co2_kg": 14.1
     },
     "hilde": {
       "name": "Hildebrand Hall",
-      "kw": 71.3,
+      "kw": 80.9,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000764",
       "meter": "76",
-      "predicted_kw": 66.3,
+      "predicted_kw": 72.3,
       "anomaly": null,
       "sparkline": [
-        63.2,
         79.6,
         77.0,
         69.2,
@@ -450,11 +483,12 @@
         66.0,
         66.5,
         59.6,
-        71.3
+        71.3,
+        80.9
       ],
-      "est_daily_kwh": 1711,
-      "est_daily_cost": 256.68,
-      "est_daily_co2_kg": 359.4
+      "est_daily_kwh": 1942,
+      "est_daily_cost": 291.24,
+      "est_daily_co2_kg": 407.7
     },
     "lksc": {
       "name": "Li Ka Shing",
@@ -486,15 +520,14 @@
     },
     "wheeler": {
       "name": "Wheeler Hall",
-      "kw": 18.7,
+      "kw": 20.3,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000C8C",
       "meter": "76",
-      "predicted_kw": 16.5,
+      "predicted_kw": 18.1,
       "anomaly": null,
       "sparkline": [
-        12.6,
         12.5,
         12.5,
         12.7,
@@ -517,23 +550,23 @@
         16.3,
         16.2,
         13.7,
-        18.7
+        18.7,
+        20.3
       ],
-      "est_daily_kwh": 449,
-      "est_daily_cost": 67.32,
-      "est_daily_co2_kg": 94.2
+      "est_daily_kwh": 487,
+      "est_daily_cost": 73.08,
+      "est_daily_co2_kg": 102.3
     },
     "dwinelle": {
       "name": "Dwinelle Hall",
-      "kw": 28.0,
+      "kw": 40.9,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC600045C",
       "meter": "76",
-      "predicted_kw": 28.6,
+      "predicted_kw": 33.4,
       "anomaly": null,
       "sparkline": [
-        29.3,
         29.3,
         29.6,
         28.8,
@@ -556,11 +589,12 @@
         29.1,
         30.2,
         28.1,
-        28.0
+        28.0,
+        40.9
       ],
-      "est_daily_kwh": 672,
-      "est_daily_cost": 100.8,
-      "est_daily_co2_kg": 141.1
+      "est_daily_kwh": 982,
+      "est_daily_cost": 147.24,
+      "est_daily_co2_kg": 206.1
     },
     "barrows": {
       "name": "Barrows Hall",
@@ -578,15 +612,14 @@
     },
     "moses": {
       "name": "Moses Hall",
-      "kw": 14.5,
+      "kw": 19.8,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6001C7A",
       "meter": "76",
-      "predicted_kw": 14.7,
+      "predicted_kw": 16.7,
       "anomaly": null,
       "sparkline": [
-        15.1,
         14.8,
         14.7,
         15.4,
@@ -609,23 +642,23 @@
         15.2,
         14.8,
         14.7,
-        14.5
+        14.5,
+        19.8
       ],
-      "est_daily_kwh": 348,
-      "est_daily_cost": 52.2,
-      "est_daily_co2_kg": 73.1
+      "est_daily_kwh": 475,
+      "est_daily_cost": 71.28,
+      "est_daily_co2_kg": 99.8
     },
     "stephens": {
       "name": "Stephens Hall",
-      "kw": 19.1,
+      "kw": 22.1,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000CB6",
       "meter": "76",
-      "predicted_kw": 14.4,
+      "predicted_kw": 17.4,
       "anomaly": null,
       "sparkline": [
-        10.9,
         9.8,
         9.8,
         15.4,
@@ -648,17 +681,18 @@
         19.8,
         9.4,
         9.6,
-        19.1
+        19.1,
+        22.1
       ],
-      "est_daily_kwh": 458,
-      "est_daily_cost": 68.76,
-      "est_daily_co2_kg": 96.3
+      "est_daily_kwh": 530,
+      "est_daily_cost": 79.56,
+      "est_daily_co2_kg": 111.4
     },
     "wurster": {
       "name": "Wurster Hall",
       "kw": 1.9,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000B5F",
       "meter": "3",
       "predicted_kw": 1.9,
@@ -695,15 +729,14 @@
     },
     "giannini": {
       "name": "Giannini Hall",
-      "kw": 15.7,
+      "kw": 29.3,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000CCA",
       "meter": "76",
-      "predicted_kw": 17.3,
+      "predicted_kw": 22.0,
       "anomaly": null,
       "sparkline": [
-        21.1,
         22.7,
         19.6,
         21.1,
@@ -726,11 +759,12 @@
         17.3,
         18.9,
         18.5,
-        15.7
+        15.7,
+        29.3
       ],
-      "est_daily_kwh": 377,
-      "est_daily_cost": 56.52,
-      "est_daily_co2_kg": 79.1
+      "est_daily_kwh": 703,
+      "est_daily_cost": 105.48,
+      "est_daily_co2_kg": 147.7
     },
     "tolman": {
       "name": "Tolman Hall",
@@ -748,15 +782,14 @@
     },
     "morgan": {
       "name": "Morgan Hall",
-      "kw": 5.0,
+      "kw": 5.4,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6001BC1",
       "meter": "76",
-      "predicted_kw": 5.1,
+      "predicted_kw": 5.2,
       "anomaly": null,
       "sparkline": [
-        5.1,
         5.0,
         5.1,
         5.1,
@@ -779,11 +812,12 @@
         5.2,
         5.0,
         5.2,
-        5.0
+        5.0,
+        5.4
       ],
-      "est_daily_kwh": 120,
-      "est_daily_cost": 18.0,
-      "est_daily_co2_kg": 25.2
+      "est_daily_kwh": 130,
+      "est_daily_cost": 19.44,
+      "est_daily_co2_kg": 27.2
     },
     "boalt": {
       "name": "Boalt Hall",
@@ -815,15 +849,14 @@
     },
     "rsf": {
       "name": "Rec Sports Facility",
-      "kw": 119.0,
+      "kw": 40.0,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000CA0",
       "meter": "76",
-      "predicted_kw": 113.0,
+      "predicted_kw": 84.8,
       "anomaly": null,
       "sparkline": [
-        112.0,
         109.0,
         78.0,
         25.0,
@@ -846,23 +879,23 @@
         107.0,
         101.0,
         115.0,
-        119.0
+        119.0,
+        40.0
       ],
-      "est_daily_kwh": 2856,
-      "est_daily_cost": 428.4,
-      "est_daily_co2_kg": 599.8
+      "est_daily_kwh": 960,
+      "est_daily_cost": 144.0,
+      "est_daily_co2_kg": 201.6
     },
     "chavez": {
       "name": "Chavez Center",
-      "kw": 42.0,
+      "kw": 94.0,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:02",
+      "timestamp": "2026-06-30 09:00:01",
       "mac": "001EC6000BB9",
       "meter": "76",
-      "predicted_kw": 45.9,
+      "predicted_kw": 64.6,
       "anomaly": null,
       "sparkline": [
-        29.0,
         33.0,
         28.0,
         33.0,
@@ -885,11 +918,12 @@
         51.0,
         48.0,
         48.0,
-        42.0
+        42.0,
+        94.0
       ],
-      "est_daily_kwh": 1008,
-      "est_daily_cost": 151.2,
-      "est_daily_co2_kg": 211.7
+      "est_daily_kwh": 2256,
+      "est_daily_cost": 338.4,
+      "est_daily_co2_kg": 473.8
     },
     "anthony": {
       "name": "Anthony Hall",
@@ -907,15 +941,14 @@
     },
     "sproul": {
       "name": "Sproul Hall",
-      "kw": 71.0,
+      "kw": 101.6,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000CAE",
       "meter": "76",
-      "predicted_kw": 70.0,
+      "predicted_kw": 82.6,
       "anomaly": null,
       "sparkline": [
-        69.1,
         73.2,
         69.5,
         69.7,
@@ -938,23 +971,23 @@
         72.1,
         68.0,
         69.2,
-        71.0
+        71.0,
+        101.6
       ],
-      "est_daily_kwh": 1704,
-      "est_daily_cost": 255.6,
-      "est_daily_co2_kg": 357.8
+      "est_daily_kwh": 2438,
+      "est_daily_cost": 365.76,
+      "est_daily_co2_kg": 512.1
     },
     "doe": {
       "name": "Doe Library",
-      "kw": 22.5,
+      "kw": 22.6,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000C54",
       "meter": "76",
-      "predicted_kw": 14.9,
+      "predicted_kw": 18.8,
       "anomaly": null,
       "sparkline": [
-        5.6,
         5.5,
         19.6,
         19.0,
@@ -977,23 +1010,23 @@
         9.4,
         9.3,
         10.2,
-        22.5
+        22.5,
+        22.6
       ],
-      "est_daily_kwh": 540,
-      "est_daily_cost": 81.0,
-      "est_daily_co2_kg": 113.4
+      "est_daily_kwh": 542,
+      "est_daily_cost": 81.36,
+      "est_daily_co2_kg": 113.9
     },
     "moffitt": {
       "name": "Moffitt Library",
-      "kw": 95.0,
+      "kw": 111.0,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000C90",
       "meter": "76",
-      "predicted_kw": 96.1,
+      "predicted_kw": 101.7,
       "anomaly": null,
       "sparkline": [
-        106.0,
         91.0,
         102.0,
         96.0,
@@ -1016,11 +1049,12 @@
         100.0,
         98.0,
         95.0,
-        95.0
+        95.0,
+        111.0
       ],
-      "est_daily_kwh": 2280,
-      "est_daily_cost": 342.0,
-      "est_daily_co2_kg": 478.8
+      "est_daily_kwh": 2664,
+      "est_daily_cost": 399.6,
+      "est_daily_co2_kg": 559.4
     },
     "uhall": {
       "name": "University Hall",
@@ -1038,15 +1072,14 @@
     },
     "northgate": {
       "name": "North Gate Hall",
-      "kw": 5.1,
+      "kw": 5.9,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6070132",
       "meter": "3",
-      "predicted_kw": 5.1,
+      "predicted_kw": 5.4,
       "anomaly": null,
       "sparkline": [
-        5.0,
         5.0,
         5.3,
         5.5,
@@ -1069,23 +1102,23 @@
         5.6,
         5.0,
         5.0,
-        5.1
+        5.1,
+        5.9
       ],
-      "est_daily_kwh": 122,
-      "est_daily_cost": 18.36,
-      "est_daily_co2_kg": 25.7
+      "est_daily_kwh": 142,
+      "est_daily_cost": 21.24,
+      "est_daily_co2_kg": 29.7
     },
     "donner": {
       "name": "Donner Laboratory",
-      "kw": 24.0,
+      "kw": 21.0,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000C24",
       "meter": "76",
-      "predicted_kw": 25.1,
+      "predicted_kw": 23.7,
       "anomaly": null,
       "sparkline": [
-        21.0,
         22.0,
         22.0,
         24.0,
@@ -1108,23 +1141,23 @@
         20.0,
         27.0,
         27.0,
-        24.0
+        24.0,
+        21.0
       ],
-      "est_daily_kwh": 576,
-      "est_daily_cost": 86.4,
-      "est_daily_co2_kg": 121.0
+      "est_daily_kwh": 504,
+      "est_daily_cost": 75.6,
+      "est_daily_co2_kg": 105.8
     },
     "bww": {
       "name": "Berkeley Way West",
-      "kw": 381.7,
+      "kw": 357.1,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:13",
+      "timestamp": "2026-06-30 09:00:12",
       "mac": "001EC6000777",
       "meter": "76",
-      "predicted_kw": 361.6,
+      "predicted_kw": 361.2,
       "anomaly": null,
       "sparkline": [
-        365.6,
         359.3,
         393.4,
         361.0,
@@ -1147,23 +1180,23 @@
         357.7,
         346.5,
         346.0,
-        381.7
+        381.7,
+        357.1
       ],
-      "est_daily_kwh": 9161,
-      "est_daily_cost": 1374.12,
-      "est_daily_co2_kg": 1923.8
+      "est_daily_kwh": 8570,
+      "est_daily_cost": 1285.56,
+      "est_daily_co2_kg": 1799.8
     },
     "mulford": {
       "name": "Mulford Hall",
-      "kw": 32.0,
+      "kw": 40.0,
       "status": "online",
-      "timestamp": "2026-06-30 06:15:00",
+      "timestamp": "2026-06-30 09:00:00",
       "mac": "001EC6000CB2",
       "meter": "76",
-      "predicted_kw": 31.7,
+      "predicted_kw": 35.1,
       "anomaly": null,
       "sparkline": [
-        31.0,
         34.0,
         32.0,
         30.0,
@@ -1186,11 +1219,12 @@
         31.0,
         31.0,
         32.0,
-        32.0
+        32.0,
+        40.0
       ],
-      "est_daily_kwh": 768,
-      "est_daily_cost": 115.2,
-      "est_daily_co2_kg": 161.3
+      "est_daily_kwh": 960,
+      "est_daily_cost": 144.0,
+      "est_daily_co2_kg": 201.6
     }
   }
 }
