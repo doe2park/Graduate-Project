@@ -28,30 +28,123 @@
  * The worker strips markers from the visible answer before returning.
  */
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+// Only the GitHub Pages site (and local dev) may call this worker.
+const ALLOWED_ORIGINS = [
+  'https://doe2park.github.io',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+];
+
+function corsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
+  };
+}
+
+function originAllowed(request) {
+  const origin = request.headers.get('Origin');
+  // Non-browser calls (no Origin header) are rejected for /aps-token,
+  // allowed for chatbot POSTs only if you want CLI testing — default: reject.
+  return origin !== null && ALLOWED_ORIGINS.includes(origin);
+}
 
 const MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 // Valid building ids the LLM may emit in action markers.
-// Keep in sync with D[] in grimes-campus-map-arcgis.html.
-const BUILDING_IDS = [
-  'grimes', 'davis', 'cory', 'soda', 'etch', 'hmm', 'hesse', 'jacobs',
-  'sutardja', 'mclaughlin', 'stanley', 'tan', 'latimer', 'evans', 'birge',
-  'hilde', 'wheeler', 'dwinelle', 'moses', 'south', 'barrows', 'stephens',
-  'wurster', 'giannini', 'california', 'mlk', 'rsf', 'chavez', 'sproul',
-  'doe', 'moffitt', 'uhall', 'zeller', 'donner', 'mulford', 'northgate',
-  'haas', 'morgan', 'bww', 'lksc', 'vlsb',
+// SINGLE SOURCE: data/building_ids.json on GitHub Pages (derived from D[] in
+// grimes-campus-map-arcgis.html). Fetched lazily + cached 1h; falls back to
+// the embedded snapshot below if the fetch fails.
+const BUILDING_IDS_URL = 'https://doe2park.github.io/Graduate-Project/data/building_ids.json';
+const BUILDING_IDS_FALLBACK = [
+  'grimes',
+  'cory',
+  'soda',
+  'davis',
+  'etch',
+  'hmm',
+  'hesse',
+  'obrien',
+  'jacobs',
+  'sutardja',
+  'mclaughlin',
+  'blum',
+  'stanley',
+  'tan',
+  'latimer',
+  'lewis',
+  'pimentel',
+  'evans',
+  'campbell',
+  'birge',
+  'leconte',
+  'vlsb',
+  'lksc',
+  'hilde',
+  'wheeler',
+  'dwinelle',
+  'moses',
+  'durant',
+  'south',
+  'barrows',
+  'stephens',
+  'haas',
+  'boalt',
+  'wurster',
+  'kroeber',
+  'tolman',
+  'morgan',
+  'giannini',
+  'california',
+  'mlk',
+  'rsf',
+  'chavez',
+  'anthony',
+  'unit1',
+  'unit2',
+  'unit3',
+  'stadium',
+  'doe',
+  'moffitt',
+  'stacks',
+  'bancroft',
+  'music',
+  'campanile',
+  'sproul',
+  'uhall',
+  'sgate',
+  'zeller',
+  'donner',
+  'mulford',
+  'northgate',
+  'bww'
 ];
+let _bidCache = { ids: null, exp: 0 };
+async function getBuildingIds() {
+  const now = Date.now();
+  if (_bidCache.ids && now < _bidCache.exp) return _bidCache.ids;
+  try {
+    const r = await fetch(BUILDING_IDS_URL, { cf: { cacheTtl: 3600 } });
+    if (r.ok) {
+      const j = await r.json();
+      if (Array.isArray(j.building_ids) && j.building_ids.length) {
+        _bidCache = { ids: j.building_ids, exp: now + 3600 * 1000 };
+        return _bidCache.ids;
+      }
+    }
+  } catch (e) { /* fall through */ }
+  return BUILDING_IDS_FALLBACK;
+}
 const CATEGORIES = [
   'Engineering', 'Science', 'Humanities', 'Professional',
   'Libraries', 'Student Life', 'Other',
 ];
 
-function buildSystemPrompt(context, lang) {
+function buildSystemPrompt(context, lang, buildingIds) {
   const langLine = lang === 'ko'
     ? 'Reply in natural Korean (한국어로 답변).'
     : 'Reply in natural English.';
@@ -84,7 +177,7 @@ Common mistakes to avoid:
 
 You may emit MULTIPLE markers if the user asks for multiple things — one per line (e.g. "compare Davis and Wheeler on the map" → "<<ZOOM:davis>>" newline "<<ZOOM:wheeler>>").
 
-Valid building_id values (use EXACTLY these, never the pretty name): ${BUILDING_IDS.join(', ')}
+Valid building_id values (use EXACTLY these, never the pretty name): ${buildingIds.join(', ')}
 Valid Category values (use EXACTLY these, case-sensitive): ${CATEGORIES.join(', ')}
 
 GROUNDING RULES:
@@ -119,10 +212,10 @@ function parseActions(text) {
   return { actions, clean };
 }
 
-function json(data, status = 200) {
+function json(data, status = 200, cors = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', ...CORS },
+    headers: { 'content-type': 'application/json; charset=utf-8', ...cors },
   });
 }
 
@@ -137,9 +230,24 @@ function json(data, status = 200) {
 // Browser usage:
 //   fetch('https://<worker-domain>/aps-token').then(r => r.json())
 //   → { access_token, expires_in, token_type }
-async function handleApsToken(env) {
+// Token cache: reuse one APS token across requests until ~2 min before expiry.
+// Cuts APS auth traffic and rate-limits abuse (isolate-global, resets on eviction).
+let _apsTokenCache = { token: null, exp: 0 };
+
+async function handleApsToken(env, request) {
+  if (!originAllowed(request)) {
+    return json({ error: 'origin not allowed' }, 403, corsHeaders(request));
+  }
   if (!env.APS_CLIENT_ID || !env.APS_CLIENT_SECRET) {
-    return json({ error: 'APS credentials not configured. Set APS_CLIENT_ID + APS_CLIENT_SECRET in Cloudflare worker env.' }, 500);
+    return json({ error: 'APS credentials not configured. Set APS_CLIENT_ID + APS_CLIENT_SECRET in Cloudflare worker env.' }, 500, corsHeaders(request));
+  }
+  const now = Date.now() / 1000;
+  if (_apsTokenCache.token && _apsTokenCache.exp - now > 120) {
+    return json({
+      access_token: _apsTokenCache.token,
+      token_type: 'Bearer',
+      expires_in: Math.floor(_apsTokenCache.exp - now),
+    }, 200, corsHeaders(request));
   }
   const basic = btoa(`${env.APS_CLIENT_ID}:${env.APS_CLIENT_SECRET}`);
   const r = await fetch('https://developer.api.autodesk.com/authentication/v2/token', {
@@ -148,44 +256,52 @@ async function handleApsToken(env) {
       'Authorization': `Basic ${basic}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: 'grant_type=client_credentials&scope=viewables:read data:read',
+    // viewables:read is all the Forge/APS Viewer needs. Do NOT add data:read —
+    // it would let any site visitor download raw bucket objects (the NWD).
+    body: 'grant_type=client_credentials&scope=viewables:read',
   });
   const data = await r.json();
+  if (r.ok && data.access_token) {
+    _apsTokenCache = { token: data.access_token, exp: now + (data.expires_in || 3600) };
+  }
   return new Response(JSON.stringify(data), {
     status: r.status,
-    headers: { 'content-type': 'application/json; charset=utf-8', ...CORS },
+    headers: { 'content-type': 'application/json; charset=utf-8', ...corsHeaders(request) },
   });
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const cors = corsHeaders(request);
 
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     // GET /aps-token — issue an APS viewer access token (server-side OAuth)
     if (request.method === 'GET' && url.pathname === '/aps-token') {
-      return handleApsToken(env);
+      return handleApsToken(env, request);
     }
 
-    if (request.method !== 'POST') return new Response('POST only', { status: 405, headers: CORS });
+    if (request.method !== 'POST') return new Response('POST only', { status: 405, headers: cors });
+    if (!originAllowed(request)) return json({ error: 'origin not allowed' }, 403, cors);
 
     let body;
     try { body = await request.json(); }
-    catch (e) { return json({ error: 'Invalid JSON' }, 400); }
+    catch (e) { return json({ error: 'Invalid JSON' }, 400, cors); }
 
     const question = (body.question || '').toString().slice(0, 2000);
-    if (!question) return json({ error: 'question required' }, 400);
+    if (!question) return json({ error: 'question required' }, 400, cors);
 
     const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
     const context = (body.context || '').toString().slice(0, 6000);
     const lang = /[\uAC00-\uD7AF]/.test(question) ? 'ko' : (body.lang || 'en');
 
     const t0 = Date.now();
+    const buildingIds = await getBuildingIds();
 
     // Build messages: system + last history turns + user question
     const messages = [
-      { role: 'system', content: buildSystemPrompt(context, lang) },
+      { role: 'system', content: buildSystemPrompt(context, lang, buildingIds) },
     ];
     for (const h of history) {
       if (!h || !h.role || !h.content) continue;
@@ -203,7 +319,7 @@ export default {
         answer: '<div class="tb-kicker">Error</div><div class="tb-title">Brain unreachable</div><div class="tb-body">The AI service timed out. I fell back to a simple answer — try a specific building name.</div>',
         actions: [],
         error: String(e).slice(0, 200),
-      }, 200);
+      }, 200, cors);
     }
 
     const { actions, clean } = parseActions(reply);
@@ -212,7 +328,7 @@ export default {
     const safeActions = actions.filter(a => {
       if (a.type === 'reset') return true;
       if (a.type === 'filter') return CATEGORIES.includes(a.arg);
-      if (a.type === 'zoom' || a.type === 'trend') return BUILDING_IDS.includes(a.arg);
+      if (a.type === 'zoom' || a.type === 'trend') return buildingIds.includes(a.arg);
       return false;
     });
 
@@ -221,6 +337,6 @@ export default {
       actions: safeActions,
       model: MODEL,
       latency_ms: Date.now() - t0,
-    });
+    }, 200, cors);
   },
 };

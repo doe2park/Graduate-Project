@@ -536,6 +536,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 <div id="ma">
   <button id="tb">☰</button>
   <a href="campus-3d.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(45,212,191,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--cyan);font-size:10px;font-weight:600;text-decoration:none">🏛 3D View</a>
+  <a href="grimes-aps-viewer.html" style="position:absolute;top:12px;right:150px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(253,181,21,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--gold);font-size:10px;font-weight:600;text-decoration:none">🏗 Bechtel BIM</a>
 
   <!-- Campus Mood: one-line plain-language summary -->
   <div id="campusMood" title="How the campus compares to typical load at this hour">
@@ -698,9 +699,6 @@ const D=[
   {id:'mulford',n:'Mulford Hall',a:'Natural Resources',lat:37.87264,lng:-122.26449,c:'Professional',nrg:1,yr:1948,floors:4},
   {id:'northgate',n:'North Gate Hall',a:'Journalism',lat:37.874974,lng:-122.259826,c:'Humanities',nrg:1,yr:1906,floors:3},
   {id:'bww',n:'Berkeley Way West',a:'Psychology / Education',lat:37.87490,lng:-122.25912,c:'Science',nrg:1,yr:2020,floors:7},
-  {id:'unit1',n:'Unit 1 Residence Hall',a:'Student Housing',lat:37.86720,lng:-122.25595,c:'Student Life',yr:1960,floors:8},
-  {id:'unit2',n:'Unit 2 Residence Hall',a:'Student Housing',lat:37.86790,lng:-122.25480,c:'Student Life',yr:1960,floors:8},
-  {id:'unit3',n:'Unit 3 Residence Hall',a:'Student Housing',lat:37.86760,lng:-122.26150,c:'Student Life',yr:1964,floors:8},
 ];
 
 const C={Engineering:{r:[0,50,98],h:'#FDB515'},Science:{r:[16,120,60],h:'#34d399'},Humanities:{r:[100,40,160],h:'#a78bfa'},Professional:{r:[30,80,200],h:'#60a5fa'},'Student Life':{r:[180,40,40],h:'#f87171'},Libraries:{r:[6,182,212],h:'#06b6d4'},Admin:{r:[148,163,184],h:'#94a3b8'}};
@@ -2176,6 +2174,40 @@ function buildContext(){
 // Note: `chatHistory` is the 24h trend data fetched on boot; conversation turns
 // live in `chatTurns` to avoid the name collision.
 var chatTurns = [];
+
+// XSS guard: the chatbot answer is LLM-generated HTML. Allow only a small
+// formatting whitelist; strip scripts, event handlers and javascript: URLs.
+function sanitizeChatHtml(html){
+  var ALLOWED={B:1,I:1,U:1,EM:1,STRONG:1,BR:1,UL:1,OL:1,LI:1,DIV:1,SPAN:1,P:1,A:1,SMALL:1,SUB:1,SUP:1};
+  var tpl=document.createElement('template');
+  tpl.innerHTML=String(html);
+  (function walk(node){
+    var children=Array.prototype.slice.call(node.children||[]);
+    for(var i=0;i<children.length;i++){
+      var el=children[i];
+      if(!ALLOWED[el.tagName]){
+        // unwrap disallowed element but keep its text content
+        el.replaceWith(document.createTextNode(el.textContent||''));
+        continue;
+      }
+      // strip all attributes except class + safe href
+      var attrs=Array.prototype.slice.call(el.attributes);
+      for(var j=0;j<attrs.length;j++){
+        var a=attrs[j].name.toLowerCase();
+        if(a==='class')continue;
+        if(a==='href'&&el.tagName==='A'){
+          var href=el.getAttribute('href')||'';
+          if(/^(https?:|#|\/)/i.test(href.trim())){el.setAttribute('target','_blank');el.setAttribute('rel','noopener');continue;}
+        }
+        el.removeAttribute(attrs[j].name);
+      }
+      walk(el);
+    }
+  })(tpl.content);
+  var out=document.createElement('div');
+  out.appendChild(tpl.content.cloneNode(true));
+  return out.innerHTML;
+}
 function stripHtml(s){var d=document.createElement('div');d.innerHTML=s||'';return (d.textContent||'').trim().replace(/\s+/g,' ').slice(0,1200)}
 
 // Dispatch action markers returned by the Phase 2 worker
@@ -2229,7 +2261,7 @@ async function sendChat(){
       });
       var data=await res.json();
       if(data.answer){
-        loading.innerHTML=data.answer;
+        loading.innerHTML=sanitizeChatHtml(data.answer);
         loading.classList.remove('loading');
         // Phase 2 worker returns an `actions` array — execute against the map
         if(data.actions&&data.actions.length)runActions(data.actions);

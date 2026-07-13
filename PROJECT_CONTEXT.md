@@ -37,8 +37,8 @@ Web-based digital twin of UC Berkeley campus energy, centered on **Grimes Hall /
 | `data/bechtel_leed.json` | LEED v4 Energy Performance — 11 end-uses, baseline vs designed |
 | `data/bechtel_lca.json` | LEED v4.1 MR Material Reuse — element reuse % |
 | `data/grimes-interior.json` | Manifest for interior scan + Cupix integration |
-| `data/bechtel_nwd_metadata.json` | APS metadata for converted Bechtel NWD |
-| `data/bechtel_nwd_properties.json` | 504MB property dump (rarely queried) |
+| `data/bechtel_nwd_metadata.json` | APS metadata dump — **LOCAL ONLY, not in repo** (regenerate via `convert_nwd_local.py`) |
+| `data/bechtel_nwd_properties.json` | 504MB property dump — **LOCAL ONLY, not in repo** |
 | `convert_nwd_local.py` | NWD→APS pipeline (auth, upload, translate, properties) |
 | `extract_leed.py` / `extract_lca.py` | LEED data extraction scripts |
 | `APS_VIEWER_SETUP.md` | Cloudflare worker setup guide (env vars, deployment) |
@@ -57,7 +57,12 @@ Web-based digital twin of UC Berkeley campus energy, centered on **Grimes Hall /
 - Cupix postMessage flow confirmed (~262 msgs/sec when navigating)
 - Worker `/aps-token` endpoint serving APS V2 tokens
 
-### 🟡 STUCK — Cupix→APS Viewer coordinate alignment
+### 🟡 IN PROGRESS — Cupix→APS Viewer coordinate alignment (yaw fix implemented, needs live test)
+
+**2026-07 root-cause analysis:** the old toggle set (scale / swapY↔Z / flipZ / subtract-offset) could never align, because the working grimes-xr calibration (`data/cupix_calib.json`) proves the Cupix↔BIM registration includes **yaw ≈ −135° about the up-axis** — unreachable by 90° swaps and sign flips. `grimes-aps-viewer.html` now applies **scale → yaw(Z) → offset**, with defaults derived from cupix_calib.json conjugated into Z-up/feet: scale 3.2808 · yaw −135° · offset (55.4, −35.4, 20.0) ft = 3.2808·(o.x, −o.z, o.y). Yaw/offset are editable in the sync panel and persisted to localStorage. Also: do NOT enable "subtract globalOffset" — it pushes z to ≈ −338 ft, outside the bbox (±47.6).
+
+<details><summary>Original stuck-state notes (pre-yaw)</summary>
+
 
 Despite both viewers loading same NWD (`ALL - UCBBE - COMBINED.nwd`, which IS Bechtel-only per user), camera positions don't align.
 
@@ -84,6 +89,8 @@ position: (26.26, -27.29, 2.08)
 - `Lock anchor` manual fallback (NOT preferred — only if nothing else works)
 
 The right combination is whichever puts the APS camera inside the building. Console logs every 30th sync with raw/transformed values.
+
+</details>
 
 ### ❌ Known broken / blocked
 
@@ -156,9 +163,9 @@ dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Z3JpbWVzLXR3aW4tYXRhNnc3Z2hzdGFxeHd5ajV0YTIv
 
 (Hardcoded in `grimes-aps-viewer.html`)
 
-APS credentials are baked into `convert_nwd_local.py` (CLIENT_ID + CLIENT_SECRET at top of file) and also stored as Cloudflare worker secrets (`APS_CLIENT_ID`, `APS_CLIENT_SECRET`). Worker `/aps-token` endpoint already deployed and confirmed returning valid tokens.
+APS credentials live ONLY in env vars (`APS_CLIENT_ID` / `APS_CLIENT_SECRET`) and Cloudflare worker secrets. They were previously committed to this public repo (`convert_nwd_local.py`, `APS_VIEWER_SETUP.md`) — **those keys are burned and must be rotated** at https://aps.autodesk.com/myapps. `convert_nwd_local.py` now reads env vars and exits if unset. Worker `/aps-token` is origin-restricted to doe2park.github.io, scope `viewables:read` only, with token caching.
 
-If credentials need rotating, generate new ones at https://aps.autodesk.com/myapps, update `convert_nwd_local.py` lines 33-34, and update worker secrets via `wrangler secret put APS_CLIENT_ID` / `APS_CLIENT_SECRET`.
+To rotate: generate new keys at https://aps.autodesk.com/myapps, then `export APS_CLIENT_ID=... APS_CLIENT_SECRET=...` locally and update worker secrets via `wrangler secret put APS_CLIENT_ID` / `APS_CLIENT_SECRET`, then `wrangler deploy worker/chatbot-worker.js --name campus-chatbot`.
 
 ---
 

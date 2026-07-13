@@ -104,13 +104,24 @@ body.compare-on #syncPanel{display:block}
     <label style="flex:1">unit scale (m→?): <input type="number" id="unitScale" value="3.2808" step="0.0001" style="width:60px;background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 4px;border-radius:3px;font:11px var(--mono)"></label>
   </div>
   <div class="row" style="margin-top:4px">
+    <label style="flex:1">yaw ° (about up-axis): <input type="number" id="yawDeg" value="-135" step="0.5" style="width:56px;background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 4px;border-radius:3px;font:11px var(--mono)"></label>
+  </div>
+  <div class="row" style="margin-top:4px;gap:4px">
+    <label>off X <input type="number" id="offX" value="55.4" step="0.1" style="width:50px;background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 3px;border-radius:3px;font:10px var(--mono)"></label>
+    <label>Y <input type="number" id="offY" value="-35.4" step="0.1" style="width:50px;background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 3px;border-radius:3px;font:10px var(--mono)"></label>
+    <label>Z <input type="number" id="offZ" value="20.0" step="0.1" style="width:50px;background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 3px;border-radius:3px;font:10px var(--mono)"></label>
+  </div>
+  <div class="row" style="margin-top:4px">
+    <button onclick="loadCalibDefaults(true)" style="flex:1;padding:3px 8px;border:1px solid rgba(52,211,153,.3);background:rgba(52,211,153,.08);color:#34d399;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">↧ Defaults from cupix_calib.json</button>
+  </div>
+  <div class="row" style="margin-top:4px">
     <label><input type="checkbox" id="useOffset"> subtract globalOffset</label>
   </div>
   <div class="row" style="margin-top:4px">
     <label><input type="checkbox" id="swapYZ"> swap Y↔Z (Z-up → Y-up)</label>
     <label><input type="checkbox" id="flipZ"> flip Z sign</label>
   </div>
-  <div class="hint" style="font-size:9.5px;color:#6b7fa0">scale 3.28 = meters→feet (US BIM default) · 1.0 = no conversion · 0.3048 = feet→meters</div>
+  <div class="hint" style="font-size:9.5px;color:#6b7fa0">transform = scale → yaw(up) → offset. Defaults derived from the working grimes-xr calibration (yaw −135°, offset = R·calib.offset × 3.2808). swap/flip should stay OFF (both worlds are Z-up).</div>
   <div class="row" style="margin-top:6px">
     <button onclick="testSync()" style="flex:1;padding:4px 8px;border:1px solid rgba(34,211,238,.3);background:rgba(34,211,238,.08);color:#67e8f9;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">🧪 Test sync</button>
     <button onclick="apsViewer.navigation.fitBounds(true, apsViewer.model.getBoundingBox())" style="flex:1;padding:4px 8px;border:1px solid rgba(148,163,184,.3);background:rgba(255,255,255,.04);color:#cbd5e1;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">⌂ Fit view</button>
@@ -120,7 +131,7 @@ body.compare-on #syncPanel{display:block}
     <button onclick="clearAnchor()" style="flex:1;padding:4px 8px;border:1px solid rgba(148,163,184,.3);background:rgba(255,255,255,.04);color:#cbd5e1;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">↺ Clear</button>
   </div>
   <div class="stat"><span class="k">anchor</span><span class="v" id="anchorVal">0, 0, 0</span></div>
-  <div class="hint">Default <b>scale=3.28</b> assumes Cupix meters → APS feet (most common). If still off: try toggles, or as last resort park APS camera where Cupix shows + click Lock anchor.</div>
+  <div class="hint">Defaults come from the proven grimes-xr calibration: <b>scale 3.28 · yaw −135° · offset (55.4, −35.4, 20.0) ft</b>. Fine-tune yaw/offset first; Lock anchor is the last resort.</div>
 </div>
 
 <script>
@@ -298,28 +309,127 @@ try {
   if (typeof saved.x === 'number') cupixAnchor = saved;
 } catch {}
 
+// Rotate (x,y) CCW about the +Z (up) axis by deg. Both Cupix and this NWD are
+// Z-up, so the registration rotation between the two worlds is a pure yaw.
+// This is the term the old toggle set could never express: the working
+// grimes-xr calibration (data/cupix_calib.json) proves the Cupix↔BIM
+// registration needs yaw ≈ −135°, which no combination of 90° axis swaps
+// and sign flips can produce.
+function yawZ(x, y, deg) {
+  const r = deg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  return [c * x - s * y, s * x + c * y];
+}
+
+function getSyncParams() {
+  return {
+    scale: parseFloat(document.getElementById('unitScale').value) || 1.0,
+    yaw:   parseFloat(document.getElementById('yawDeg').value) || 0,
+    off: {
+      x: parseFloat(document.getElementById('offX').value) || 0,
+      y: parseFloat(document.getElementById('offY').value) || 0,
+      z: parseFloat(document.getElementById('offZ').value) || 0,
+    },
+    swapYZ: document.getElementById('swapYZ').checked,
+    flipZ:  document.getElementById('flipZ').checked,
+    useGlobalOffset: document.getElementById('useOffset').checked,
+  };
+}
+
 function transformCupixToAps(cx, cy, cz) {
+  const P = getSyncParams();
   let x = cx, y = cy, z = cz;
-  // STEP 1: unit conversion (Cupix meters → APS feet, typical for US BIM)
-  const scale = parseFloat(document.getElementById('unitScale').value) || 1.0;
-  x *= scale; y *= scale; z *= scale;
-  // STEP 2: optional axis swap (most NWD are Z-up, default off)
-  if (document.getElementById('swapYZ').checked) {
-    const ty = z, tz = -y;
-    y = ty; z = tz;
-  }
-  if (document.getElementById('flipZ').checked) z = -z;
-  // STEP 3: optional globalOffset subtraction (depends on how APS shifted model)
-  if (document.getElementById('useOffset').checked) {
+  // STEP 1: unit conversion (Cupix meters → APS feet)
+  x *= P.scale; y *= P.scale; z *= P.scale;
+  // STEP 2: registration yaw about the shared up-axis (Z)
+  if (P.yaw) [x, y] = yawZ(x, y, P.yaw);
+  // STEP 3: registration translation (feet, APS world)
+  x += P.off.x; y += P.off.y; z += P.off.z;
+  // STEP 4 (legacy/debug, default off): axis swap / flip
+  if (P.swapYZ) { const ty = z, tz = -y; y = ty; z = tz; }
+  if (P.flipZ) z = -z;
+  // STEP 5 (legacy/debug, default off): globalOffset subtraction.
+  // NOTE: with the recorded offset (x=115, y=79, z=345 ft) this pushes z to
+  // ≈ −338 ft — far outside the bbox (±47.6). Leave OFF unless re-verified.
+  if (P.useGlobalOffset) {
     const off = window.__apsGlobalOffset || { x: 0, y: 0, z: 0 };
     x -= off.x; y -= off.y; z -= off.z;
   }
-  // STEP 4: user-calibrated anchor (last resort fallback)
+  // STEP 6: user-calibrated anchor (last resort fallback)
   x += cupixAnchor.x;
   y += cupixAnchor.y;
   z += cupixAnchor.z;
   return [x, y, z];
 }
+
+// Direction vectors: rotate only (uniform scale doesn't change direction;
+// offsets/anchors don't apply to directions).
+function transformCupixDirToAps(dx, dy, dz) {
+  const P = getSyncParams();
+  let x = dx, y = dy, z = dz;
+  if (P.yaw) [x, y] = yawZ(x, y, P.yaw);
+  if (P.swapYZ) { const ty = z, tz = -y; y = ty; z = tz; }
+  if (P.flipZ) z = -z;
+  return [x, y, z];
+}
+
+// ── Settings persistence + defaults derived from the XR calibration ──
+// grimes-xr's proven calibration lives in data/cupix_calib.json in the
+// Three.js Y-up/meters frame: p_bim = Ry(yaw)·Rx(−90°)·p_c·scale + offset.
+// Conjugating into this viewer's Z-up/feet frame gives:
+//   scale_aps  = 3.2808 × calib.scale
+//   yaw_aps    = calib.yRotation            (same angle, now about +Z)
+//   offset_aps = 3.2808 × (o.x, −o.z, o.y)  (Y-up → Z-up axis remap)
+const SYNC_LS_KEY = 'apsCupixSync.v2';
+
+function applySyncValues(v) {
+  if (v.scale != null) document.getElementById('unitScale').value = v.scale;
+  if (v.yaw != null) document.getElementById('yawDeg').value = v.yaw;
+  if (v.off) {
+    document.getElementById('offX').value = v.off.x;
+    document.getElementById('offY').value = v.off.y;
+    document.getElementById('offZ').value = v.off.z;
+  }
+}
+
+function saveSyncValues() {
+  try { localStorage.setItem(SYNC_LS_KEY, JSON.stringify(getSyncParams())); } catch {}
+}
+['unitScale','yawDeg','offX','offY','offZ','swapYZ','flipZ','useOffset'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', () => { saveSyncValues(); if (lastTm) applyCupixToAps(lastTm); });
+});
+
+window.loadCalibDefaults = async (force) => {
+  try {
+    const r = await fetch('data/cupix_calib.json?ts=' + Date.now());
+    const j = await r.json();
+    const c = j.calib || {};
+    const M2FT = 3.28084;
+    const derived = {
+      scale: +((c.scale || 1.0) * M2FT).toFixed(4),
+      yaw: c.yRotation || 0,
+      off: c.offset ? {
+        x: +(c.offset.x * M2FT).toFixed(1),
+        y: +(-c.offset.z * M2FT).toFixed(1),
+        z: +(c.offset.y * M2FT).toFixed(1),
+      } : { x: 0, y: 0, z: 0 },
+    };
+    applySyncValues(derived);
+    saveSyncValues();
+    console.log('[sync] defaults derived from cupix_calib.json:', derived);
+    if (lastTm) applyCupixToAps(lastTm);
+  } catch (e) {
+    if (force) alert('Could not load data/cupix_calib.json: ' + e.message);
+  }
+};
+
+// On load: restore saved settings, else derive from the XR calibration file.
+(function initSyncSettings() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SYNC_LS_KEY) || 'null'); } catch {}
+  if (saved && typeof saved.scale === 'number') applySyncValues(saved);
+  else loadCalibDefaults(false);
+})();
 
 // Capture the offset that maps current Cupix pos → current APS camera pos.
 // User has to manually drive the APS camera (orbit/pan) to where Cupix is
@@ -360,19 +470,13 @@ function applyCupixToAps(tm) {
   const VecCtor = camPos.constructor;
   const dist = 10;
 
-  // Transform Cupix position
+  // Transform Cupix position (scale → yaw → offset → legacy toggles → anchor)
   const [px, py, pz] = transformCupixToAps(tm[3], tm[7], tm[11]);
-  // Transform forward vector (no offset for direction vectors, but swap/flip apply)
-  // Camera looks toward -row2, so forward = -tm[8..10] in Cupix space
-  const fwdC = [-tm[8], -tm[9], -tm[10]];
-  let [fx, fy, fz] = fwdC;
-  if (document.getElementById('swapYZ').checked) { const ty = fz, tz = -fy; fy = ty; fz = tz; }
-  if (document.getElementById('flipZ').checked) fz = -fz;
+  // Camera looks toward -row2, so forward = -tm[8..10] in Cupix space.
+  // Directions get the same yaw (+ any legacy swap/flip) but no scale/offset.
+  const [fx, fy, fz] = transformCupixDirToAps(-tm[8], -tm[9], -tm[10]);
   // Up: row 1 (tm[4..6])
-  const upC = [tm[4], tm[5], tm[6]];
-  let [ux, uy, uz] = upC;
-  if (document.getElementById('swapYZ').checked) { const ty = uz, tz = -uy; uy = ty; uz = tz; }
-  if (document.getElementById('flipZ').checked) uz = -uz;
+  const [ux, uy, uz] = transformCupixDirToAps(tm[4], tm[5], tm[6]);
 
   const pos = new VecCtor(px, py, pz);
   const target = new VecCtor(px + fx * dist, py + fy * dist, pz + fz * dist);
@@ -396,10 +500,11 @@ function applyCupixToAps(tm) {
   document.getElementById('apsPos').textContent =
     `${camNow.x.toFixed(1)}, ${camNow.y.toFixed(1)}, ${camNow.z.toFixed(1)}`;
   if (msgCount % 30 === 1) {
+    const P = getSyncParams();
     console.log('[sync] cupix raw:', tm[3].toFixed(2), tm[7].toFixed(2), tm[11].toFixed(2),
                 '→ transformed pos:', pos.x.toFixed(2), pos.y.toFixed(2), pos.z.toFixed(2),
                 '· target:', target.x.toFixed(2), target.y.toFixed(2), target.z.toFixed(2),
-                '· toggles:', {offset:document.getElementById('useOffset').checked, swap:document.getElementById('swapYZ').checked, flipZ:document.getElementById('flipZ').checked});
+                '· params:', {scale:P.scale, yaw:P.yaw, off:P.off, subGlobalOffset:P.useGlobalOffset, swap:P.swapYZ, flipZ:P.flipZ});
   }
 }
 

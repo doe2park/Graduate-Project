@@ -7,7 +7,8 @@
 ## Prerequisites
 
 1. **APS credentials** — Client ID + Client Secret from https://aps.autodesk.com
-   - Already on file: stored in `convert_nwd_local.py` (and need to be added to Cloudflare worker env vars below)
+   - Keep them ONLY in env vars / Cloudflare worker secrets — never in committed files.
+   - ⚠️ Old credentials were previously committed to this public repo — they must be rotated at https://aps.autodesk.com/myapps before use.
 2. **Cloudflare Worker deployment access** — the `worker/chatbot-worker.js` worker needs to be redeployed with new env vars
 3. **The URN of the converted NWD** — already obtained, hardcoded in `grimes-aps-viewer.html`:
    ```
@@ -27,8 +28,8 @@ The worker needs `APS_CLIENT_ID` and `APS_CLIENT_SECRET` env vars to issue viewe
 1. Open https://dash.cloudflare.com → Workers & Pages → `campus-chatbot`
 2. Click **Settings** → **Variables and Secrets**
 3. Add two **Secrets** (not plain text — secrets are encrypted):
-   - Name: `APS_CLIENT_ID` · Value: `ATa6W7GHsTaqXwYj5tA2zMzZduxlP8IOn91nQOCUzvAz7JOu`
-   - Name: `APS_CLIENT_SECRET` · Value: `8XnyIQ1ABvT61bidNUATuIhKk9mDUulA1iCXN9k8QxoH9mGHzBQ51lw1ggRh48k3`
+   - Name: `APS_CLIENT_ID` · Value: (your APS Client ID)
+   - Name: `APS_CLIENT_SECRET` · Value: (your APS Client Secret)
 4. Click **Save and deploy**
 
 **Via wrangler CLI (alternative):**
@@ -36,10 +37,10 @@ The worker needs `APS_CLIENT_ID` and `APS_CLIENT_SECRET` env vars to issue viewe
 ```bash
 cd ~/Graduate-Project/worker
 wrangler secret put APS_CLIENT_ID
-# paste: ATa6W7GHsTaqXwYj5tA2zMzZduxlP8IOn91nQOCUzvAz7JOu
+# paste: <YOUR_APS_CLIENT_ID>
 
 wrangler secret put APS_CLIENT_SECRET
-# paste: 8XnyIQ1ABvT61bidNUATuIhKk9mDUulA1iCXN9k8QxoH9mGHzBQ51lw1ggRh48k3
+# paste: <YOUR_APS_CLIENT_SECRET>
 ```
 
 ### 2. Redeploy the worker

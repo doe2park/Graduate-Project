@@ -30,8 +30,16 @@ import urllib.error
 import urllib.parse
 from pathlib import Path
 
-CLIENT_ID = "ATa6W7GHsTaqXwYj5tA2zMzZduxlP8IOn91nQOCUzvAz7JOu"
-CLIENT_SECRET = "8XnyIQ1ABvT61bidNUATuIhKk9mDUulA1iCXN9k8QxoH9mGHzBQ51lw1ggRh48k3"
+# APS credentials — NEVER hardcode. Set env vars before running:
+#   export APS_CLIENT_ID="..."
+#   export APS_CLIENT_SECRET="..."
+# (Old keys that were committed here have been exposed publicly — rotate them
+#  at https://aps.autodesk.com/myapps before reuse.)
+import os
+CLIENT_ID = os.environ.get("APS_CLIENT_ID", "")
+CLIENT_SECRET = os.environ.get("APS_CLIENT_SECRET", "")
+if not CLIENT_ID or not CLIENT_SECRET:
+    sys.exit("ERROR: set APS_CLIENT_ID and APS_CLIENT_SECRET env vars (see https://aps.autodesk.com/myapps)")
 
 APS = "https://developer.api.autodesk.com"
 CHUNK = 50 * 1024 * 1024  # 50MB parts

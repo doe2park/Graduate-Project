@@ -5,6 +5,11 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
+# Default GITHUB_TOKEN may be read-only depending on repo settings —
+# this job commits to main, so request write explicitly.
+permissions:
+  contents: write
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -45,5 +50,8 @@ jobs:
           git config user.email "bmo@github-actions.bot"
           git add data/
           git diff --staged --quiet || git commit -m "🔋 Update campus energy $(date +'%H:%M')"
-          git pull --rebase origin main || true
-          git push
+          # Rebase-retry: bmo-fetch.yml may push between our checkout and push
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep $((i * 5))
+          done

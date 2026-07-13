@@ -38,7 +38,8 @@ BUILDINGS = [
     {"id":"hesse","name":"Hesse & O'Brien Hall","mac":"001EC600077D","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"sutardja","name":"Sutardja Dai Hall","mac":"444D50E019ED","db":"dbU216ucberkelF682","meters":["76","29","30","97"]},
     {"id":"mclaughlin","name":"McLaughlin Hall","mac":"001EC6000495","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"stanley","name":"Stanley Hall","mac":"001EC6000C5A","db":"dbU216ucberkelF682","meters":["3"]},
+    # "stanley" removed 2026-07: its MAC (001EC6000C5A) duplicated Grimes — readings were
+    # actually Grimes meter #3. Re-add only after confirming Stanley's real AcquiSuite MAC.
     {"id":"tan","name":"Tan Hall","mac":"0050C230ED00","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"latimer","name":"Latimer & Pimentel Hall","mac":"0050C230ECE6","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"birge","name":"Birge Hall","mac":"001EC6001C55","db":"dbU216ucberkelF682","meters":["3","76","77"]},
@@ -116,7 +117,7 @@ def fetch_latest_kw(session, mac, db, meter_id):
             if val is not None:
                 try:
                     kw = float(val)
-                    if 0 < kw < 50000:
+                    if 0 <= kw < 50000:
                         return round(kw, 1), timestamp
                 except (ValueError, TypeError):
                     pass
@@ -124,7 +125,7 @@ def fetch_latest_kw(session, mac, db, meter_id):
             if "kW" in col_name and "kWh" not in col_name:
                 try:
                     kw = float(val)
-                    if 0 < kw < 50000:
+                    if 0 <= kw < 50000:
                         return round(kw, 1), timestamp
                 except (ValueError, TypeError):
                     pass
@@ -182,12 +183,19 @@ def run():
         if bid in results and results[bid]["kw"] is not None:
             continue
 
-        kw, ts, meter_used = None, None, None
+        # Sum every meter that responds — a building's load is the SUM of its
+        # meters (e.g. Grimes = #3 roof + #76 HVAC/lighting + #77 outlets),
+        # not whichever single meter happened to answer first.
+        kw_sum, ts, meters_used = None, None, []
         for mid in b["meters"]:
-            kw, ts = fetch_latest_kw(session, b["mac"], b["db"], mid)
-            if kw is not None:
-                meter_used = mid
-                break
+            mkw, mts = fetch_latest_kw(session, b["mac"], b["db"], mid)
+            if mkw is not None:
+                kw_sum = (kw_sum or 0.0) + mkw
+                meters_used.append(mid)
+                if mts:
+                    ts = mts
+        kw = round(kw_sum, 1) if kw_sum is not None else None
+        meter_used = "+".join(meters_used) if meters_used else None
 
         if bid not in results or (kw is not None and (results.get(bid, {}).get("kw") is None)):
             if kw is not None:
@@ -205,24 +213,24 @@ def run():
             results[bid] = {
                 "name": b["name"].replace(" (Legacy)", ""),
                 "kw": kw,
-                "status": "online" if kw else "offline",
+                "status": "online" if kw is not None else "offline",
                 "timestamp": ts,
                 "mac": b["mac"],
                 "meter": meter_used,
                 "predicted_kw": prediction,
                 "anomaly": anomaly,
                 "sparkline": sparkline,
-                "est_daily_kwh": round(kw * 24) if kw else None,
-                "est_daily_cost": round(kw * 24 * COST_PER_KWH, 2) if kw else None,
-                "est_daily_co2_kg": round(kw * 24 * CO2_PER_KWH, 1) if kw else None,
+                "est_daily_kwh": round(kw * 24) if kw is not None else None,
+                "est_daily_cost": round(kw * 24 * COST_PER_KWH, 2) if kw is not None else None,
+                "est_daily_co2_kg": round(kw * 24 * CO2_PER_KWH, 1) if kw is not None else None,
             }
 
-        icon = "✅" if kw else "·"
-        kw_str = f"{kw} kW (m#{meter_used})" if kw else "no data"
+        icon = "✅" if kw is not None else "·"
+        kw_str = f"{kw} kW (m#{meter_used})" if kw is not None else "no data"
         anom = f" ⚠️ {results[bid].get('anomaly',{}).get('type','')}" if results.get(bid,{}).get("anomaly") else ""
         print(f"  {icon} {b['name']:30s} {kw_str}{anom}")
 
-    total_kw = round(sum(r["kw"] for r in results.values() if r["kw"]), 1)
+    total_kw = round(sum(r["kw"] for r in results.values() if r["kw"] is not None), 1)
     anomalies = {k: v["anomaly"] for k, v in results.items() if v.get("anomaly")}
 
     output = {

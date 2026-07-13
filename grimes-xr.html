@@ -618,13 +618,26 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const gltfLoader = new GLTFLoader(); gltfLoader.setDRACOLoader(dracoLoader);
 
+// glb node name → SYSTEM_INFO index. Mapping by NAME (not traversal order) so a
+// re-exported glb with different node ordering can't scramble colors/labels/sensors.
+// Names must match binding.json / the glb exactly.
+const NODE_TO_SYS = {
+  'HVAC Duct': 0, 'HVAC Equipment': 1, 'Piping': 2, 'Sprinkler': 3,
+  'Conduit': 4, 'Diffusers': 5, 'Pumps/Valves': 6, 'Electrical': 7,
+};
+
 gltfLoader.load('grimes-mep-only.glb', (gltf) => {
   scene.add(gltf.scene);
   let meshIdx = 0;
   gltf.scene.traverse(child => {
     if (!child.isMesh) return;
     allMeshes.push(child);
-    const sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
+    const nodeName = child.name || (child.parent && child.parent.name) || '';
+    let sysIdx = NODE_TO_SYS[nodeName];
+    if (sysIdx === undefined) {
+      console.warn('[glb] unknown node name "' + nodeName + '" — falling back to traversal order', meshIdx);
+      sysIdx = Math.min(meshIdx, SYSTEM_INFO.length - 1);
+    }
     const sys = SYSTEM_INFO[sysIdx];
     const mat = new THREE.MeshBasicMaterial({ color: sys.hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
     child.material = mat;
