@@ -1,3 +1,10 @@
+> **DEPRECATED 2026-07.** The Autodesk APS dependency was removed from the project.
+> The full-BIM page is now `grimes-bim-viewer.html` — self-hosted Three.js + GLB, reusing
+> the grimes-xr Cupix calibration. The worker's `/aps-token` endpoint was deleted.
+> This document is kept for historical reference only. If you followed it in the past,
+> delete the APS app at https://aps.autodesk.com/myapps (invalidates the once-exposed keys)
+> and remove the `APS_CLIENT_ID` / `APS_CLIENT_SECRET` worker secrets.
+
 # APS Viewer Setup Guide
 
 > `grimes-aps-viewer.html` renders the full Bechtel BIM (same NWD that Cupix uses internally for its BIM Compare mode) in Autodesk's official **APS Viewer** SDK. This bypasses NWD → glTF conversion entirely — APS already has the model, the viewer just renders it from the URN.

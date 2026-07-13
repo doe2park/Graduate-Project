@@ -48,8 +48,7 @@ function corsHeaders(request) {
 
 function originAllowed(request) {
   const origin = request.headers.get('Origin');
-  // Non-browser calls (no Origin header) are rejected for /aps-token,
-  // allowed for chatbot POSTs only if you want CLI testing — default: reject.
+  // Non-browser calls (no Origin header) are rejected — default: reject.
   return origin !== null && ALLOWED_ORIGINS.includes(origin);
 }
 
@@ -219,57 +218,6 @@ function json(data, status = 200, cors = {}) {
   });
 }
 
-// APS (Autodesk Platform Services) token endpoint — issues a viewer-scoped
-// access token so the browser can load URN-based BIM models in Forge Viewer
-// without exposing the client secret. Server-side 2-legged OAuth.
-//
-// Requires Cloudflare Worker env vars:
-//   APS_CLIENT_ID
-//   APS_CLIENT_SECRET
-//
-// Browser usage:
-//   fetch('https://<worker-domain>/aps-token').then(r => r.json())
-//   → { access_token, expires_in, token_type }
-// Token cache: reuse one APS token across requests until ~2 min before expiry.
-// Cuts APS auth traffic and rate-limits abuse (isolate-global, resets on eviction).
-let _apsTokenCache = { token: null, exp: 0 };
-
-async function handleApsToken(env, request) {
-  if (!originAllowed(request)) {
-    return json({ error: 'origin not allowed' }, 403, corsHeaders(request));
-  }
-  if (!env.APS_CLIENT_ID || !env.APS_CLIENT_SECRET) {
-    return json({ error: 'APS credentials not configured. Set APS_CLIENT_ID + APS_CLIENT_SECRET in Cloudflare worker env.' }, 500, corsHeaders(request));
-  }
-  const now = Date.now() / 1000;
-  if (_apsTokenCache.token && _apsTokenCache.exp - now > 120) {
-    return json({
-      access_token: _apsTokenCache.token,
-      token_type: 'Bearer',
-      expires_in: Math.floor(_apsTokenCache.exp - now),
-    }, 200, corsHeaders(request));
-  }
-  const basic = btoa(`${env.APS_CLIENT_ID}:${env.APS_CLIENT_SECRET}`);
-  const r = await fetch('https://developer.api.autodesk.com/authentication/v2/token', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${basic}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    // viewables:read is all the Forge/APS Viewer needs. Do NOT add data:read —
-    // it would let any site visitor download raw bucket objects (the NWD).
-    body: 'grant_type=client_credentials&scope=viewables:read',
-  });
-  const data = await r.json();
-  if (r.ok && data.access_token) {
-    _apsTokenCache = { token: data.access_token, exp: now + (data.expires_in || 3600) };
-  }
-  return new Response(JSON.stringify(data), {
-    status: r.status,
-    headers: { 'content-type': 'application/json; charset=utf-8', ...corsHeaders(request) },
-  });
-}
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -277,10 +225,8 @@ export default {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
-    // GET /aps-token — issue an APS viewer access token (server-side OAuth)
-    if (request.method === 'GET' && url.pathname === '/aps-token') {
-      return handleApsToken(env, request);
-    }
+    // (The /aps-token endpoint was removed 2026-07 — the BIM viewer is now
+    //  self-hosted Three.js + GLB with no Autodesk dependency.)
 
     if (request.method !== 'POST') return new Response('POST only', { status: 405, headers: cors });
     if (!originAllowed(request)) return json({ error: 'origin not allowed' }, 403, cors);

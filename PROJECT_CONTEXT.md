@@ -12,12 +12,12 @@ Web-based digital twin of UC Berkeley campus energy, centered on **Grimes Hall /
 **Three main pages:**
 - `grimes-campus-map-arcgis.html` — campus map, Engineer/Public modes, per-building popups (LEED panels for Grimes)
 - `grimes-xr.html` — 3D BIM viewer with custom Three.js + MEP-only glb model
-- `grimes-aps-viewer.html` — NEW — full Bechtel BIM via Autodesk APS Viewer (no glb conversion needed)
+- `grimes-bim-viewer.html` — full Bechtel BIM, self-hosted Three.js + GLB (APS dependency removed 2026-07; grimes-aps-viewer.html is a redirect stub)
 
 **Live URLs:**
 - Main map: https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html
 - XR viewer (MEP-only): https://doe2park.github.io/Graduate-Project/grimes-xr.html
-- APS viewer (full BIM): https://doe2park.github.io/Graduate-Project/grimes-aps-viewer.html
+- Full BIM viewer (Three.js): https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html
 - LEED panels preview: https://doe2park.github.io/Graduate-Project/leed-lca-preview.html
 
 **Repo:** https://github.com/doe2park/Graduate-Project (GitHub Pages auto-deploys main)
@@ -30,8 +30,8 @@ Web-based digital twin of UC Berkeley campus energy, centered on **Grimes Hall /
 |---|---|
 | `grimes-campus-map-arcgis.html` | Main campus map. ArcGIS JS, sonar markers, Engineer SCADA + Public storytelling popups. LEED panels for Grimes only. |
 | `grimes-xr.html` | Three.js BIM viewer (MEP only — `grimes-mep-only.glb`). Floor nav, heatmaps, Cupix Compare split-screen with auto-sync. |
-| `grimes-aps-viewer.html` | **NEW** — Autodesk APS Viewer embedding the full Bechtel NWD by URN. Cupix Compare with calibration toggles. **CURRENTLY DEBUGGING COORD ALIGNMENT.** |
-| `worker/chatbot-worker.js` | Cloudflare Worker — `/aps-token` endpoint (NEW) + chatbot proxy |
+| `grimes-bim-viewer.html` | Full Bechtel BIM — self-hosted Three.js + GLB. Cupix Compare reuses the SAME calibration as grimes-xr (`data/cupix_calib.json`), so there is no separate APS coordinate problem anymore. |
+| `worker/chatbot-worker.js` | Cloudflare Worker — campus chatbot (Workers AI). `/aps-token` removed 2026-07. |
 | `data/campus_energy.json` | Live BMO snapshot (auto-updated ~15min via GitHub Actions) |
 | `data/baselines.json` | Per-building hour-of-week baseline |
 | `data/bechtel_leed.json` | LEED v4 Energy Performance — 11 end-uses, baseline vs designed |
@@ -53,11 +53,16 @@ Web-based digital twin of UC Berkeley campus energy, centered on **Grimes Hall /
 - Main campus map with Engineer/Public modes
 - Per-building LEED panels for Grimes (Engineer + Public both)
 - `grimes-xr.html` with Three.js MEP viewer + Cupix Compare + sync (calibrated)
-- `grimes-aps-viewer.html` APS Viewer renders the full Bechtel BIM (loads via URN, no glb)
+- `grimes-bim-viewer.html` renders full Bechtel BIM from local GLBs (no external BIM service)
 - Cupix postMessage flow confirmed (~262 msgs/sec when navigating)
-- Worker `/aps-token` endpoint serving APS V2 tokens
+- Worker: chatbot only (the `/aps-token` endpoint was removed with the APS dependency)
 
-### 🟡 IN PROGRESS — Cupix→APS Viewer coordinate alignment (yaw fix implemented, needs live test)
+### ✅ RESOLVED BY REMOVAL — Cupix→APS Viewer coordinate alignment
+
+**2026-07: the APS Viewer was retired entirely.** The full-BIM page (`grimes-bim-viewer.html`)
+is now the same Three.js world as grimes-xr, so it consumes `data/cupix_calib.json`
+directly — one calibration, two viewers, no APS coordinate system to fight.
+The analysis below is kept for the record.
 
 **2026-07 root-cause analysis:** the old toggle set (scale / swapY↔Z / flipZ / subtract-offset) could never align, because the working grimes-xr calibration (`data/cupix_calib.json`) proves the Cupix↔BIM registration includes **yaw ≈ −135° about the up-axis** — unreachable by 90° swaps and sign flips. `grimes-aps-viewer.html` now applies **scale → yaw(Z) → offset**, with defaults derived from cupix_calib.json conjugated into Z-up/feet: scale 3.2808 · yaw −135° · offset (55.4, −35.4, 20.0) ft = 3.2808·(o.x, −o.z, o.y). Yaw/offset are editable in the sync panel and persisted to localStorage. Also: do NOT enable "subtract globalOffset" — it pushes z to ≈ −338 ft, outside the bbox (±47.6).
 
@@ -99,23 +104,16 @@ The right combination is whichever puts the APS camera inside the building. Cons
 
 ---
 
-## How to continue debugging APS Viewer sync
+## Full-BIM viewer quick test (post-APS)
 
-1. Open https://doe2park.github.io/Graduate-Project/grimes-aps-viewer.html
-2. Cmd+Shift+R (cache bust)
-3. Open DevTools console
-4. Wait for `[aps-viewer] model loaded.` log with bbox/offset values
-5. Click `⌂ Fit view` to see whole model (confirms it's Bechtel only or campus combined)
-6. Click `🪞 Cupix Compare` → split-screen
-7. Click into Cupix photo + drag → check sync panel
-8. Try toggling: default scale 3.2808 first (already on), then add `subtract globalOffset` if still off, then others
-9. Console logs `[sync] cupix raw: ... → transformed pos: ... · toggles: {...}` every 30th sync — paste to diagnose
-
-### What the right combination probably is
-
-Most likely: just `scale=3.2808` (the default in latest push). If not, also `subtract globalOffset`. Y/Z swap probably NOT needed (both are Z-up). Z flip probably NOT needed.
-
----
+1. Open https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html (Cmd+Shift+R)
+2. MEP model loads (1.7 MB); `🏢 Building shell` lazily loads the 57 MB full-building GLB
+3. `🪞 Cupix Compare` → split screen; sync panel shows msg/tm/applied counters
+4. Calibration auto-loads from `data/cupix_calib.json` (yaw −135°, swap+flip, camMat);
+   fine-tune yaw/offset in the panel — values persist per-browser
+5. Known limitation vs the old APS viewer: GLB carries geometry only — no per-element
+   Revit properties/tree. Element-level metadata would need a glb re-export with
+   `extras` or the (retired) APS pipeline.
 
 ## LEED data context
 
@@ -161,7 +159,7 @@ User uploaded `ALL - UCBBE - COMBINED.nwd` (185 MB, Bechtel only despite the nam
 dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Z3JpbWVzLXR3aW4tYXRhNnc3Z2hzdGFxeHd5ajV0YTIvQUxMJTIwLSUyMFVDQkJFJTIwLSUyMENPTUJJTkVELm53ZA
 ```
 
-(Hardcoded in `grimes-aps-viewer.html`)
+(Historical — the URN is no longer used anywhere; the APS app can be deleted at https://aps.autodesk.com/myapps, which also invalidates the once-exposed credentials.)
 
 APS credentials live ONLY in env vars (`APS_CLIENT_ID` / `APS_CLIENT_SECRET`) and Cloudflare worker secrets. They were previously committed to this public repo (`convert_nwd_local.py`, `APS_VIEWER_SETUP.md`) — **those keys are burned and must be rotated** at https://aps.autodesk.com/myapps. `convert_nwd_local.py` now reads env vars and exits if unset. Worker `/aps-token` is origin-restricted to doe2park.github.io, scope `viewables:read` only, with token caching.
 
@@ -260,7 +258,7 @@ Recent additions all needed this (toggleCupixCompare, lockHere, etc).
 
 ## Open priorities (user's choice)
 
-1. **Finish APS Viewer Cupix sync** (try scale=3.28, then offset, then swap) — almost there, just coord transform tweaks
+1. ~~Finish APS Viewer Cupix sync~~ — obsolete: APS removed, grimes-bim-viewer.html shares grimes-xr's calibration
 2. **Prepare presentation slides** — `LEED_LCA_PRESENTATION.md` notes exist, could become pptx
 3. **Add Bechtel-only NWD if available** (skip this if combined NWD turns out to be Bechtel after all — user confirmed it is)
 4. **Auto-search Bechtel within combined NWD** (skip — file is already Bechtel-only)
@@ -286,10 +284,9 @@ If you're a fresh Claude reading this:
 ## Quick test the project is alive
 
 After pulling latest, in a browser:
-1. Open https://doe2park.github.io/Graduate-Project/grimes-aps-viewer.html
-2. APS Viewer should render the Bechtel BIM (full architectural model with MEP/structure)
-3. Click `🪞 Cupix Compare` → split screen
-4. Navigate in Cupix → check sync panel for msg count + position match
-5. The unit scale (3.2808 default) should make positions land inside the building
+1. Open https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html — live kW markers
+2. Open https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html — MEP GLB renders
+3. `🪞 Cupix Compare` → navigate in Cupix → BIM camera follows (calib from cupix_calib.json)
+4. Chatbot answers on the campus map (worker: chatbot-only since 2026-07)
 
 If broken at any step, that's the regression to fix first.

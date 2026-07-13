@@ -1,0 +1,13 @@
+# Cloudflare Worker config — deploy from the REPO ROOT with just:
+#   wrangler deploy
+#
+# (worker/wrangler.toml also exists for deploying from inside worker/;
+#  both target the same "campus-chatbot" worker.)
+
+name = "campus-chatbot"
+main = "worker/chatbot-worker.js"
+compatibility_date = "2026-07-13"
+
+# Workers AI binding — exposes env.AI.run(model, input)  (verified live)
+[ai]
+binding = "AI"

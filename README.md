@@ -35,7 +35,7 @@ BMO Obvius Meters (154 devices, 26 online)
 | **Energy Dashboard** | [campus-energy-dashboard.html](https://doe2park.github.io/Graduate-Project/campus-energy-dashboard.html) | Chart.js 4.4 |
 | **Weekly Report** | [weekly-report.html](https://doe2park.github.io/Graduate-Project/weekly-report.html) | Vanilla JS |
 | **Grimes MEP Viewer** | [grimes-xr.html](https://doe2park.github.io/Graduate-Project/grimes-xr.html) | Three.js + WebXR |
-| **Bechtel Full BIM** | [grimes-aps-viewer.html](https://doe2park.github.io/Graduate-Project/grimes-aps-viewer.html) | Autodesk APS Viewer (NWD-native) + Cupix 360° compare |
+| **Bechtel Full BIM** | [grimes-bim-viewer.html](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | Three.js + GLB (self-hosted, no external BIM service) + Cupix 360° compare |
 | **Comfort Dashboard** | [comfort-dashboard.html](https://doe2park.github.io/Graduate-Project/comfort-dashboard.html) | Vanilla JS |
 | **BIM-IoT Prototype** | [grimes-bim-iot/protoys.html](https://doe2park.github.io/Graduate-Project/grimes-bim-iot/protoys.html) | Physics-based sensor simulation (BAS-ready) |
 | **AI Chatbot** | [campus-chatbot.ucb-dt.workers.dev](https://campus-chatbot.ucb-dt.workers.dev) | Cloudflare Workers AI |
@@ -238,17 +238,18 @@ Graduate-Project/
 ├── comfort-dashboard.html           # Comfort metrics view
 ├── weekly-report.html               # Weekly report viewer
 ├── grimes-xr.html                   # Grimes MEP 3D viewer (Three.js + WebXR + Cupix compare)
-├── grimes-aps-viewer.html           # Full Bechtel BIM via Autodesk APS Viewer + Cupix sync
+├── grimes-bim-viewer.html           # Full Bechtel BIM — self-hosted Three.js + GLB + Cupix sync
+├── grimes-aps-viewer.html           # (deprecated stub — redirects to grimes-bim-viewer.html)
 ├── grimes-bim-iot/protoys.html      # BIM-IoT sensor dashboard prototype (simulated, BAS-ready)
 ├── grimes-mep-only.glb              # MEP 3D model (1.7 MB)
 ├── grimes-mep-compressed.glb        # Full building model (57 MB, lazy-loaded overlay)
 ├── bmo_fetch.py                     # BMO fetcher — Grimes detail (building_data.json)
 ├── bmo_fetch_campus.py              # BMO fetcher — campus-wide (campus_energy.json)
 ├── generate_weekly_report.py        # Weekly report generator
-├── convert_nwd_local.py             # NWD → APS upload/translate pipeline (needs APS env vars)
+├── convert_nwd_local.py             # (reference only) retired NWD → APS pipeline
 ├── extract_leed.py / extract_lca.py # LEED submittal → JSON extractors
 ├── worker/
-│   ├── chatbot-worker.js            # Cloudflare Worker: chatbot + /aps-token endpoint
+│   ├── chatbot-worker.js            # Cloudflare Worker: campus chatbot (Workers AI)
 │   └── wrangler.toml
 ├── buildings/grimes/                # Twin package: manifest, Brick model, binding, sources
 ├── twin/twin-resolver.js            # Building-agnostic glb-node → live-data resolver

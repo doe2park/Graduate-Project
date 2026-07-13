@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UC Berkeley · Bechtel Full BIM (Three.js)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#FDB515;--bg:#060a12;--text:#e0e7f1;--dim:#6b7fa0;
+  --cyan:#22d3ee;--green:#34d399;--red:#f87171;
+  --border:rgba(255,255,255,.08);
+  --mono:'JetBrains Mono',monospace;--font:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden}
+#topbar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(8,12,24,.94);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:14px;z-index:100;font-size:13px}
+#topbar a.back{color:var(--cyan);text-decoration:none;font:500 12px/1 var(--font)}
+.tb-title{font-weight:600;color:#fff;letter-spacing:-.2px}
+.tb-sub{font:500 10.5px/1 var(--mono);color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
+.tb-spacer{flex:1}
+.tb-btn{padding:5px 11px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:#cbd5e1;border-radius:5px;cursor:pointer;font:500 11.5px/1 var(--font);transition:all .15s;text-decoration:none}
+.tb-btn:hover{border-color:rgba(34,211,238,.3);color:#67e8f9}
+.tb-btn.active{background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.4);color:#67e8f9}
+#main{position:fixed;top:48px;left:0;right:0;bottom:0;display:flex}
+#cupixPane{display:none;flex:1;height:100%;background:#000;border-right:2px solid var(--cyan);flex-direction:column}
+#cupixPane.show{display:flex}
+#cupixHdr{padding:7px 12px;background:rgba(8,12,24,.85);border-bottom:1px solid rgba(34,211,238,.2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;font-size:11px}
+#cupixHdr span{font:600 10px/1 var(--mono);color:var(--cyan);letter-spacing:.5px;text-transform:uppercase}
+#cupixFrame{flex:1;border:0;background:#000;width:100%}
+#viewerPane{flex:1;height:100%;position:relative;background:#0a0f1a}
+#viewerPane canvas{display:block}
+#loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#cbd5e1;z-index:10;pointer-events:none}
+#loading .spinner{width:42px;height:42px;border:3px solid rgba(34,211,238,.15);border-top-color:var(--cyan);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading .msg{font:500 13px/1.4 var(--font);color:#94a3b8}
+#loading .sub{font:500 10.5px/1.4 var(--mono);color:#475569;margin-top:6px}
+#syncPanel{position:fixed;right:14px;bottom:14px;z-index:60;width:238px;background:rgba(8,12,24,.95);border:1px solid rgba(34,211,238,.3);border-radius:6px;padding:9px 12px;display:none;font:11px/1.4 var(--font);color:#cbd5e1}
+body.compare-on #syncPanel{display:block}
+#syncPanel .hdr{font:600 10px/1 var(--mono);color:var(--cyan);letter-spacing:.4px;text-transform:uppercase;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(34,211,238,.15);display:flex;justify-content:space-between}
+#syncPanel .stat{display:flex;justify-content:space-between;font:10px/1.3 var(--mono);color:#94a3b8;padding:2px 0}
+#syncPanel .stat .k{color:#64748b}
+#syncPanel .stat .v{color:#cbd5e1}
+#syncPanel .row{display:flex;gap:8px;margin-top:6px;font-size:10px;align-items:center}
+#syncPanel .row label{display:flex;align-items:center;gap:4px;cursor:pointer;color:#94a3b8}
+#syncPanel input[type=number]{background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 4px;border-radius:3px;font:10px var(--mono)}
+#syncPanel .hint{font:italic 9.5px/1.4 var(--font);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
+#legend{position:fixed;left:14px;bottom:14px;z-index:50;background:rgba(8,12,24,.9);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font:10px/1.6 var(--mono);color:#94a3b8}
+#legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <a href="grimes-campus-map-arcgis.html" class="back">◂ Campus</a>
+  <span class="tb-title">Bechtel · Full BIM</span>
+  <span class="tb-sub">Three.js · GLB · no external BIM service</span>
+  <span class="tb-spacer"></span>
+  <button class="tb-btn" id="bldgBtn" onclick="toggleBuilding()">🏢 Building shell</button>
+  <button class="tb-btn" id="compareBtn" onclick="toggleCompare()">🪞 Cupix Compare</button>
+  <a class="tb-btn" href="grimes-xr.html">▸ MEP dashboards</a>
+</div>
+
+<div id="main">
+  <div id="cupixPane">
+    <div id="cupixHdr">
+      <span>📷 360° walk · Cupix</span>
+      <button class="tb-btn" onclick="toggleCompare()" style="padding:3px 9px;font-size:10px">✕ Exit</button>
+    </div>
+    <iframe id="cupixFrame" allow="fullscreen; xr-spatial-tracking; clipboard-write; autoplay" allowfullscreen></iframe>
+  </div>
+  <div id="viewerPane">
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="msg">Loading Bechtel MEP model…</div>
+      <div class="sub" id="loadSub">grimes-mep-only.glb · 1.7 MB</div>
+    </div>
+  </div>
+</div>
+
+<div id="legend"></div>
+
+<div id="syncPanel">
+  <div class="hdr"><span>🔗 Cupix → BIM</span><span id="msgCount">0 msgs</span></div>
+  <div class="stat"><span class="k">tm msgs / applied</span><span class="v"><span id="tmCount">0</span> / <span id="applyCount">0</span></span></div>
+  <div class="stat"><span class="k">cupix pos</span><span class="v" id="cupixPos">—</span></div>
+  <div class="stat"><span class="k">bim cam</span><span class="v" id="bimPos">—</span></div>
+  <div class="stat" id="skipRow" style="display:none;color:#fbbf24"><span class="k">skip</span><span class="v" id="skipReason"></span></div>
+  <div class="row">
+    <label><input type="checkbox" id="syncPos" checked> position</label>
+    <label><input type="checkbox" id="syncRot" checked> rotation</label>
+  </div>
+  <div class="row">
+    <label style="flex:1">yaw ° <input type="number" id="yawDeg" step="0.5" style="width:56px"></label>
+    <label>scale <input type="number" id="scaleIn" step="0.0001" style="width:56px"></label>
+  </div>
+  <div class="row" style="gap:4px">
+    <label>off X <input type="number" id="offX" step="0.1" style="width:48px"></label>
+    <label>Y <input type="number" id="offY" step="0.1" style="width:48px"></label>
+    <label>Z <input type="number" id="offZ" step="0.1" style="width:48px"></label>
+  </div>
+  <div class="row">
+    <button onclick="reloadCalib()" style="flex:1;padding:4px 8px;border:1px solid rgba(52,211,153,.3);background:rgba(52,211,153,.08);color:#34d399;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">↧ Reload cupix_calib.json</button>
+  </div>
+  <div class="hint">Calibration auto-loads from <b>data/cupix_calib.json</b> (same registration grimes-xr uses: yaw −135°, swap+flip, camMat). Local tweaks persist in this browser.</div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ══════════ SCENE ══════════ */
+const pane = document.getElementById('viewerPane');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0f1a);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
+camera.position.set(35, 25, 35);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+pane.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(50, 80, 30); scene.add(dl);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 8, 0);
+
+function fitLayout() {
+  const w = pane.clientWidth, h = pane.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', fitLayout);
+fitLayout();
+
+/* ══════════ MODELS ══════════ */
+// Same assets + same placement math as grimes-xr.html, so the calibration in
+// data/cupix_calib.json applies to THIS viewer's world frame unchanged.
+const SYSTEMS = [
+  { name:'HVAC Duct',      label:'HVAC Ductwork',      hex:0x2dd4bf },
+  { name:'HVAC Equipment', label:'HVAC Equipment',     hex:0x1ab3a6 },
+  { name:'Piping',         label:'Plumbing / Piping',  hex:0x38bdf8 },
+  { name:'Sprinkler',      label:'Fire Protection',    hex:0xf87171 },
+  { name:'Conduit',        label:'Electrical',         hex:0xf59e0b },
+  { name:'Diffusers',      label:'Diffusers / Grilles',hex:0x80f2cc },
+  { name:'Pumps/Valves',   label:'Pumps / Valves',     hex:0xe879f9 },
+  { name:'Electrical',     label:'Spiral Ductwork',    hex:0x4de6cc },
+];
+const NAME_TO_SYS = Object.fromEntries(SYSTEMS.map((s, i) => [s.name, i]));
+
+const draco = new DRACOLoader();
+draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
+
+const allMeshes = [];
+let _bimBboxCache = null;
+function bimBbox() {
+  if (!_bimBboxCache || _bimBboxCache.isEmpty()) {
+    const b = new THREE.Box3();
+    allMeshes.forEach(m => b.expandByObject(m));
+    _bimBboxCache = b;
+  }
+  return _bimBboxCache;
+}
+
+loader.load('grimes-mep-only.glb', (gltf) => {
+  scene.add(gltf.scene);
+  let idx = 0;
+  gltf.scene.traverse(child => {
+    if (!child.isMesh) return;
+    allMeshes.push(child);
+    const nm = child.name || (child.parent && child.parent.name) || '';
+    let si = NAME_TO_SYS[nm];
+    if (si === undefined) { console.warn('[glb] unknown node', nm); si = Math.min(idx, SYSTEMS.length - 1); }
+    child.material = new THREE.MeshBasicMaterial({ color: SYSTEMS[si].hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+    idx++;
+  });
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('legend').innerHTML = SYSTEMS.map(s =>
+    `<div><span class="sw" style="background:#${s.hex.toString(16).padStart(6,'0')}"></span>${s.label}</div>`).join('');
+  const bb = bimBbox(), c = bb.getCenter(new THREE.Vector3());
+  controls.target.copy(c);
+  camera.position.set(c.x + 45, c.y + 30, c.z + 45);
+}, p => { document.getElementById('loadSub').textContent = `MEP… ${(p.loaded/1048576).toFixed(1)} MB`; },
+() => {
+  const el = document.getElementById('loading');
+  el.querySelector('.msg').textContent = 'Error loading grimes-mep-only.glb';
+  el.querySelector('.spinner').style.animation = 'none';
+});
+
+// Full building shell (57 MB, Draco) — lazy toggle, identical transform to grimes-xr:
+// feet→meters, Z-up→Y-up, recentered — so it lands in the same frame as the MEP glb.
+let building = null, buildingLoading = false;
+window.toggleBuilding = () => {
+  const btn = document.getElementById('bldgBtn');
+  if (building) { building.visible = !building.visible; btn.classList.toggle('active', building.visible); return; }
+  if (buildingLoading) return;
+  buildingLoading = true;
+  btn.textContent = '⏳ 57 MB…';
+  loader.load('grimes-mep-compressed.glb', (gltf) => {
+    building = gltf.scene;
+    const FT_TO_M = 0.3048;
+    building.scale.setScalar(FT_TO_M);
+    building.updateMatrixWorld(true);
+    const pre = new THREE.Box3().setFromObject(building).getCenter(new THREE.Vector3());
+    building.position.sub(pre);
+    building.rotation.x = -Math.PI / 2;
+    building.updateMatrixWorld(true);
+    const post = new THREE.Box3().setFromObject(building).getCenter(new THREE.Vector3());
+    building.position.sub(post);
+    building.updateMatrixWorld(true);
+    const ghost = new THREE.MeshBasicMaterial({ color: 0x8899aa, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
+    building.traverse(ch => { if (ch.isMesh) ch.material = ghost; });
+    scene.add(building);
+    buildingLoading = false;
+    btn.textContent = '🏢 Building shell';
+    btn.classList.add('active');
+  }, p => { btn.textContent = `⏳ ${(p.loaded/1048576).toFixed(0)}/57 MB`; },
+  () => { buildingLoading = false; btn.textContent = '⚠ shell failed'; });
+};
+
+/* ══════════ CUPIX SYNC — ported verbatim from grimes-xr.html ══════════ */
+const LS_KEY = 'bimViewerCupixSync.v1';
+const calib = {
+  enabled: true, syncPos: true, syncRot: true,
+  swapYZ: true, flipZ: true, camMat: null,
+  scale: 1.0, yRotation: -135, offset: { x: 16.9, y: 6.096, z: 10.8 },
+};
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+  if (saved) Object.assign(calib, saved, { offset: Object.assign({}, calib.offset, saved.offset || {}) });
+} catch {}
+function saveCalib() { try { localStorage.setItem(LS_KEY, JSON.stringify(calib)); } catch {} }
+
+let CUPIX_URL = 'https://herrero.cupix.works/v2/sv/q7qk7m?svpl=basic&svv=4&qp=2QtKby0x5DjQCH1Yrdk5rr&ql=83000';
+fetch('data/grimes-interior.json').then(r => r.json())
+  .then(j => { if (j?.cupix?.default_url) CUPIX_URL = j.cupix.default_url; }).catch(() => {});
+
+// Remote calibration file — single source shared with grimes-xr.
+let _calibVersion = null;
+async function fetchCalibFile(force) {
+  try {
+    const r = await fetch('data/cupix_calib.json?ts=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j?.calib) return;
+    if (!force && j.version !== undefined && j.version === _calibVersion) return;
+    _calibVersion = j.version;
+    Object.assign(calib, j.calib, { offset: Object.assign({}, calib.offset, j.calib.offset || {}) });
+    saveCalib(); syncPanelInputs();
+    console.log('[calib] loaded version', j.version, JSON.stringify(j.calib));
+    if (lastTm) applyCupix(lastTm, true);
+  } catch {}
+}
+window.reloadCalib = () => fetchCalibFile(true);
+fetchCalibFile(true);
+setInterval(() => { if (document.body.classList.contains('compare-on')) fetchCalibFile(false); }, 10000);
+
+// tm helpers (identical logic to grimes-xr)
+function findTm(o, depth = 0) {
+  if (!o || typeof o !== 'object' || depth > 4) return null;
+  const t = o.tm;
+  if (t) {
+    if (Array.isArray(t) && t.length === 16 && t.every(n => typeof n === 'number')) return t;
+    if (Array.isArray(t.elements) && t.elements.length === 16) return t.elements;
+  }
+  for (const k in o) {
+    const v = o[k];
+    if (!v || typeof v !== 'object') continue;
+    if (Array.isArray(v) && v.length > 64) continue;
+    const r = findTm(v, depth + 1);
+    if (r) return r;
+  }
+  return null;
+}
+function normalizeTm(tm) {
+  const colMajor = tm[3] === 0 && tm[7] === 0 && tm[11] === 0 && (tm[12] !== 0 || tm[13] !== 0 || tm[14] !== 0);
+  if (!colMajor) return tm;
+  return [tm[0],tm[4],tm[8],tm[12], tm[1],tm[5],tm[9],tm[13], tm[2],tm[6],tm[10],tm[14], tm[3],tm[7],tm[11],tm[15]];
+}
+
+// position: swap → flipZ → scale → yaw(Y) → offset
+function pointToBim(px, py, pz) {
+  let x = px, y = py, z = pz;
+  if (calib.swapYZ) { const t = y; y = z; z = t; }
+  if (calib.flipZ) z = -z;
+  x *= calib.scale; y *= calib.scale; z *= calib.scale;
+  if (calib.yRotation) {
+    const r = calib.yRotation * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+    const nx = c * x + s * z, nz = -s * x + c * z;
+    x = nx; z = nz;
+  }
+  return new THREE.Vector3(x + calib.offset.x, y + calib.offset.y, z + calib.offset.z);
+}
+function axisConvMatrix() {
+  if (!calib.swapYZ) return new THREE.Matrix4();
+  return new THREE.Matrix4().set(1,0,0,0, 0,0,1,0, 0,(calib.flipZ?-1:1),0,0, 0,0,0,1);
+}
+function rotToBim(tm) {
+  const W = axisConvMatrix();
+  if (calib.yRotation) W.premultiply(new THREE.Matrix4().makeRotationY(calib.yRotation * Math.PI / 180));
+  const R = new THREE.Matrix4().set(tm[0],tm[1],tm[2],0, tm[4],tm[5],tm[6],0, tm[8],tm[9],tm[10],0, 0,0,0,1);
+  const m = W.multiply(R);
+  if (Array.isArray(calib.camMat) && calib.camMat.length === 16) {
+    m.multiply(new THREE.Matrix4().fromArray(calib.camMat));
+  } else if (!calib.flipZ) {
+    m.multiply(axisConvMatrix().invert());
+  }
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+// user-override: hand-driving the BIM pauses sync for 2.5 s
+let userUntil = 0;
+const bump = () => { userUntil = Date.now() + 2500; };
+renderer.domElement.addEventListener('pointerdown', bump);
+renderer.domElement.addEventListener('wheel', bump, { passive: true });
+
+let msgCount = 0, tmCount = 0, applyCount = 0, lastTm = null, lastSyncAt = 0;
+function applyCupix(tm, force) {
+  if (!force && Date.now() < userUntil) return;
+  if (!document.getElementById('syncPos').checked && !document.getElementById('syncRot').checked) return;
+  const p = pointToBim(tm[3], tm[7], tm[11]);
+  const skipEl = document.getElementById('skipRow');
+  if (!isFinite(p.x + p.y + p.z)) return;
+  const bb = bimBbox(), M = 40;
+  if (!bb.isEmpty() && (p.x < bb.min.x-M || p.x > bb.max.x+M || p.y < bb.min.y-M || p.y > bb.max.y+M || p.z < bb.min.z-M || p.z > bb.max.z+M)) {
+    skipEl.style.display = '';
+    document.getElementById('skipReason').textContent = 'outside model — check calib';
+    return;
+  }
+  skipEl.style.display = 'none';
+  lastSyncAt = Date.now();
+  if (document.getElementById('syncPos').checked) camera.position.copy(p);
+  if (document.getElementById('syncRot').checked) camera.quaternion.copy(rotToBim(tm));
+  controls.target.copy(p.clone().add(new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).multiplyScalar(2)));
+  applyCount++;
+  document.getElementById('applyCount').textContent = applyCount;
+  document.getElementById('bimPos').textContent = `${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}`;
+}
+
+window.addEventListener('message', (e) => {
+  let host = '';
+  try { host = new URL(e.origin || 'http://x/').hostname; } catch {}
+  if (!/cupix\.works$/i.test(host)) return;
+  msgCount++;
+  document.getElementById('msgCount').textContent = msgCount + ' msgs';
+  let msg = null;
+  if (typeof e.data === 'string') { try { msg = JSON.parse(e.data); } catch { return; } }
+  else if (e.data && typeof e.data === 'object') msg = e.data;
+  if (!msg) return;
+  let tm = findTm(msg);
+  if (Array.isArray(tm) && tm.length === 16) {
+    tm = normalizeTm(tm);
+    tmCount++; lastTm = tm;
+    document.getElementById('tmCount').textContent = tmCount;
+    document.getElementById('cupixPos').textContent = `${tm[3].toFixed(1)}, ${tm[7].toFixed(1)}, ${tm[11].toFixed(1)}`;
+    applyCupix(tm, false);
+    if (tmCount % 30 === 1) console.log('[sync] raw', tm[3].toFixed(2), tm[7].toFixed(2), tm[11].toFixed(2),
+      '→', camera.position.x.toFixed(2), camera.position.y.toFixed(2), camera.position.z.toFixed(2),
+      '· calib', { yaw: calib.yRotation, scale: calib.scale, off: calib.offset, swap: calib.swapYZ, flipZ: calib.flipZ, camMat: !!calib.camMat });
+  }
+});
+
+// Official CupixWorks SiteView embed API — handshake + 2 Hz camera polling
+let apiUuid = 1, pollTimer = null;
+function apiSend(operationType) {
+  const w = document.getElementById('cupixFrame').contentWindow;
+  if (!w) return false;
+  try { w.postMessage({ operationType, header: 'CUPIXWORKS_API', uuid: String(apiUuid++), timestamp: Date.now() }, '*'); } catch { return false; }
+  return true;
+}
+function startPolling() {
+  stopPolling();
+  apiSend('APP_API_START');
+  pollTimer = setInterval(() => {
+    if (!document.body.classList.contains('compare-on')) { stopPolling(); return; }
+    if (tmCount === 0) apiSend('APP_API_START');
+    apiSend('GET_CAMERA_PARAMETERS');
+  }, 500);
+}
+function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+/* ══════════ UI ══════════ */
+window.toggleCompare = () => {
+  const on = document.body.classList.toggle('compare-on');
+  const paneEl = document.getElementById('cupixPane');
+  const frame = document.getElementById('cupixFrame');
+  document.getElementById('compareBtn').classList.toggle('active', on);
+  if (on) {
+    paneEl.classList.add('show');
+    if (!frame.src) frame.src = CUPIX_URL;
+    startPolling();
+  } else {
+    paneEl.classList.remove('show');
+    stopPolling();
+  }
+  setTimeout(fitLayout, 100);
+};
+
+function syncPanelInputs() {
+  document.getElementById('yawDeg').value = calib.yRotation;
+  document.getElementById('scaleIn').value = calib.scale;
+  document.getElementById('offX').value = calib.offset.x;
+  document.getElementById('offY').value = calib.offset.y;
+  document.getElementById('offZ').value = calib.offset.z;
+}
+syncPanelInputs();
+[['yawDeg', v => calib.yRotation = v], ['scaleIn', v => calib.scale = v],
+ ['offX', v => calib.offset.x = v], ['offY', v => calib.offset.y = v], ['offZ', v => calib.offset.z = v]]
+.forEach(([id, set]) => {
+  document.getElementById(id).addEventListener('change', e => {
+    set(parseFloat(e.target.value) || 0);
+    saveCalib();
+    if (lastTm) applyCupix(lastTm, true);
+  });
+});
+
+renderer.setAnimationLoop(() => {
+  // Don't let OrbitControls re-aim the camera while Cupix is driving it
+  // (same fix as grimes-xr commit d913737).
+  if (Date.now() - lastSyncAt > 800) controls.update();
+  renderer.render(scene, camera);
+});
+</script>
+
+</body>
+</html>
