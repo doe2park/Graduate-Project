@@ -47,6 +47,24 @@ body.compare-on #syncPanel{display:block}
 #syncPanel .hint{font:italic 9.5px/1.4 var(--font);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
 #legend{position:fixed;left:14px;bottom:14px;z-index:50;background:rgba(8,12,24,.9);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font:10px/1.6 var(--mono);color:#94a3b8}
 #legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+/* ── Mobile (<768px) — same breakpoint as grimes-xr.html ── */
+@media(max-width:768px){
+  #topbar{padding:0 10px;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+  #topbar>*{flex-shrink:0}
+  .tb-sub{display:none}
+  .tb-btn{padding:5px 8px;font-size:10.5px}
+  /* Cupix Compare: side-by-side halves are unusable on a phone → stack vertically */
+  #main{flex-direction:column}
+  #cupixPane.show{flex:none;height:50%;border-right:none;border-bottom:2px solid var(--cyan)}
+  #viewerPane{height:auto;min-height:0}
+  #legend{left:10px;bottom:10px;padding:6px 8px;font-size:9px;line-height:1.5;max-width:46vw}
+  body.compare-on #legend{display:none}
+  #syncPanel{left:10px;right:10px;bottom:10px;width:auto;max-height:42vh;overflow-y:auto}
+  #syncPanel .hdr{cursor:pointer}
+  #syncPanel.collapsed>:not(.hdr){display:none}
+  #syncPanel.collapsed .hdr{margin-bottom:0;padding-bottom:0;border-bottom:none}
+  #syncPanel input[type=number]{font-size:16px} /* prevent iOS focus zoom */
+}
 </style>
 </head>
 <body>
@@ -134,12 +152,23 @@ controls.target.set(0, 8, 0);
 
 function fitLayout() {
   const w = pane.clientWidth, h = pane.clientHeight;
-  renderer.setSize(w, h, false);
+  if (!w || !h) return;
+  // updateStyle=true: keep the canvas CSS size at w×h. With `false` the canvas
+  // has no CSS size and lays out at buffer size (w×DPR) — on DPR>1 phones it
+  // rendered 2–3× larger than the pane (the "broken" mobile layout).
+  renderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', fitLayout);
+window.addEventListener('orientationchange', () => setTimeout(fitLayout, 250));
+if (window.ResizeObserver) new ResizeObserver(fitLayout).observe(pane);
 fitLayout();
+// Touch controls: OrbitControls handles touch via pointer events, but the
+// browser must not claim the gestures for scroll/zoom first.
+renderer.domElement.style.touchAction = 'none';
+
+const mobileMq = window.matchMedia('(max-width:768px)');
 
 /* ══════════ MODELS ══════════ */
 // Same assets + same placement math as grimes-xr.html, so the calibration in
@@ -203,6 +232,8 @@ window.toggleBuilding = () => {
   const btn = document.getElementById('bldgBtn');
   if (building) { building.visible = !building.visible; btn.classList.toggle('active', building.visible); return; }
   if (buildingLoading) return;
+  // Never auto-download 57 MB on a phone — stays opt-in behind an explicit confirm.
+  if (mobileMq.matches && !confirm('Building shell is a 57 MB download. Load it on this device?')) return;
   buildingLoading = true;
   btn.textContent = '⏳ 57 MB…';
   loader.load('grimes-mep-compressed.glb', (gltf) => {
@@ -413,6 +444,13 @@ function syncPanelInputs() {
   document.getElementById('offZ').value = calib.offset.z;
 }
 syncPanelInputs();
+// On phones the sync panel starts collapsed (header only) — tap header to expand.
+// Desktop keeps the always-open panel unchanged.
+const syncPanelEl = document.getElementById('syncPanel');
+if (mobileMq.matches) syncPanelEl.classList.add('collapsed');
+syncPanelEl.querySelector('.hdr').addEventListener('click', () => {
+  if (mobileMq.matches) syncPanelEl.classList.toggle('collapsed');
+});
 [['yawDeg', v => calib.yRotation = v], ['scaleIn', v => calib.scale = v],
  ['offX', v => calib.offset.x = v], ['offY', v => calib.offset.y = v], ['offZ', v => calib.offset.z = v]]
 .forEach(([id, set]) => {
