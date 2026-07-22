@@ -47,6 +47,27 @@ body.compare-on #syncPanel{display:block}
 #syncPanel .hint{font:italic 9.5px/1.4 var(--font);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
 #legend{position:fixed;left:14px;bottom:14px;z-index:50;background:rgba(8,12,24,.9);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font:10px/1.6 var(--mono);color:#94a3b8}
 #legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+/* ── Twin panel: click a system → Brick entity + live BMO data ── */
+#twinPanel{position:fixed;right:14px;top:62px;z-index:70;width:264px;background:rgba(8,12,24,.95);border:1px solid rgba(52,211,153,.35);border-radius:6px;padding:10px 12px;display:none;font:11px/1.45 var(--font);color:#cbd5e1}
+#twinPanel.show{display:block}
+#twinPanel .thdr{font:600 10px/1 var(--mono);color:var(--green);letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(52,211,153,.15)}
+#twinPanel .thdr button{background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;line-height:1}
+#twinPanel .ttype{font:500 9.5px/1.4 var(--mono);color:#64748b;margin-bottom:6px;word-break:break-all}
+#twinPanel .pt{display:flex;justify-content:space-between;gap:8px;font:10.5px/1.5 var(--mono);padding:2px 0;color:#94a3b8}
+#twinPanel .pt .v{color:#e0e7f1;font-weight:600;white-space:nowrap}
+#twinPanel canvas{width:100%;height:38px;margin-top:6px;border-radius:3px;background:rgba(0,0,0,.25)}
+#twinPanel .foot{font:9.5px/1.5 var(--mono);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
+/* ── As-built discrepancy notes (inside sync panel, compare mode) ── */
+#notesSec{margin-top:8px;padding-top:6px;border-top:1px solid rgba(34,211,238,.15)}
+#notesSec .nhdr{font:600 10px/1 var(--mono);color:#fbbf24;letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between}
+#notesSec .nbtns{display:flex;gap:6px;margin:6px 0}
+#notesSec .nbtns button{flex:1;padding:4px 6px;border-radius:4px;font:600 9.5px/1 var(--font);cursor:pointer;border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:#fbbf24}
+#notesSec .nbtns button.exp{border-color:rgba(148,163,184,.3);background:rgba(255,255,255,.03);color:#94a3b8}
+#notesList{max-height:110px;overflow-y:auto}
+#notesList .note{display:flex;gap:6px;align-items:baseline;font:9.5px/1.5 var(--mono);color:#94a3b8;padding:2px 0;cursor:pointer}
+#notesList .note:hover{color:#e0e7f1}
+#notesList .note .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#notesList .note .del{margin-left:auto;color:#64748b}
 /* ── Mobile (<768px) — same breakpoint as grimes-xr.html ── */
 @media(max-width:768px){
   #topbar{padding:0 10px;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
@@ -64,6 +85,9 @@ body.compare-on #syncPanel{display:block}
   #syncPanel.collapsed>:not(.hdr){display:none}
   #syncPanel.collapsed .hdr{margin-bottom:0;padding-bottom:0;border-bottom:none}
   #syncPanel input[type=number]{font-size:16px} /* prevent iOS focus zoom */
+  #twinPanel{left:10px;right:10px;top:auto;bottom:10px;width:auto;max-height:44vh;overflow-y:auto}
+  body.compare-on #twinPanel{bottom:58px} /* clear the collapsed sync-panel header */
+  body.twin-open #legend{display:none}
 }
 </style>
 </head>
@@ -98,6 +122,14 @@ body.compare-on #syncPanel{display:block}
 
 <div id="legend"></div>
 
+<div id="twinPanel">
+  <div class="thdr"><span id="twinTitle">System</span><button onclick="clearPick()" title="close">✕</button></div>
+  <div class="ttype" id="twinType"></div>
+  <div id="twinPoints"></div>
+  <canvas id="twinSpark" width="480" height="76"></canvas>
+  <div class="foot" id="twinFoot"></div>
+</div>
+
 <div id="syncPanel">
   <div class="hdr"><span>🔗 Cupix → BIM</span><span id="msgCount">0 msgs</span></div>
   <div class="stat"><span class="k">tm msgs / applied</span><span class="v"><span id="tmCount">0</span> / <span id="applyCount">0</span></span></div>
@@ -120,9 +152,18 @@ body.compare-on #syncPanel{display:block}
   <div class="row">
     <button onclick="reloadCalib()" style="flex:1;padding:4px 8px;border:1px solid rgba(52,211,153,.3);background:rgba(52,211,153,.08);color:#34d399;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">↧ Reload cupix_calib.json</button>
   </div>
+  <div id="notesSec">
+    <div class="nhdr"><span>⚑ As-built notes</span><span id="noteCount">0</span></div>
+    <div class="nbtns">
+      <button onclick="flagNote()">⚑ Flag discrepancy</button>
+      <button class="exp" onclick="exportNotes()">⇩ Export JSON</button>
+    </div>
+    <div id="notesList"></div>
+  </div>
   <div class="hint">Calibration auto-loads from <b>data/cupix_calib.json</b> (same registration grimes-xr uses: yaw −135°, swap+flip, camMat). Local tweaks persist in this browser.</div>
 </div>
 
+<script src="twin/twin-resolver.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -460,6 +501,165 @@ syncPanelEl.querySelector('.hdr').addEventListener('click', () => {
     if (lastTm) applyCupix(lastTm, true);
   });
 });
+
+/* ══════════ TWIN: click a system → Brick entity → live BMO data ══════════
+   Uses the shared twin/twin-resolver.js package logic (same as twin-viewer):
+   glb node --binding--> Brick entity --isFedBy/hasPoint--> externalReference
+   --sources adapter--> data/building_data.json live kW. */
+const fetchJson = u => fetch(u, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
+const _jsonCache = {};
+const cachedJson = u => {
+  const c = _jsonCache[u];
+  if (c && Date.now() - c.at < 60000) return c.p;
+  const p = fetchJson(u);
+  _jsonCache[u] = { at: Date.now(), p };
+  p.catch(() => delete _jsonCache[u]);
+  return p;
+};
+let twinPkg = null;
+if (window.TwinResolver) {
+  TwinResolver.loadPackage('buildings/grimes/manifest.json', fetchJson)
+    .then(p => { twinPkg = p; console.log('[twin] package loaded:', p.manifest.name); })
+    .catch(e => console.warn('[twin] package load failed —', e.message));
+}
+
+const raycaster = new THREE.Raycaster(), _ptr = new THREE.Vector2();
+let _downX = 0, _downY = 0, picked = null;
+renderer.domElement.addEventListener('pointerdown', e => { _downX = e.clientX; _downY = e.clientY; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (Math.hypot(e.clientX - _downX, e.clientY - _downY) > 6) return; // drag, not a tap
+  const r = renderer.domElement.getBoundingClientRect();
+  _ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(_ptr, camera);
+  const hit = raycaster.intersectObjects(allMeshes, false)[0];
+  if (hit) pickSystem(hit.object); else clearPick();
+});
+
+function highlight(mesh) {
+  allMeshes.forEach(m => { m.material.opacity = mesh ? (m === mesh ? 1 : 0.12) : 0.85; });
+}
+window.clearPick = () => {
+  picked = null;
+  highlight(null);
+  document.getElementById('twinPanel').classList.remove('show');
+  document.body.classList.remove('twin-open');
+};
+
+function sumSeries(vals, points) {
+  const list = points.map(p => (vals[p.ref] && vals[p.ref].series) || []).filter(s => s.length);
+  if (!list.length) return [];
+  const n = Math.min(...list.map(s => s.length));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    let v = 0;
+    for (const s of list) v += s[s.length - n + i].v || 0;
+    out.push({ t: list[0][list[0].length - n + i].t, v });
+  }
+  return out;
+}
+function drawSpark(cv, series) {
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (series.length < 2) return;
+  const vs = series.map(s => s.v), min = Math.min(...vs), max = Math.max(...vs), rng = (max - min) || 1;
+  ctx.beginPath();
+  series.forEach((s, i) => {
+    const x = i / (series.length - 1) * (cv.width - 8) + 4;
+    const y = cv.height - 6 - (s.v - min) / rng * (cv.height - 12);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5; ctx.stroke();
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function pickSystem(mesh) {
+  picked = mesh;
+  highlight(mesh);
+  document.body.classList.add('twin-open');
+  document.getElementById('twinPanel').classList.add('show');
+  const name = mesh.name || (mesh.parent && mesh.parent.name) || '';
+  const titleEl = document.getElementById('twinTitle'), typeEl = document.getElementById('twinType');
+  const ptsEl = document.getElementById('twinPoints'), footEl = document.getElementById('twinFoot');
+  titleEl.textContent = name;
+  ptsEl.innerHTML = ''; footEl.textContent = '';
+  drawSpark(document.getElementById('twinSpark'), []);
+  if (!twinPkg) { typeEl.textContent = 'twin package not loaded (serve over http)'; return; }
+  const res = TwinResolver.resolveNode(twinPkg, name);
+  if (!res.bound) { typeEl.textContent = '⚠ ' + res.reason; return; }
+  titleEl.textContent = res.label;
+  typeEl.textContent = res.type + ' · ' + res.uri + (res.feeders.length ? ' · fed by: ' + res.feeders.join(', ') : '');
+  if (!res.points.length) { ptsEl.innerHTML = '<div class="pt"><span>no live points bound</span></div>'; return; }
+  ptsEl.innerHTML = '<div class="pt"><span>loading live data…</span></div>';
+  try {
+    const vals = await TwinResolver.fetchValues(twinPkg, res.points, cachedJson);
+    if (picked !== mesh) return; // user picked something else meanwhile
+    let total = 0, latestTs = null, rows = '';
+    res.points.forEach(p => {
+      const v = vals[p.ref] || {};
+      if (v.error) { rows += `<div class="pt"><span>${esc(p.ref)}</span><span class="v">⚠</span></div>`; return; }
+      if (typeof v.value === 'number') total += v.value;
+      if (v.ts) latestTs = latestTs && latestTs > v.ts ? latestTs : v.ts;
+      rows += `<div class="pt"><span>${esc(v.name || p.ref)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'} ${esc(v.unit || 'kW')}</span></div>`;
+    });
+    rows += `<div class="pt" style="border-top:1px solid rgba(148,163,184,.12);margin-top:3px;padding-top:4px"><span>Σ system feed</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`;
+    ptsEl.innerHTML = rows;
+    drawSpark(document.getElementById('twinSpark'), sumSeries(vals, res.points));
+    footEl.textContent = 'BMO live · ' + (latestTs || '—') + ' · 24 h sparkline';
+    cachedJson('data/campus_energy.json').then(ce => {
+      const g = ce && ce.buildings && ce.buildings.grimes;
+      if (g && picked === mesh) footEl.textContent += ` · bldg ${g.kw} kW (baseline ${g.predicted_kw ?? '—'})${g.anomaly ? ' ⚠ anomaly' : ''}`;
+    }).catch(() => {});
+  } catch (e) {
+    if (picked === mesh) ptsEl.innerHTML = `<div class="pt"><span>⚠ live data unavailable (${esc(e.message)})</span></div>`;
+  }
+}
+
+/* ══════════ AS-BUILT DISCREPANCY NOTES (Compare mode) ══════════
+   Flag a spot where the 360° photo and the BIM disagree; each note stores the
+   BIM camera + raw Cupix position + calibration snapshot, so it can be
+   re-visited and exported as evidence for as-built model updates. */
+const NOTES_KEY = 'asbuiltNotes.grimes.v1';
+let notes = [];
+try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]'); } catch {}
+function renderNotes() {
+  document.getElementById('noteCount').textContent = notes.length;
+  document.getElementById('notesList').innerHTML = notes.map((n, i) =>
+    `<div class="note" onclick="gotoNote(${i})" title="${esc(n.at)}"><span>⚑</span><span class="txt">${esc(n.note)}</span><span class="del" onclick="event.stopPropagation();delNote(${i})">✕</span></div>`).join('');
+}
+function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch {} renderNotes(); }
+window.flagNote = () => {
+  const note = prompt('As-built discrepancy — what differs between the 360° photo and the BIM here?');
+  if (!note) return;
+  notes.push({
+    id: Date.now(), at: new Date().toISOString(), note,
+    system: picked ? (picked.name || null) : null,
+    cam: camera.position.toArray().map(v => +v.toFixed(3)),
+    quat: camera.quaternion.toArray().map(v => +v.toFixed(4)),
+    target: controls.target.toArray().map(v => +v.toFixed(3)),
+    cupixRaw: lastTm ? [lastTm[3], lastTm[7], lastTm[11]].map(v => +v.toFixed(3)) : null,
+    calib: { yaw: calib.yRotation, scale: calib.scale, offset: { ...calib.offset } },
+  });
+  saveNotes();
+};
+window.gotoNote = i => {
+  const n = notes[i];
+  if (!n) return;
+  userUntil = Date.now() + 4000; // pause Cupix sync while inspecting
+  camera.position.fromArray(n.cam);
+  camera.quaternion.fromArray(n.quat);
+  controls.target.fromArray(n.target);
+};
+window.delNote = i => { notes.splice(i, 1); saveNotes(); };
+window.exportNotes = () => {
+  const blob = new Blob([JSON.stringify({ _schema: 'asbuilt-notes/1', building: 'grimes', exported_at: new Date().toISOString(), notes }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'asbuilt_notes_grimes.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+renderNotes();
 
 renderer.setAnimationLoop(() => {
   // Don't let OrbitControls re-aim the camera while Cupix is driving it
