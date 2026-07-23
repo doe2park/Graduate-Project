@@ -259,6 +259,7 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   const bb = bimBbox(), c = bb.getCenter(new THREE.Vector3());
   controls.target.copy(c);
   camera.position.set(c.x + 45, c.y + 30, c.z + 45);
+  alignShellToMep(); // in case the shell finished loading before the MEP
 }, p => { document.getElementById('loadSub').textContent = `MEP… ${(p.loaded/1048576).toFixed(1)} MB`; },
 () => {
   const el = document.getElementById('loading');
@@ -269,6 +270,18 @@ loader.load('grimes-mep-only.glb', (gltf) => {
 // Full building shell (57 MB, Draco) — lazy toggle, identical transform to grimes-xr:
 // feet→meters, Z-up→Y-up, recentered — so it lands in the same frame as the MEP glb.
 let building = null, buildingLoading = false;
+function alignShellToMep() {
+  if (!building) return;
+  const bb = bimBbox();
+  if (bb.isEmpty()) return; // MEP not loaded yet — realigned from the MEP callback
+  const mepC = bb.getCenter(new THREE.Vector3());
+  const sc = new THREE.Box3().setFromObject(building).getCenter(new THREE.Vector3());
+  building.position.add(mepC.sub(sc));
+  building.updateMatrixWorld(true);
+  const fin = new THREE.Box3().setFromObject(building);
+  building.position.y += bb.min.y - fin.min.y; // both floors on the same line
+  building.updateMatrixWorld(true);
+}
 window.toggleBuilding = () => {
   const btn = document.getElementById('bldgBtn');
   if (building) { building.visible = !building.visible; btn.classList.toggle('active', building.visible); return; }
@@ -289,8 +302,16 @@ window.toggleBuilding = () => {
     const post = new THREE.Box3().setFromObject(building).getCenter(new THREE.Vector3());
     building.position.sub(post);
     building.updateMatrixWorld(true);
-    const ghost = new THREE.MeshBasicMaterial({ color: 0x8899aa, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
-    building.traverse(ch => { if (ch.isMesh) ch.material = ghost; });
+    // Align to the MEP model (same as grimes-xr): recentering alone puts the
+    // shell's CENTER at the origin, but the MEP sits at y 0..20 — so half the
+    // shell ended up underground and off the camera's focus ("button does
+    // nothing" bug). Match centers, then set both floors to the same y.
+    alignShellToMep();
+    // 0.07 was near-invisible on the dark background; 0.18 reads as a ghost
+    // shell while keeping the MEP clearly visible through it. (EdgesGeometry
+    // was considered but is prohibitive on a 57 MB mesh.)
+    const ghost = new THREE.MeshBasicMaterial({ color: 0x8899aa, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
+    building.traverse(ch => { if (ch.isMesh) { ch.material = ghost; ch.renderOrder = -1; } });
     scene.add(building);
     buildingLoading = false;
     btn.textContent = '🏢 Building shell';
