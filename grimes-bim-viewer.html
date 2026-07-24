@@ -54,19 +54,35 @@ body.compare-on #syncPanel{display:block}
 #syncPanel .hint{font:italic 9.5px/1.4 var(--font);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
 #legend{position:fixed;left:14px;bottom:14px;z-index:50;background:rgba(8,12,24,.9);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font:10px/1.6 var(--mono);color:#94a3b8}
 #legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-/* ── Twin panel: click a system → Brick entity + live BMO data ── */
+/* ── Twin panel: visual-first — big number + chart up top, prose folded into ⓘ.
+   Three density levels: (1) headline kW/badge/chart, (2) compact rows, (3) details. ── */
 #twinPanel{position:fixed;right:14px;top:62px;z-index:70;width:264px;background:rgba(8,12,24,.95);border:1px solid rgba(52,211,153,.35);border-radius:6px;padding:10px 12px;display:none;font:11px/1.45 var(--font);color:#cbd5e1}
 #twinPanel.show{display:block}
-#twinPanel .thdr{font:600 10px/1 var(--mono);color:var(--green);letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(52,211,153,.15)}
-#twinPanel .thdr button{background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;line-height:1}
-#twinPanel .ttype{font:500 9.5px/1.4 var(--mono);color:#64748b;margin-bottom:6px;word-break:break-all}
-#twinPanel .pt{display:flex;justify-content:space-between;gap:8px;font:10.5px/1.5 var(--mono);padding:2px 0;color:#94a3b8}
+#twinPanel .thdr{display:flex;align-items:center;gap:8px;padding-bottom:7px;margin-bottom:4px;border-bottom:1px solid rgba(52,211,153,.15);font:600 12px/1.2 var(--font);color:#e8eef7}
+#twinPanel .thdr .sysdot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:#64748b}
+#twinPanel .thdr #twinTitle{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#twinPanel .thdr button{background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;line-height:1;padding:2px}
+#twinPanel .thdr button.on{color:#67e8f9}
+#twinPanel .bigrow{display:flex;align-items:baseline;gap:10px;margin:6px 0 0}
+#twinPanel .bigkw{font:700 26px/1 var(--mono);color:#fff}
+#twinPanel .bigkw small{font:600 12px var(--mono);color:#64748b}
+#twinPanel .badge{font:700 9.5px/1 var(--mono);padding:3px 7px;border-radius:4px;background:rgba(52,211,153,.15);color:#34d399;letter-spacing:.3px}
+#twinPanel .badge.hi{background:rgba(248,113,113,.18);color:#f87171}
+#twinPanel .badge.lo{background:rgba(96,165,250,.18);color:#93c5fd}
+#twinPanel .badge.na{background:rgba(148,163,184,.12);color:#94a3b8}
+#twinPanel .srcnote{font:9px/1.4 var(--mono);color:#475569;margin:3px 0 5px}
+#twinPanel canvas{width:100%;height:64px;border-radius:4px;background:rgba(0,0,0,.25);display:block}
+#twinPanel .pt{display:flex;justify-content:space-between;gap:8px;font:10.5px/1.6 var(--mono);padding:1px 0;color:#94a3b8}
 #twinPanel .pt .v{color:#e0e7f1;font-weight:600;white-space:nowrap}
-#twinPanel canvas{width:100%;height:38px;margin-top:6px;border-radius:3px;background:rgba(0,0,0,.25)}
-#twinPanel .foot{font:9.5px/1.5 var(--mono);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
-#twinPanel .bhdr{font:600 10px/1 var(--mono);color:var(--gold);letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:7px;border-top:1px solid rgba(253,181,21,.2)}
-#twinPanel .bhdr .badge{font:700 9px/1 var(--mono);padding:2px 6px;border-radius:3px;background:rgba(52,211,153,.15);color:#34d399}
-#twinPanel .bhdr .badge.anom{background:rgba(248,113,113,.18);color:#f87171}
+#twinPanel .mut{color:#475569;font-style:italic}
+#twinPanel .morebtn{font:9.5px/1.6 var(--mono);color:#64748b;cursor:pointer;user-select:none}
+#twinPanel .morebtn:hover{color:#94a3b8}
+#twinPanel .evline{display:flex;justify-content:space-between;gap:8px;font:10px/1.6 var(--mono);color:#94a3b8;margin-top:6px;padding-top:5px;border-top:1px solid rgba(148,163,184,.1)}
+#twinPanel .simline{font:9.5px/1.5 var(--mono);color:#34d399}
+#twinDetails{display:none;margin-top:7px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12);font:9.5px/1.7 var(--mono);color:#64748b;word-break:break-all}
+#twinDetails.open{display:block}
+#twinDetails>div{margin-bottom:4px}
+#twinDetails canvas{height:36px;margin-top:2px}
 /* ── As-built discrepancy notes (inside sync panel, compare mode) ── */
 #notesSec{margin-top:8px;padding-top:6px;border-top:1px solid rgba(34,211,238,.15)}
 #notesSec .nhdr{font:600 10px/1 var(--mono);color:#fbbf24;letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between}
@@ -142,15 +158,22 @@ body.compare-on #syncPanel{display:block}
 <div id="walkHint"><b>WASD</b> move · <b>mouse</b> look · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>Esc</b> exit</div>
 
 <div id="twinPanel">
-  <div class="thdr"><span id="twinTitle">System</span><button onclick="clearPick()" title="close">✕</button></div>
-  <div class="ttype" id="twinType"></div>
+  <div class="thdr">
+    <span class="sysdot" id="twinDot"></span>
+    <span id="twinTitle">System</span>
+    <button id="twinInfoBtn" onclick="toggleTwinInfo()" title="details">ⓘ</button>
+    <button onclick="clearPick()" title="close">✕</button>
+  </div>
+  <div class="bigrow"><span class="bigkw" id="twinBigKw">— <small>kW</small></span><span class="badge na" id="twinBadge">…</span></div>
+  <div class="srcnote" id="twinSrc"></div>
+  <canvas id="twinBaseSpark" width="480" height="128"></canvas>
   <div id="twinPoints"></div>
-  <canvas id="twinSpark" width="480" height="76"></canvas>
-  <div class="foot" id="twinFoot"></div>
-  <div id="twinEquip"></div>
-  <div class="bhdr" id="twinBaseHdr" style="display:none"><span>⚡ Bldg load vs baseline</span><span class="badge" id="twinBadge"></span></div>
-  <div id="twinBaseRow" style="display:none"></div>
-  <canvas id="twinBaseSpark" width="480" height="86" style="display:none"></canvas>
+  <div id="twinEvent"></div>
+  <div id="twinDetails">
+    <div id="twinDetInfo"></div>
+    <div id="twinDetEquip"></div>
+    <canvas id="twinSpark" width="480" height="72"></canvas>
+  </div>
 </div>
 
 <div id="syncPanel">
@@ -820,68 +843,70 @@ function drawSpark(cv, series) {
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+window.toggleTwinInfo = () => {
+  document.getElementById('twinDetails').classList.toggle('open');
+  document.getElementById('twinInfoBtn').classList.toggle('on');
+};
+window.toggleTwinMore = id => {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+};
+
 async function pickSystem(mesh) {
   picked = mesh;
   highlight(mesh);
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
-  renderBaseline(); // building-level baseline/anomaly section (independent of system)
   const name = mesh.name || (mesh.parent && mesh.parent.name) || '';
-  const titleEl = document.getElementById('twinTitle'), typeEl = document.getElementById('twinType');
-  const ptsEl = document.getElementById('twinPoints'), footEl = document.getElementById('twinFoot');
-  titleEl.textContent = name;
-  ptsEl.innerHTML = ''; footEl.textContent = '';
-  drawSpark(document.getElementById('twinSpark'), []);
-  document.getElementById('twinEquip').innerHTML = '';
-  if (!twinPkg) { typeEl.textContent = 'twin package not loaded (serve over http)'; return; }
-  const res = TwinResolver.resolveNode(twinPkg, name);
   const si = NAME_TO_SYS[name] ?? NAME_TO_SYS_N[NORM(name)];
-  const sysLabel = si != null ? SYSTEMS[si].label : null;
+  document.getElementById('twinDot').style.background =
+    si != null ? '#' + SYSTEMS[si].hex.toString(16).padStart(6, '0') : '#64748b';
+  document.getElementById('twinTitle').textContent = si != null ? SYSTEMS[si].label : name;
+  const ptsEl = document.getElementById('twinPoints'), detInfo = document.getElementById('twinDetInfo');
+  ptsEl.innerHTML = ''; detInfo.innerHTML = '';
+  document.getElementById('twinDetEquip').innerHTML = '';
+  drawSpark(document.getElementById('twinSpark'), []);
+  renderBaseline();                               // headline: big kW, badge, band chart, event line
+  if (!twinPkg) { detInfo.textContent = 'twin package not loaded (serve over http)'; return; }
+  const res = TwinResolver.resolveNode(twinPkg, name);
   if (!res.bound) {
-    titleEl.textContent = sysLabel || name;
-    typeEl.textContent = '⚠ ' + res.reason;
-    ptsEl.innerHTML = `<div class="pt" style="color:#475569;font-style:italic"><span>`
-      + `This glb node has no Brick binding yet — add "${esc(name)}" to buildings/grimes/binding.json to link it to live data.</span></div>`;
+    ptsEl.innerHTML = '<div class="pt mut"><span>ⓘ not bound to live data — see details</span></div>';
+    detInfo.innerHTML = esc(res.reason) + '<br>Add "' + esc(name)
+      + '" to buildings/grimes/binding.json to link it.';
     return;
   }
-  titleEl.textContent = res.label;
-  typeEl.textContent = res.type + ' · ' + res.uri;
-  // relationships: category (viewer legend), brick:isPartOf, brick:isFedBy
+  // prose lives in ⓘ details: brick class/URI + relationships
   const rawEnt = twinPkg.brick.entities[res.uri] || {};
   const parentEnt = rawEnt.isPartOf && twinPkg.brick.entities[rawEnt.isPartOf];
-  let rows0 = '';
-  if (sysLabel) rows0 += `<div class="pt"><span>category</span><span class="v">${esc(sysLabel)}</span></div>`;
-  if (parentEnt) rows0 += `<div class="pt"><span>part of</span><span class="v">${esc(parentEnt.label || rawEnt.isPartOf)}</span></div>`;
-  if (res.feeders.length) rows0 += `<div class="pt"><span>fed by</span><span class="v">${esc(res.feeders.join(' + '))}</span></div>`;
+  detInfo.innerHTML = esc(res.type) + '<br>' + esc(res.uri)
+    + (parentEnt ? '<br>part of: ' + esc(parentEnt.label || rawEnt.isPartOf) : '')
+    + (res.feeders.length ? '<br>fed by: ' + esc(res.feeders.join(' + ')) : '');
   renderEquip(name);
   if (!res.points.length) {
-    ptsEl.innerHTML = rows0 + '<div class="pt" style="color:#475569;font-style:italic"><span>'
-      + 'No live points — this system has no metered feed in the Brick model'
-      + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection is unmetered)' : '') + '.</span></div>';
+    ptsEl.innerHTML = '<div class="pt mut"><span>ⓘ unmetered system'
+      + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection)' : '') + '</span></div>';
     return;
   }
-  ptsEl.innerHTML = rows0 + '<div class="pt"><span>loading live data…</span></div>';
   try {
     const vals = await TwinResolver.fetchValues(twinPkg, res.points, cachedJson);
     if (picked !== mesh) return; // user picked something else meanwhile
-    let total = 0, latestTs = null, rows = rows0;
-    res.points.forEach(p => {
+    let total = 0;
+    const rows = res.points.map(p => {
       const v = vals[p.ref] || {};
-      if (v.error) { rows += `<div class="pt"><span>${esc(p.ref)}</span><span class="v">⚠</span></div>`; return; }
       if (typeof v.value === 'number') total += v.value;
-      if (v.ts) latestTs = latestTs && latestTs > v.ts ? latestTs : v.ts;
-      rows += `<div class="pt"><span>${esc(v.name || p.ref)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'} ${esc(v.unit || 'kW')}</span></div>`;
+      const nm = String(v.name || p.ref).replace(/\s*\(.*\)$/, ''); // short name
+      return `<div class="pt"><span>· ${esc(nm)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'}</span></div>`;
     });
-    rows += `<div class="pt" style="border-top:1px solid rgba(148,163,184,.12);margin-top:3px;padding-top:4px"><span>Σ system feed</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`;
-    ptsEl.innerHTML = rows;
-    drawSpark(document.getElementById('twinSpark'), sumSeries(vals, res.points));
-    footEl.textContent = 'BMO live · ' + (latestTs || '—') + ' · 24 h sparkline';
-    cachedJson('data/campus_energy.json').then(ce => {
-      const g = ce && ce.buildings && ce.buildings.grimes;
-      if (g && picked === mesh) footEl.textContent += ` · bldg ${g.kw} kW (baseline ${g.predicted_kw ?? '—'})${g.anomaly ? ' ⚠ anomaly' : ''}`;
-    }).catch(() => {});
+    let html = `<div class="pt"><span>Σ system feed</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
+      + rows.slice(0, 3).join('');
+    if (rows.length > 3) {
+      html += `<div id="twinPtsMore" style="display:none">${rows.slice(3).join('')}</div>`
+        + `<div class="morebtn" onclick="toggleTwinMore('twinPtsMore')">… ${rows.length - 3} more</div>`;
+    }
+    ptsEl.innerHTML = html;
+    drawSpark(document.getElementById('twinSpark'), sumSeries(vals, res.points)); // 24h feed, in details
   } catch (e) {
-    if (picked === mesh) ptsEl.innerHTML = `<div class="pt"><span>⚠ live data unavailable (${esc(e.message)})</span></div>`;
+    if (picked === mesh) ptsEl.innerHTML = '<div class="pt mut"><span>⚠ live data unavailable</span></div>';
   }
 }
 
@@ -889,21 +914,17 @@ async function pickSystem(mesh) {
    If an NWD-extracted element registry exists, show per-system counts and a
    few representative items. If not, say WHY there's nothing to show. */
 async function renderEquip(nodeName) {
-  const el = document.getElementById('twinEquip');
+  const el = document.getElementById('twinDetEquip'); // lives inside ⓘ details
   try {
     const reg = await cachedJson('buildings/grimes/equipment.json');
     const key = Object.keys(reg.systems || {}).find(k => NORM(k) === NORM(nodeName));
     const sys = key && reg.systems[key];
     if (!sys || !(sys.items || []).length) throw new Error('no entry');
-    el.innerHTML = `<div class="pt"><span>equipment (NWD registry)</span><span class="v">${sys.items.length} items</span></div>`
-      + sys.items.slice(0, 3).map(it =>
-        `<div class="pt"><span style="color:#64748b">· ${esc(it.name || it)}</span><span class="v">${esc(it.type || '')}</span></div>`).join('')
-      + (sys.items.length > 3 ? `<div class="pt"><span style="color:#475569">… +${sys.items.length - 3} more</span></div>` : '');
+    el.innerHTML = 'equipment: ' + sys.items.length + ' items — '
+      + sys.items.slice(0, 3).map(it => esc(it.name || it)).join(', ')
+      + (sys.items.length > 3 ? ', …' : '');
   } catch {
-    el.innerHTML = '<div class="pt" style="color:#475569;font-style:italic"><span>'
-      + 'No per-element registry: the GLB carries system-tier geometry only — element attributes '
-      + '(tags, sizes, Revit IDs) need an NWD re-export with one node per element '
-      + '(then list them in buildings/grimes/equipment.json).</span></div>';
+    el.innerHTML = 'no element registry — GLB is system-tier geometry; NWD re-export needed for per-element data';
   }
 }
 
@@ -912,14 +933,17 @@ async function renderEquip(nodeName) {
    from the repo's own archived snapshots. Building-level, shown in the twin
    panel: current vs typical-for-this-hour, ±3σ band chart, ⚠ badge on |z|>3. */
 async function renderBaseline() {
-  const hdr = document.getElementById('twinBaseHdr'), row = document.getElementById('twinBaseRow'),
-        cv = document.getElementById('twinBaseSpark'), badge = document.getElementById('twinBadge');
+  const big = document.getElementById('twinBigKw'), badge = document.getElementById('twinBadge'),
+        srcEl = document.getElementById('twinSrc'), evEl = document.getElementById('twinEvent'),
+        cv = document.getElementById('twinBaseSpark');
+  big.innerHTML = '— <small>kW</small>'; badge.textContent = '…'; badge.className = 'badge na';
+  srcEl.textContent = ''; evEl.innerHTML = '';
+  cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   try {
     const eb = await cachedJson('data/energy_baseline.json');
     const med = eb && eb.buildings && eb.buildings.grimes;
-    // Prefer the TOWT weather-normalized model when its quality flag passes
-    // (CV-RMSE ≤ 30 %, ≥ 14 d); otherwise the hour-of-week median. Both files
-    // share the recent24/current shape, so the source is just swapped.
+    // TOWT (weather-normalized) preferred when its quality flag passes; both
+    // files share the current/recent24 shape so the source is just swapped.
     let src = med, srcName = 'median';
     try {
       const tw = await cachedJson('data/towt_baseline.json');
@@ -927,28 +951,32 @@ async function renderBaseline() {
       if (tg && tg.use_towt && tg.recent24 && tg.recent24.length) { src = tg; srcName = 'weather-normalized'; }
     } catch {} // towt file is optional
     if (!src || !src.recent24 || !src.recent24.length) return;
-    hdr.style.display = 'flex'; row.style.display = 'block'; cv.style.display = 'block';
-    hdr.querySelector('span').innerHTML = `⚡ Load vs baseline <span style="color:#64748b;text-transform:none">(${srcName})</span>`;
     const c = src.current || {}, z = typeof c.z === 'number' ? c.z : null;
-    badge.textContent = c.anomaly ? `⚠ z ${z}` : (z === null ? 'no live' : `ok · z ${z}`);
-    badge.classList.toggle('anom', !!c.anomaly);
+    big.innerHTML = (c.kw != null ? c.kw : '—') + ' <small>kW</small>';
+    if (z === null) { badge.textContent = 'NO LIVE'; badge.className = 'badge na'; }
+    else if (c.anomaly && z > 0) { badge.textContent = 'HIGH z ' + z; badge.className = 'badge hi'; }
+    else if (c.anomaly) { badge.textContent = 'LOW z ' + z; badge.className = 'badge lo'; }
+    else { badge.textContent = 'OK z ' + z; badge.className = 'badge'; }
+    srcEl.textContent = 'bldg load vs ' + srcName + ' baseline · typical now '
+      + (c.base != null ? c.base + ' kW' : '—');
+    drawBaseChart(cv, src.recent24, src.sigma, (eb && eb.z_threshold) || 3);
+    // latest anomaly event (one line) + staggered-start sim callout; rest folds
     let sim = null;
     try { sim = await cachedJson('data/startup_sim.json'); } catch {}
-    // event log lives in the median pipeline; dawn spikes get the sim callout
-    const evs = ((med && med.events) || []).slice(-3).reverse();
-    row.innerHTML = `<div class="pt"><span>now / typical (this hr)</span><span class="v">${c.kw ?? '—'} / ${c.base ?? '—'} kW</span></div>`
-      + (evs.length
-        ? `<div class="pt"><span>recent events (14 d)</span><span class="v">${((med && med.events) || []).length}</span></div>`
-          + evs.map(ev => {
-            let h = `<div class="pt"><span style="color:#64748b">· ${esc(ev.start.slice(5, 16))}</span><span class="v" style="color:${ev.dir === 'high' ? '#f87171' : '#93c5fd'}">${esc(ev.dir)} z ${ev.peak_z} · ${ev.hours}h</span></div>`;
-            if (sim && ev.dir === 'high' && +ev.start.slice(11, 13) <= 6) {
-              const [lo, hi] = sim.est_peak_reduction_kw || [10, 20];
-              h += `<div class="pt"><span style="color:#475569">&nbsp;&nbsp;→ simulated fix</span><span class="v" style="color:#34d399">staggered start, est. −${lo}~${hi} kW peak</span></div>`;
-            }
-            return h;
-          }).join('')
-        : '<div class="pt"><span style="color:#475569">no |z|&gt;3 events in 14 d</span></div>');
-    drawBaseChart(cv, src.recent24, src.sigma, (eb && eb.z_threshold) || 3);
+    const evs = ((med && med.events) || []).slice().reverse();
+    if (evs.length) {
+      const ev = evs[0];
+      let h = `<div class="evline"><span>${ev.dir === 'high' ? '⚠' : 'ℹ'} ${esc(ev.start.slice(5, 16))} ${esc(ev.dir)} z ${ev.peak_z} · ${ev.hours}h</span>`
+        + (evs.length > 1 ? `<span class="morebtn" onclick="toggleTwinMore('twinEvMore')">+${evs.length - 1}</span>` : '')
+        + '</div>';
+      if (sim && ev.dir === 'high' && +ev.start.slice(11, 13) <= 6) {
+        const [lo, hi] = sim.est_peak_reduction_kw || [10, 20];
+        h += `<div class="simline">→ sim fix: staggered start, est. −${lo}~${hi} kW peak</div>`;
+      }
+      h += `<div id="twinEvMore" style="display:none">` + evs.slice(1, 6).map(e2 =>
+        `<div class="pt"><span>· ${esc(e2.start.slice(5, 16))}</span><span class="v">${esc(e2.dir)} z ${e2.peak_z} · ${e2.hours}h</span></div>`).join('') + '</div>';
+      evEl.innerHTML = h;
+    }
   } catch (e) { console.warn('[baseline]', e.message); }
 }
 function drawBaseChart(cv, recent, sigma, zt) {
@@ -976,6 +1004,11 @@ function drawBaseChart(cv, recent, sigma, zt) {
   recent.forEach((p, i) => {
     if (Math.abs(p.z) > zt) { ctx.fillStyle = '#f87171'; ctx.beginPath(); ctx.arc(X(i), Y(p.kw), 3.5, 0, 7); ctx.fill(); }
   });
+  // minimal axis labels: just the kW range
+  ctx.fillStyle = 'rgba(148,163,184,.55)';
+  ctx.font = '600 15px JetBrains Mono, monospace';
+  ctx.fillText(Math.round(hi) + '', 6, 18);
+  ctx.fillText(Math.round(lo) + '', 6, H - 8);
 }
 
 /* ══════════ AS-BUILT DISCREPANCY NOTES (Compare mode) ══════════

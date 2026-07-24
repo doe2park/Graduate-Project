@@ -1146,9 +1146,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     var sbWn  = sbSrc === twb && !!twb;
     if(sbSrc && sbSrc.current && sbSrc.current.anomaly){
       var zc = sbSrc.current;
+      // concise: direction + z + actual vs expected, one line
       h += '<div class="pe-anomaly'+(zc.z>0?'':' low')+'">'
-         +   '[σ] '+(sbWn?'TOWT':'BASELINE')+' '+(zc.z>0?'HIGH':'LOW')+' — z='+zc.z.toFixed(1)
-         +   ' · '+zc.kw+' kW vs '+(sbWn?'weather-normalized':'typical')+' '+zc.base+' kW'
+         +   (zc.z>0?'[!] HIGH':'[i] LOW')+' z'+Math.abs(zc.z).toFixed(1)
+         +   ' · '+zc.kw+' kW (expected '+zc.base+')'
+         +   (sbWn?' · weather-norm':'')
          + '</div>';
     }
 
