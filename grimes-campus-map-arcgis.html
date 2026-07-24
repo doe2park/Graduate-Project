@@ -768,6 +768,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   window.C = C;
 
   function renderMarkers(energyData){
+    window.renderMarkers = renderMarkers; // exposed for the 24 h timelapse control
     gL.removeAll();
     _breathers.length=0;
     _sonars.length=0;
@@ -2131,9 +2132,26 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       }
       totalEl.innerHTML = '<b style="color:var(--gold)">' + totalKw + '</b><small>Total kW</small>';
 
+      // campus water/steam ticker (sums the flow blocks the 15-min fetch attaches)
+      var wSum=0, sSum=0, wN=0, sN=0;
+      Object.values(bldgs).forEach(function(b){
+        var f=b.flow; if(!f) return;
+        if(f.water_gpm!=null){wSum+=f.water_gpm;wN++;}
+        if(f.steam_lb_hr!=null){sSum+=f.steam_lb_hr;sN++;}
+      });
+      var stats=document.querySelector('.sh-stats');
+      if(stats && wN+sN>0){
+        var wEl=document.getElementById('campus-water');
+        if(!wEl){wEl=document.createElement('div');wEl.id='campus-water';wEl.className='sh-s';wEl.style.background='rgba(96,165,250,.10)';wEl.style.border='1px solid rgba(96,165,250,.22)';stats.appendChild(wEl);}
+        wEl.innerHTML='<b style="color:#60a5fa">'+Math.round(wSum)+'</b><small>💧 GPM · '+wN+' bldg</small>';
+        var sEl=document.getElementById('campus-steam');
+        if(!sEl){sEl=document.createElement('div');sEl.id='campus-steam';sEl.className='sh-s';sEl.style.background='rgba(251,146,60,.10)';sEl.style.border='1px solid rgba(251,146,60,.22)';stats.appendChild(sEl);}
+        sEl.innerHTML='<b style="color:#fb923c">'+Math.round(sSum)+'</b><small>♨️ lb/h · '+sN+' bldg</small>';
+      }
+
       renderList();
       window.currentEnergyData=bldgs;
-      renderMarkers(bldgs);  // Re-render markers with live energy colors
+      if(!window._tlActive) renderMarkers(bldgs);  // timelapse owns the markers while replaying
       console.log('[BMO] Updated ' + updated + ' buildings, total: ' + totalKw + ' kW');
     } catch (e) {
       console.warn('[BMO] Fetch failed:', e.message);
@@ -2840,6 +2858,65 @@ async function computeCampusMood(){
 // Kick off when live data lands, then refresh each minute
 var _moodInit=setInterval(function(){if(window.currentEnergyData){computeCampusMood();clearInterval(_moodInit)}},400);
 setInterval(computeCampusMood,60000);
+</script>
+
+<!-- 24 h load timelapse: scrub or replay the last day across every marker -->
+<div id="tlBar" style="position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:110;display:flex;align-items:center;gap:10px;background:rgba(8,12,24,.93);border:1px solid rgba(148,163,184,.25);border-radius:24px;padding:8px 16px;font:11px 'JetBrains Mono',monospace;color:#94a3b8;box-shadow:0 8px 24px rgba(0,0,0,.45)">
+  <button id="tlPlay" title="Replay the last 24 h" style="background:rgba(253,181,21,.14);border:1px solid rgba(253,181,21,.35);color:#FDB515;border-radius:14px;padding:4px 12px;font:600 11px 'Calibri',sans-serif;cursor:pointer">▶ 24h</button>
+  <input id="tlSlider" type="range" min="0" max="23" value="23" style="width:150px;accent-color:#FDB515">
+  <span id="tlLabel" style="min-width:118px;text-align:center">live · now</span>
+  <button id="tlLive" style="display:none;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.35);color:#34d399;border-radius:14px;padding:4px 10px;font:600 11px 'Calibri',sans-serif;cursor:pointer">● LIVE</button>
+</div>
+<script>
+(function(){
+  var idx=23, timer=null;
+  var slider=document.getElementById('tlSlider'), label=document.getElementById('tlLabel'),
+      playBtn=document.getElementById('tlPlay'), liveBtn=document.getElementById('tlLive');
+  function synth(i){
+    var src=window.currentEnergyData; if(!src||!window.renderMarkers) return null;
+    var out={};
+    Object.keys(src).forEach(function(k){
+      var b=src[k], sp=(b.sparkline||[]).slice(-24);
+      var v=sp.length?sp[Math.min(i,sp.length-1)]:null;
+      out[k]=Object.assign({},b,{kw:(typeof v==='number'?v:null)});
+    });
+    return out;
+  }
+  function hourLabel(i){
+    var d=new Date(Date.now()-(23-i)*3600000), h=d.getHours(), ap=h>=12?'PM':'AM';
+    return '~'+(h%12||12)+':00 '+ap;
+  }
+  function apply(i){
+    idx=i;
+    var s=synth(i); if(!s) return;
+    window._tlActive=true;
+    liveBtn.style.display='';
+    window.renderMarkers(s);
+    var tot=0; Object.values(s).forEach(function(b){if(b.kw)tot+=b.kw;});
+    label.textContent=hourLabel(i)+' · '+Math.round(tot)+' kW';
+    slider.value=i;
+  }
+  function stopPlay(){ if(timer){clearInterval(timer);timer=null;} playBtn.textContent='▶ 24h'; }
+  function goLive(){
+    stopPlay();
+    window._tlActive=false;
+    liveBtn.style.display='none';
+    label.textContent='live · now';
+    slider.value=23;
+    if(window.currentEnergyData&&window.renderMarkers) window.renderMarkers(window.currentEnergyData);
+  }
+  playBtn.addEventListener('click',function(){
+    if(timer){goLive();return;}                       // toggle: playing → back to live
+    apply(0);
+    playBtn.textContent='⏸ stop';
+    timer=setInterval(function(){                     // 24 frames × 500 ms ≈ 12 s
+      if(idx>=23){goLive();return;}
+      apply(idx+1);
+    },500);
+  });
+  slider.addEventListener('input',function(){ stopPlay(); apply(+this.value); });
+  liveBtn.addEventListener('click',goLive);
+})();
 </script>
 
 <!-- First-visit hint (once per browser) -->
