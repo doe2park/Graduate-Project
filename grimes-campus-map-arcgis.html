@@ -862,6 +862,12 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   window.energyBaseline=null;
   fetch('data/energy_baseline.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.energyBaseline=d;}).catch(function(){});
 
+  // TOWT weather-normalized baseline (optional — produced by scripts/towt_baseline.py
+  // on the Actions runner). When a building's use_towt quality flag passes, the
+  // σ-banner uses it instead of the hour-of-week median.
+  window.towtBaseline=null;
+  fetch('data/towt_baseline.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.towtBaseline=d;}).catch(function(){});
+
   // LEED design-intent data (Grimes/Bechtel only) — feeds the "Design Intent vs Actual" panel
   // and the Public LEED badge. Extracted from the LEED submittal calculator by extract_leed.py.
   window.leedData=null;
@@ -1133,13 +1139,16 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          + '</div>';
     }
 
-    // ── BASELINE σ-BANNER (statistical: hour-of-week median + MAD z, |z|>3) ──
+    // ── BASELINE σ-BANNER — TOWT (weather-normalized) preferred, median fallback ──
     var ebb = window.energyBaseline && window.energyBaseline.buildings && window.energyBaseline.buildings[b.id];
-    if(ebb && ebb.current && ebb.current.anomaly){
-      var zc = ebb.current;
+    var twb = window.towtBaseline && window.towtBaseline.buildings && window.towtBaseline.buildings[b.id];
+    var sbSrc = (twb && twb.use_towt && twb.current) ? twb : ebb;
+    var sbWn  = sbSrc === twb && !!twb;
+    if(sbSrc && sbSrc.current && sbSrc.current.anomaly){
+      var zc = sbSrc.current;
       h += '<div class="pe-anomaly'+(zc.z>0?'':' low')+'">'
-         +   '[σ] BASELINE '+(zc.z>0?'HIGH':'LOW')+' — z='+zc.z.toFixed(1)
-         +   ' · '+zc.kw+' kW vs typical '+zc.base+' kW for this hour'
+         +   '[σ] '+(sbWn?'TOWT':'BASELINE')+' '+(zc.z>0?'HIGH':'LOW')+' — z='+zc.z.toFixed(1)
+         +   ' · '+zc.kw+' kW vs '+(sbWn?'weather-normalized':'typical')+' '+zc.base+' kW'
          + '</div>';
     }
 

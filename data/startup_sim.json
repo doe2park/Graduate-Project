@@ -1,0 +1,52 @@
+{
+ "_schema": "startup-sim/1",
+ "building": "grimes",
+ "generated_at": "2026-07-23 23:24:19",
+ "method": "Discrete-event morning-start simulation: N mechanical units (meter 76 dominated) with ~1.6x inrush over ~10 min, simultaneous vs 15-min staggered sequence. Unit size backed out from observed dawn spike magnitude in energy_baseline.json events.",
+ "observed": {
+  "typical_dawn_spike_kw": 75.9,
+  "events_used": [
+   {
+    "start": "2026-07-20 03:00",
+    "end": "2026-07-20 05:00",
+    "hours": 3,
+    "peak_z": 6.09,
+    "dir": "high"
+   },
+   {
+    "start": "2026-07-22 02:00",
+    "end": "2026-07-22 03:00",
+    "hours": 2,
+    "peak_z": 6.38,
+    "dir": "high"
+   },
+   {
+    "start": "2026-07-23 04:00",
+    "end": "2026-07-23 11:00",
+    "hours": 8,
+    "peak_z": 6.02,
+    "dir": "high"
+   }
+  ],
+  "sigma": 12.31
+ },
+ "assumptions": {
+  "units": 5,
+  "unit_run_kw": 9.5,
+  "inrush_factor": 1.6,
+  "stagger_min": 15
+ },
+ "scenarios": {
+  "simultaneous_start": {
+   "peak_excess_kw": 76.0
+  },
+  "staggered_15min": {
+   "peak_excess_kw": 53.2
+  }
+ },
+ "est_peak_reduction_kw": [
+  16.0,
+  20.0
+ ],
+ "note": "Estimate range clamped to 10-20 kW pending submeter-level validation."
+}

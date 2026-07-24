@@ -26,7 +26,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install requests python-dotenv
+        run: pip install requests python-dotenv numpy
 
       - name: Fetch campus energy data
         env:
@@ -42,6 +42,14 @@ jobs:
         # accumulated series cache, then recomputes hour-of-week medians and
         # z-scores. '|| true' so a stats hiccup never blocks the data commit.
         run: python scripts/build_baseline.py || true
+
+      - name: TOWT weather-normalized baseline
+        # Fetches Berkeley hourly temps (open-meteo; cached in
+        # data/weather_cache.json so calls stay minimal) and fits the
+        # time-of-week + piecewise-temperature model. Guarded: a failure
+        # never blocks the data commit; frontends fall back to the
+        # median baseline while towt_baseline.json is absent.
+        run: python scripts/towt_baseline.py || true
 
       - name: Archive daily snapshot
         run: |

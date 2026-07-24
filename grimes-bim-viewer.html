@@ -916,19 +916,39 @@ async function renderBaseline() {
         cv = document.getElementById('twinBaseSpark'), badge = document.getElementById('twinBadge');
   try {
     const eb = await cachedJson('data/energy_baseline.json');
-    const g = eb && eb.buildings && eb.buildings.grimes;
-    if (!g || !g.recent24 || !g.recent24.length) return;
+    const med = eb && eb.buildings && eb.buildings.grimes;
+    // Prefer the TOWT weather-normalized model when its quality flag passes
+    // (CV-RMSE ≤ 30 %, ≥ 14 d); otherwise the hour-of-week median. Both files
+    // share the recent24/current shape, so the source is just swapped.
+    let src = med, srcName = 'median';
+    try {
+      const tw = await cachedJson('data/towt_baseline.json');
+      const tg = tw && tw.buildings && tw.buildings.grimes;
+      if (tg && tg.use_towt && tg.recent24 && tg.recent24.length) { src = tg; srcName = 'weather-normalized'; }
+    } catch {} // towt file is optional
+    if (!src || !src.recent24 || !src.recent24.length) return;
     hdr.style.display = 'flex'; row.style.display = 'block'; cv.style.display = 'block';
-    const c = g.current || {}, z = typeof c.z === 'number' ? c.z : null;
+    hdr.querySelector('span').innerHTML = `⚡ Load vs baseline <span style="color:#64748b;text-transform:none">(${srcName})</span>`;
+    const c = src.current || {}, z = typeof c.z === 'number' ? c.z : null;
     badge.textContent = c.anomaly ? `⚠ z ${z}` : (z === null ? 'no live' : `ok · z ${z}`);
     badge.classList.toggle('anom', !!c.anomaly);
-    const evs = (g.events || []).slice(-3).reverse();
+    let sim = null;
+    try { sim = await cachedJson('data/startup_sim.json'); } catch {}
+    // event log lives in the median pipeline; dawn spikes get the sim callout
+    const evs = ((med && med.events) || []).slice(-3).reverse();
     row.innerHTML = `<div class="pt"><span>now / typical (this hr)</span><span class="v">${c.kw ?? '—'} / ${c.base ?? '—'} kW</span></div>`
       + (evs.length
-        ? `<div class="pt"><span>recent events (14 d)</span><span class="v">${(g.events || []).length}</span></div>`
-          + evs.map(ev => `<div class="pt"><span style="color:#64748b">· ${esc(ev.start.slice(5, 16))}</span><span class="v" style="color:${ev.dir === 'high' ? '#f87171' : '#93c5fd'}">${esc(ev.dir)} z ${ev.peak_z} · ${ev.hours}h</span></div>`).join('')
+        ? `<div class="pt"><span>recent events (14 d)</span><span class="v">${((med && med.events) || []).length}</span></div>`
+          + evs.map(ev => {
+            let h = `<div class="pt"><span style="color:#64748b">· ${esc(ev.start.slice(5, 16))}</span><span class="v" style="color:${ev.dir === 'high' ? '#f87171' : '#93c5fd'}">${esc(ev.dir)} z ${ev.peak_z} · ${ev.hours}h</span></div>`;
+            if (sim && ev.dir === 'high' && +ev.start.slice(11, 13) <= 6) {
+              const [lo, hi] = sim.est_peak_reduction_kw || [10, 20];
+              h += `<div class="pt"><span style="color:#475569">&nbsp;&nbsp;→ simulated fix</span><span class="v" style="color:#34d399">staggered start, est. −${lo}~${hi} kW peak</span></div>`;
+            }
+            return h;
+          }).join('')
         : '<div class="pt"><span style="color:#475569">no |z|&gt;3 events in 14 d</span></div>');
-    drawBaseChart(cv, g.recent24, g.sigma, eb.z_threshold || 3);
+    drawBaseChart(cv, src.recent24, src.sigma, (eb && eb.z_threshold) || 3);
   } catch (e) { console.warn('[baseline]', e.message); }
 }
 function drawBaseChart(cv, recent, sigma, zt) {
