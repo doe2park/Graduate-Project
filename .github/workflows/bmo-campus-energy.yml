@@ -37,6 +37,12 @@ jobs:
       - name: Generate weekly report
         run: python generate_weekly_report.py || true
 
+      - name: Build energy baseline / anomaly stats
+        # Incremental: appends the fresh snapshot + rolling history to the
+        # accumulated series cache, then recomputes hour-of-week medians and
+        # z-scores. '|| true' so a stats hiccup never blocks the data commit.
+        run: python scripts/build_baseline.py || true
+
       - name: Archive daily snapshot
         run: |
           TODAY=$(date +'%Y-%m-%d')

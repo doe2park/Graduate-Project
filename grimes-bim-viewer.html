@@ -57,6 +57,9 @@ body.compare-on #syncPanel{display:block}
 #twinPanel .pt .v{color:#e0e7f1;font-weight:600;white-space:nowrap}
 #twinPanel canvas{width:100%;height:38px;margin-top:6px;border-radius:3px;background:rgba(0,0,0,.25)}
 #twinPanel .foot{font:9.5px/1.5 var(--mono);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
+#twinPanel .bhdr{font:600 10px/1 var(--mono);color:var(--gold);letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:7px;border-top:1px solid rgba(253,181,21,.2)}
+#twinPanel .bhdr .badge{font:700 9px/1 var(--mono);padding:2px 6px;border-radius:3px;background:rgba(52,211,153,.15);color:#34d399}
+#twinPanel .bhdr .badge.anom{background:rgba(248,113,113,.18);color:#f87171}
 /* ── As-built discrepancy notes (inside sync panel, compare mode) ── */
 #notesSec{margin-top:8px;padding-top:6px;border-top:1px solid rgba(34,211,238,.15)}
 #notesSec .nhdr{font:600 10px/1 var(--mono);color:#fbbf24;letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between}
@@ -128,6 +131,9 @@ body.compare-on #syncPanel{display:block}
   <div id="twinPoints"></div>
   <canvas id="twinSpark" width="480" height="76"></canvas>
   <div class="foot" id="twinFoot"></div>
+  <div class="bhdr" id="twinBaseHdr" style="display:none"><span>⚡ Bldg load vs baseline</span><span class="badge" id="twinBadge"></span></div>
+  <div id="twinBaseRow" style="display:none"></div>
+  <canvas id="twinBaseSpark" width="480" height="86" style="display:none"></canvas>
 </div>
 
 <div id="syncPanel">
@@ -599,6 +605,7 @@ async function pickSystem(mesh) {
   highlight(mesh);
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
+  renderBaseline(); // building-level baseline/anomaly section (independent of system)
   const name = mesh.name || (mesh.parent && mesh.parent.name) || '';
   const titleEl = document.getElementById('twinTitle'), typeEl = document.getElementById('twinType');
   const ptsEl = document.getElementById('twinPoints'), footEl = document.getElementById('twinFoot');
@@ -634,6 +641,54 @@ async function pickSystem(mesh) {
   } catch (e) {
     if (picked === mesh) ptsEl.innerHTML = `<div class="pt"><span>⚠ live data unavailable (${esc(e.message)})</span></div>`;
   }
+}
+
+/* ══════════ BASELINE / ANOMALY (data/energy_baseline.json) ══════════
+   Hour-of-week median baseline + MAD z-scores built by scripts/build_baseline.py
+   from the repo's own archived snapshots. Building-level, shown in the twin
+   panel: current vs typical-for-this-hour, ±3σ band chart, ⚠ badge on |z|>3. */
+async function renderBaseline() {
+  const hdr = document.getElementById('twinBaseHdr'), row = document.getElementById('twinBaseRow'),
+        cv = document.getElementById('twinBaseSpark'), badge = document.getElementById('twinBadge');
+  try {
+    const eb = await cachedJson('data/energy_baseline.json');
+    const g = eb && eb.buildings && eb.buildings.grimes;
+    if (!g || !g.recent24 || !g.recent24.length) return;
+    hdr.style.display = 'flex'; row.style.display = 'block'; cv.style.display = 'block';
+    const c = g.current || {}, z = typeof c.z === 'number' ? c.z : null;
+    badge.textContent = c.anomaly ? `⚠ z ${z}` : (z === null ? 'no live' : `ok · z ${z}`);
+    badge.classList.toggle('anom', !!c.anomaly);
+    const evs = g.events || [], ev = evs[evs.length - 1];
+    row.innerHTML = `<div class="pt"><span>now / typical (this hr)</span><span class="v">${c.kw ?? '—'} / ${c.base ?? '—'} kW</span></div>`
+      + (ev ? `<div class="pt"><span>last event</span><span class="v">${esc(ev.dir)} z ${ev.peak_z} · ${esc(ev.start.slice(5, 16))}</span></div>` : '');
+    drawBaseChart(cv, g.recent24, g.sigma, eb.z_threshold || 3);
+  } catch (e) { console.warn('[baseline]', e.message); }
+}
+function drawBaseChart(cv, recent, sigma, zt) {
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const lo = Math.min(...recent.map(p => Math.min(p.kw, p.base - zt * sigma))),
+        hi = Math.max(...recent.map(p => Math.max(p.kw, p.base + zt * sigma)));
+  const rng = (hi - lo) || 1, W = cv.width, H = cv.height;
+  const X = i => i / (recent.length - 1) * (W - 8) + 4;
+  const Y = v => H - 6 - (v - lo) / rng * (H - 12);
+  // normal band: baseline ± z_threshold·σ
+  ctx.beginPath();
+  recent.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.base + zt * sigma)) : ctx.moveTo(X(0), Y(p.base + zt * sigma)); });
+  for (let i = recent.length - 1; i >= 0; i--) ctx.lineTo(X(i), Y(recent[i].base - zt * sigma));
+  ctx.closePath(); ctx.fillStyle = 'rgba(253,181,21,.10)'; ctx.fill();
+  // baseline (typical) — dashed gold
+  ctx.beginPath();
+  recent.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.base)) : ctx.moveTo(X(0), Y(p.base)); });
+  ctx.strokeStyle = 'rgba(253,181,21,.7)'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+  // actual load — green
+  ctx.beginPath();
+  recent.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.kw)) : ctx.moveTo(X(0), Y(p.kw)); });
+  ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5; ctx.stroke();
+  // anomalous hours — red dots
+  recent.forEach((p, i) => {
+    if (Math.abs(p.z) > zt) { ctx.fillStyle = '#f87171'; ctx.beginPath(); ctx.arc(X(i), Y(p.kw), 3.5, 0, 7); ctx.fill(); }
+  });
 }
 
 /* ══════════ AS-BUILT DISCREPANCY NOTES (Compare mode) ══════════

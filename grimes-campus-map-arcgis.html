@@ -857,6 +857,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   window.baselines=null;
   fetch('data/baselines.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.baselines=d;}).catch(function(){});
 
+  // Statistical baseline/anomaly layer (hour-of-week median + MAD z-scores) —
+  // built by scripts/build_baseline.py every 15 min. Feeds the σ-banner in popups.
+  window.energyBaseline=null;
+  fetch('data/energy_baseline.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.energyBaseline=d;}).catch(function(){});
+
   // LEED design-intent data (Grimes/Bechtel only) — feeds the "Design Intent vs Actual" panel
   // and the Public LEED badge. Extracted from the LEED submittal calculator by extract_leed.py.
   window.leedData=null;
@@ -1125,6 +1130,16 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          +   (isHigh?'[!]':'[i]')+' '+anomaly.type.toUpperCase()+' — '
          +   kw+' kW vs recent '+anomaly.avg+' kW'
          +   (pctOff!=null?' ('+(pctOff>=0?'+':'')+pctOff+'%)':'')
+         + '</div>';
+    }
+
+    // ── BASELINE σ-BANNER (statistical: hour-of-week median + MAD z, |z|>3) ──
+    var ebb = window.energyBaseline && window.energyBaseline.buildings && window.energyBaseline.buildings[b.id];
+    if(ebb && ebb.current && ebb.current.anomaly){
+      var zc = ebb.current;
+      h += '<div class="pe-anomaly'+(zc.z>0?'':' low')+'">'
+         +   '[σ] BASELINE '+(zc.z>0?'HIGH':'LOW')+' — z='+zc.z.toFixed(1)
+         +   ' · '+zc.kw+' kW vs typical '+zc.base+' kW for this hour'
          + '</div>';
     }
 
