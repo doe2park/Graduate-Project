@@ -77,6 +77,16 @@ body.compare-on #syncPanel{display:block}
 #twinPanel .mut{color:#475569;font-style:italic}
 #twinPanel .morebtn{font:9.5px/1.6 var(--mono);color:#64748b;cursor:pointer;user-select:none}
 #twinPanel .morebtn:hover{color:#94a3b8}
+#twinPanel .pt.sysrow{cursor:pointer}
+#twinPanel .pt.sysrow:hover{color:#e0e7f1}
+#twinPanel .pt.sysrow .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+/* micro-legend under the chart so first-timers can read it instantly */
+#twinPanel .chartkey{display:flex;gap:10px;font:9px/1 var(--mono);color:#64748b;margin:4px 0 2px}
+#twinPanel .chartkey .k{display:flex;align-items:center;gap:4px}
+#twinPanel .chartkey i{display:inline-block}
+#twinPanel .chartkey .ln{width:10px;height:2px;background:#34d399}
+#twinPanel .chartkey .bd{width:8px;height:6px;background:rgba(253,181,21,.28);border-radius:1px}
+#twinPanel .chartkey .dt{width:6px;height:6px;background:#f87171;border-radius:50%}
 #twinPanel .evline{display:flex;justify-content:space-between;gap:8px;font:10px/1.6 var(--mono);color:#94a3b8;margin-top:6px;padding-top:5px;border-top:1px solid rgba(148,163,184,.1)}
 #twinPanel .simline{font:9.5px/1.5 var(--mono);color:#34d399}
 #twinDetails{display:none;margin-top:7px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12);font:9.5px/1.7 var(--mono);color:#64748b;word-break:break-all}
@@ -186,14 +196,15 @@ body.compare-on #syncPanel{display:block}
   <div class="thdr">
     <span class="sysdot" id="twinDot"></span>
     <span id="twinTitle">System</span>
-    <button id="twinInfoBtn" onclick="toggleTwinInfo()" title="details">ⓘ</button>
     <button onclick="clearPick()" title="close">✕</button>
   </div>
   <div class="bigrow"><span class="bigkw" id="twinBigKw">— <small>kW</small></span><span class="badge na" id="twinBadge">…</span></div>
   <div class="srcnote" id="twinSrc"></div>
   <canvas id="twinBaseSpark" width="480" height="128"></canvas>
+  <div class="chartkey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
   <div id="twinPoints"></div>
   <div id="twinEvent"></div>
+  <div class="morebtn" id="twinInfoBtn" onclick="toggleTwinInfo()">▸ More details</div>
   <div id="twinDetails">
     <div id="twinDetZ"></div>
     <div id="twinDetInfo"></div>
@@ -306,6 +317,8 @@ draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
 
 const allMeshes = [];
+const shellMeshes = [];            // building-shell meshes (pickable, lower priority)
+const sysMesh = {};                // system index → representative MEP mesh
 let _bimBboxCache = null;
 function bimBbox() {
   if (!_bimBboxCache || _bimBboxCache.isEmpty()) {
@@ -325,6 +338,7 @@ loader.load('grimes-mep-only.glb', (gltf) => {
     const nm = child.name || (child.parent && child.parent.name) || '';
     let si = NAME_TO_SYS[nm] ?? NAME_TO_SYS_N[NORM(nm)];
     if (si === undefined) { console.warn('[glb] unknown node', nm); si = Math.min(idx, SYSTEMS.length - 1); }
+    if (!(si in sysMesh)) sysMesh[si] = child;
     child.material = new THREE.MeshBasicMaterial({ color: SYSTEMS[si].hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
     idx++;
   });
@@ -397,7 +411,7 @@ function loadShell() {
     // shading (flat MeshBasic at 0.18 read as fog). 0.24 keeps MEP visible.
     // (EdgesGeometry was considered but is prohibitive on a 57 MB mesh.)
     const ghost = new THREE.MeshLambertMaterial({ color: 0x9fb2c8, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false });
-    building.traverse(ch => { if (ch.isMesh) { ch.material = ghost; ch.renderOrder = -1; } });
+    building.traverse(ch => { if (ch.isMesh) { ch.material = ghost; ch.renderOrder = -1; shellMeshes.push(ch); } });
     scene.add(building);
     buildingLoading = false;
     btn.textContent = '🏢 Building shell';
@@ -844,8 +858,11 @@ renderer.domElement.addEventListener('pointerup', e => {
   const r = renderer.domElement.getBoundingClientRect();
   _ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   raycaster.setFromCamera(_ptr, camera);
-  const hit = raycaster.intersectObjects(allMeshes, false)[0];
-  if (hit) pickSystem(hit.object); else clearPick();
+  // MEP systems win when overlapping; the shell is the fallback target
+  const mepHit = raycaster.intersectObjects(allMeshes, false)[0];
+  if (mepHit) { pickSystem(mepHit.object); return; }
+  const shellHit = (building && building.visible) ? raycaster.intersectObjects(shellMeshes, false)[0] : null;
+  if (shellHit) pickBuilding(); else clearPick();
 });
 
 function highlight(mesh) {
@@ -887,13 +904,38 @@ function drawSpark(cv, series) {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 window.toggleTwinInfo = () => {
-  document.getElementById('twinDetails').classList.toggle('open');
-  document.getElementById('twinInfoBtn').classList.toggle('on');
+  const det = document.getElementById('twinDetails');
+  det.classList.toggle('open');
+  document.getElementById('twinInfoBtn').textContent = det.classList.contains('open') ? '▾ Less' : '▸ More details';
 };
 window.toggleTwinMore = id => {
   const el = document.getElementById(id);
   if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
 };
+
+// Shell/wall click → building-level panel: load + baseline + system directory.
+const BUILDING_PICK = {};
+window.selectSysByIndex = i => { const m = sysMesh[i]; if (m) pickSystem(m); };
+function pickBuilding() {
+  picked = BUILDING_PICK;
+  highlight(null);
+  document.getElementById('clickHint').classList.remove('show');
+  document.body.classList.add('twin-open');
+  document.getElementById('twinPanel').classList.add('show');
+  document.getElementById('twinDot').style.background = '#FDB515';
+  document.getElementById('twinTitle').textContent = 'Bechtel Engineering Center · Building structure';
+  document.getElementById('twinDetEquip').innerHTML = '';
+  drawSpark(document.getElementById('twinSpark'), []);
+  renderBaseline(); // same headline: load, status, band chart, latest event
+  document.getElementById('twinPoints').innerHTML =
+    '<div class="pt mut"><span>Systems in this building — click one:</span></div>'
+    + SYSTEMS.map((s, i) =>
+      `<div class="pt sysrow" onclick="selectSysByIndex(${i})"><span><span class="sw" style="background:#${s.hex.toString(16).padStart(6, '0')}"></span>${esc(s.label)}</span><span class="v">▸</span></div>`).join('');
+  const bEnt = twinPkg && twinPkg.brick.entities['grimes:Grimes'];
+  document.getElementById('twinDetInfo').innerHTML =
+    (bEnt ? esc(bEnt.type) + ' · grimes:Grimes<br>' : '')
+    + 'The shell is architectural context — the colored systems carry the live meter feeds.';
+}
 
 async function pickSystem(mesh) {
   picked = mesh;
@@ -914,7 +956,7 @@ async function pickSystem(mesh) {
   if (!twinPkg) { detInfo.textContent = 'twin package not loaded (serve over http)'; return; }
   const res = TwinResolver.resolveNode(twinPkg, name);
   if (!res.bound) {
-    ptsEl.innerHTML = '<div class="pt mut"><span>ⓘ not bound to live data — see details</span></div>';
+    ptsEl.innerHTML = '<div class="pt mut"><span>Not bound to live data — see More details</span></div>';
     detInfo.innerHTML = esc(res.reason) + '<br>Add "' + esc(name)
       + '" to buildings/grimes/binding.json to link it.';
     return;
@@ -927,8 +969,8 @@ async function pickSystem(mesh) {
     + (res.feeders.length ? '<br>fed by: ' + esc(res.feeders.join(' + ')) : '');
   renderEquip(name);
   if (!res.points.length) {
-    ptsEl.innerHTML = '<div class="pt mut"><span>ⓘ unmetered system'
-      + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection)' : '') + '</span></div>';
+    ptsEl.innerHTML = '<div class="pt mut"><span>No meter on this system'
+      + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection is unmetered)' : '') + '</span></div>';
     return;
   }
   try {
@@ -941,7 +983,7 @@ async function pickSystem(mesh) {
       const nm = String(v.name || p.ref).replace(/\s*\(.*\)$/, ''); // short name
       return `<div class="pt"><span>· ${esc(nm)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'}</span></div>`;
     });
-    let html = `<div class="pt"><span>Σ system feed</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
+    let html = `<div class="pt"><span>Total power</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
       + rows.slice(0, 3).join('');
     if (rows.length > 3) {
       html += `<div id="twinPtsMore" style="display:none">${rows.slice(3).join('')}</div>`
@@ -976,6 +1018,16 @@ async function renderEquip(nodeName) {
    Hour-of-week median baseline + MAD z-scores built by scripts/build_baseline.py
    from the repo's own archived snapshots. Building-level, shown in the twin
    panel: current vs typical-for-this-hour, ±3σ band chart, ⚠ badge on |z|>3. */
+const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function fmtEvTime(s) { // '2026-07-24 02:00' → 'Jul 24, 2:00 AM'
+  const d = new Date(String(s).replace(' ', 'T'));
+  if (isNaN(d)) return esc(s);
+  let h = d.getHours();
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${MONS[d.getMonth()]} ${d.getDate()}, ${h}:${String(d.getMinutes()).padStart(2, '0')} ${ap}`;
+}
+
 async function renderBaseline() {
   const big = document.getElementById('twinBigKw'), badge = document.getElementById('twinBadge'),
         srcEl = document.getElementById('twinSrc'), evEl = document.getElementById('twinEvent'),
@@ -1015,15 +1067,15 @@ async function renderBaseline() {
     const evs = ((med && med.events) || []).slice().reverse();
     if (evs.length) {
       const ev = evs[0];
-      let h = `<div class="evline"><span>${ev.dir === 'high' ? '⚠' : 'ℹ'} ${esc(ev.start.slice(5, 16))} ${esc(ev.dir)} z ${ev.peak_z} · ${ev.hours}h</span>`
-        + (evs.length > 1 ? `<span class="morebtn" onclick="toggleTwinMore('twinEvMore')">+${evs.length - 1}</span>` : '')
+      let h = `<div class="evline"><span>${ev.dir === 'high' ? '⚠' : 'ℹ'} ${fmtEvTime(ev.start)} — unusually ${esc(ev.dir)} for ${ev.hours}h</span>`
+        + (evs.length > 1 ? `<span class="morebtn" onclick="toggleTwinMore('twinEvMore')">+${evs.length - 1} more</span>` : '')
         + '</div>';
       if (sim && ev.dir === 'high' && +ev.start.slice(11, 13) <= 6) {
         const [lo, hi] = sim.est_peak_reduction_kw || [10, 20];
-        h += `<div class="simline">→ sim fix: staggered start, est. −${lo}~${hi} kW peak</div>`;
+        h += `<div class="simline">→ simulated fix: staggered start, est. −${lo}~${hi} kW peak</div>`;
       }
       h += `<div id="twinEvMore" style="display:none">` + evs.slice(1, 6).map(e2 =>
-        `<div class="pt"><span>· ${esc(e2.start.slice(5, 16))}</span><span class="v">${esc(e2.dir)} z ${e2.peak_z} · ${e2.hours}h</span></div>`).join('') + '</div>';
+        `<div class="pt"><span>· ${fmtEvTime(e2.start)}</span><span class="v">${esc(e2.dir)} · ${e2.hours}h</span></div>`).join('') + '</div>';
       evEl.innerHTML = h;
     }
   } catch (e) { console.warn('[baseline]', e.message); }
