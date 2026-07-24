@@ -94,6 +94,20 @@ body.compare-on #syncPanel{display:block}
 #notesList .note:hover{color:#e0e7f1}
 #notesList .note .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #notesList .note .del{margin-left:auto;color:#64748b}
+/* ── First-visit welcome + persistent click hint ── */
+#welcome{position:fixed;inset:0;z-index:200;background:rgba(4,8,16,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
+#welcome.show{display:flex}
+#welcome .card{max-width:400px;margin:20px;background:rgba(10,16,30,.97);border:1px solid rgba(34,211,238,.35);border-radius:12px;padding:22px 24px;font:13px/1.65 var(--font);color:#cbd5e1;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#welcome h2{font:600 16px/1.3 var(--font);color:#fff;margin-bottom:10px}
+#welcome .em{color:#67e8f9}
+#welcome button{margin-top:14px;width:100%;padding:9px;border:1px solid rgba(34,211,238,.5);background:rgba(34,211,238,.15);color:#67e8f9;font:600 12px var(--font);border-radius:7px;cursor:pointer}
+#clickHint{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);z-index:55;background:rgba(8,12,24,.9);border:1px solid rgba(253,181,21,.35);border-radius:20px;padding:7px 14px;font:500 11px/1 var(--font);color:#fbbf24;cursor:pointer;display:none;white-space:nowrap}
+#clickHint.show{display:block}
+#legend .lg-title{font:600 9px/1 var(--mono);color:#94a3b8;letter-spacing:.5px;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid rgba(148,163,184,.15)}
+/* calibration panel is engineer tooling — collapsed (header only) by default */
+#syncPanel .hdr{cursor:pointer}
+#syncPanel.collapsed>:not(.hdr){display:none}
+#syncPanel.collapsed .hdr{margin-bottom:0;padding-bottom:0;border-bottom:none}
 /* ── Walk mode hint overlay ── */
 #walkHint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;background:rgba(8,12,24,.92);border:1px solid rgba(34,211,238,.35);border-radius:8px;padding:10px 16px;font:10.5px/1.7 var(--mono);color:#94a3b8;display:none;pointer-events:none;transition:opacity .6s;text-align:center;white-space:nowrap}
 #walkHint b{color:#67e8f9;font-weight:600}
@@ -129,10 +143,10 @@ body.compare-on #syncPanel{display:block}
   <span class="tb-title">Bechtel · Full BIM</span>
   <span class="tb-sub">Three.js · GLB · no external BIM service</span>
   <span class="tb-spacer"></span>
-  <button class="tb-btn" id="walkBtn" onclick="toggleWalk()">🚶 Walk</button>
-  <button class="tb-btn" id="bldgBtn" onclick="toggleBuilding()">🏢 Building shell</button>
-  <button class="tb-btn" id="compareBtn" onclick="toggleCompare()">🪞 Cupix Compare</button>
-  <a class="tb-btn" href="grimes-xr.html">▸ MEP dashboards</a>
+  <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
+  <button class="tb-btn" id="bldgBtn" onclick="toggleBuilding()" title="Show/hide the translucent building envelope around the systems">🏢 Building shell</button>
+  <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
+  <a class="tb-btn" href="grimes-xr.html" title="Open the immersive MEP sensor dashboards">▸ MEP dashboards</a>
 </div>
 
 <div id="main">
@@ -155,6 +169,17 @@ body.compare-on #syncPanel{display:block}
 
 <div id="legend"></div>
 
+<div id="welcome">
+  <div class="card">
+    <h2>🏛️ Bechtel Engineering Center — Live Digital Twin</h2>
+    This is a live digital twin of an operating campus building.<br><br>
+    <span class="em">Colored pipes &amp; ducts</span> are the building's real systems — <b>click one</b> to see its live energy data.<br><br>
+    <span class="em">🚶 Walk</span> explores the building like a game · <span class="em">🪞 Compare</span> walks the real 360° site photos side-by-side.
+    <button onclick="dismissWelcome()">Got it — let me explore</button>
+  </div>
+</div>
+<div id="clickHint">💡 Click any colored system to see live data</div>
+
 <div id="walkHint"><b>WASD</b> move · <b>mouse</b> look · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>Esc</b> exit</div>
 
 <div id="twinPanel">
@@ -170,6 +195,7 @@ body.compare-on #syncPanel{display:block}
   <div id="twinPoints"></div>
   <div id="twinEvent"></div>
   <div id="twinDetails">
+    <div id="twinDetZ"></div>
     <div id="twinDetInfo"></div>
     <div id="twinDetEquip"></div>
     <canvas id="twinSpark" width="480" height="72"></canvas>
@@ -177,7 +203,7 @@ body.compare-on #syncPanel{display:block}
 </div>
 
 <div id="syncPanel">
-  <div class="hdr"><span>🔗 Cupix → BIM</span><span id="msgCount">0 msgs</span></div>
+  <div class="hdr" title="Engineer tooling — click to expand"><span>⚙ calibration · Cupix → BIM</span><span id="msgCount">0 msgs</span></div>
   <div class="stat"><span class="k">tm msgs / applied</span><span class="v"><span id="tmCount">0</span> / <span id="applyCount">0</span></span></div>
   <div class="stat"><span class="k">cupix pos</span><span class="v" id="cupixPos">—</span></div>
   <div class="stat"><span class="k">bim cam</span><span class="v" id="bimPos">—</span></div>
@@ -303,7 +329,8 @@ loader.load('grimes-mep-only.glb', (gltf) => {
     idx++;
   });
   document.getElementById('loading').style.display = 'none';
-  document.getElementById('legend').innerHTML = SYSTEMS.map(s =>
+  document.getElementById('legend').innerHTML =
+    '<div class="lg-title">BUILDING SYSTEMS · click to inspect</div>' + SYSTEMS.map(s =>
     `<div><span class="sw" style="background:#${s.hex.toString(16).padStart(6,'0')}"></span>${s.label}</div>`).join('');
   const bb = bimBbox(), c = bb.getCenter(new THREE.Vector3());
   controls.target.copy(c);
@@ -756,11 +783,27 @@ function syncPanelInputs() {
 syncPanelInputs();
 // On phones the sync panel starts collapsed (header only) — tap header to expand.
 // Desktop keeps the always-open panel unchanged.
+// Calibration is engineer tooling — collapsed by default on every device;
+// the ⚙ header toggles it (kept out of sight during public Compare demos).
 const syncPanelEl = document.getElementById('syncPanel');
-if (mobileMq.matches) syncPanelEl.classList.add('collapsed');
-syncPanelEl.querySelector('.hdr').addEventListener('click', () => {
-  if (mobileMq.matches) syncPanelEl.classList.toggle('collapsed');
-});
+syncPanelEl.classList.add('collapsed');
+syncPanelEl.querySelector('.hdr').addEventListener('click', () => syncPanelEl.classList.toggle('collapsed'));
+
+/* ── First-visit welcome (once, localStorage) + click hint ── */
+window.dismissWelcome = () => {
+  document.getElementById('welcome').classList.remove('show');
+  try { localStorage.setItem('bimViewer.welcomed.v1', '1'); } catch {}
+  showClickHint();
+};
+function showClickHint() {
+  // runs at startup (nothing picked yet); pickSystem removes the hint later
+  document.getElementById('clickHint').classList.add('show');
+}
+let welcomed = false;
+try { welcomed = !!localStorage.getItem('bimViewer.welcomed.v1'); } catch {}
+if (welcomed) showClickHint();
+else document.getElementById('welcome').classList.add('show');
+document.getElementById('clickHint').addEventListener('click', e => e.currentTarget.classList.remove('show'));
 [['yawDeg', v => calib.yRotation = v], ['scaleIn', v => calib.scale = v],
  ['offX', v => calib.offset.x = v], ['offY', v => calib.offset.y = v], ['offZ', v => calib.offset.z = v]]
 .forEach(([id, set]) => {
@@ -855,6 +898,7 @@ window.toggleTwinMore = id => {
 async function pickSystem(mesh) {
   picked = mesh;
   highlight(mesh);
+  document.getElementById('clickHint').classList.remove('show'); // hint served its purpose
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
   const name = mesh.name || (mesh.parent && mesh.parent.name) || '';
@@ -952,14 +996,19 @@ async function renderBaseline() {
     } catch {} // towt file is optional
     if (!src || !src.recent24 || !src.recent24.length) return;
     const c = src.current || {}, z = typeof c.z === 'number' ? c.z : null;
+    const zt = (eb && eb.z_threshold) || 3;
     big.innerHTML = (c.kw != null ? c.kw : '—') + ' <small>kW</small>';
-    if (z === null) { badge.textContent = 'NO LIVE'; badge.className = 'badge na'; }
-    else if (c.anomaly && z > 0) { badge.textContent = 'HIGH z ' + z; badge.className = 'badge hi'; }
-    else if (c.anomaly) { badge.textContent = 'LOW z ' + z; badge.className = 'badge lo'; }
-    else { badge.textContent = 'OK z ' + z; badge.className = 'badge'; }
+    // plain-language status; the z-score itself lives in ⓘ details
+    const pct = (c.base && c.kw != null) ? Math.round((c.kw - c.base) / c.base * 100) : null;
+    if (z === null) { badge.textContent = 'No live reading'; badge.className = 'badge na'; }
+    else if (c.anomaly && z > 0) { badge.textContent = 'Using more than usual' + (pct != null ? ` (+${pct}%)` : ''); badge.className = 'badge hi'; }
+    else if (c.anomaly) { badge.textContent = 'Using less than usual' + (pct != null ? ` (${pct}%)` : ''); badge.className = 'badge lo'; }
+    else { badge.textContent = 'Normal for this hour'; badge.className = 'badge'; }
+    document.getElementById('twinDetZ').textContent =
+      z === null ? '' : `z-score ${z} (|z|>${zt} flags anomaly) · σ ${src.sigma} kW · ${srcName} baseline`;
     srcEl.textContent = 'bldg load vs ' + srcName + ' baseline · typical now '
       + (c.base != null ? c.base + ' kW' : '—');
-    drawBaseChart(cv, src.recent24, src.sigma, (eb && eb.z_threshold) || 3);
+    drawBaseChart(cv, src.recent24, src.sigma, zt);
     // latest anomaly event (one line) + staggered-start sim callout; rest folds
     let sim = null;
     try { sim = await cachedJson('data/startup_sim.json'); } catch {}

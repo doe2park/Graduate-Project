@@ -2829,5 +2829,20 @@ var _moodInit=setInterval(function(){if(window.currentEnergyData){computeCampusM
 setInterval(computeCampusMood,60000);
 </script>
 
+<!-- First-visit hint (once per browser) -->
+<div id="firstHint" style="display:none;position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:120;background:rgba(8,12,24,.92);border:1px solid rgba(253,181,21,.4);border-radius:20px;padding:8px 16px;font:500 12px/1 'Calibri',sans-serif;color:#fbbf24;cursor:pointer;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.4)">💡 Click a building — live energy data</div>
+<script>
+(function(){
+  try{
+    if(localStorage.getItem('campusMap.hinted.v1')) return;
+    var el=document.getElementById('firstHint');
+    el.style.display='block';
+    function hide(){ el.style.display='none'; try{localStorage.setItem('campusMap.hinted.v1','1');}catch(e){} }
+    el.addEventListener('click',hide);
+    setTimeout(hide,20000);
+  }catch(e){}
+})();
+</script>
+
 </body>
 </html>
