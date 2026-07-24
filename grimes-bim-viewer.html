@@ -94,10 +94,23 @@ body.compare-on #syncPanel{display:block}
 #twinPanel .chartkey .dt{width:6px;height:6px;background:#f87171;border-radius:50%}
 #twinPanel .evline{display:flex;justify-content:space-between;gap:8px;font:10px/1.6 var(--mono);color:#94a3b8;margin-top:6px;padding-top:5px;border-top:1px solid rgba(148,163,184,.1)}
 #twinPanel .simline{font:9.5px/1.5 var(--mono);color:#34d399}
-#twinDetails{display:none;margin-top:7px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12);font:9.5px/1.7 var(--mono);color:#64748b;word-break:break-all}
+#twinDetails{display:none;margin-top:7px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12);font:9.5px/1.7 var(--mono);color:#64748b}
 #twinDetails.open{display:block}
-#twinDetails>div{margin-bottom:4px}
-#twinDetails canvas{height:36px;margin-top:2px}
+#twinDetails canvas{height:36px;margin-top:4px}
+/* details typographic hierarchy: grouped label–value rows, URI demoted */
+#twinDetails .dsec{font:600 8px/1 var(--mono);color:#526078;letter-spacing:.6px;text-transform:uppercase;margin:9px 0 4px;padding-top:7px;border-top:1px solid rgba(148,163,184,.08)}
+#twinDetails .dsec:first-child{margin-top:0;padding-top:0;border-top:none}
+#twinDetails .drow{display:flex;justify-content:space-between;gap:10px;font:10px/1.8 var(--mono)}
+#twinDetails .drow .dk{color:#526078;flex-shrink:0}
+#twinDetails .drow .dv{color:#a8b6cc;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#twinDetails .dnote{font:9.5px/1.6 var(--mono);color:#64748b;margin:2px 0}
+#twinDetails .duri{font:8.5px/1.5 var(--mono);color:#3c4a63;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* expected-range line: visible without hovering the chart */
+#twinPanel .rangeline{font:10px/1.5 var(--mono);color:#94a3b8;margin:2px 0 4px;display:none}
+#twinPanel .rangeline.on{display:block}
+#twinPanel .rangeline b{color:#e0e7f1;font-weight:600}
+#twinPanel .rangeline.anom{color:#fca5a5}
+#twinPanel .rangeline.anom b{color:#f87171}
 /* ── As-built discrepancy notes (inside sync panel, compare mode) ── */
 #notesSec{margin-top:8px;padding-top:6px;border-top:1px solid rgba(34,211,238,.15)}
 #notesSec .nhdr{font:600 10px/1 var(--mono);color:#fbbf24;letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between}
@@ -205,6 +218,7 @@ body.compare-on #syncPanel{display:block}
   </div>
   <div class="bigrow"><span class="bigkw" id="twinBigKw">— <small>kW</small></span><span class="badge na" id="twinBadge">…</span></div>
   <div class="srcnote" id="twinSrc"></div>
+  <div class="rangeline" id="twinRange"></div>
   <canvas id="twinBaseSpark" width="640" height="180"></canvas>
   <div id="chartTip"></div>
   <div class="chartkey" id="chartKey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
@@ -212,9 +226,9 @@ body.compare-on #syncPanel{display:block}
   <div id="twinEvent"></div>
   <div class="morebtn" id="twinInfoBtn" onclick="toggleTwinInfo()">▸ More details</div>
   <div id="twinDetails">
-    <div id="twinDetZ"></div>
+    <div id="twinDetZ" class="dnote"></div>
     <div id="twinDetInfo"></div>
-    <div id="twinDetEquip"></div>
+    <div id="twinDetEquip" class="dnote"></div>
     <canvas id="twinSpark" width="480" height="72"></canvas>
   </div>
 </div>
@@ -911,6 +925,8 @@ function drawSpark(cv, series) {
 }
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dsec = t => `<div class="dsec">${t}</div>`;
+const drow = (k, v) => `<div class="drow"><span class="dk">${k}</span><span class="dv">${v}</span></div>`;
 
 window.toggleTwinInfo = () => {
   const det = document.getElementById('twinDetails');
@@ -990,8 +1006,12 @@ function pickBuilding() {
       `<div class="pt sysrow" onclick="selectSysByIndex(${i})"><span><span class="sw" style="background:#${s.hex.toString(16).padStart(6, '0')}"></span>${esc(s.label)}</span><span class="v">▸</span></div>`).join('');
   const bEnt = twinPkg && twinPkg.brick.entities['grimes:Grimes'];
   document.getElementById('twinDetInfo').innerHTML =
-    (bEnt ? esc(bEnt.type) + ' · grimes:Grimes<br>' : '')
-    + 'The shell is architectural context — the colored systems carry the live meter feeds.';
+    dsec('Identity')
+    + drow('brick class', bEnt ? esc(String(bEnt.type).replace('brick:', '')) : 'Building')
+    + drow('campus', 'UC Berkeley')
+    + dsec('About')
+    + '<div class="dnote">The shell is architectural context — the colored systems carry the live meter feeds.</div>'
+    + '<div class="duri">grimes:Grimes</div>';
 }
 
 async function pickSystem(mesh) {
@@ -1018,17 +1038,29 @@ async function pickSystem(mesh) {
   const res = TwinResolver.resolveNode(twinPkg, name);
   if (!res.bound) {
     ptsEl.innerHTML = '<div class="pt mut"><span>Not bound to live data — see More details</span></div>';
-    detInfo.innerHTML = esc(res.reason) + '<br>Add "' + esc(name)
-      + '" to buildings/grimes/binding.json to link it.';
+    detInfo.innerHTML = dsec('Why no data')
+      + `<div class="dnote">${esc(res.reason)}</div>`
+      + `<div class="dnote">Add "${esc(name)}" to buildings/grimes/binding.json to link it.</div>`;
     return;
   }
-  // prose lives in ⓘ details: brick class/URI + relationships
+  // structured details: grouped label–value rows, URI demoted to the footer
   const rawEnt = twinPkg.brick.entities[res.uri] || {};
   const parentEnt = rawEnt.isPartOf && twinPkg.brick.entities[rawEnt.isPartOf];
-  detInfo.innerHTML = esc(res.type) + '<br>' + esc(res.uri)
-    + (parentEnt ? '<br>part of: ' + esc(parentEnt.label || rawEnt.isPartOf) : '')
-    + (res.feeders.length ? '<br>fed by: ' + esc(res.feeders.join(' + ')) : '')
-    + '<br>Next step: BAS/IoT sensor integration will populate these channels.';
+  detInfo.innerHTML =
+    dsec('Identity')
+    + drow('brick class', esc(String(res.type).replace('brick:', '').replace(/_/g, ' ')))
+    + (si != null ? drow('category', esc(SYSTEMS[si].label)) : '')
+    + ((parentEnt || res.feeders.length)
+      ? dsec('Relationships')
+        + (parentEnt ? drow('part of', esc(parentEnt.label || rawEnt.isPartOf)) : '')
+        + (res.feeders.length ? drow('fed by', esc(res.feeders.join(' + '))) : '')
+      : '')
+    + dsec('Data source')
+    + drow('adapter', 'BMO · 15-min CSV export')
+    + (res.points.length ? drow('points', esc(res.points.map(p => p.ref).join(', '))) : drow('points', 'none'))
+    + dsec('Next steps')
+    + '<div class="dnote">BAS/IoT sensor integration will populate the remaining channels.</div>'
+    + `<div class="duri">${esc(res.uri)}</div>`;
   renderEquip(name);
   if (!res.points.length) {
     ptsEl.innerHTML = channelRows(sysName, await liveChannels(sysName, null))
@@ -1111,6 +1143,7 @@ async function renderFlowHeadline() {
   big.innerHTML = '— <small>GPM</small>'; big.style.color = '#93c5fd';
   badge.textContent = '…'; badge.className = 'badge na';
   srcEl.textContent = ''; evEl.innerHTML = '';
+  document.getElementById('twinRange').className = 'rangeline';
   document.getElementById('chartKey').innerHTML = CHARTKEY_FLOW;
   cv._chart = null; // flow chart has its own scale — disable power hover
   cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
@@ -1123,8 +1156,14 @@ async function renderFlowHeadline() {
     badge.textContent = 'LIVE FLOW'; badge.className = 'badge lo';
     const st = w.stats_today && w.stats_today.water_rate;
     srcEl.textContent = 'domestic water · meter #250'
-      + (st && st.max != null ? ` · today peak ${(st.max * 7.481).toFixed(1)} GPM` : '')
       + (L.timestamp ? ' · ' + L.timestamp.slice(11, 16) : '');
+    const rngEl = document.getElementById('twinRange');
+    if (st && st.max != null) {
+      rngEl.innerHTML = `Today's range: <b>${(st.min * 7.481).toFixed(1)}–${(st.max * 7.481).toFixed(1)} GPM</b> · avg ${((st.avg || 0) * 7.481).toFixed(1)}`;
+      rngEl.className = 'rangeline on';
+    } else {
+      rngEl.className = 'rangeline'; rngEl.innerHTML = '';
+    }
     drawFlowChart(cv, (w.timeseries_water || []).map(p => ({ t: p.t, v: (p.v || 0) * 7.481 })));
     const steam = +L.steam_rate_gpm, irr = +L.irrigation_rate_gpm;
     evEl.innerHTML =
@@ -1166,6 +1205,7 @@ async function renderBaseline() {
   big.innerHTML = '— <small>kW</small>'; big.style.color = '';
   badge.textContent = '…'; badge.className = 'badge na';
   srcEl.textContent = ''; evEl.innerHTML = '';
+  document.getElementById('twinRange').className = 'rangeline';
   document.getElementById('chartKey').innerHTML = CHARTKEY_POWER;
   cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   try {
@@ -1191,8 +1231,22 @@ async function renderBaseline() {
     else { badge.textContent = 'Normal for this hour'; badge.className = 'badge'; }
     document.getElementById('twinDetZ').textContent =
       z === null ? '' : `z-score ${z} (|z|>${zt} flags anomaly) · σ ${src.sigma} kW · ${srcName} baseline`;
-    srcEl.textContent = 'bldg load vs ' + srcName + ' baseline · typical now '
-      + (c.base != null ? c.base + ' kW' : '—');
+    srcEl.textContent = 'bldg load vs ' + srcName + ' baseline';
+    // expected range, visible without hovering: baseline ± zt·σ for this hour
+    const rngEl = document.getElementById('twinRange');
+    if (c.base != null) {
+      const bandLo = Math.max(0, Math.round(c.base - zt * src.sigma)),
+            bandHi = Math.round(c.base + zt * src.sigma);
+      if (c.anomaly && c.kw != null) {
+        rngEl.innerHTML = `Now <b>${c.kw} kW</b> — ${z > 0 ? 'above' : 'below'} typical range (${bandLo}–${bandHi} kW)`;
+        rngEl.className = 'rangeline on anom';
+      } else {
+        rngEl.innerHTML = `Typical for this hour: <b>${bandLo}–${bandHi} kW</b>`;
+        rngEl.className = 'rangeline on';
+      }
+    } else {
+      rngEl.className = 'rangeline'; rngEl.innerHTML = '';
+    }
     drawBaseChart(cv, src.recent24, src.sigma, zt);
     cv._chart.events = (med && med.events) || []; // for hover tooltips
     // latest anomaly event (one line) + staggered-start sim callout; rest folds
