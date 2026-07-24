@@ -1157,11 +1157,12 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     // ── WATER & STEAM — live flow channels where the logger exposes them ──
     var fl = live && live.flow;
     if(fl && (fl.water_gpm!=null || fl.steam_lb_hr!=null || fl.condensate_gpm!=null || fl.irrigation_gpm!=null)){
+      // trade colors: water blue, steam/condensate orange, irrigation light blue
       var fbits=[];
-      if(fl.water_gpm!=null)      fbits.push('💧 water '+fl.water_gpm+' GPM');
-      if(fl.steam_lb_hr!=null)    fbits.push('♨️ steam '+fl.steam_lb_hr+' lb/h');
-      if(fl.condensate_gpm!=null) fbits.push('condensate '+fl.condensate_gpm+' GPM');
-      if(fl.irrigation_gpm!=null) fbits.push('irrigation '+fl.irrigation_gpm+' GPM');
+      if(fl.water_gpm!=null)      fbits.push('<span style="color:#60a5fa">💧 water '+fl.water_gpm+' GPM</span>');
+      if(fl.steam_lb_hr!=null)    fbits.push('<span style="color:#fb923c">♨️ steam '+fl.steam_lb_hr+' lb/h</span>');
+      if(fl.condensate_gpm!=null) fbits.push('<span style="color:#fb923c">condensate '+fl.condensate_gpm+' GPM</span>');
+      if(fl.irrigation_gpm!=null) fbits.push('<span style="color:#93c5fd">irrigation '+fl.irrigation_gpm+' GPM</span>');
       h += '<div class="pe-sec" style="margin-top:8px"><span>Water &amp; Steam</span><span>live</span></div>'
          + '<div style="font:10.5px/1.7 \'JetBrains Mono\',monospace;color:#94a3b8;padding:2px 0 4px">'+fbits.join(' · ')+'</div>';
     }

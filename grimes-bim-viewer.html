@@ -207,7 +207,7 @@ body.compare-on #syncPanel{display:block}
   <div class="srcnote" id="twinSrc"></div>
   <canvas id="twinBaseSpark" width="640" height="180"></canvas>
   <div id="chartTip"></div>
-  <div class="chartkey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
+  <div class="chartkey" id="chartKey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
   <div id="twinPoints"></div>
   <div id="twinEvent"></div>
   <div class="morebtn" id="twinInfoBtn" onclick="toggleTwinInfo()">▸ More details</div>
@@ -303,15 +303,18 @@ const mobileMq = window.matchMedia('(max-width:768px)');
 /* ══════════ MODELS ══════════ */
 // Same assets + same placement math as grimes-xr.html, so the calibration in
 // data/cupix_calib.json applies to THIS viewer's world frame unchanged.
+// Trade-convention palette (dark-bg adjusted), grouped: electrical → air →
+// water → fire. Yellow = electrical, greens/teal = air side, blue = water,
+// purple = pumps/valves, red = fire protection.
 const SYSTEMS = [
-  { name:'HVAC Duct',      label:'HVAC Ductwork',      hex:0x2dd4bf },
-  { name:'HVAC Equipment', label:'HVAC Equipment',     hex:0x1ab3a6 },
-  { name:'Piping',         label:'Plumbing / Piping',  hex:0x38bdf8 },
+  { name:'Conduit',        label:'Electrical',         hex:0xfacc15 },
+  { name:'HVAC Duct',      label:'HVAC Ductwork',      hex:0x34d399 },
+  { name:'HVAC Equipment', label:'HVAC Equipment',     hex:0x0ea87a },
+  { name:'Diffusers',      label:'Diffusers / Grilles',hex:0x86efac },
+  { name:'Electrical',     label:'Spiral Ductwork',    hex:0x2dd4bf },
+  { name:'Piping',         label:'Plumbing / Piping',  hex:0x60a5fa },
+  { name:'Pumps/Valves',   label:'Pumps / Valves',     hex:0xc084fc },
   { name:'Sprinkler',      label:'Fire Protection',    hex:0xf87171 },
-  { name:'Conduit',        label:'Electrical',         hex:0xf59e0b },
-  { name:'Diffusers',      label:'Diffusers / Grilles',hex:0x80f2cc },
-  { name:'Pumps/Valves',   label:'Pumps / Valves',     hex:0xe879f9 },
-  { name:'Electrical',     label:'Spiral Ductwork',    hex:0x4de6cc },
 ];
 const NAME_TO_SYS = Object.fromEntries(SYSTEMS.map((s, i) => [s.name, i]));
 // glb exporters sanitize names ("HVAC Duct" → "HVAC_Duct") — match normalized.
@@ -1006,7 +1009,11 @@ async function pickSystem(mesh) {
   ptsEl.innerHTML = ''; detInfo.innerHTML = '';
   document.getElementById('twinDetEquip').innerHTML = '';
   drawSpark(document.getElementById('twinSpark'), []);
-  renderBaseline();                               // headline: big kW, badge, band chart, event line
+  const sysName = si != null ? SYSTEMS[si].name : null;
+  const isPiping = SYS_CHANNELS[sysName] === 'piping';
+  // Plumbing is flow-first: GPM headline + 24 h flow chart. Everything else
+  // keeps the electricity-vs-baseline headline.
+  if (isPiping) renderFlowHeadline(); else renderBaseline();
   if (!twinPkg) { detInfo.textContent = 'twin package not loaded (serve over http)'; return; }
   const res = TwinResolver.resolveNode(twinPkg, name);
   if (!res.bound) {
@@ -1023,7 +1030,6 @@ async function pickSystem(mesh) {
     + (res.feeders.length ? '<br>fed by: ' + esc(res.feeders.join(' + ')) : '')
     + '<br>Next step: BAS/IoT sensor integration will populate these channels.';
   renderEquip(name);
-  const sysName = si != null ? SYSTEMS[si].name : null;
   if (!res.points.length) {
     ptsEl.innerHTML = channelRows(sysName, await liveChannels(sysName, null))
       + '<div class="pt mut"><span>No meter on this system'
@@ -1040,15 +1046,21 @@ async function pickSystem(mesh) {
       const nm = String(v.name || p.ref).replace(/\s*\(.*\)$/, ''); // short name
       return `<div class="pt"><span>· ${esc(nm)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'}</span></div>`;
     });
-    let html = channelRows(sysName, await liveChannels(sysName, total))
-      + '<div class="sec">Connected now · building electricity (proxy)</div>'
+    let elec = '<div class="sec">Connected now · building electricity (proxy)</div>'
       + `<div class="pt"><span>Total power</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
       + rows.slice(0, 3).join('');
     if (rows.length > 3) {
-      html += `<div id="twinPtsMore" style="display:none">${rows.slice(3).join('')}</div>`
+      elec += `<div id="twinPtsMore" style="display:none">${rows.slice(3).join('')}</div>`
         + `<div class="morebtn" onclick="toggleTwinMore('twinPtsMore')">… ${rows.length - 3} more</div>`;
     }
-    ptsEl.innerHTML = html;
+    const chans = channelRows(sysName, await liveChannels(sysName, total));
+    if (isPiping) {
+      // flow-first: electricity proxy is secondary → lives in More details
+      ptsEl.innerHTML = chans;
+      detInfo.innerHTML += '<div style="margin-top:5px">' + elec + '</div>';
+    } else {
+      ptsEl.innerHTML = chans + elec;
+    }
     drawSpark(document.getElementById('twinSpark'), sumSeries(vals, res.points)); // 24h feed, in details
   } catch (e) {
     if (picked === mesh) ptsEl.innerHTML = '<div class="pt mut"><span>⚠ live data unavailable</span></div>';
@@ -1087,12 +1099,74 @@ function fmtEvTime(s) { // '2026-07-24 02:00' → 'Jul 24, 2:00 AM'
   return `${MONS[d.getMonth()]} ${d.getDate()}, ${h}:${String(d.getMinutes()).padStart(2, '0')} ${ap}`;
 }
 
+const CHARTKEY_POWER = '<span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span>';
+const CHARTKEY_FLOW = '<span class="k"><i class="ln" style="background:#60a5fa"></i>water flow (24 h)</span>';
+
+/* Flow-first headline for Plumbing: GPM big number, 24 h flow chart (blue),
+   steam/irrigation companion rows. Electricity proxy moves to details. */
+async function renderFlowHeadline() {
+  const big = document.getElementById('twinBigKw'), badge = document.getElementById('twinBadge'),
+        srcEl = document.getElementById('twinSrc'), evEl = document.getElementById('twinEvent'),
+        cv = document.getElementById('twinBaseSpark');
+  big.innerHTML = '— <small>GPM</small>'; big.style.color = '#93c5fd';
+  badge.textContent = '…'; badge.className = 'badge na';
+  srcEl.textContent = ''; evEl.innerHTML = '';
+  document.getElementById('chartKey').innerHTML = CHARTKEY_FLOW;
+  cv._chart = null; // flow chart has its own scale — disable power hover
+  cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+  try {
+    const bd = await cachedJson('data/building_data.json');
+    const w = bd && bd.water, L = w && w.latest;
+    if (!L) { srcEl.textContent = 'no flow data available'; return; }
+    const gpm = ((L.water1_rate_cfm || 0) + (L.water2_rate_cfm || 0)) * 7.481;
+    big.innerHTML = gpm.toFixed(1) + ' <small>GPM</small>';
+    badge.textContent = 'LIVE FLOW'; badge.className = 'badge lo';
+    const st = w.stats_today && w.stats_today.water_rate;
+    srcEl.textContent = 'domestic water · meter #250'
+      + (st && st.max != null ? ` · today peak ${(st.max * 7.481).toFixed(1)} GPM` : '')
+      + (L.timestamp ? ' · ' + L.timestamp.slice(11, 16) : '');
+    drawFlowChart(cv, (w.timeseries_water || []).map(p => ({ t: p.t, v: (p.v || 0) * 7.481 })));
+    const steam = +L.steam_rate_gpm, irr = +L.irrigation_rate_gpm;
+    evEl.innerHTML =
+      `<div class="pt"><span><i class="livedot" style="background:#fb923c"></i>Steam condensate</span><span class="v" style="color:#fb923c">${isFinite(steam) ? steam.toFixed(1) : '—'} GPM</span></div>`
+      + `<div class="pt"><span><i class="livedot" style="background:#60a5fa"></i>Irrigation</span><span class="v" style="color:#93c5fd">${isFinite(irr) ? irr.toFixed(1) : '—'} GPM</span></div>`;
+  } catch (e) { console.warn('[flow]', e.message); }
+}
+function drawFlowChart(cv, series) {
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (series.length < 2) return;
+  const vs = series.map(p => p.v), lo = 0, hi = Math.max(1, Math.max(...vs));
+  const W = cv.width, H = cv.height, PT = 8, PB = 26, rng = hi - lo || 1;
+  const X = i => i / (series.length - 1) * (W - 8) + 4;
+  const Y = v => H - PB - (v - lo) / rng * (H - PB - PT);
+  ctx.beginPath();
+  series.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.v)) : ctx.moveTo(X(0), Y(p.v)); });
+  ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.lineTo(X(series.length - 1), Y(0)); ctx.lineTo(X(0), Y(0)); ctx.closePath();
+  ctx.fillStyle = 'rgba(96,165,250,.12)'; ctx.fill();
+  ctx.fillStyle = 'rgba(148,163,184,.55)';
+  ctx.font = '600 17px JetBrains Mono, monospace';
+  ctx.fillText(hi.toFixed(1) + ' GPM', 6, 20);
+  ctx.fillText('0', 6, H - PB - 5);
+  ctx.fillStyle = 'rgba(148,163,184,.45)';
+  series.forEach((p, i) => {
+    const hh = +String(p.t).slice(11, 13), mm = String(p.t).slice(14, 16);
+    if (hh % 6 === 0 && mm === '00') {
+      const lbl = hh === 0 ? '12 AM' : hh < 12 ? hh + ' AM' : hh === 12 ? '12 PM' : (hh - 12) + ' PM';
+      ctx.fillText(lbl, Math.max(2, Math.min(X(i) - 22, W - 62)), H - 7);
+    }
+  });
+}
+
 async function renderBaseline() {
   const big = document.getElementById('twinBigKw'), badge = document.getElementById('twinBadge'),
         srcEl = document.getElementById('twinSrc'), evEl = document.getElementById('twinEvent'),
         cv = document.getElementById('twinBaseSpark');
-  big.innerHTML = '— <small>kW</small>'; badge.textContent = '…'; badge.className = 'badge na';
+  big.innerHTML = '— <small>kW</small>'; big.style.color = '';
+  badge.textContent = '…'; badge.className = 'badge na';
   srcEl.textContent = ''; evEl.innerHTML = '';
+  document.getElementById('chartKey').innerHTML = CHARTKEY_POWER;
   cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   try {
     const eb = await cachedJson('data/energy_baseline.json');
