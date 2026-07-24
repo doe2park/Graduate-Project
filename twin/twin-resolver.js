@@ -24,8 +24,20 @@
 
   // Resolve a clicked glb node name to its Brick entity + the points that
   // describe its live data (its own points, plus those of meters that feed it).
+  // glb exporters routinely sanitize node names ("HVAC Duct" -> "HVAC_Duct"),
+  // so binding lookups are normalized: case, spaces, underscores, and other
+  // punctuation are ignored. Exact match still wins when present.
+  function normKey(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+
   function resolveNode(pkg, nodeName) {
-    const uri = pkg.binding.nodes[nodeName];
+    let uri = pkg.binding.nodes[nodeName];
+    if (!uri) {
+      if (!pkg._normNodes) {
+        pkg._normNodes = {};
+        for (const k in pkg.binding.nodes) pkg._normNodes[normKey(k)] = pkg.binding.nodes[k];
+      }
+      uri = pkg._normNodes[normKey(nodeName)];
+    }
     if (!uri) return { nodeName, bound: false, reason: 'no binding for node "' + nodeName + '"' };
     const ent = pkg.brick.entities[uri];
     if (!ent) return { nodeName, uri, bound: false, reason: 'binding points to unknown entity ' + uri };

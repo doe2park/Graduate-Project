@@ -23,12 +23,19 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .tb-btn:hover{border-color:rgba(34,211,238,.3);color:#67e8f9}
 .tb-btn.active{background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.4);color:#67e8f9}
 #main{position:fixed;top:48px;left:0;right:0;bottom:0;display:flex}
-#cupixPane{display:none;flex:1;height:100%;background:#000;border-right:2px solid var(--cyan);flex-direction:column}
+#cupixPane{display:none;flex:1 1 50%;height:100%;background:#000;flex-direction:column;min-width:0}
 #cupixPane.show{display:flex}
+/* Draggable split divider (desktop Compare mode) */
+#splitDivider{display:none;flex:0 0 6px;height:100%;cursor:col-resize;background:rgba(34,211,238,.28);touch-action:none;position:relative;z-index:40}
+#splitDivider:hover,#splitDivider.dragging{background:rgba(34,211,238,.6)}
+body.compare-on #splitDivider{display:block}
 #cupixHdr{padding:7px 12px;background:rgba(8,12,24,.85);border-bottom:1px solid rgba(34,211,238,.2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;font-size:11px}
 #cupixHdr span{font:600 10px/1 var(--mono);color:var(--cyan);letter-spacing:.5px;text-transform:uppercase}
 #cupixFrame{flex:1;border:0;background:#000;width:100%}
-#viewerPane{flex:1;height:100%;position:relative;background:#0a0f1a}
+/* min-width:0 is load-bearing: without it the flex item's min-width is the
+   canvas's own width (auto), so the viewer pane refused to shrink and the
+   Cupix pane collapsed to a sliver instead of a 50/50 split. */
+#viewerPane{flex:1 1 50%;height:100%;position:relative;background:#0a0f1a;min-width:0;min-height:0}
 #viewerPane canvas{display:block}
 #loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#cbd5e1;z-index:10;pointer-events:none}
 #loading .spinner{width:42px;height:42px;border:3px solid rgba(34,211,238,.15);border-top-color:var(--cyan);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
@@ -80,6 +87,7 @@ body.compare-on #syncPanel{display:block}
   /* Cupix Compare: side-by-side halves are unusable on a phone → stack vertically */
   #main{flex-direction:column}
   #cupixPane.show{flex:none;height:50%;border-right:none;border-bottom:2px solid var(--cyan)}
+  #splitDivider{display:none!important} /* stacked layout: no drag divider */
   #viewerPane{height:auto;min-height:0}
   #legend{left:10px;bottom:10px;padding:6px 8px;font-size:9px;line-height:1.5;max-width:46vw}
   body.compare-on #legend{display:none}
@@ -114,6 +122,7 @@ body.compare-on #syncPanel{display:block}
     </div>
     <iframe id="cupixFrame" allow="fullscreen; xr-spatial-tracking; clipboard-write; autoplay" allowfullscreen></iframe>
   </div>
+  <div id="splitDivider" title="drag to resize"></div>
   <div id="viewerPane">
     <div id="loading">
       <div class="spinner"></div>
@@ -131,6 +140,7 @@ body.compare-on #syncPanel{display:block}
   <div id="twinPoints"></div>
   <canvas id="twinSpark" width="480" height="76"></canvas>
   <div class="foot" id="twinFoot"></div>
+  <div id="twinEquip"></div>
   <div class="bhdr" id="twinBaseHdr" style="display:none"><span>⚡ Bldg load vs baseline</span><span class="badge" id="twinBadge"></span></div>
   <div id="twinBaseRow" style="display:none"></div>
   <canvas id="twinBaseSpark" width="480" height="86" style="display:none"></canvas>
@@ -231,6 +241,9 @@ const SYSTEMS = [
   { name:'Electrical',     label:'Spiral Ductwork',    hex:0x4de6cc },
 ];
 const NAME_TO_SYS = Object.fromEntries(SYSTEMS.map((s, i) => [s.name, i]));
+// glb exporters sanitize names ("HVAC Duct" → "HVAC_Duct") — match normalized.
+const NORM = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+const NAME_TO_SYS_N = Object.fromEntries(SYSTEMS.map((s, i) => [NORM(s.name), i]));
 
 const draco = new DRACOLoader();
 draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
@@ -254,7 +267,7 @@ loader.load('grimes-mep-only.glb', (gltf) => {
     if (!child.isMesh) return;
     allMeshes.push(child);
     const nm = child.name || (child.parent && child.parent.name) || '';
-    let si = NAME_TO_SYS[nm];
+    let si = NAME_TO_SYS[nm] ?? NAME_TO_SYS_N[NORM(nm)];
     if (si === undefined) { console.warn('[glb] unknown node', nm); si = Math.min(idx, SYSTEMS.length - 1); }
     child.material = new THREE.MeshBasicMaterial({ color: SYSTEMS[si].hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
     idx++;
@@ -488,6 +501,37 @@ function startPolling() {
 function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
 /* ══════════ UI ══════════ */
+// Draggable Compare split (desktop). Ratio persists in localStorage.
+const SPLIT_KEY = 'bimViewer.splitPct.v1';
+const dividerEl = document.getElementById('splitDivider');
+const cupixPaneEl = document.getElementById('cupixPane');
+function applySplit() {
+  if (mobileMq.matches) { cupixPaneEl.style.flexBasis = ''; return; } // stacked on mobile
+  let pct = parseFloat(localStorage.getItem(SPLIT_KEY));
+  if (!isFinite(pct)) pct = 50;
+  cupixPaneEl.style.flexBasis = Math.min(80, Math.max(20, pct)) + '%';
+}
+let _dragging = false;
+dividerEl.addEventListener('pointerdown', e => {
+  _dragging = true;
+  dividerEl.classList.add('dragging');
+  dividerEl.setPointerCapture(e.pointerId); // keeps events even over the iframe
+  e.preventDefault();
+});
+dividerEl.addEventListener('pointermove', e => {
+  if (!_dragging) return;
+  const pct = Math.min(80, Math.max(20, e.clientX / window.innerWidth * 100));
+  cupixPaneEl.style.flexBasis = pct + '%';
+  fitLayout();
+});
+dividerEl.addEventListener('pointerup', () => {
+  if (!_dragging) return;
+  _dragging = false;
+  dividerEl.classList.remove('dragging');
+  try { localStorage.setItem(SPLIT_KEY, String(parseFloat(cupixPaneEl.style.flexBasis) || 50)); } catch {}
+  fitLayout();
+});
+
 window.toggleCompare = () => {
   const on = document.body.classList.toggle('compare-on');
   const paneEl = document.getElementById('cupixPane');
@@ -495,6 +539,7 @@ window.toggleCompare = () => {
   document.getElementById('compareBtn').classList.toggle('active', on);
   if (on) {
     paneEl.classList.add('show');
+    applySplit();
     if (!frame.src) frame.src = CUPIX_URL;
     startPolling();
   } else {
@@ -612,17 +657,39 @@ async function pickSystem(mesh) {
   titleEl.textContent = name;
   ptsEl.innerHTML = ''; footEl.textContent = '';
   drawSpark(document.getElementById('twinSpark'), []);
+  document.getElementById('twinEquip').innerHTML = '';
   if (!twinPkg) { typeEl.textContent = 'twin package not loaded (serve over http)'; return; }
   const res = TwinResolver.resolveNode(twinPkg, name);
-  if (!res.bound) { typeEl.textContent = '⚠ ' + res.reason; return; }
+  const si = NAME_TO_SYS[name] ?? NAME_TO_SYS_N[NORM(name)];
+  const sysLabel = si != null ? SYSTEMS[si].label : null;
+  if (!res.bound) {
+    titleEl.textContent = sysLabel || name;
+    typeEl.textContent = '⚠ ' + res.reason;
+    ptsEl.innerHTML = `<div class="pt" style="color:#475569;font-style:italic"><span>`
+      + `This glb node has no Brick binding yet — add "${esc(name)}" to buildings/grimes/binding.json to link it to live data.</span></div>`;
+    return;
+  }
   titleEl.textContent = res.label;
-  typeEl.textContent = res.type + ' · ' + res.uri + (res.feeders.length ? ' · fed by: ' + res.feeders.join(', ') : '');
-  if (!res.points.length) { ptsEl.innerHTML = '<div class="pt"><span>no live points bound</span></div>'; return; }
-  ptsEl.innerHTML = '<div class="pt"><span>loading live data…</span></div>';
+  typeEl.textContent = res.type + ' · ' + res.uri;
+  // relationships: category (viewer legend), brick:isPartOf, brick:isFedBy
+  const rawEnt = twinPkg.brick.entities[res.uri] || {};
+  const parentEnt = rawEnt.isPartOf && twinPkg.brick.entities[rawEnt.isPartOf];
+  let rows0 = '';
+  if (sysLabel) rows0 += `<div class="pt"><span>category</span><span class="v">${esc(sysLabel)}</span></div>`;
+  if (parentEnt) rows0 += `<div class="pt"><span>part of</span><span class="v">${esc(parentEnt.label || rawEnt.isPartOf)}</span></div>`;
+  if (res.feeders.length) rows0 += `<div class="pt"><span>fed by</span><span class="v">${esc(res.feeders.join(' + '))}</span></div>`;
+  renderEquip(name);
+  if (!res.points.length) {
+    ptsEl.innerHTML = rows0 + '<div class="pt" style="color:#475569;font-style:italic"><span>'
+      + 'No live points — this system has no metered feed in the Brick model'
+      + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection is unmetered)' : '') + '.</span></div>';
+    return;
+  }
+  ptsEl.innerHTML = rows0 + '<div class="pt"><span>loading live data…</span></div>';
   try {
     const vals = await TwinResolver.fetchValues(twinPkg, res.points, cachedJson);
     if (picked !== mesh) return; // user picked something else meanwhile
-    let total = 0, latestTs = null, rows = '';
+    let total = 0, latestTs = null, rows = rows0;
     res.points.forEach(p => {
       const v = vals[p.ref] || {};
       if (v.error) { rows += `<div class="pt"><span>${esc(p.ref)}</span><span class="v">⚠</span></div>`; return; }
@@ -643,6 +710,28 @@ async function pickSystem(mesh) {
   }
 }
 
+/* ── Equipment registry (optional buildings/grimes/equipment.json) ──
+   If an NWD-extracted element registry exists, show per-system counts and a
+   few representative items. If not, say WHY there's nothing to show. */
+async function renderEquip(nodeName) {
+  const el = document.getElementById('twinEquip');
+  try {
+    const reg = await cachedJson('buildings/grimes/equipment.json');
+    const key = Object.keys(reg.systems || {}).find(k => NORM(k) === NORM(nodeName));
+    const sys = key && reg.systems[key];
+    if (!sys || !(sys.items || []).length) throw new Error('no entry');
+    el.innerHTML = `<div class="pt"><span>equipment (NWD registry)</span><span class="v">${sys.items.length} items</span></div>`
+      + sys.items.slice(0, 3).map(it =>
+        `<div class="pt"><span style="color:#64748b">· ${esc(it.name || it)}</span><span class="v">${esc(it.type || '')}</span></div>`).join('')
+      + (sys.items.length > 3 ? `<div class="pt"><span style="color:#475569">… +${sys.items.length - 3} more</span></div>` : '');
+  } catch {
+    el.innerHTML = '<div class="pt" style="color:#475569;font-style:italic"><span>'
+      + 'No per-element registry: the GLB carries system-tier geometry only — element attributes '
+      + '(tags, sizes, Revit IDs) need an NWD re-export with one node per element '
+      + '(then list them in buildings/grimes/equipment.json).</span></div>';
+  }
+}
+
 /* ══════════ BASELINE / ANOMALY (data/energy_baseline.json) ══════════
    Hour-of-week median baseline + MAD z-scores built by scripts/build_baseline.py
    from the repo's own archived snapshots. Building-level, shown in the twin
@@ -658,9 +747,12 @@ async function renderBaseline() {
     const c = g.current || {}, z = typeof c.z === 'number' ? c.z : null;
     badge.textContent = c.anomaly ? `⚠ z ${z}` : (z === null ? 'no live' : `ok · z ${z}`);
     badge.classList.toggle('anom', !!c.anomaly);
-    const evs = g.events || [], ev = evs[evs.length - 1];
+    const evs = (g.events || []).slice(-3).reverse();
     row.innerHTML = `<div class="pt"><span>now / typical (this hr)</span><span class="v">${c.kw ?? '—'} / ${c.base ?? '—'} kW</span></div>`
-      + (ev ? `<div class="pt"><span>last event</span><span class="v">${esc(ev.dir)} z ${ev.peak_z} · ${esc(ev.start.slice(5, 16))}</span></div>` : '');
+      + (evs.length
+        ? `<div class="pt"><span>recent events (14 d)</span><span class="v">${(g.events || []).length}</span></div>`
+          + evs.map(ev => `<div class="pt"><span style="color:#64748b">· ${esc(ev.start.slice(5, 16))}</span><span class="v" style="color:${ev.dir === 'high' ? '#f87171' : '#93c5fd'}">${esc(ev.dir)} z ${ev.peak_z} · ${ev.hours}h</span></div>`).join('')
+        : '<div class="pt"><span style="color:#475569">no |z|&gt;3 events in 14 d</span></div>');
     drawBaseChart(cv, g.recent24, g.sigma, eb.z_threshold || 3);
   } catch (e) { console.warn('[baseline]', e.message); }
 }
