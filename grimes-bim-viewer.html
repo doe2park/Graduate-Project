@@ -136,6 +136,9 @@ body.compare-on #syncPanel{display:block}
 #syncPanel .hdr{cursor:pointer}
 #syncPanel.collapsed>:not(.hdr){display:none}
 #syncPanel.collapsed .hdr{margin-bottom:0;padding-bottom:0;border-bottom:none}
+/* ── Walk mode: center crosshair (pointer-locked aiming) ── */
+#crosshair{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;pointer-events:none;font:300 24px/1 var(--font);color:rgba(226,232,240,.75);transition:transform .12s,color .12s;text-shadow:0 0 6px rgba(0,0,0,.8)}
+#crosshair.hot{color:#34d399;transform:translate(-50%,-50%) scale(1.4)}
 /* ── Walk mode: current-floor badge ── */
 #levelBadge{display:none;position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:80;background:rgba(8,12,24,.9);border:1px solid rgba(34,211,238,.3);border-radius:14px;padding:5px 14px;font:600 11px/1 var(--mono);color:#67e8f9;pointer-events:none;letter-spacing:.3px}
 /* ── Walk mode hint overlay ── */
@@ -189,6 +192,7 @@ body.compare-on #syncPanel{display:block}
   </div>
   <div id="splitDivider" title="drag to resize"></div>
   <div id="viewerPane">
+    <div id="crosshair">+</div>
     <div id="loading">
       <div class="spinner"></div>
       <div class="msg">Loading Bechtel MEP model…</div>
@@ -494,6 +498,26 @@ let floorLevels, levelIdx = 0, _groundAcc = 0, _shellWasVisible = true;
 let plockActive = false, plockFailed = false, dragLook = false, _dragX = 0, _dragY = 0;
 let yaw = 0, pitch = 0;
 const _floorRay = new THREE.Raycaster();
+const _centerVec = new THREE.Vector2(0, 0);
+let aimedMesh = null, _aimAcc = 0;
+
+/* Center-ray aiming while pointer-locked: crosshair heats up over a pickable
+   MEP system; click opens the twin panel (walking continues). */
+function updateCrosshair() {
+  document.getElementById('crosshair').style.display = (walkMode && plockActive) ? 'block' : 'none';
+}
+function updateAim() {
+  if (!plockActive) { aimedMesh = null; return; }
+  raycaster.setFromCamera(_centerVec, camera);
+  const hit = raycaster.intersectObjects(allMeshes, false)[0];
+  aimedMesh = hit ? hit.object : null;
+  document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);
+}
+// No AxesHelper/GridHelper exists in this scene and both glbs are
+// triangle-only, but hide any line/point objects defensively while walking.
+function setLinesVisible(v) {
+  scene.traverse(o => { if (o.isLine || o.isPoints) o.visible = v; });
+}
 
 /* Slab detection: one-time downward multi-ray through the shell collects hit
    heights, clustered into a floor list. Falls back to 3.5 m steps if the
@@ -589,7 +613,7 @@ function showWalkHint() {
   el.innerHTML = (plockFailed
       ? '<b>drag mouse</b> to look (pointer lock unavailable) · '
       : '<b>mouse</b> look · ')
-    + '<b>WASD</b> move · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>Esc</b> exit';
+    + '<b>WASD</b> move · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>click</b> inspect · <b>Esc</b> exit';
   el.style.display = 'block'; el.style.opacity = '1';
   clearTimeout(_hintTimer);
   _hintTimer = setTimeout(() => { el.style.opacity = '0'; }, 6000);
@@ -638,6 +662,8 @@ function enterWalk() {
   document.getElementById('walkBtn').classList.add('active');
   document.getElementById('levelBadge').style.display = 'block';
   updateLevelBadge();
+  setLinesVisible(false);
+  updateCrosshair();
   showWalkHint();
   if (document.body.classList.contains('compare-on')) {
     document.getElementById('skipRow').style.display = '';
@@ -661,6 +687,8 @@ function exitWalk() {
   }
   document.getElementById('walkBtn').classList.remove('active');
   document.getElementById('levelBadge').style.display = 'none';
+  setLinesVisible(true);
+  updateCrosshair();
   hideWalkHint();
   document.getElementById('skipRow').style.display = 'none';
 }
@@ -668,7 +696,14 @@ function exitWalk() {
 /* pointer-lock state machine + drag-to-look fallback */
 document.addEventListener('pointerlockchange', () => {
   plockActive = document.pointerLockElement === renderer.domElement;
+  updateCrosshair();
   if (!plockActive && walkMode) exitWalk();      // Esc / lock lost → exit walk
+});
+// center-ray inspect: while locked, a click picks whatever the crosshair is on
+renderer.domElement.addEventListener('click', () => {
+  if (!walkMode || !plockActive) return;
+  updateAim();
+  if (aimedMesh) pickSystem(aimedMesh); else clearPick();
 });
 document.addEventListener('pointerlockerror', () => {
   plockFailed = true;
@@ -714,6 +749,9 @@ function updateWalk(dt) {
   // in-storey ground follow (ramps/steps), throttled to ~10 Hz
   _groundAcc += dt;
   if (_groundAcc > 0.1) { _groundAcc = 0; groundFollow(); }
+  // crosshair aim feedback, ~8 Hz (MEP glb is light — 8 meshes)
+  _aimAcc += dt;
+  if (_aimAcc > 0.12) { _aimAcc = 0; updateAim(); }
   // smooth floor easing (~0.6 s exponential approach)
   floorY += (floorTargetY - floorY) * Math.min(1, dt * 7);
   if (Math.abs(floorTargetY - floorY) < 0.005) floorY = floorTargetY;
@@ -1008,7 +1046,8 @@ const raycaster = new THREE.Raycaster(), _ptr = new THREE.Vector2();
 let _downX = 0, _downY = 0, picked = null;
 renderer.domElement.addEventListener('pointerdown', e => { _downX = e.clientX; _downY = e.clientY; });
 renderer.domElement.addEventListener('pointerup', e => {
-  if (walkMode) return; // pointer is locked — clicks are not picks
+  if (walkMode && plockActive) return; // locked → the center-ray click pick handles it
+  // (drag-look fallback keeps normal click picks: >6 px movement means a drag)
   if (Math.hypot(e.clientX - _downX, e.clientY - _downY) > 6) return; // drag, not a tap
   const r = renderer.domElement.getBoundingClientRect();
   _ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
