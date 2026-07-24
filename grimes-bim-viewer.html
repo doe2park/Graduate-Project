@@ -78,6 +78,10 @@ body.compare-on #syncPanel{display:block}
 #twinPanel .mut{color:#475569;font-style:italic}
 #twinPanel .morebtn{font:9.5px/1.6 var(--mono);color:#64748b;cursor:pointer;user-select:none}
 #twinPanel .morebtn:hover{color:#94a3b8}
+#twinPanel .sec{font:600 8.5px/1 var(--mono);color:#64748b;letter-spacing:.5px;margin:7px 0 3px;text-transform:uppercase}
+#twinPanel .pt.ch-off{color:#41506a}
+#twinPanel .pt.ch-off span:last-child{font-style:italic;color:#3c4a63;font-weight:400}
+#twinPanel .livedot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:5px;vertical-align:1px}
 #twinPanel .pt.sysrow{cursor:pointer}
 #twinPanel .pt.sysrow:hover{color:#e0e7f1}
 #twinPanel .pt.sysrow .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
@@ -915,6 +919,33 @@ window.toggleTwinMore = id => {
   if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
 };
 
+/* Expected telemetry per system category — answers "it's Piping, why only
+   kW?": each discipline lists the channels it SHOULD have; only the ones a
+   real meter backs show live values, the rest read "not connected". */
+const CHANNELS = {
+  duct:   [['Airflow', 'CFM'], ['Static pressure', 'in. w.c.'], ['Supply air temp', '°F']],
+  equip:  [['Power', 'kW', 'power'], ['Speed', '%'], ['Status', '']],
+  piping: [['Flow', 'GPM'], ['Supply temp', '°F'], ['Return temp', '°F'], ['Pressure', 'psi']],
+  fire:   [['Line pressure', 'psi'], ['Valve status', ''], ['Flow switch', '']],
+  elec:   [['Power', 'kW', 'power'], ['Voltage', 'V'], ['Current', 'A']],
+};
+const SYS_CHANNELS = {
+  'HVAC Duct': 'duct', 'Diffusers': 'duct',
+  'HVAC Equipment': 'equip', 'Pumps/Valves': 'equip',
+  'Piping': 'piping', 'Sprinkler': 'fire',
+  'Conduit': 'elec', 'Electrical': 'elec',
+};
+function channelRows(sysName, livePowerKw) {
+  const set = CHANNELS[SYS_CHANNELS[sysName]] || [];
+  if (!set.length) return '';
+  return '<div class="sec">Sensor channels</div>' + set.map(([label, unit, kind]) => {
+    if (kind === 'power' && livePowerKw != null) {
+      return `<div class="pt"><span><i class="livedot"></i>${label}</span><span class="v" style="color:#34d399">${livePowerKw.toFixed(1)} ${unit}</span></div>`;
+    }
+    return `<div class="pt ch-off"><span>${label}${unit ? ' (' + unit + ')' : ''}</span><span>— not connected</span></div>`;
+  }).join('');
+}
+
 // Shell/wall click → building-level panel: load + baseline + system directory.
 const BUILDING_PICK = {};
 window.selectSysByIndex = i => { const m = sysMesh[i]; if (m) pickSystem(m); };
@@ -968,10 +999,13 @@ async function pickSystem(mesh) {
   const parentEnt = rawEnt.isPartOf && twinPkg.brick.entities[rawEnt.isPartOf];
   detInfo.innerHTML = esc(res.type) + '<br>' + esc(res.uri)
     + (parentEnt ? '<br>part of: ' + esc(parentEnt.label || rawEnt.isPartOf) : '')
-    + (res.feeders.length ? '<br>fed by: ' + esc(res.feeders.join(' + ')) : '');
+    + (res.feeders.length ? '<br>fed by: ' + esc(res.feeders.join(' + ')) : '')
+    + '<br>Next step: BAS/IoT sensor integration will populate these channels.';
   renderEquip(name);
+  const sysName = si != null ? SYSTEMS[si].name : null;
   if (!res.points.length) {
-    ptsEl.innerHTML = '<div class="pt mut"><span>No meter on this system'
+    ptsEl.innerHTML = channelRows(sysName, null)
+      + '<div class="pt mut"><span>No meter on this system'
       + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection is unmetered)' : '') + '</span></div>';
     return;
   }
@@ -985,7 +1019,9 @@ async function pickSystem(mesh) {
       const nm = String(v.name || p.ref).replace(/\s*\(.*\)$/, ''); // short name
       return `<div class="pt"><span>· ${esc(nm)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'}</span></div>`;
     });
-    let html = `<div class="pt"><span>Total power</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
+    let html = channelRows(sysName, total)
+      + '<div class="sec">Connected now · building electricity (proxy)</div>'
+      + `<div class="pt"><span>Total power</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
       + rows.slice(0, 3).join('');
     if (rows.length > 3) {
       html += `<div id="twinPtsMore" style="display:none">${rows.slice(3).join('')}</div>`
