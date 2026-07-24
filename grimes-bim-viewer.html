@@ -199,7 +199,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
 /* ══════════ SCENE ══════════ */
 const pane = document.getElementById('viewerPane');
@@ -287,6 +286,10 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   controls.target.copy(c);
   camera.position.set(c.x + 45, c.y + 30, c.z + 45);
   alignShellToMep(); // in case the shell finished loading before the MEP
+  // Desktop: shell is part of the default view — start the 57 MB download in
+  // the background once the MEP is up (progress shows on the topbar button).
+  // Mobile keeps the confirm-gated manual toggle.
+  if (!mobileMq.matches) loadShell();
 }, p => { document.getElementById('loadSub').textContent = `MEP… ${(p.loaded/1048576).toFixed(1)} MB`; },
 () => {
   const el = document.getElementById('loading');
@@ -315,6 +318,11 @@ window.toggleBuilding = () => {
   if (buildingLoading) return;
   // Never auto-download 57 MB on a phone — stays opt-in behind an explicit confirm.
   if (mobileMq.matches && !confirm('Building shell is a 57 MB download. Load it on this device?')) return;
+  loadShell();
+};
+function loadShell() {
+  if (building || buildingLoading) return;
+  const btn = document.getElementById('bldgBtn');
   buildingLoading = true;
   btn.textContent = '⏳ 57 MB…';
   loader.load('grimes-mep-compressed.glb', (gltf) => {
@@ -334,10 +342,11 @@ window.toggleBuilding = () => {
     // shell ended up underground and off the camera's focus ("button does
     // nothing" bug). Match centers, then set both floors to the same y.
     alignShellToMep();
-    // 0.07 was near-invisible on the dark background; 0.18 reads as a ghost
-    // shell while keeping the MEP clearly visible through it. (EdgesGeometry
-    // was considered but is prohibitive on a 57 MB mesh.)
-    const ghost = new THREE.MeshBasicMaterial({ color: 0x8899aa, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
+    // Shell is default-on for desktop now, so it must read as "a building":
+    // Lambert picks up the scene's ambient+directional light for subtle
+    // shading (flat MeshBasic at 0.18 read as fog). 0.24 keeps MEP visible.
+    // (EdgesGeometry was considered but is prohibitive on a 57 MB mesh.)
+    const ghost = new THREE.MeshLambertMaterial({ color: 0x9fb2c8, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false });
     building.traverse(ch => { if (ch.isMesh) { ch.material = ghost; ch.renderOrder = -1; } });
     scene.add(building);
     buildingLoading = false;
@@ -345,19 +354,34 @@ window.toggleBuilding = () => {
     btn.classList.add('active');
   }, p => { btn.textContent = `⏳ ${(p.loaded/1048576).toFixed(0)}/57 MB`; },
   () => { buildingLoading = false; btn.textContent = '⚠ shell failed'; });
-};
+}
 
 /* ══════════ WALK MODE — first/third-person walkthrough (desktop) ══════════
-   PointerLockControls handles look only; movement/positioning is ours, so
-   switching 1st↔3rd person is just a camera offset. No collision by design
-   (walls are pass-through — handy in a BIM viewer); only floor height is
-   enforced: eye = floor + 1.6 m, floors change in 3.5 m steps (Q/E or R/F). */
-const plc = new PointerLockControls(camera, renderer.domElement);
+   Look is implemented directly (no PointerLockControls): pointer lock is
+   requested synchronously inside the button's click handler, and if the lock
+   fails or is unavailable (pointerlockerror never surfaces in PLC — the
+   likely cause of "mouse look does nothing"), we fall back to drag-to-look.
+   Movement/positioning is ours, so 1st↔3rd person is just a camera offset.
+   No wall collision by design; eye = floor + 1.6 m, floors step 3.5 m. */
 let walkMode = false, thirdPerson = false, floorY = 0;
+let plockActive = false, plockFailed = false, dragLook = false, _dragX = 0, _dragY = 0;
+let yaw = 0, pitch = 0;
 const playerPos = new THREE.Vector3();
 const keys = {};
 let savedCam = null, _hintTimer = null;
 const WALK_SPEED = 3.0, RUN_SPEED = 8.0, EYE = 1.6, FLOOR_STEP = 3.5, FLOOR_MAX = 21;
+const LOOK_SENS = 0.002, MAX_PITCH = 89 * Math.PI / 180;
+
+const _lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+function applyLook() {
+  _lookEuler.set(pitch, yaw, 0, 'YXZ');
+  camera.quaternion.setFromEuler(_lookEuler);
+}
+function rotateLook(dx, dy) {
+  yaw -= dx * LOOK_SENS;
+  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch - dy * LOOK_SENS));
+  applyLook();
+}
 const avatar = new THREE.Mesh(
   new THREE.CapsuleGeometry(0.3, 1.0, 4, 12),
   new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.85 }));
@@ -366,6 +390,10 @@ scene.add(avatar);
 
 function showWalkHint() {
   const el = document.getElementById('walkHint');
+  el.innerHTML = (plockFailed
+      ? '<b>drag mouse</b> to look (pointer lock unavailable) · '
+      : '<b>mouse</b> look · ')
+    + '<b>WASD</b> move · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>Esc</b> exit';
   el.style.display = 'block'; el.style.opacity = '1';
   clearTimeout(_hintTimer);
   _hintTimer = setTimeout(() => { el.style.opacity = '0'; }, 6000);
@@ -377,20 +405,30 @@ function hideWalkHint() {
 }
 
 window.toggleWalk = () => {
-  if (walkMode) { plc.unlock(); return; }        // 'unlock' handler does the exit
+  if (walkMode) {
+    if (plockActive) { try { document.exitPointerLock(); } catch {} } // change-handler also exits; exitWalk below is idempotent
+    exitWalk();
+    return;
+  }
   if (mobileMq.matches) return;                  // desktop-only
   enterWalk();
-  plc.lock();                                    // must run inside the click gesture
+  // Synchronously inside the click gesture — no awaits/timeouts before this.
+  try { renderer.domElement.requestPointerLock(); } catch { plockFailed = true; showWalkHint(); }
 };
 function enterWalk() {
   walkMode = true; thirdPerson = false;
   savedCam = { pos: camera.position.clone(), quat: camera.quaternion.clone(), target: controls.target.clone() };
+  // seed yaw/pitch from the current view so entry doesn't snap the camera
+  _lookEuler.setFromQuaternion(camera.quaternion, 'YXZ');
+  yaw = _lookEuler.y;
+  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, _lookEuler.x));
+  applyLook();
   const bb = bimBbox();
   const c = bb.isEmpty() ? new THREE.Vector3() : bb.getCenter(new THREE.Vector3());
   floorY = 0;
   playerPos.set(c.x, 0, c.z);                    // spawn at model center, ground floor
   camera.position.set(playerPos.x, EYE, playerPos.z);
-  controls.enabled = false;
+  controls.enabled = false;                      // Orbit fully off while walking
   document.getElementById('walkBtn').classList.add('active');
   showWalkHint();
   if (document.body.classList.contains('compare-on')) {
@@ -400,7 +438,7 @@ function enterWalk() {
 }
 function exitWalk() {
   if (!walkMode) return;
-  walkMode = false; thirdPerson = false;
+  walkMode = false; thirdPerson = false; dragLook = false;
   avatar.visible = false;
   for (const k in keys) keys[k] = false;
   if (savedCam) {
@@ -413,10 +451,32 @@ function exitWalk() {
   hideWalkHint();
   document.getElementById('skipRow').style.display = 'none';
 }
-plc.addEventListener('unlock', exitWalk);        // Esc (or lost lock) exits
+
+/* pointer-lock state machine + drag-to-look fallback */
+document.addEventListener('pointerlockchange', () => {
+  plockActive = document.pointerLockElement === renderer.domElement;
+  if (!plockActive && walkMode) exitWalk();      // Esc / lock lost → exit walk
+});
+document.addEventListener('pointerlockerror', () => {
+  plockFailed = true;
+  if (walkMode) showWalkHint();                  // stay in walk, advertise drag-look
+});
+document.addEventListener('mousemove', e => {
+  if (walkMode && plockActive) rotateLook(e.movementX || 0, e.movementY || 0);
+});
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (walkMode && !plockActive) { dragLook = true; _dragX = e.clientX; _dragY = e.clientY; }
+});
+window.addEventListener('pointermove', e => {
+  if (!dragLook) return;
+  rotateLook(e.clientX - _dragX, e.clientY - _dragY);
+  _dragX = e.clientX; _dragY = e.clientY;
+});
+window.addEventListener('pointerup', () => { dragLook = false; });
 
 document.addEventListener('keydown', e => {
   if (!walkMode) return;
+  if (e.code === 'Escape' && !plockActive) { exitWalk(); return; } // fallback-mode Esc
   keys[e.code] = true;
   if (e.code === 'KeyV') thirdPerson = !thirdPerson;
   if (e.code === 'KeyQ' || e.code === 'KeyR') floorY = Math.min(FLOOR_MAX, floorY + FLOOR_STEP);
