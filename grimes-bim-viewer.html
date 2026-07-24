@@ -56,7 +56,8 @@ body.compare-on #syncPanel{display:block}
 #legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 /* ── Twin panel: visual-first — big number + chart up top, prose folded into ⓘ.
    Three density levels: (1) headline kW/badge/chart, (2) compact rows, (3) details. ── */
-#twinPanel{position:fixed;right:14px;top:62px;z-index:70;width:264px;background:rgba(8,12,24,.95);border:1px solid rgba(52,211,153,.35);border-radius:6px;padding:10px 12px;display:none;font:11px/1.45 var(--font);color:#cbd5e1}
+#twinPanel{position:fixed;right:14px;top:62px;z-index:70;width:320px;background:rgba(8,12,24,.95);border:1px solid rgba(52,211,153,.35);border-radius:6px;padding:10px 12px;display:none;font:11px/1.45 var(--font);color:#cbd5e1}
+#chartTip{position:absolute;z-index:5;display:none;background:rgba(6,10,20,.96);border:1px solid rgba(148,163,184,.3);border-radius:5px;padding:5px 8px;font:9.5px/1.5 var(--mono);color:#cbd5e1;pointer-events:none;white-space:nowrap}
 #twinPanel.show{display:block}
 #twinPanel .thdr{display:flex;align-items:center;gap:8px;padding-bottom:7px;margin-bottom:4px;border-bottom:1px solid rgba(52,211,153,.15);font:600 12px/1.2 var(--font);color:#e8eef7}
 #twinPanel .thdr .sysdot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:#64748b}
@@ -71,7 +72,7 @@ body.compare-on #syncPanel{display:block}
 #twinPanel .badge.lo{background:rgba(96,165,250,.18);color:#93c5fd}
 #twinPanel .badge.na{background:rgba(148,163,184,.12);color:#94a3b8}
 #twinPanel .srcnote{font:9px/1.4 var(--mono);color:#475569;margin:3px 0 5px}
-#twinPanel canvas{width:100%;height:64px;border-radius:4px;background:rgba(0,0,0,.25);display:block}
+#twinPanel canvas{width:100%;height:90px;border-radius:4px;background:rgba(0,0,0,.25);display:block}
 #twinPanel .pt{display:flex;justify-content:space-between;gap:8px;font:10.5px/1.6 var(--mono);padding:1px 0;color:#94a3b8}
 #twinPanel .pt .v{color:#e0e7f1;font-weight:600;white-space:nowrap}
 #twinPanel .mut{color:#475569;font-style:italic}
@@ -200,7 +201,8 @@ body.compare-on #syncPanel{display:block}
   </div>
   <div class="bigrow"><span class="bigkw" id="twinBigKw">— <small>kW</small></span><span class="badge na" id="twinBadge">…</span></div>
   <div class="srcnote" id="twinSrc"></div>
-  <canvas id="twinBaseSpark" width="480" height="128"></canvas>
+  <canvas id="twinBaseSpark" width="640" height="180"></canvas>
+  <div id="chartTip"></div>
   <div class="chartkey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
   <div id="twinPoints"></div>
   <div id="twinEvent"></div>
@@ -1061,6 +1063,7 @@ async function renderBaseline() {
     srcEl.textContent = 'bldg load vs ' + srcName + ' baseline · typical now '
       + (c.base != null ? c.base + ' kW' : '—');
     drawBaseChart(cv, src.recent24, src.sigma, zt);
+    cv._chart.events = (med && med.events) || []; // for hover tooltips
     // latest anomaly event (one line) + staggered-start sim callout; rest folds
     let sim = null;
     try { sim = await cachedJson('data/startup_sim.json'); } catch {}
@@ -1080,14 +1083,15 @@ async function renderBaseline() {
     }
   } catch (e) { console.warn('[baseline]', e.message); }
 }
-function drawBaseChart(cv, recent, sigma, zt) {
+function drawBaseChart(cv, recent, sigma, zt, hoverI) {
   const ctx = cv.getContext('2d');
   ctx.clearRect(0, 0, cv.width, cv.height);
   const lo = Math.min(...recent.map(p => Math.min(p.kw, p.base - zt * sigma))),
         hi = Math.max(...recent.map(p => Math.max(p.kw, p.base + zt * sigma)));
   const rng = (hi - lo) || 1, W = cv.width, H = cv.height;
+  const PT = 8, PB = 26; // bottom padding reserves room for the time axis
   const X = i => i / (recent.length - 1) * (W - 8) + 4;
-  const Y = v => H - 6 - (v - lo) / rng * (H - 12);
+  const Y = v => H - PB - (v - lo) / rng * (H - PB - PT);
   // normal band: baseline ± z_threshold·σ
   ctx.beginPath();
   recent.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.base + zt * sigma)) : ctx.moveTo(X(0), Y(p.base + zt * sigma)); });
@@ -1105,12 +1109,66 @@ function drawBaseChart(cv, recent, sigma, zt) {
   recent.forEach((p, i) => {
     if (Math.abs(p.z) > zt) { ctx.fillStyle = '#f87171'; ctx.beginPath(); ctx.arc(X(i), Y(p.kw), 3.5, 0, 7); ctx.fill(); }
   });
-  // minimal axis labels: just the kW range
+  // axes: kW range on the left, a few time ticks along the bottom
   ctx.fillStyle = 'rgba(148,163,184,.55)';
-  ctx.font = '600 15px JetBrains Mono, monospace';
-  ctx.fillText(Math.round(hi) + '', 6, 18);
-  ctx.fillText(Math.round(lo) + '', 6, H - 8);
+  ctx.font = '600 17px JetBrains Mono, monospace';
+  ctx.fillText(Math.round(hi) + ' kW', 6, 20);
+  ctx.fillText(Math.round(lo) + '', 6, H - PB - 5);
+  ctx.fillStyle = 'rgba(148,163,184,.45)';
+  recent.forEach((p, i) => {
+    const hh = +String(p.ts).slice(11, 13), mm = String(p.ts).slice(14, 16);
+    if (hh % 6 === 0 && mm === '00') {
+      const lbl = hh === 0 ? '12 AM' : hh < 12 ? hh + ' AM' : hh === 12 ? '12 PM' : (hh - 12) + ' PM';
+      ctx.fillText(lbl, Math.max(2, Math.min(X(i) - 22, W - 62)), H - 7);
+    }
+  });
+  // hover crosshair + marker
+  if (hoverI != null && recent[hoverI]) {
+    const hx = X(hoverI), p = recent[hoverI];
+    ctx.strokeStyle = 'rgba(226,232,240,.35)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(hx, PT); ctx.lineTo(hx, H - PB); ctx.stroke();
+    ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.arc(hx, Y(p.kw), 4.5, 0, 7); ctx.fill();
+  }
+  cv._chart = Object.assign(cv._chart || {}, { recent, sigma, zt });
 }
+
+/* ── chart hover/scrub: crosshair + tooltip (mouse + touch drag) ── */
+const _baseCv = document.getElementById('twinBaseSpark');
+_baseCv.style.touchAction = 'none';
+function chartHover(e) {
+  const st = _baseCv._chart;
+  if (!st || !st.recent || st.recent.length < 2) return;
+  const rect = _baseCv.getBoundingClientRect();
+  const fx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const i = Math.round(fx * (st.recent.length - 1));
+  drawBaseChart(_baseCv, st.recent, st.sigma, st.zt, i);
+  const p = st.recent[i];
+  const unusual = Math.abs(p.z) > st.zt;
+  const status = unusual ? (p.z > 0 ? 'unusually high' : 'unusually low') : 'normal';
+  const evd = unusual && (st.events || []).find(ev => p.ts >= ev.start && p.ts <= ev.end);
+  const tip = document.getElementById('chartTip');
+  tip.innerHTML = `<b>${fmtEvTime(p.ts)}</b><br>${p.kw} kW actual · ${p.base} expected`
+    + `<br><span style="color:${unusual ? '#f87171' : '#34d399'}">${status}</span>`
+    + (evd ? ` <span style="color:#94a3b8">(${evd.hours}h event)</span>` : '');
+  tip.style.display = 'block';
+  // keep the tooltip inside the panel
+  const panel = document.getElementById('twinPanel');
+  let left = _baseCv.offsetLeft + fx * rect.width - tip.offsetWidth / 2;
+  left = Math.max(4, Math.min(left, panel.clientWidth - tip.offsetWidth - 4));
+  let top = _baseCv.offsetTop - tip.offsetHeight - 6;
+  if (top < 2) top = _baseCv.offsetTop + rect.height + 6;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+function chartLeave() {
+  const st = _baseCv._chart;
+  document.getElementById('chartTip').style.display = 'none';
+  if (st && st.recent && st.recent.length > 1) drawBaseChart(_baseCv, st.recent, st.sigma, st.zt);
+}
+_baseCv.addEventListener('pointermove', chartHover);
+_baseCv.addEventListener('pointerdown', chartHover);
+_baseCv.addEventListener('pointerleave', chartLeave);
+_baseCv.addEventListener('pointerup', chartLeave);
 
 /* ══════════ AS-BUILT DISCREPANCY NOTES (Compare mode) ══════════
    Flag a spot where the 360° photo and the BIM disagree; each note stores the
