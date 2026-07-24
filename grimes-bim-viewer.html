@@ -925,22 +925,43 @@ window.toggleTwinMore = id => {
 const CHANNELS = {
   duct:   [['Airflow', 'CFM'], ['Static pressure', 'in. w.c.'], ['Supply air temp', '°F']],
   equip:  [['Power', 'kW', 'power'], ['Speed', '%'], ['Status', '']],
-  piping: [['Flow', 'GPM'], ['Supply temp', '°F'], ['Return temp', '°F'], ['Pressure', 'psi']],
+  piping: [['Water flow', 'GPM', 'water'], ['Steam condensate', 'GPM', 'steam'], ['Irrigation', 'GPM', 'irr'],
+           ['Supply temp', '°F'], ['Return temp', '°F'], ['Pressure', 'psi']],
   fire:   [['Line pressure', 'psi'], ['Valve status', ''], ['Flow switch', '']],
   elec:   [['Power', 'kW', 'power'], ['Voltage', 'V'], ['Current', 'A']],
 };
+// Flow telemetry is real: meter #250 'Condensate & Water' on the Bechtel
+// logger (steam condensate GPM, irrigation GPM, two domestic water CFm) is
+// already fetched into data/building_data.json every 15 min by bmo_fetch.py.
+async function liveChannels(sysName, powerKw) {
+  const live = { power: powerKw };
+  if (SYS_CHANNELS[sysName] === 'piping') {
+    try {
+      const bd = await cachedJson('data/building_data.json');
+      const w = bd && bd.water && bd.water.latest;
+      if (w) {
+        const cf = (w.water1_rate_cfm || 0) + (w.water2_rate_cfm || 0);
+        live.water = cf * 7.481;               // ft³/min → gal/min
+        live.steam = w.steam_rate_gpm;
+        live.irr = w.irrigation_rate_gpm;
+      }
+    } catch {}
+  }
+  return live;
+}
 const SYS_CHANNELS = {
   'HVAC Duct': 'duct', 'Diffusers': 'duct',
   'HVAC Equipment': 'equip', 'Pumps/Valves': 'equip',
   'Piping': 'piping', 'Sprinkler': 'fire',
   'Conduit': 'elec', 'Electrical': 'elec',
 };
-function channelRows(sysName, livePowerKw) {
+function channelRows(sysName, live) {
   const set = CHANNELS[SYS_CHANNELS[sysName]] || [];
   if (!set.length) return '';
   return '<div class="sec">Sensor channels</div>' + set.map(([label, unit, kind]) => {
-    if (kind === 'power' && livePowerKw != null) {
-      return `<div class="pt"><span><i class="livedot"></i>${label}</span><span class="v" style="color:#34d399">${livePowerKw.toFixed(1)} ${unit}</span></div>`;
+    const v = kind && live ? live[kind] : null;
+    if (v != null && isFinite(v)) {
+      return `<div class="pt"><span><i class="livedot"></i>${label}</span><span class="v" style="color:#34d399">${(+v).toFixed(1)} ${unit}</span></div>`;
     }
     return `<div class="pt ch-off"><span>${label}${unit ? ' (' + unit + ')' : ''}</span><span>— not connected</span></div>`;
   }).join('');
@@ -1004,7 +1025,7 @@ async function pickSystem(mesh) {
   renderEquip(name);
   const sysName = si != null ? SYSTEMS[si].name : null;
   if (!res.points.length) {
-    ptsEl.innerHTML = channelRows(sysName, null)
+    ptsEl.innerHTML = channelRows(sysName, await liveChannels(sysName, null))
       + '<div class="pt mut"><span>No meter on this system'
       + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection is unmetered)' : '') + '</span></div>';
     return;
@@ -1019,7 +1040,7 @@ async function pickSystem(mesh) {
       const nm = String(v.name || p.ref).replace(/\s*\(.*\)$/, ''); // short name
       return `<div class="pt"><span>· ${esc(nm)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'}</span></div>`;
     });
-    let html = channelRows(sysName, total)
+    let html = channelRows(sysName, await liveChannels(sysName, total))
       + '<div class="sec">Connected now · building electricity (proxy)</div>'
       + `<div class="pt"><span>Total power</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
       + rows.slice(0, 3).join('');
