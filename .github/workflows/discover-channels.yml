@@ -13,7 +13,7 @@ jobs:
   discover:
     runs-on: ubuntu-latest
     concurrency:
-      group: bmo-fetch          # share the group so we don't race the 15-min pushes
+      group: bmo-discovery      # own group: the 15-min workflows cancel-in-progress their own groups
     steps:
       - uses: actions/checkout@v4
 

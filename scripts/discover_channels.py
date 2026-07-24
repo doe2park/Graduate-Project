@@ -61,7 +61,7 @@ def probe(session, dev, mid, start, end):
             'DB': dev['db'], 'AS': dev['mac'], 'MB': mid, 'DOWNLOAD': 'YES',
             'DATE_RANGE_STARTTIME': start, 'DATE_RANGE_ENDTIME': end,
             'DELIMITER': 'TAB', 'COLNAMES': 'ON', 'EXPORTTIMEZONE': 'US/Pacific',
-        }, timeout=25)
+        }, timeout=15)
         if r.status_code != 200 or '<html' in r.text.lower()[:200]:
             return None
         lines = [l for l in r.text.splitlines() if l.strip()]
@@ -106,7 +106,7 @@ def main():
             info = probe(s, dev, mid, ss, ee)
             if info:
                 meters[mid] = info
-            time.sleep(0.12)
+            time.sleep(0.05)
         report['devices'][dev['mac']] = {'building': dev['id'], 'name': dev['name'], 'meters': meters}
         fl = {mid: m['flow_like'] for mid, m in meters.items() if m['flow_like']}
         if fl:

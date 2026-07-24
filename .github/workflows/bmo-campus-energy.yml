@@ -51,15 +51,6 @@ jobs:
         # median baseline while towt_baseline.json is absent.
         run: python scripts/towt_baseline.py || true
 
-      - name: One-shot channel discovery (until report exists)
-        # Fallback for environments where workflow_dispatch can't be triggered:
-        # runs once, then self-skips forever because the report file exists.
-        env:
-          BMO_USERNAME: ${{ secrets.BMO_USERNAME }}
-          BMO_PASSWORD: ${{ secrets.BMO_PASSWORD }}
-        run: |
-          [ -f data/bmo_channels_report.json ] || python scripts/discover_channels.py || true
-
       - name: Archive daily snapshot
         run: |
           TODAY=$(date +'%Y-%m-%d')
