@@ -134,6 +134,114 @@ def fetch_latest_kw(session, mac, db, meter_id):
         return None, None
 
 
+
+
+# ── Flow channels (water / steam / condensate / irrigation) ───────────────
+# Discovered by scripts/discover_channels.py → data/bmo_channels_report.json:
+# 29 buildings expose non-electric channels, almost all on meter #250 (plus a
+# few odd slots). Column names vary per site, so channels are classified by
+# regex; only the Ave-Rate style columns are summed (Min/Max/Inst skipped).
+import re as _re
+
+FLOW_METERS = {
+    "grimes": ["250"], "cory": ["250"], "soda": ["250"], "davis": ["250"],
+    "etch": ["250"], "hmm": ["250"], "hesse": ["250"], "mclaughlin": ["250"],
+    "latimer": ["250"], "birge": ["250"], "hilde": ["250"], "lksc": ["1"],
+    "wheeler": ["250"], "dwinelle": ["250", "53"], "barrows": ["250"],
+    "moses": ["250"], "stephens": ["250"], "wurster": ["250"],
+    "giannini": ["250"], "morgan": ["250"], "rsf": ["250"],
+    "chavez": ["250", "3"], "sproul": ["250"], "doe": ["250"],
+    "moffitt": ["250"], "northgate": ["2"], "donner": ["250"],
+    "bww": ["250"], "mulford": ["250"],
+}
+
+_FLOW_UNIT = _re.compile(r"\((cfm|gpm|lb/hr)\)", _re.I)
+
+
+def _classify_flow_col(col):
+    """column name -> (kind, unit) or None. Rate columns only."""
+    c = col.lower()
+    m = _FLOW_UNIT.search(c)
+    if not m:
+        return None
+    if "min (" in c or "max (" in c or "instantaneous" in c:
+        return None
+    unit = m.group(1)
+    if "irrig" in c:
+        kind = "irrigation"
+    elif "condensate" in c:
+        kind = "condensate"
+    elif "steam" in c:
+        kind = "steam"
+    elif "water" in c:
+        kind = "water"
+    else:
+        return None
+    return kind, unit
+
+
+def _aggregate_flow_row(row):
+    """last CSV row -> partial sums per kind, CFm converted to GPM."""
+    by_kind = {}
+    cols = {}
+    for col in row.keys():
+        k = _classify_flow_col(col)
+        if k:
+            cols.setdefault(k[0], []).append((col, k[1]))
+    for kind, cands in cols.items():
+        low = [(c, u, c.lower()) for c, u in cands]
+        use = ([(c, u) for c, u, l in low if "ave" in l]
+               or [(c, u) for c, u, l in low if "rate" in l]
+               or cands)
+        total = 0.0
+        got = False
+        for col, unit in use:
+            try:
+                v = float(row.get(col))
+            except (TypeError, ValueError):
+                continue
+            if not (0 <= v < 1e6):
+                continue
+            total += v * 7.481 if unit == "cfm" else v
+            got = True
+        if got:
+            by_kind[kind] = round(total, 2)
+    return by_kind
+
+
+def fetch_flow(session, mac, db, meter_ids):
+    """-> {'water_gpm','steam_lb_hr','condensate_gpm','irrigation_gpm','ts'} (None-filled)."""
+    out = {"water_gpm": None, "steam_lb_hr": None, "condensate_gpm": None,
+           "irrigation_gpm": None, "ts": None}
+    keymap = {"water": "water_gpm", "steam": "steam_lb_hr",
+              "condensate": "condensate_gpm", "irrigation": "irrigation_gpm"}
+    now = datetime.now()
+    start = now - timedelta(hours=2)
+    for mid in meter_ids:
+        url = f"{BMO_BASE}/members/mbdev_export.php/{mac}_{mid}.csv"
+        params = {
+            "DB": db, "AS": mac, "MB": mid, "DOWNLOAD": "YES",
+            "DATE_RANGE_STARTTIME": start.strftime("%Y-%m-%d+%H:%M:%S"),
+            "DATE_RANGE_ENDTIME": now.strftime("%Y-%m-%d+%H:%M:%S"),
+            "DELIMITER": "TAB", "COLNAMES": "ON", "EXPORTTIMEZONE": TIMEZONE,
+        }
+        try:
+            r = session.get(url, params=params, timeout=20)
+            if r.status_code != 200 or "<html" in r.text[:200].lower():
+                continue
+            rows = list(csv.DictReader(io.StringIO(r.text), delimiter="\t"))
+            if not rows:
+                continue
+            last = rows[-1]
+            out["ts"] = last.get("time (US/Pacific)", out["ts"])
+            for kind, v in _aggregate_flow_row(last).items():
+                key = keymap[kind]
+                out[key] = round((out[key] or 0.0) + v, 2)
+        except Exception:
+            continue
+    return out
+
+
 def load_history():
     try:
         with open(HISTORY_FILE) as f:
@@ -224,6 +332,10 @@ def run():
                 "est_daily_cost": round(kw * 24 * COST_PER_KWH, 2) if kw is not None else None,
                 "est_daily_co2_kg": round(kw * 24 * CO2_PER_KWH, 1) if kw is not None else None,
             }
+
+        # flow channels (water/steam) where the logger exposes them
+        if bid in results and bid in FLOW_METERS and "flow" not in results[bid]:
+            results[bid]["flow"] = fetch_flow(session, b["mac"], b["db"], FLOW_METERS[bid])
 
         icon = "✅" if kw is not None else "·"
         kw_str = f"{kw} kW (m#{meter_used})" if kw is not None else "no data"
