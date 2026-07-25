@@ -1,0 +1,45 @@
+{
+  "_schema": "twin-equipment/1",
+  "_doc": "Design-basis equipment registry for Grimes (fmr. Bechtel) Engineering Center. Extracted from 50% DD Energy Model Summary (ESD, 2022-07-29, Tables 23-32) and LEED EEM Memo (2023-08-08, final design revisions applied). 'system' matches the 8 viewer systems in grimes-bim-viewer.html SYSTEMS[].",
+  "_source": {
+    "files": [
+      "Bechtel_50_ DD_Energy Model Summary.pdf (Tables 23-32)",
+      "Bechtel_LEED_EA Min Energy Perf_EEM Memo.pdf"
+    ],
+    "extracted": "2026-07-24",
+    "leed_project_id": "1000171106"
+  },
+  "meters": {
+    "3":  { "name": "Roof Electric", "voltage": "480V 3-phase", "serves": "Rooftop mechanical (HPC-3-1 heat pump chiller and related roof equipment)" },
+    "76": { "name": "480/277V Electric", "voltage": "480V", "serves": "AHUs, pumps, large mechanical, 277V lighting" },
+    "77": { "name": "208/120V Electric", "voltage": "208V", "serves": "Plug loads, 120V lighting, IT, small equipment" }
+  },
+  "setpoints": {
+    "indoor_cooling_f": 75, "indoor_heating_f": 70,
+    "setback_cooling_f": 80, "setback_heating_f": 60,
+    "idf_room_f": 75,
+    "tolerance_f": 2
+  },
+  "equipment": [
+    { "tag": "HPC-3-1", "system": "HVAC Equipment", "category": "Air-Cooled Heat Pump Chiller", "description": "Rooftop air-cooled heat pump chiller — simultaneous CHW/HW source for the all-electric plant", "location": "Roof", "meter": "3", "specs": { "cooling_eer": 11.9, "cooling_ieer": 14.58, "heating_cop": 2.52, "chw_supply_f": 44, "chw_delta_t_f": 12, "hw_supply_f": 120, "hw_delta_t_f": 15 }, "source": "DD Tables 30/32 + EEM Memo items 10-11 (final design values)" },
+    { "tag": "AHU-1-1", "system": "HVAC Equipment", "category": "Air Handling Unit", "description": "Central building services AHU — VAV with electric reheat, CHW cooling, OA economizer", "serves": "Central building (all floors except Sibley Auditorium)", "meter": "76", "specs": { "type": "VAV w/ electric reheat", "supply_cfm": 60550, "supply_fan_hp": 69, "supply_fan_control": "VFD", "oa_cfm": 16000, "return_exhaust_cfm": 55000, "return_fan_hp": 30, "return_fan_control": "VFD", "economizer_high_limit_f": 75, "filter": "MERV 13" }, "source": "DD Table 29" },
+    { "tag": "AHU-2-1", "system": "HVAC Equipment", "category": "Air Handling Unit", "description": "Sibley Auditorium AHU — constant volume, CHW cooling, OA economizer", "serves": "Sibley Auditorium", "meter": "76", "specs": { "type": "Constant volume", "supply_cfm": 12200, "supply_fan_hp": 10.78, "supply_fan_control": "VFD", "oa_cfm": 3450, "return_exhaust_cfm": 11600, "return_fan_hp": 5, "return_fan_control": "VFD", "economizer_high_limit_f": 75, "filter": "MERV 13" }, "source": "DD Table 29" },
+    { "tag": "RAD-L1..L4", "system": "HVAC Equipment", "category": "Radiant Floor Heating/Cooling", "description": "Hydronic radiant floor panels — 15 zones across Levels 1-4 (L1, L2 z1-4, L3 z1-5, L4 z1-5)", "serves": "Levels 1-4 occupied zones", "meter": "76", "specs": { "zones": 15, "cooling_capacity_mbh": 191, "cooling_supply_f": 55, "heating_capacity_mbh": 325, "heating_supply_f": 107 }, "source": "DD Table 29 + EEM Memo item 12" },
+    { "tag": "CU-1-1/FCU-1-1", "system": "HVAC Equipment", "category": "DX Split System", "description": "IDF room dedicated cooling — constant volume DX split", "serves": "208-IDF Room", "meter": "76", "specs": { "seer": 16, "type": "Constant volume DX", "setpoint_f": 75 }, "source": "DD Table 29 + EEM Memo item 13" },
+    { "tag": "CHWP-1-1..1-5", "system": "Pumps/Valves", "category": "Chilled Water Pumps", "description": "CHW distribution pumps (5), all variable speed", "meter": "76", "specs": { "count": 5, "hp": [15, 15, 5, 5, 5], "control": "Variable" }, "source": "DD Table 30" },
+    { "tag": "HWP-1-1..1-2", "system": "Pumps/Valves", "category": "Hot Water Pumps", "description": "HW distribution pumps (2), variable speed", "meter": "76", "specs": { "count": 2, "hp": [7.5, 7.5], "control": "Variable" }, "source": "DD Table 32" },
+    { "tag": "RP-1", "system": "Pumps/Valves", "category": "DHW Recirculation Pump", "description": "Domestic hot water recirculation", "meter": "77", "specs": { "gpm": 5, "hp": 0.167, "control": "Variable" }, "source": "DD Table 27" },
+    { "tag": "EWH-1", "system": "Piping", "category": "Electric Water Heater", "description": "Domestic hot water heater w/ storage", "meter": "77", "specs": { "input_kw": 18, "storage_gal": 80, "efficiency": 0.99 }, "source": "DD Table 27" },
+    { "tag": "EWH-2", "system": "Piping", "category": "Electric Water Heater (Tankless)", "description": "Domestic hot water heater, no storage", "meter": "77", "specs": { "input_kw": 13.3, "storage_gal": 0, "efficiency": 0.99 }, "source": "DD Table 27" },
+    { "tag": "CHW/HW-LOOP", "system": "Piping", "category": "Hydronic Distribution", "description": "CHW loop (44F/dT12) and HW loop (120F/dT15) from HPC-3-1 to AHUs and radiant zones", "meter": "76", "specs": { "chw_supply_f": 44, "hw_supply_f": 120 }, "source": "DD Tables 30/32" },
+    { "tag": "ELEV-1..2", "system": "Conduit", "category": "Elevators", "description": "Passenger elevators (2)", "meter": "77", "specs": { "count": 2, "kw_each": 33, "annual_kwh_design": 6000 }, "source": "DD Table 23" }
+  ],
+  "envelope": {
+    "_doc": "Passive measures from EEM Memo (final design values) — context for energy-gap analysis, not viewer geometry.",
+    "roof_u": 0.033, "wall_u": 0.05,
+    "glazing": "Solarban 72 Low-E, assembly U-0.36",
+    "skylight_u": 0.36,
+    "lpd_reduction_vs_901_2010": 0.44,
+    "shading": "Upper-level external shading structure + ground-level south horizontal shades"
+  }
+}

@@ -1585,6 +1585,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       h += '</div>';  // /pe-leed2
     }
 
+    // ── One-line design-gap summary (annual design model vs metered annualized) ──
+    if(b.id==='grimes'){
+      h += '<div style="font:500 9.5px/1.6 \'JetBrains Mono\',monospace;color:#94a3b8;padding:3px 2px 0">Design vs actual: <b style="color:#fbbf24">+9–16%</b> (preliminary)</div>';
+    }
+
     // ── MATERIAL REUSE (LEED v4.1 MR — Building Life-Cycle Impact Reduction) ──
     // Embodied-carbon counterpart to the operational-energy LEED panel above.
     // Bechtel renovation kept ~94% of existing floor structure, full envelope —

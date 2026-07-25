@@ -105,6 +105,20 @@ body.compare-on #syncPanel{display:block}
 #twinDetails .drow .dv{color:#a8b6cc;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #twinDetails .dnote{font:9.5px/1.6 var(--mono);color:#64748b;margin:2px 0}
 #twinDetails .duri{font:8.5px/1.5 var(--mono);color:#3c4a63;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* design-equipment rows (tag · category · headline spec, click to unfold) */
+#twinDetEquip .eqrow{display:flex;gap:6px;align-items:baseline;font:10px/1.8 var(--mono);cursor:pointer;user-select:none}
+#twinDetEquip .eqrow:hover .eqcat{color:#e0e7f1}
+#twinDetEquip .eqtag{color:#67e8f9;font-weight:600;flex-shrink:0}
+#twinDetEquip .eqcat{color:#a8b6cc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#twinDetEquip .eqspec{margin-left:auto;color:#94a3b8;flex-shrink:0;text-align:right}
+#twinDetEquip .eqdet{margin:0 0 4px 2px;padding:2px 0 3px 8px;border-left:1px solid rgba(148,163,184,.15)}
+/* design-vs-actual bars (building panel) */
+#twinPanel .dvarow{display:flex;align-items:center;gap:6px;font:10px/1.7 var(--mono);color:#94a3b8;padding:1px 0}
+#twinPanel .dvarow .dvak{width:46px;flex-shrink:0}
+#twinPanel .dvarow .dvav{flex-shrink:0;color:#e0e7f1;font-weight:600}
+#twinPanel .dvabar{flex:1;height:9px;background:rgba(0,0,0,.3);border-radius:3px;position:relative;overflow:hidden}
+#twinPanel .dvabar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+#twinPanel .dvabar i.rng{background:rgba(52,211,153,.35);border-radius:0 3px 3px 0}
 /* expected-range line: visible without hovering the chart */
 #twinPanel .rangeline{font:10px/1.5 var(--mono);color:#94a3b8;margin:2px 0 4px;display:none}
 #twinPanel .rangeline.on{display:block}
@@ -1172,7 +1186,8 @@ function pickBuilding() {
   drawSpark(document.getElementById('twinSpark'), []);
   renderBaseline(); // same headline: load, status, band chart, latest event
   document.getElementById('twinPoints').innerHTML =
-    '<div class="pt mut"><span>Systems in this building — click one:</span></div>'
+    '<div id="dvaWidget"></div>'
+    + '<div class="pt mut"><span>Systems in this building — click one:</span></div>'
     + SYSTEMS.map((s, i) =>
       `<div class="pt sysrow" onclick="selectSysByIndex(${i})"><span><span class="sw" style="background:#${s.hex.toString(16).padStart(6, '0')}"></span>${esc(s.label)}</span><span class="v">▸</span></div>`).join('');
   const bEnt = twinPkg && twinPkg.brick.entities['grimes:Grimes'];
@@ -1183,6 +1198,34 @@ function pickBuilding() {
     + dsec('About')
     + '<div class="dnote">The shell is architectural context — the colored systems carry the live meter feeds.</div>'
     + '<div class="duri">grimes:Grimes</div>';
+  renderDesignVsActual();
+}
+
+/* ── DESIGN vs ACTUAL (data/design_model.json) — building-panel widget ──
+   LEED design-model annual electricity vs the measured annualized range.
+   Values load from the design-model file; only the layout lives here. */
+async function renderDesignVsActual() {
+  let dm;
+  try { dm = await cachedJson('data/design_model.json'); } catch { return; }
+  const el = document.getElementById('dvaWidget');
+  if (!el || !dm || !dm.annual) return;
+  const design = dm.annual.proposed_kwh;
+  const mc = dm.measured_comparison || {};
+  const g = String(mc.gap_vs_design_pct || '').match(/\+?(\d+)\s*to\s*\+?(\d+)/);
+  const loPct = g ? +g[1] : 9, hiPct = g ? +g[2] : 16;
+  const mLo = mc.naive_annualized_kwh || Math.round(design * (1 + loPct / 100));
+  const mHi = Math.round(design * (1 + hiPct / 100));
+  const max = Math.max(design, mHi) || 1;
+  const mwh = v => (v / 1000).toFixed(1);
+  const pw = v => (v / max * 100).toFixed(1);
+  const peak = dm.peak || {};
+  el.innerHTML =
+    '<div class="sec">Design vs actual · annual electricity</div>'
+    + `<div class="dvarow"><span class="dvak">design</span><div class="dvabar"><i style="width:${pw(design)}%;background:rgba(253,181,21,.55)"></i></div><span class="dvav">${mwh(design)} MWh</span></div>`
+    + `<div class="dvarow"><span class="dvak">actual</span><div class="dvabar"><i style="width:${pw(mLo)}%;background:#34d399"></i><i class="rng" style="left:${pw(mLo)}%;width:${pw(mHi - mLo)}%"></i></div><span class="dvav">${mwh(mLo)}–${mwh(mHi)} MWh</span></div>`
+    + `<div class="pt"><span>Gap vs design</span><span class="v" style="color:#fbbf24">+${loPct}–${hiPct}%</span></div>`
+    + (peak.coincident_kw ? `<div class="pt"><span>Design coincident peak</span><span class="v">${esc(peak.coincident_kw)} kW</span></div>` : '')
+    + '<div class="mut" style="font:italic 9px/1.6 var(--mono)">July-only sample — winter data needed</div>';
 }
 
 async function pickSystem(mesh) {
@@ -1205,6 +1248,7 @@ async function pickSystem(mesh) {
   // Plumbing is flow-first: GPM headline + 24 h flow chart. Everything else
   // keeps the electricity-vs-baseline headline.
   if (isPiping) renderFlowHeadline(); else renderBaseline();
+  renderEquip(sysName || name); // design-basis equipment for this system (independent of live binding)
   if (!twinPkg) { detInfo.textContent = 'twin package not loaded (serve over http)'; return; }
   const res = TwinResolver.resolveNode(twinPkg, name);
   if (!res.bound) {
@@ -1232,7 +1276,6 @@ async function pickSystem(mesh) {
     + dsec('Next steps')
     + '<div class="dnote">BAS/IoT sensor integration will populate the remaining channels.</div>'
     + `<div class="duri">${esc(res.uri)}</div>`;
-  renderEquip(name);
   if (!res.points.length) {
     ptsEl.innerHTML = channelRows(sysName, await liveChannels(sysName, null))
       + '<div class="pt mut"><span>No meter on this system'
@@ -1270,19 +1313,60 @@ async function pickSystem(mesh) {
   }
 }
 
-/* ── Equipment registry (optional buildings/grimes/equipment.json) ──
-   If an NWD-extracted element registry exists, show per-system counts and a
-   few representative items. If not, say WHY there's nothing to show. */
-async function renderEquip(nodeName) {
+/* ── DESIGN EQUIPMENT (buildings/grimes/equipment.json) ──
+   Design-basis equipment registry (LEED/DD documents). Rows filtered by the
+   picked system's `system` field: tag · category · 1–2 headline specs; click
+   a row to unfold the remaining specs. Falls back to the old "no registry"
+   note when the file is missing or nothing matches this system. */
+const _specFmt = {
+  heating_cop: v => 'COP ' + v,
+  cooling_eer: v => 'EER ' + v,
+  seer: v => 'SEER ' + v,
+  supply_cfm: v => (+v).toLocaleString() + ' CFM',
+  input_kw: v => v + ' kW',
+  kw_each: v => v + ' kW each',
+  zones: v => v + ' zones',
+  gpm: v => v + ' GPM',
+  count: v => '×' + v,
+  hp: v => (Array.isArray(v) ? v.join('/') : v) + ' hp',
+  chw_supply_f: v => 'CHW ' + v + '°F',
+  hw_supply_f: v => 'HW ' + v + '°F',
+  storage_gal: v => v + ' gal',
+};
+const _specPriority = ['heating_cop', 'cooling_eer', 'supply_cfm', 'input_kw', 'kw_each', 'seer', 'zones', 'count', 'hp', 'gpm', 'chw_supply_f', 'hw_supply_f', 'storage_gal'];
+function headlineSpecKeys(specs) {
+  const keys = _specPriority.filter(k => k in specs).slice(0, 2);
+  if (!keys.length && Object.keys(specs).length) keys.push(Object.keys(specs)[0]);
+  return keys;
+}
+const fmtSpec = (k, v) => _specFmt[k] ? _specFmt[k](v)
+  : String(k).replace(/_/g, ' ') + ' ' + (Array.isArray(v) ? v.join('/') : v);
+let _eqUid = 0;
+async function renderEquip(sysName) {
   const el = document.getElementById('twinDetEquip'); // lives inside ⓘ details
   try {
     const reg = await cachedJson('buildings/grimes/equipment.json');
-    const key = Object.keys(reg.systems || {}).find(k => NORM(k) === NORM(nodeName));
-    const sys = key && reg.systems[key];
-    if (!sys || !(sys.items || []).length) throw new Error('no entry');
-    el.innerHTML = 'equipment: ' + sys.items.length + ' items — '
-      + sys.items.slice(0, 3).map(it => esc(it.name || it)).join(', ')
-      + (sys.items.length > 3 ? ', …' : '');
+    const items = (reg.equipment || []).filter(it => NORM(it.system || '') === NORM(sysName || ''));
+    if (!items.length) throw new Error('no entry');
+    el.innerHTML = dsec('Design equipment · ' + items.length)
+      + items.map(it => {
+        const specs = it.specs || {};
+        const head = headlineSpecKeys(specs);
+        const rest = Object.keys(specs).filter(k => !head.includes(k));
+        const id = 'eqd' + (_eqUid++);
+        const det =
+          (it.description ? `<div class="dnote">${esc(it.description)}</div>` : '')
+          + rest.map(k => drow(esc(String(k).replace(/_/g, ' ')),
+              esc(Array.isArray(specs[k]) ? specs[k].join(' / ') : specs[k]))).join('')
+          + (it.serves ? drow('serves', esc(it.serves)) : '')
+          + (it.location ? drow('location', esc(it.location)) : '')
+          + (it.meter ? drow('meter', 'M' + esc(it.meter)) : '')
+          + (it.source ? `<div class="dnote">${esc(it.source)}</div>` : '');
+        return `<div class="eqrow" onclick="toggleTwinMore('${id}')" title="click for full specs">`
+          + `<span class="eqtag">${esc(it.tag)}</span><span class="eqcat">${esc(it.category)}</span>`
+          + `<span class="eqspec">${esc(head.map(k => fmtSpec(k, specs[k])).join(' · '))}</span></div>`
+          + `<div id="${id}" class="eqdet" style="display:none">${det}</div>`;
+      }).join('');
   } catch {
     el.innerHTML = 'no element registry — GLB is system-tier geometry; NWD re-export needed for per-element data';
   }
