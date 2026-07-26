@@ -300,6 +300,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 /* ══════════ SCENE ══════════ */
 const pane = document.getElementById('viewerPane');
@@ -309,9 +310,27 @@ const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
 camera.position.set(35, 25, 35);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/* ── Render-quality pass (lighting/material/tonemapping only — NO postprocessing:
+   the 57 MB shell is ~31k draw calls, SSAO etc. would tank it) ── */
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const EXPOSURE_ORBIT = 1.15, EXPOSURE_WALK = 1.45; // interiors read dark otherwise
+renderer.toneMappingExposure = EXPOSURE_ORBIT;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 pane.appendChild(renderer.domElement);
-scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(50, 80, 30); scene.add(dl);
+// Sky/ground hemisphere + warm key + cool fill — replaces the old flat
+// ambient-only rig that made every shell face read the same tone.
+scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x46403a, 0.9));
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+const dl = new THREE.DirectionalLight(0xfff1dc, 1.5); dl.position.set(50, 80, 30); scene.add(dl);
+const dlFill = new THREE.DirectionalLight(0x9db8dc, 0.45); dlFill.position.set(-45, 35, -55); scene.add(dlFill);
+// Neutral studio environment (PMREM) — the shell GLB carries real
+// MeshStandardMaterials (metalness .2 / roughness .4), so image-based
+// lighting is what makes metals/glass stop looking like flat plastic.
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+}
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 8, 0);
 
@@ -383,7 +402,9 @@ loader.load('grimes-mep-only.glb', (gltf) => {
     let si = NAME_TO_SYS[nm] ?? NAME_TO_SYS_N[NORM(nm)];
     if (si === undefined) { console.warn('[glb] unknown node', nm); si = Math.min(idx, SYSTEMS.length - 1); }
     if (!(si in sysMesh)) sysMesh[si] = child;
-    child.material = new THREE.MeshBasicMaterial({ color: SYSTEMS[si].hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+    // toneMapped:false — system colors are UI (must match the legend swatches),
+    // so they bypass the ACES curve applied to the photographic shell.
+    child.material = new THREE.MeshBasicMaterial({ color: SYSTEMS[si].hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85, toneMapped: false });
     idx++;
   });
   document.getElementById('loading').style.display = 'none';
@@ -412,6 +433,50 @@ let building = null, buildingLoading = false;
 // GLB materials (or a plain opaque wall tone) for Walk mode realism.
 const shellGhostMat = new THREE.MeshLambertMaterial({ color: 0x9fb2c8, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false });
 const shellSolidMat = new THREE.MeshLambertMaterial({ color: 0xb8bfc9, side: THREE.DoubleSide });
+
+/* ── Shell material upgrade (in place, per unique material) ──
+   The Navisworks export names each node after its Revit material
+   ("Wood_(White_Oak_Rift_Cut)", "UCBBECH_-_GL-3A", "Concrete_-_Cast-in-Place…")
+   and keeps real base colors, but flattens PBR to metalness .2 / roughness .4
+   and — crucially — exports glass with alphaMode OPAQUE, so glazing rendered
+   as solid pale slabs. This pass fixes transparency and assigns plausible
+   metal/wood/concrete/gypsum/fabric responses from the names. Materials are
+   shared across meshes; the _upgraded flag makes the pass run once each. */
+const GLASS_TINT = new THREE.Color(0x9cc4dd);
+function upgradeShellMaterial(mat, nodeName) {
+  if (!mat || mat.userData._upgraded) return;
+  mat.userData._upgraded = true;
+  if (!('metalness' in mat)) return; // only PBR materials from the GLB
+  const n = String(nodeName).toLowerCase();
+  const isGlass = mat.opacity < 0.999 || /glass|glazing|_gl-|-gl-|vitr|curtain/.test(n);
+  if (isGlass) {
+    mat.transparent = true;
+    mat.depthWrite = false;
+    mat.opacity = Math.min(0.5, Math.max(0.18, mat.opacity < 0.999 ? mat.opacity + 0.08 : 0.35));
+    mat.metalness = 0; mat.roughness = 0.06;
+    mat.envMapIntensity = 1.3;
+    // near-white/grey glass → cool blue tint (colored glass keeps its color)
+    const c = mat.color, lum = (c.r + c.g + c.b) / 3;
+    if (lum > 0.55 && Math.abs(c.r - c.b) < 0.15) c.lerp(GLASS_TINT, 0.65);
+    mat.side = THREE.DoubleSide;
+  } else if (/chrome|stainless|polished/.test(n)) {
+    mat.metalness = 0.95; mat.roughness = 0.18; mat.envMapIntensity = 1.1;
+  } else if (/metal|steel|alum|_mtl|stl-|hndrl|guardrail|handrail|stud|caster|frame/.test(n)) {
+    mat.metalness = 0.75; mat.roughness = 0.42; mat.envMapIntensity = 0.8;
+  } else if (/wood|oak|birch|maple|timber|_wd/.test(n)) {
+    mat.metalness = 0; mat.roughness = 0.55; mat.envMapIntensity = 0.5;
+  } else if (/concrete|cement|masonry|cmu|brick|terrazzo|stone/.test(n)) {
+    mat.metalness = 0; mat.roughness = 0.95; mat.envMapIntensity = 0.3;
+  } else if (/gypsum|gwb|plaster|paint|wall|ceiling|acous/.test(n)) {
+    mat.metalness = 0; mat.roughness = 0.9; mat.envMapIntensity = 0.35;
+    // dead-grey default walls → subtle warm off-white so rooms don't feel concrete-boxed
+    if (/default_wall/.test(n)) mat.color.lerp(new THREE.Color(0xd8d2c6), 0.5);
+  } else if (/fabric|upholstery|carpet|cloth|felt/.test(n)) {
+    mat.metalness = 0; mat.roughness = 1.0; mat.envMapIntensity = 0.25;
+  } else {
+    mat.metalness = 0.05; mat.roughness = 0.7; mat.envMapIntensity = 0.45;
+  }
+}
 const shellBounds = []; // {mesh, box} — cheap XZ prefilter for ground raycasts
 function setShellMode(solid) {
   if (!building) return;
@@ -473,6 +538,7 @@ function loadShell() {
     // each mesh for Walk mode's opaque look (setShellMode toggles).
     building.traverse(ch => {
       if (!ch.isMesh) return;
+      upgradeShellMaterial(ch.material, ch.name || (ch.parent && ch.parent.name) || '');
       ch.userData.origMat = ch.material;
       ch.material = shellGhostMat;
       ch.renderOrder = -1;
@@ -651,6 +717,7 @@ window.toggleWalk = () => {
 };
 function enterWalk() {
   walkMode = true; thirdPerson = false;
+  renderer.toneMappingExposure = EXPOSURE_WALK; // indoor: no direct sky view → lift exposure (no fog by design)
   savedCam = { pos: camera.position.clone(), quat: camera.quaternion.clone(), target: controls.target.clone() };
   // seed yaw/pitch from the current view so entry doesn't snap the camera
   _lookEuler.setFromQuaternion(camera.quaternion, 'YXZ');
@@ -687,6 +754,7 @@ function enterWalk() {
 function exitWalk() {
   if (!walkMode) return;
   walkMode = false; thirdPerson = false; dragLook = false;
+  renderer.toneMappingExposure = EXPOSURE_ORBIT;
   avatar.visible = false;
   for (const k in keys) keys[k] = false;
   if (savedCam) {
