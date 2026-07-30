@@ -1,0 +1,73 @@
+{
+  "_schema": "design-model/1",
+  "_doc": "LEED v4 EAp2/EAc1 design-phase energy model for Grimes (fmr. Bechtel) Engineering Center. baseline = ASHRAE 90.1-2010 PRM code minimum; proposed = as-designed IES VE model. Use for design-intent vs measured comparison. Measured counterpart: building_data.json meters 3+76+77.",
+  "_source": {
+    "files": [
+      "20240529_Bechtel_LEEDv4MinEnergyPerfCalc.xlsm (Performance_Outputs_Summary)",
+      "20240529_Bechtel_EUI.pdf (IES VE 2023.4.1.0 output, sim p_20240529_1.aps)",
+      "20240529_Bechtel_PRM.pdf"
+    ],
+    "extracted": "2026-07-24",
+    "leed_project_id": "1000171106",
+    "rating_system": "LEED v4 BD+C: New Construction"
+  },
+  "building": {
+    "name": "UCB Bechtel Engineering Center-Remodel (Grimes Engineering Center)",
+    "conditioned_area_sqft": 72108,
+    "unconditioned_area_sqft": 16680,
+    "percent_new_construction": 0.44,
+    "percent_renovation_existing": 0.56,
+    "all_electric": true
+  },
+  "simulation": {
+    "tool": "IES VE 2023.4.1.0",
+    "weather_file": "USA_CA_Oakland.Intl.AP.724930_TMY3.epw",
+    "hours": 8760,
+    "utility_rate_usd_per_kwh": 0.21,
+    "utility_rate_source": "EIA 2022 CA average"
+  },
+  "annual": {
+    "proposed_kwh": 824544,
+    "baseline_kwh": 1501425,
+    "savings_pct": 45.1,
+    "proposed_cost_usd": 149464,
+    "baseline_cost_usd": 272115,
+    "avg_load_kw": 94.1
+  },
+  "peak": {
+    "coincident_kw": 568.2,
+    "coincident_when": "Dec 4, 07:00 (TMY3)",
+    "noncoincident_sum_kw": 854.6,
+    "_doc": "Use coincident_kw for comparison with measured whole-building peak. noncoincident_sum_kw is the sum of per-end-use peaks and overstates real demand."
+  },
+  "eui": {
+    "site_kbtu_per_sqft_yr": 39,
+    "site_kwh_per_sqft_yr": 11.4,
+    "site_kwh_per_m2_yr": 123
+  },
+  "leed": {
+    "eac1_points": 17,
+    "threshold_basis": "45.1% cost savings vs ASHRAE 90.1-2010 baseline"
+  },
+  "end_uses": [
+    { "end_use": "Space heating",              "baseline_kwh": 868508, "proposed_kwh": 146725, "savings_pct": 83.1,   "baseline_kw": 635.5, "proposed_kw": 496.35 },
+    { "end_use": "Fans - interior ventilation","baseline_kwh": 94301,  "proposed_kwh": 237435, "savings_pct": -151.8, "baseline_kw": 25.5,  "proposed_kw": 108.38 },
+    { "end_use": "Space cooling",              "baseline_kwh": 92418,  "proposed_kwh": 57642,  "savings_pct": 37.6,   "baseline_kw": 149.8, "proposed_kw": 128.07 },
+    { "end_use": "Interior lighting",          "baseline_kwh": 162547, "proposed_kwh": 104862, "savings_pct": 35.5,   "baseline_kw": 57.0,  "proposed_kw": 37.69 },
+    { "end_use": "Exterior lighting",          "baseline_kwh": 36884,  "proposed_kwh": 21652,  "savings_pct": 41.3,   "baseline_kw": 7.8,   "proposed_kw": 3.81 },
+    { "end_use": "Pumps",                      "baseline_kwh": 3154,   "proposed_kwh": 14348,  "savings_pct": -355.0, "baseline_kw": 0.4,   "proposed_kw": 9.58 },
+    { "end_use": "Heat rejection",             "baseline_kwh": 5899,   "proposed_kwh": 4166,   "savings_pct": 29.4,   "baseline_kw": 9.6,   "proposed_kw": 9.26 },
+    { "end_use": "Fans - exhaust",             "baseline_kwh": 313,    "proposed_kwh": 313,    "savings_pct": 0.0,    "baseline_kw": 0.06,  "proposed_kw": 0.06 },
+    { "end_use": "Service water heating",      "baseline_kwh": 81113,  "proposed_kwh": 81113,  "savings_pct": 0.0,    "baseline_kw": 19.75, "proposed_kw": 19.75 },
+    { "end_use": "Receptacle equipment",       "baseline_kwh": 121554, "proposed_kwh": 121555, "savings_pct": 0.0,    "baseline_kw": 31.42, "proposed_kw": 31.42 },
+    { "end_use": "IT equipment",               "baseline_kwh": 29047,  "proposed_kwh": 29047,  "savings_pct": 0.0,    "baseline_kw": 9.61,  "proposed_kw": 9.61 },
+    { "end_use": "Elevators and escalators",   "baseline_kwh": 6000,   "proposed_kwh": 6000,   "savings_pct": 0.0,    "baseline_kw": 0.7,   "proposed_kw": 0.67 }
+  ],
+  "measured_comparison": {
+    "meter_formula": "kw_3 + kw_76 + kw_77",
+    "_meter_note": "Verified 2026-07-24: three parallel feeders, no double counting. M3 = Roof Electric (rooftop mechanical, 480V), M76 = 480/277V, M77 = 208/120V. M3 is NOT the main service.",
+    "measured_daily_kwh_jul13_24_avg": 2472,
+    "naive_annualized_kwh": 902000,
+    "gap_vs_design_pct": "+9 to +16 (July-only sample; all-electric heating dominant in design — re-estimate after winter data)"
+  }
+}
