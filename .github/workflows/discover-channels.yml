@@ -1,6 +1,7 @@
 # One-shot BMO channel inventory: probes every known AcquiSuite device for
 # all responding meter IDs and records their column headers, so we know which
 # buildings expose water/gas/steam channels beyond electricity.
+# Report is committed to the `data` branch.
 name: Discover BMO Channels
 
 on:
@@ -13,9 +14,17 @@ jobs:
   discover:
     runs-on: ubuntu-latest
     concurrency:
-      group: bmo-discovery      # own group: the 15-min workflows cancel-in-progress their own groups
+      group: bmo-discovery
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+          path: _data
+
+      - name: Seed working data dir
+        run: rsync -a _data/data/ data/
 
       - uses: actions/setup-python@v5
         with:
@@ -30,13 +39,15 @@ jobs:
           BMO_PASSWORD: ${{ secrets.BMO_PASSWORD }}
         run: python scripts/discover_channels.py
 
-      - name: Commit report
+      - name: Commit report to data branch
         run: |
+          rsync -a data/bmo_channels_report.json _data/data/bmo_channels_report.json
+          cd _data
           git config user.name "BMO Channel Discovery"
           git config user.email "bmo@github-actions.bot"
           git add data/bmo_channels_report.json
           git diff --staged --quiet || git commit -m "🔎 BMO channel inventory"
           for i in 1 2 3; do
-            git pull --rebase origin main && git push && break
+            git pull --rebase origin data && git push origin data && break
             sleep $((i * 5))
           done

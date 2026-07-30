@@ -1,12 +1,13 @@
 name: BMO Campus Energy Fetch
 
+# Data commits go to the `data` branch (orphan) — main stays code-only.
+# Pages fetch outputs from raw.githubusercontent.com/<repo>/data/data/*.json
+
 on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
-# Default GITHUB_TOKEN may be read-only depending on repo settings —
-# this job commits to main, so request write explicitly.
 permissions:
   contents: write
 
@@ -17,9 +18,16 @@ jobs:
       group: bmo-energy
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4   # main: scripts + static configs
+
+      - uses: actions/checkout@v4   # data branch: accumulated outputs
         with:
-          fetch-depth: 0
+          ref: data
+          path: _data
+
+      - name: Seed working data dir from data branch
+        # Scripts append to history/caches, so they must see the latest outputs.
+        run: rsync -a _data/data/ data/
 
       - uses: actions/setup-python@v5
         with:
@@ -38,34 +46,28 @@ jobs:
         run: python generate_weekly_report.py || true
 
       - name: Build energy baseline / anomaly stats
-        # Incremental: appends the fresh snapshot + rolling history to the
-        # accumulated series cache, then recomputes hour-of-week medians and
-        # z-scores. '|| true' so a stats hiccup never blocks the data commit.
         run: python scripts/build_baseline.py || true
 
       - name: TOWT weather-normalized baseline
-        # Fetches Berkeley hourly temps (open-meteo; cached in
-        # data/weather_cache.json so calls stay minimal) and fits the
-        # time-of-week + piecewise-temperature model. Guarded: a failure
-        # never blocks the data commit; frontends fall back to the
-        # median baseline while towt_baseline.json is absent.
         run: python scripts/towt_baseline.py || true
 
       - name: Archive daily snapshot
         run: |
           TODAY=$(date +'%Y-%m-%d')
+          mkdir -p data/archive
           cp data/campus_energy.json "data/archive/${TODAY}.json"
-          cp data/building_data.json "data/archive/buildings_${TODAY}.json"
+          cp data/building_data.json "data/archive/buildings_${TODAY}.json" 2>/dev/null || true
           echo "Archived: ${TODAY}"
-      
-      - name: Commit and push
+
+      - name: Commit and push to data branch
         run: |
+          rsync -a data/ _data/data/
+          cd _data
           git config user.name "BMO Auto-Fetcher"
           git config user.email "bmo@github-actions.bot"
           git add data/
           git diff --staged --quiet || git commit -m "🔋 Update campus energy $(date +'%H:%M')"
-          # Rebase-retry: bmo-fetch.yml may push between our checkout and push
           for i in 1 2 3; do
-            git pull --rebase origin main && git push && break
+            git pull --rebase origin data && git push origin data && break
             sleep $((i * 5))
           done

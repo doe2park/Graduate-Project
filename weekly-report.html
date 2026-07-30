@@ -57,13 +57,13 @@ a{color:var(--cyan);text-decoration:none}
 <div class="wrap" id="app"><div id="loading"><div class="spin"></div>Loading report...</div></div>
 
 <script>
-const REPORT_URL='https://doe2park.github.io/Graduate-Project/data/weekly_report.json';
+const REPORT_URL='https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/weekly_report.json';
 const ARCHIVE_BASE='https://doe2park.github.io/Graduate-Project/data/archive/';
 var weekOffset=0;
 function getArchiveDate(o){var d=new Date();d.setDate(d.getDate()+o*7);return d.toISOString().slice(0,10)}
 function changeWeek(dir){weekOffset+=dir;if(weekOffset>0)weekOffset=0;document.getElementById('nextBtn').disabled=(weekOffset>=0);if(weekOffset===0){document.getElementById('weekLabel').textContent='This week';document.getElementById('weekLabel').style.color='var(--cyan)'}else{document.getElementById('weekLabel').textContent=getArchiveDate(weekOffset);document.getElementById('weekLabel').style.color='var(--gold)'}init()}
 
-const NAMES_URL='https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
+const NAMES_URL='https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy.json';
 
 Chart.defaults.color='#64748b';
 Chart.defaults.borderColor='rgba(255,255,255,.06)';

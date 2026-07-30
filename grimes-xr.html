@@ -2655,7 +2655,7 @@ let liveData = null;
 
 async function fetchLiveData() {
   try {
-    const res = await fetch('https://doe2park.github.io/Graduate-Project/data/building_data.json?t=' + Date.now());
+    const res = await fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json?t=' + Date.now());
     liveData = await res.json();
     updateDashboard();
     console.log('📡 Live data updated:', liveData.generated_at);
@@ -4283,7 +4283,7 @@ window.addEventListener('resize',()=>{
 });
 </script>
 <script>
-fetch("https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t="+Date.now())
+fetch("https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy.json?t="+Date.now())
 .then(r=>r.json()).then(d=>{
   var el=document.getElementById("liveKwBadge");
   if(el)el.innerHTML="⚡ Campus: "+d.total_kw+" kW · "+d.buildings_online+" buildings";
@@ -4506,7 +4506,7 @@ function renderSpark(series){
 // identifier in updatePublicStory() resolves via the global scope chain.
 async function _publicFetch(){
   try{
-    var r=await fetch('https://doe2park.github.io/Graduate-Project/data/building_data.json?t='+Date.now());
+    var r=await fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json?t='+Date.now());
     window.liveData=await r.json();
     updatePublicStory();
   }catch(e){console.warn('Public fetch failed:',e);}

@@ -311,7 +311,7 @@ camera.position.set(35, 25, 35);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 /* ── Render-quality pass (lighting/material/tonemapping only — NO postprocessing:
-   the 57 MB shell is ~31k draw calls, SSAO etc. would tank it) ── */
+   the 21 MB shell is ~120 draw calls, SSAO etc. would tank it) ── */
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 const EXPOSURE_ORBIT = 1.15, EXPOSURE_WALK = 1.45; // interiors read dark otherwise
 renderer.toneMappingExposure = EXPOSURE_ORBIT;
@@ -415,7 +415,7 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   controls.target.copy(c);
   camera.position.set(c.x + 45, c.y + 30, c.z + 45);
   alignShellToMep(); // in case the shell finished loading before the MEP
-  // Desktop: shell is part of the default view — start the 57 MB download in
+  // Desktop: shell is part of the default view — start the 21 MB download in
   // the background once the MEP is up (progress shows on the topbar button).
   // Mobile keeps the confirm-gated manual toggle.
   if (!mobileMq.matches) loadShell();
@@ -426,7 +426,7 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   el.querySelector('.spinner').style.animation = 'none';
 });
 
-// Full building shell (57 MB, Draco) — lazy toggle, identical transform to grimes-xr:
+// Full building shell (21 MB, Draco+WebP, material-preserving join) — lazy toggle, identical transform to grimes-xr:
 // feet→meters, Z-up→Y-up, recentered — so it lands in the same frame as the MEP glb.
 let building = null, buildingLoading = false;
 // Shell materials: translucent ghost for Orbit (MEP stays visible), original
@@ -507,15 +507,15 @@ window.toggleBuilding = () => {
   const btn = document.getElementById('bldgBtn');
   if (building) { building.visible = !building.visible; btn.classList.toggle('active', building.visible); return; }
   if (buildingLoading) return;
-  // Never auto-download 57 MB on a phone — stays opt-in behind an explicit confirm.
-  if (mobileMq.matches && !confirm('Building shell is a 57 MB download. Load it on this device?')) return;
+  // Never auto-download 21 MB on a phone — stays opt-in behind an explicit confirm.
+  if (mobileMq.matches && !confirm('Building shell is a 21 MB download. Load it on this device?')) return;
   loadShell();
 };
 function loadShell() {
   if (building || buildingLoading) return;
   const btn = document.getElementById('bldgBtn');
   buildingLoading = true;
-  btn.textContent = '⏳ 57 MB…';
+  btn.textContent = '⏳ 21 MB…';
   loader.load('grimes-mep-compressed.glb', (gltf) => {
     building = gltf.scene;
     const FT_TO_M = 0.3048;
@@ -562,7 +562,7 @@ function loadShell() {
     buildingLoading = false;
     btn.textContent = '🏢 Building shell';
     btn.classList.add('active');
-  }, p => { btn.textContent = `⏳ ${(p.loaded/1048576).toFixed(0)}/57 MB`; },
+  }, p => { btn.textContent = `⏳ ${(p.loaded/1048576).toFixed(0)}/21 MB`; },
   () => { buildingLoading = false; btn.textContent = '⚠ shell failed'; });
 }
 
@@ -1209,7 +1209,7 @@ async function liveChannels(sysName, powerKw) {
   const live = { power: powerKw };
   if (SYS_CHANNELS[sysName] === 'piping') {
     try {
-      const bd = await cachedJson('data/building_data.json');
+      const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
       const w = bd && bd.water && bd.water.latest;
       if (w) {
         const cf = (w.water1_rate_cfm || 0) + (w.water2_rate_cfm || 0);
@@ -1471,7 +1471,7 @@ async function renderFlowHeadline() {
   cv._chart = null; // flow chart has its own scale — disable power hover
   cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   try {
-    const bd = await cachedJson('data/building_data.json');
+    const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
     const w = bd && bd.water, L = w && w.latest;
     if (!L) { srcEl.textContent = 'no flow data available'; return; }
     const gpm = ((L.water1_rate_cfm || 0) + (L.water2_rate_cfm || 0)) * 7.481;
@@ -1532,13 +1532,13 @@ async function renderBaseline() {
   document.getElementById('chartKey').innerHTML = CHARTKEY_POWER;
   cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   try {
-    const eb = await cachedJson('data/energy_baseline.json');
+    const eb = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/energy_baseline.json');
     const med = eb && eb.buildings && eb.buildings.grimes;
     // TOWT (weather-normalized) preferred when its quality flag passes; both
     // files share the current/recent24 shape so the source is just swapped.
     let src = med, srcName = 'median';
     try {
-      const tw = await cachedJson('data/towt_baseline.json');
+      const tw = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/towt_baseline.json');
       const tg = tw && tw.buildings && tw.buildings.grimes;
       if (tg && tg.use_towt && tg.recent24 && tg.recent24.length) { src = tg; srcName = 'weather-normalized'; }
     } catch {} // towt file is optional

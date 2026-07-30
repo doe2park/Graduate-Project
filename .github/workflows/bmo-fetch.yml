@@ -1,17 +1,18 @@
 # .github/workflows/bmo-fetch.yml
-# Auto-fetch BMO energy data every 15 min → commit JSON → GitHub Pages serves it
+# Auto-fetch Grimes BMO data every 15 min → commit JSON to the `data` branch.
+# Main stays code-only; pages fetch from raw.githubusercontent.com/<repo>/data/
 
 name: BMO Data Fetch
 
 on:
   schedule:
     # Offset from bmo-campus-energy.yml ('*/15') to avoid two workflows
-    # pushing to main at the same minute (push races → failed pushes).
+    # pushing to the data branch at the same minute.
     - cron: '7,22,37,52 * * * *'
-  workflow_dispatch:          # Manual trigger button in GitHub UI
+  workflow_dispatch:
 
 permissions:
-  contents: write             # Needed to commit building_data.json
+  contents: write
 
 jobs:
   fetch:
@@ -21,8 +22,17 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Checkout repo
+      - name: Checkout main (scripts)
         uses: actions/checkout@v4
+
+      - name: Checkout data branch
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: _data
+
+      - name: Seed working data dir
+        run: rsync -a _data/data/ data/
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,15 +48,15 @@ jobs:
           BMO_PASSWORD: ${{ secrets.BMO_PASSWORD }}
         run: python bmo_fetch.py --hours 24
 
-      - name: Commit & push JSON
+      - name: Commit & push to data branch
         run: |
+          rsync -a data/building_data.json _data/data/building_data.json
+          cd _data
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/building_data.json
           git diff --cached --quiet || git commit -m "Update energy data $(date -u +'%Y-%m-%d %H:%M UTC')"
-          # Rebase-retry: another workflow may have pushed meanwhile
           for i in 1 2 3; do
-            git push && break
-            git pull --rebase origin main
+            git pull --rebase origin data && git push origin data && break
             sleep $((i * 5))
           done

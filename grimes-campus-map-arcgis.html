@@ -856,18 +856,18 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   // 4-tier fallback: (wday,hr) → (weekday|weekend,hr) → hr → building overall.
   // Built by build_baselines.py from data/archive/*.json sparklines.
   window.baselines=null;
-  fetch('data/baselines.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.baselines=d;}).catch(function(){});
+  fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/baselines.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.baselines=d;}).catch(function(){});
 
   // Statistical baseline/anomaly layer (hour-of-week median + MAD z-scores) —
   // built by scripts/build_baseline.py every 15 min. Feeds the σ-banner in popups.
   window.energyBaseline=null;
-  fetch('data/energy_baseline.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.energyBaseline=d;}).catch(function(){});
+  fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/energy_baseline.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.energyBaseline=d;}).catch(function(){});
 
   // TOWT weather-normalized baseline (optional — produced by scripts/towt_baseline.py
   // on the Actions runner). When a building's use_towt quality flag passes, the
   // σ-banner uses it instead of the hour-of-week median.
   window.towtBaseline=null;
-  fetch('data/towt_baseline.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.towtBaseline=d;}).catch(function(){});
+  fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/towt_baseline.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.towtBaseline=d;}).catch(function(){});
 
   // LEED design-intent data (Grimes/Bechtel only) — feeds the "Design Intent vs Actual" panel
   // and the Public LEED badge. Extracted from the LEED submittal calculator by extract_leed.py.
@@ -2092,7 +2092,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   renderList();
 
   // ═══ LIVE DATA FROM BMO ═══
-  const ENERGY_URL = 'https://doe2park.github.io/Graduate-Project/data/campus_energy.json';
+  const ENERGY_URL = 'https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy.json';
 
   async function fetchLiveData() {
     try {
@@ -2176,9 +2176,9 @@ var AI_PROXY = 'https://campus-chatbot.ucb-dt.workers.dev';
 var chatOpen=false;
 function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('open',chatOpen);if(chatOpen)document.getElementById('chatIn').focus()}
 var chatData=null, chatHistory=null, chatWeekly=null;
-fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatData=d}).catch(function(){});
-fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatHistory=d}).catch(function(){});
-fetch('https://doe2park.github.io/Graduate-Project/data/weekly_report.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatWeekly=d}).catch(function(){});
+fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatData=d}).catch(function(){});
+fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy_history.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatHistory=d}).catch(function(){});
+fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/weekly_report.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){chatWeekly=d}).catch(function(){});
 
 // ─── Event delegation for in-answer action buttons (zoom / filter / reset) ───
 document.addEventListener('click',function(e){
@@ -2792,7 +2792,7 @@ var _moodHist=null;
 async function _loadMoodHist(){
   if(_moodHist)return _moodHist;
   try{
-    var r=await fetch('https://doe2park.github.io/Graduate-Project/data/campus_energy_history.json?t='+Date.now());
+    var r=await fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy_history.json?t='+Date.now());
     if(r.ok)_moodHist=await r.json();
   }catch(e){_moodHist={}}
   return _moodHist;

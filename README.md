@@ -141,9 +141,16 @@ HVAC, plumbing, and fire protection sensor readings shown on component click are
 
 ### Automated Pipeline
 
+> **Branch layout (since 2026-07-30):** `main` is code-only. All pipeline outputs
+> are committed to the orphan **`data` branch** and fetched by the pages from
+> `https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/…`.
+> Static configs (LEED extracts, cupix_calib, building_ids, manifests) stay on `main`.
+> Weather-normalized **TOWT baselines** (`scripts/towt_baseline.py`) and hour-of-week
+> baselines (`scripts/build_baseline.py`) run in the same 15-min workflow.
+
 | File | Description | Update Frequency |
 |---|---|---|
-| `data/campus_energy.json` | Live snapshot — 26 buildings × kW, cost, CO₂, anomaly flags, prediction | Every 15 min |
+| `data/campus_energy.json` | Live snapshot — kW, cost, CO₂, anomaly flags, prediction (on `data` branch) | Every 15 min |
 | `data/campus_energy_history.json` | 24-hour rolling history — up to 96 data points per building | Every 15 min |
 | `data/daily/YYYY-MM-DD.json` | Permanent daily archive — all readings preserved for trend analysis | Append each cycle |
 | `data/weekly_report.json` | 7-day summary — avg/peak/min kW, cost, CO₂ per building | Every 15 min |
@@ -242,7 +249,7 @@ Graduate-Project/
 ├── grimes-aps-viewer.html           # (deprecated stub — redirects to grimes-bim-viewer.html)
 ├── grimes-bim-iot/protoys.html      # BIM-IoT sensor dashboard prototype (simulated, BAS-ready)
 ├── grimes-mep-only.glb              # MEP 3D model (1.7 MB)
-├── grimes-mep-compressed.glb        # Full building model (57 MB, lazy-loaded overlay)
+├── grimes-mep-compressed.glb        # Full building model (21 MB Draco+WebP, lazy-loaded overlay)
 ├── bmo_fetch.py                     # BMO fetcher — Grimes detail (building_data.json)
 ├── bmo_fetch_campus.py              # BMO fetcher — campus-wide (campus_energy.json)
 ├── generate_weekly_report.py        # Weekly report generator

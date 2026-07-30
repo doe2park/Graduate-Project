@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-07-30 UPDATE (read this first)
+
+- **Data/code split:** `main` = code only. Pipeline outputs live on the orphan `data` branch; pages fetch `raw.githubusercontent.com/doe2park/Graduate-Project/data/data/*.json`. Workflows seed from + push to that branch. Static configs (bechtel_*, cupix_calib, building_ids, grimes-interior, design_model, startup_sim) remain on main.
+- **Shell GLB re-optimized:** grimes-mep-compressed.glb is now 21 MB (Draco + WebP, material-preserving join: 120 nodes/85 materials — glass detection + floor raycast still work). Was 57 MB / 31k draw calls.
+- **Legacy pages** moved to `legacy/` (grimes-campus-map, dashboard, grimes-3d-viewer, basemap-preview, viz-preview).
+- **Already live beyond the notes below:** TOWT weather-normalized baselines, hour-of-week baselines, channel discovery workflow (`data/bmo_channels_report.json` on data branch), Brick twin package (`buildings/grimes/`, `TWIN_GENERALIZATION_DESIGN.md`), comfort vote system (`vote.html` + comfort-dashboard + worker API).
+- **Next phases (agreed roadmap):** element-identity GLB re-export (Revit→IFC→glTF with GlobalIds, no APS), own interior scan into `scans/`, Quest 3 WebXR immersive-ar MVP with QR anchors, channel data → Brick points. See Obsidian vault note `Thesis/Improvement Roadmap`.
+
 ## TL;DR
 
 Web-based digital twin of UC Berkeley campus energy, centered on **Grimes Hall / Bechtel Engineering Center**. Live BMO meter data on ArcGIS map + 3D BIM viewer for Grimes + LEED submittal data integration + Cupix 360° panorama compare with auto-sync.
@@ -107,7 +115,7 @@ The right combination is whichever puts the APS camera inside the building. Cons
 ## Full-BIM viewer quick test (post-APS)
 
 1. Open https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html (Cmd+Shift+R)
-2. MEP model loads (1.7 MB); `🏢 Building shell` lazily loads the 57 MB full-building GLB
+2. MEP model loads (1.7 MB); `🏢 Building shell` lazily loads the 21 MB full-building GLB
 3. `🪞 Cupix Compare` → split screen; sync panel shows msg/tm/applied counters
 4. Calibration auto-loads from `data/cupix_calib.json` (yaw −135°, swap+flip, camMat);
    fine-tune yaw/offset in the panel — values persist per-browser
