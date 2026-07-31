@@ -228,43 +228,85 @@ def poll_translation(token: str, urn: str):
         time.sleep(POLL_SECS)
 
 
-# ─── SVF → glb ─────────────────────────────────────────────────────────────
+# ─── SVF → glb (element identity) ──────────────────────────────────────────
 def svf_to_glb(urn: str, token: str, out_path: Path):
-    print(f"[6/6] Convert SVF → glb: {out_path}")
+    """svf-utils' GLTFWriter names every output node by its dbId — that gives
+    the element-tier identity the twin needs (the old mep-only export had only
+    8 discipline meshes). Extract glTF, then pack to glb WITHOUT
+    join/flatten/palette so node names survive."""
+    print(f"[6/7] Convert SVF → glb (element identity): {out_path}")
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # We delegate to a community Node tool. Two known-good options:
-    #   a) aps-modelderivative-svf-utils  (newer name)
-    #   b) forge-convert-utils            (legacy but still works)
-    candidates = ["aps-modelderivative-svf-utils", "forge-convert-utils"]
-    tool = None
-    for cand in candidates:
-        if shutil.which(cand) or shutil.which(f"{cand}-svf2gltf"):
-            tool = cand
-            break
+    here = Path(__file__).resolve().parent
+    extractor = here / "scripts" / "nwd_extract_elements.js"
+    workdir = out_path.parent / "_svf_work"
+    workdir.mkdir(parents=True, exist_ok=True)
 
-    if not tool:
-        print("\n  ⚠ Node tool not found on PATH.")
-        print("    Install one of:")
-        for c in candidates:
-            print(f"      npm install -g {c}")
-        print(f"\n    Then run:")
-        print(f"      forge-svf2gltf -t glb -o {out_path} {urn}")
-        print(f"      (uses APS_CLIENT_ID / APS_CLIENT_SECRET env vars)")
-        sys.exit(0)
+    if subprocess.run(["node", "-e", "require('svf-utils')"], cwd=str(here),
+                      capture_output=True).returncode != 0:
+        print("      installing svf-utils (local npm) ...")
+        subprocess.run(["npm", "install", "--no-save", "svf-utils"],
+                       cwd=str(here), check=True)
 
-    cmd = [f"{tool}-svf2gltf" if shutil.which(f"{tool}-svf2gltf") else tool,
-           "-t", "glb", "-o", str(out_path), urn]
-    print(f"      $ {' '.join(cmd)}")
-    env = os.environ.copy()
-    env.setdefault("APS_CLIENT_ID", env.get("FORGE_CLIENT_ID", ""))
-    env.setdefault("APS_CLIENT_SECRET", env.get("FORGE_CLIENT_SECRET", ""))
-    r = subprocess.run(cmd, env=env)
+    r = subprocess.run(["node", str(extractor), urn, str(workdir)],
+                       cwd=str(here), env=os.environ)
     if r.returncode != 0:
-        sys.exit("SVF → glb conversion failed (check Node tool output above)")
+        sys.exit("SVF → glTF extraction failed (check output above)")
+
+    gltfs = sorted(workdir.rglob("*.gltf"))
+    if not gltfs:
+        sys.exit(f"No .gltf produced under {workdir}")
+
+    print("      packing to glb (Draco, node names preserved) ...")
+    r = subprocess.run(["npx", "-y", "@gltf-transform/cli", "optimize",
+                        str(gltfs[0]), str(out_path),
+                        "--compress", "draco", "--simplify", "false",
+                        "--palette", "false", "--join", "false", "--flatten", "false"])
+    if r.returncode != 0:
+        sys.exit("glb packing failed")
 
     sz = out_path.stat().st_size / 1024 / 1024
     print(f"      ✓ wrote {out_path} ({sz:.1f} MB)")
+
+
+# ─── properties sidecar ────────────────────────────────────────────────────
+def fetch_properties(urn: str, token: str, out_path: Path):
+    """dbId → {name, externalId, type/category/level} sidecar for the
+    element-tier binding.json work. Matches GLB node names (dbIds)."""
+    print(f"[7/7] Properties sidecar: {out_path}.meta.json")
+    H = {"Authorization": f"Bearer {token}"}
+    r = requests.get(f"{MD_BASE}/designdata/{urn}/metadata", headers=H, timeout=60)
+    r.raise_for_status()
+    guid = r.json()["data"]["metadata"][0]["guid"]
+
+    props = None
+    for _ in range(60):   # big models: server-side extraction can 202 for a while
+        r = requests.get(f"{MD_BASE}/designdata/{urn}/metadata/{guid}/properties",
+                         params={"forceget": "true"}, headers=H, timeout=600)
+        if r.status_code == 202:
+            time.sleep(POLL_SECS); continue
+        r.raise_for_status()
+        props = r.json()["data"]["collection"]
+        break
+    if props is None:
+        sys.exit("properties extraction timed out")
+
+    slim = {}
+    for p in props:
+        entry = {"name": p.get("name", ""), "externalId": p.get("externalId", "")}
+        po = p.get("properties", {}) or {}
+        for group in ("Item", "Element"):
+            g = po.get(group)
+            if isinstance(g, dict):
+                for k in ("Type", "Category", "Layer", "Level", "Source File"):
+                    if k in g:
+                        entry[k.lower().replace(" ", "_")] = g[k]
+        slim[str(p["objectid"])] = entry
+
+    meta_path = Path(str(out_path) + ".meta.json")
+    with open(meta_path, "w") as f:
+        json.dump({"_schema": "twin-elements/1", "_source": urn, "elements": slim}, f)
+    print(f"      ✓ {len(slim)} elements → {meta_path}")
 
 
 # ─── main ──────────────────────────────────────────────────────────────────
@@ -313,6 +355,7 @@ def main():
         poll_translation(token, urn)
 
     svf_to_glb(urn, token, Path(args.output))
+    fetch_properties(urn, token, Path(args.output))
 
     print("\n────────────────────────────────────────────────────")
     print(f"  Done. Now wire it into the Interior loader:")
