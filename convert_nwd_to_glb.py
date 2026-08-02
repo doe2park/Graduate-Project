@@ -103,19 +103,32 @@ def upload(token: str, bucket: str, src: Path) -> str:
     n_parts = max(1, (size + CHUNK_SIZE - 1) // CHUNK_SIZE)
     headers = {"Authorization": f"Bearer {token}"}
 
-    sig = requests.get(
-        f"{OSS_BASE}/buckets/{bucket}/objects/{name}/signeds3upload",
-        headers=headers, params={"parts": n_parts}, timeout=60,
-    )
-    sig.raise_for_status()
-    sig_data = sig.json()
-    upload_key = sig_data["uploadKey"]
+    # Signed URLs expire in ~2 minutes (X-Amz-Expires=119), so batch-fetching
+    # all part URLs upfront 403s partway through a big upload. Request each
+    # part's URL right before uploading it, and refresh once on 403.
+    upload_key = None
+
+    def signed_url_for(part_no: int) -> str:
+        nonlocal upload_key
+        params = {"parts": 1, "firstPart": part_no}
+        if upload_key:
+            params["uploadKey"] = upload_key
+        r = requests.get(
+            f"{OSS_BASE}/buckets/{bucket}/objects/{name}/signeds3upload",
+            headers=headers, params=params, timeout=60,
+        )
+        r.raise_for_status()
+        d = r.json()
+        upload_key = d["uploadKey"]
+        return d["urls"][0]
 
     with open(src, "rb") as f:
-        for i, url in enumerate(sig_data["urls"]):
+        for i in range(n_parts):
             chunk = f.read(CHUNK_SIZE)
             print(f"      uploading part {i+1}/{n_parts} ({len(chunk)/1024/1024:.1f} MB)...")
-            up = requests.put(url, data=chunk, timeout=300)
+            up = requests.put(signed_url_for(i + 1), data=chunk, timeout=300)
+            if up.status_code == 403:   # URL expired mid-flight — refresh once
+                up = requests.put(signed_url_for(i + 1), data=chunk, timeout=300)
             up.raise_for_status()
 
     fin = requests.post(
