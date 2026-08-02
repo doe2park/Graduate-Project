@@ -148,45 +148,22 @@ def trigger_translation(token: str, object_id: str) -> str:
     urn_b64 = base64.urlsafe_b64encode(object_id.encode()).decode().rstrip("=")
     print(f"[4/6] Translate: triggering SVF translation (urn={urn_b64[:24]}...)")
 
-    # Try a sequence of endpoint+body variations. Different APS account vintages
-    # accept slightly different shapes; we try the most modern first.
+    # Correct Model Derivative endpoint is designdata/job.
+    # IMPORTANT: request "svf" (not svf2) — svf-utils' SVFReader consumes the
+    # classic SVF derivative; SVF2/OTG is a different internal format.
     attempts = [
-        # 1. Modern: output.destination.region required, lowercase 'us'
         {
-            "url":  f"{MD_BASE}/designs",
-            "body": {"input": {"urn": urn_b64},
-                     "output": {"destination": {"region": "us"},
-                                "formats": [{"type": "svf2", "views": ["3d"]}]}},
-            "label": "v2/designs + destination us + svf2",
-        },
-        # 2. Same with svf (older)
-        {
-            "url":  f"{MD_BASE}/designs",
+            "url":  f"{MD_BASE}/designdata/job",
             "body": {"input": {"urn": urn_b64},
                      "output": {"destination": {"region": "us"},
                                 "formats": [{"type": "svf", "views": ["3d"]}]}},
-            "label": "v2/designs + destination us + svf",
+            "label": "designdata/job + destination us + svf",
         },
-        # 3. Without destination (older clients work this way)
         {
-            "url":  f"{MD_BASE}/designs",
+            "url":  f"{MD_BASE}/designdata/job",
             "body": {"input": {"urn": urn_b64},
                      "output": {"formats": [{"type": "svf", "views": ["3d"]}]}},
-            "label": "v2/designs (no destination)",
-        },
-        # 4. Legacy /job endpoint
-        {
-            "url":  f"{MD_BASE}/designs/job",
-            "body": {"input": {"urn": urn_b64},
-                     "output": {"formats": [{"type": "svf", "views": ["3d"]}]}},
-            "label": "v2/designs/job (legacy)",
-        },
-        # 5. Even older /job endpoint
-        {
-            "url":  f"{MD_BASE}/job",
-            "body": {"input": {"urn": urn_b64},
-                     "output": {"formats": [{"type": "svf", "views": ["3d"]}]}},
-            "label": "v2/job (legacy-legacy)",
+            "label": "designdata/job (no destination)",
         },
     ]
 
@@ -218,7 +195,7 @@ def poll_translation(token: str, urn: str):
     start = time.time()
     while True:
         r = requests.get(
-            f"{MD_BASE}/designs/{urn}/manifest",
+            f"{MD_BASE}/designdata/{urn}/manifest",
             headers={"Authorization": f"Bearer {token}"},
             timeout=30,
         )
