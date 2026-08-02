@@ -169,7 +169,9 @@ def trigger_translation(token: str, object_id: str) -> str:
 
     headers = {"Authorization": f"Bearer {token}",
                "Content-Type": "application/json",
-               "x-ads-force": "true"}
+               # no x-ads-force: if the derivative already exists, the job
+               # returns immediately instead of re-translating for ~10 min
+               }
 
     for i, a in enumerate(attempts, 1):
         print(f"      try {i}/{len(attempts)}: {a['label']}")
