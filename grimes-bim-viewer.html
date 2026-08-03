@@ -484,6 +484,16 @@ function upgradeShellMaterial(mat, nodeName) {
   }
 }
 const shellBounds = []; // {mesh, box} — cheap XZ prefilter for ground raycasts
+/* Walk mode: MEP fades to translucent context (architecture is the star).
+   Orbit mode: MEP back to the saturated SCADA look. */
+function setMepGhost(ghost) {
+  allMeshes.forEach(m => {
+    if (!m.material) return;
+    m.material.opacity = ghost ? 0.30 : 0.85;
+    m.material.depthWrite = !ghost;
+    m.material.emissiveIntensity = ghost ? 0.15 : 0.35;
+  });
+}
 function setShellMode(solid) {
   if (!building) return;
   building.traverse(ch => {
@@ -742,6 +752,12 @@ function enterWalk() {
     building.visible = true;
     setShellMode(true);
   }
+  // Architecture-first walkthrough: the building (walls/stairs/glass) is the
+  // primary surface, MEP systems become translucent context so the space
+  // reads as a space, not a pile of colored blocks.
+  setMepGhost(true);
+  // Perf: walking is fill-rate-bound on laptops/phones — cap DPR while inside.
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
   ensureFloors();
   levelIdx = floorLevels ? nearestLevelIdx(0) : 0;
   floorTargetY = floorLevels ? floorLevels[levelIdx] : 0;
@@ -776,6 +792,8 @@ function exitWalk() {
     setShellMode(false);                         // back to the MEP-friendly ghost
     building.visible = _shellWasVisible;
   }
+  setMepGhost(false);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   document.getElementById('walkBtn').classList.remove('active');
   document.getElementById('levelBadge').style.display = 'none';
   setLinesVisible(true);
@@ -1158,7 +1176,8 @@ renderer.domElement.addEventListener('pointerup', e => {
 });
 
 function highlight(mesh) {
-  allMeshes.forEach(m => { m.material.opacity = mesh ? (m === mesh ? 1 : 0.12) : 0.85; });
+  const base = walkMode ? 0.30 : 0.85;   // walk keeps MEP as translucent context
+  allMeshes.forEach(m => { m.material.opacity = mesh ? (m === mesh ? 1 : 0.12) : base; });
 }
 window.clearPick = () => {
   picked = null;
