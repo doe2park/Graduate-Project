@@ -403,9 +403,14 @@ loader.load('grimes-mep-only.glb', (gltf) => {
     let si = NAME_TO_SYS[nm] ?? NAME_TO_SYS_N[NORM(nm)];
     if (si === undefined) { console.warn('[glb] unknown node', nm); si = Math.min(idx, SYSTEMS.length - 1); }
     if (!(si in sysMesh)) sysMesh[si] = child;
-    // toneMapped:false — system colors are UI (must match the legend swatches),
-    // so they bypass the ACES curve applied to the photographic shell.
-    child.material = new THREE.MeshBasicMaterial({ color: SYSTEMS[si].hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85, toneMapped: false });
+    // The source glb ships without normals; unlit MeshBasic made every system
+    // read as a flat color block (worst in Walk mode). Compute normals once
+    // and shade with Lambert — emissive tint keeps the legend color identity.
+    if (!child.geometry.attributes.normal) child.geometry.computeVertexNormals();
+    child.material = new THREE.MeshLambertMaterial({
+      color: SYSTEMS[si].hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85,
+      toneMapped: false, emissive: SYSTEMS[si].hex, emissiveIntensity: 0.35,
+    });
     idx++;
   });
   document.getElementById('loading').style.display = 'none';
@@ -590,7 +595,10 @@ function updateCrosshair() {
 function updateAim() {
   if (!plockActive) { aimedMesh = null; return; }
   raycaster.setFromCamera(_centerVec, camera);
-  const hit = raycaster.intersectObjects(allMeshes, false)[0];
+  // equipment elements are aimable in walk mode too — nearest hit wins
+  const targets = (equipGroup && equipGroup.visible && equipMeshes.length)
+    ? equipMeshes.concat(allMeshes) : allMeshes;
+  const hit = raycaster.intersectObjects(targets, false)[0];
   aimedMesh = hit ? hit.object : null;
   document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);
 }
@@ -786,7 +794,9 @@ document.addEventListener('pointerlockchange', () => {
 renderer.domElement.addEventListener('click', () => {
   if (!walkMode || !plockActive) return;
   updateAim();
-  if (aimedMesh) pickSystem(aimedMesh); else clearPick();
+  if (!aimedMesh) { clearPick(); return; }
+  if (aimedMesh.userData && aimedMesh.userData.equipId) pickEquipment(aimedMesh);
+  else pickSystem(aimedMesh);
 });
 document.addEventListener('pointerlockerror', () => {
   plockFailed = true;
