@@ -192,6 +192,7 @@ body.compare-on #syncPanel{display:block}
   <span class="tb-spacer"></span>
   <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
   <button class="tb-btn" id="bldgBtn" onclick="toggleBuilding()" title="Show/hide the translucent building envelope around the systems">🏢 Building shell</button>
+  <button class="tb-btn" id="equipBtn" onclick="toggleEquipment()" title="Element-tier equipment layer (16 MB): panelboards, AHUs, air terminals — tap any unit for identity + live feeder data">⚡ Equipment</button>
   <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
   <a class="tb-btn" href="grimes-xr.html" title="Open the immersive MEP sensor dashboards">▸ MEP dashboards</a>
 </div>
@@ -1134,6 +1135,11 @@ renderer.domElement.addEventListener('pointerup', e => {
   const r = renderer.domElement.getBoundingClientRect();
   _ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   raycaster.setFromCamera(_ptr, camera);
+  // Equipment (element tier) wins first — small targets beat system blobs
+  if (equipGroup && equipGroup.visible && equipMeshes.length) {
+    const eqHit = raycaster.intersectObjects(equipMeshes, false)[0];
+    if (eqHit) { pickEquipment(eqHit.object); return; }
+  }
   // MEP systems win when overlapping; the shell is the fallback target
   const mepHit = raycaster.intersectObjects(allMeshes, false)[0];
   if (mepHit) { pickSystem(mepHit.object); return; }
@@ -1147,9 +1153,155 @@ function highlight(mesh) {
 window.clearPick = () => {
   picked = null;
   highlight(null);
+  unhighlightEquip();
   document.getElementById('twinPanel').classList.remove('show');
   document.body.classList.remove('twin-open');
 };
+
+/* ══════════ EQUIPMENT LAYER — element tier (Phase 2) ══════════
+   buildings/grimes/grimes-equipment.glb: 285 elements extracted from the
+   741k-element APS conversion, every node named by its dbId. elements.json
+   carries identity (name/category/level) + panelboard meter feeds.
+   Registration vs the viewer frame: the new APS export is meters/Y-up like
+   grimes-mep-only.glb, offset by a constant — derived by matching the
+   conduit-set bounding boxes in both files (X/Z exact, Y within ~0.3 m). */
+const EQUIP_OFFSET = { x: 31.0, y: -97.2, z: -28.2 };
+let equipGroup = null, equipLoading = false, equipMeshes = [], equipMeta = null, equipPicked = null;
+
+window.toggleEquipment = () => {
+  const btn = document.getElementById('equipBtn');
+  if (equipGroup) {
+    equipGroup.visible = !equipGroup.visible;
+    btn.classList.toggle('active', equipGroup.visible);
+    if (!equipGroup.visible && equipPicked) clearPick();
+    return;
+  }
+  if (equipLoading) return;
+  equipLoading = true;
+  btn.textContent = '⏳ 16 MB…';
+  Promise.all([
+    cachedJson('buildings/grimes/elements.json'),
+    new Promise((res, rej) => loader.load('buildings/grimes/grimes-equipment.glb', res,
+      p => { if (p.total) btn.textContent = `⏳ ${(p.loaded / 1048576).toFixed(0)}/16 MB`; }, rej)),
+  ]).then(([metaJson, gltf]) => {
+    equipMeta = metaJson.elements || {};
+    equipGroup = gltf.scene;
+    equipGroup.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
+    equipGroup.updateMatrixWorld(true);
+    equipGroup.traverse(ch => {
+      if (!ch.isMesh) return;
+      ch.userData.equipId = findEquipId(ch);
+      if (ch.material) ch.material = ch.material.clone(); // per-mesh highlightable
+      equipMeshes.push(ch);
+    });
+    scene.add(equipGroup);
+    equipLoading = false;
+    btn.textContent = '⚡ Equipment';
+    btn.classList.add('active');
+    console.log('[equip] loaded:', equipMeshes.length, 'meshes /', Object.keys(equipMeta).length, 'elements');
+  }).catch(e => {
+    equipLoading = false;
+    btn.textContent = '⚡ Equipment';
+    console.error('[equip] load failed —', e);
+  });
+};
+
+function findEquipId(obj) {
+  for (let o = obj; o; o = o.parent) {
+    if (o.name && equipMeta && equipMeta[o.name]) return o.name;
+  }
+  return null;
+}
+function unhighlightEquip() {
+  if (equipPicked && equipPicked.material && equipPicked.material.emissive !== undefined
+      && equipPicked.userData.baseEmissive !== undefined) {
+    equipPicked.material.emissive.setHex(equipPicked.userData.baseEmissive);
+    equipPicked.material.emissiveIntensity = equipPicked.userData.baseEmissiveI ?? 1;
+  }
+  equipPicked = null;
+}
+const EQUIP_LABELS = {  // family name → human label
+  'eE_EQ_Panelboard_v2': 'Panelboard', 'RT_EQ_Transformer': 'Transformer',
+  'eE_EQ_Disconnect_v2': 'Disconnect switch', 'RT_EQ_Panel_TopHat': 'Panel (top hat)',
+  'RT_EQ_Ground_Bar': 'Ground bar', 'RT_EQ_Access_Panel': 'Access panel', 'RT_EQ_Pad': 'Equipment pad',
+};
+async function pickEquipment(mesh) {
+  const id = mesh.userData.equipId || findEquipId(mesh);
+  const info = id && equipMeta && equipMeta[id];
+  if (!info) return;
+  document.getElementById('clickHint').classList.remove('show');
+  highlight(null);
+  unhighlightEquip();
+  equipPicked = mesh; picked = mesh;
+  if (mesh.material && mesh.material.emissive !== undefined) {
+    mesh.userData.baseEmissive = mesh.material.emissive.getHex();
+    mesh.userData.baseEmissiveI = mesh.material.emissiveIntensity;
+    mesh.material.emissive.setHex(0xfbbf24);
+    mesh.material.emissiveIntensity = 0.9;
+  }
+  document.body.classList.add('twin-open');
+  document.getElementById('twinPanel').classList.add('show');
+  const label = EQUIP_LABELS[info.name] || info.name || 'Equipment';
+  document.getElementById('twinDot').style.background = '#fbbf24';
+  document.getElementById('twinTitle').textContent = label + (info.level ? ' · ' + info.level : '');
+  const ptsEl = document.getElementById('twinPoints');
+  const detInfo = document.getElementById('twinDetInfo');
+  document.getElementById('twinDetEquip').innerHTML = '';
+  document.getElementById('twinDetZ').innerHTML = '';
+  document.getElementById('twinRange').classList.remove('on');
+  document.getElementById('twinEvent').innerHTML = '';
+  drawSpark(document.getElementById('twinSpark'), []);
+  detInfo.innerHTML =
+    dsec('Identity')
+    + drow('element', esc(label))
+    + (info.category ? drow('category', esc(info.category)) : '')
+    + (info.level ? drow('level', esc(info.level)) : '')
+    + drow('dbId', esc(id))
+    + dsec('Source')
+    + drow('geometry', 'APS SVF → element GLB (dbId-named nodes)')
+    + drow('identity file', 'buildings/grimes/elements.json');
+  const bigEl = document.getElementById('twinBigKw'), badgeEl = document.getElementById('twinBadge');
+  const srcEl = document.getElementById('twinSrc');
+  const feeds = info.isFedBy || [];
+  if (!feeds.length) {
+    bigEl.innerHTML = '— <small>kW</small>';
+    badgeEl.textContent = 'NO FEED'; badgeEl.className = 'badge na';
+    srcEl.textContent = 'No meter mapping for this element yet (non-electrical or unmapped).';
+    ptsEl.innerHTML = '<div class="pt mut"><span>Identity-only element — live feed applies to panelboards.</span></div>';
+    return;
+  }
+  badgeEl.textContent = '…'; badgeEl.className = 'badge na';
+  srcEl.textContent = 'Feeder meter total — per-panel submetering not installed (93 panels identified for future sub-metering).';
+  try {
+    const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+    const meters = bd.meters || {};
+    let total = 0, rows = '', series = [];
+    for (const ref of feeds) {
+      const mid = String(ref).split(':')[2];          // bmo:meter:76:kw → 76
+      const m = meters[mid];
+      const kw = m && m.latest && typeof m.latest.kw === 'number' ? m.latest.kw : null;
+      if (kw != null) total += kw;
+      const mlabel = mid === '3' ? 'Roof Electric' : mid === '76' ? '480/277V (HVAC/Ltg)' : mid === '77' ? '208/120V (Plug/IT)' : 'Meter ' + mid;
+      rows += `<div class="pt"><span>feeder · ${esc(mlabel)}</span><span class="v">${kw != null ? kw.toFixed(1) + ' kW' : 'offline'}</span></div>`;
+      if (m && Array.isArray(m.timeseries_kw)) series.push(m.timeseries_kw.map(s => ({ t: s.t, v: s.v })));
+    }
+    bigEl.innerHTML = total.toFixed(1) + ' <small>kW feeders</small>';
+    badgeEl.textContent = 'LIVE'; badgeEl.className = 'badge';
+    ptsEl.innerHTML = rows;
+    if (series.length) {
+      const n = Math.min(...series.map(s => s.length));
+      const sum = [];
+      for (let i = 0; i < n; i++) {
+        let v = 0; for (const s of series) v += s[s.length - n + i].v || 0;
+        sum.push({ t: series[0][series[0].length - n + i].t, v });
+      }
+      drawSpark(document.getElementById('twinSpark'), sum);
+    }
+  } catch (e) {
+    badgeEl.textContent = 'OFFLINE'; badgeEl.className = 'badge na';
+    ptsEl.innerHTML = '<div class="pt mut"><span>Live feed unreachable — ' + esc(e.message) + '</span></div>';
+  }
+}
 
 function sumSeries(vals, points) {
   const list = points.map(p => (vals[p.ref] && vals[p.ref].series) || []).filter(s => s.length);
