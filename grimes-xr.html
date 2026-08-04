@@ -698,6 +698,9 @@ bldgToggle.addEventListener('click', () => {
       // Store original materials BEFORE applying ghost
       buildingModel.traverse(child => {
         if (child.isMesh) {
+          const nm = child.name || (child.parent && child.parent.name) || '';
+          // Revit datum geometry (grid/level lines) is annotation, not building
+          if (/^grid$|^level\b|datum/i.test(nm)) { child.visible = false; return; }
           bldgOriginalMats.set(child.uuid, child.material);
           child.material = ghostMat;
           child.renderOrder = -1;

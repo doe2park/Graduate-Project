@@ -550,7 +550,12 @@ function loadShell() {
     // each mesh for Walk mode's opaque look (setShellMode toggles).
     building.traverse(ch => {
       if (!ch.isMesh) return;
-      upgradeShellMaterial(ch.material, ch.name || (ch.parent && ch.parent.name) || '');
+      const nm = ch.name || (ch.parent && ch.parent.name) || '';
+      // Revit datum geometry (grid/level lines + bubbles) came along in the
+      // export — annotation, not building. Hide it and keep it out of the
+      // floor-detection raycasts.
+      if (/^grid$|^level\b|datum/i.test(nm)) { ch.visible = false; return; }
+      upgradeShellMaterial(ch.material, nm);
       ch.userData.origMat = ch.material;
       ch.material = shellGhostMat;
       ch.renderOrder = -1;
