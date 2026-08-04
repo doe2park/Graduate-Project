@@ -534,21 +534,17 @@ function loadShell() {
   btn.textContent = '⏳ 21 MB…';
   loader.load('grimes-mep-compressed.glb', (gltf) => {
     building = gltf.scene;
-    const FT_TO_M = 0.3048;
-    building.scale.setScalar(FT_TO_M);
-    building.updateMatrixWorld(true);
-    const pre = new THREE.Box3().setFromObject(building).getCenter(new THREE.Vector3());
-    building.position.sub(pre);
+    // DERIVED placement (2026-08-03) — replaces the old bbox-center heuristic.
+    // Registration chain, anchored on geometry present in multiple exports:
+    //   shell(ft,Z-up) → master(m,Y-up): scale·axis-flip + rotY(180°), T=0
+    //     (proven by the Bolia furniture set: 0.00 m residual, all axes)
+    //   master → viewer(mep-only frame): rotY(180°) + T=(-35.28,-97.16,28.60)
+    //     (conduit-set bbox match under the H180 hypothesis)
+    //   ⇒ shell → viewer: the two 180° rotations cancel — pure translation.
+    building.scale.setScalar(0.3048);
     building.rotation.x = -Math.PI / 2;
+    building.position.set(-35.28, -97.16, 28.60);
     building.updateMatrixWorld(true);
-    const post = new THREE.Box3().setFromObject(building).getCenter(new THREE.Vector3());
-    building.position.sub(post);
-    building.updateMatrixWorld(true);
-    // Align to the MEP model (same as grimes-xr): recentering alone puts the
-    // shell's CENTER at the origin, but the MEP sits at y 0..20 — so half the
-    // shell ended up underground and off the camera's focus ("button does
-    // nothing" bug). Match centers, then set both floors to the same y.
-    alignShellToMep();
     // Ghost by default (Orbit): Lambert picks up scene light for subtle
     // shading; 0.24 keeps MEP visible. Original GLB materials are kept on
     // each mesh for Walk mode's opaque look (setShellMode toggles).
@@ -1194,7 +1190,11 @@ window.clearPick = () => {
    Registration vs the viewer frame: the new APS export is meters/Y-up like
    grimes-mep-only.glb, offset by a constant — derived by matching the
    conduit-set bounding boxes in both files (X/Z exact, Y within ~0.3 m). */
-const EQUIP_OFFSET = { x: 31.0, y: -97.2, z: -28.2 };
+// DERIVED (2026-08-03): the new APS export is rotated 180° about Y relative
+// to the viewer frame (asymmetric-anchor proof; bbox min/max matching alone
+// cannot detect a 180° rotation since sizes are preserved). Placement is
+// rotY(π) + this translation (conduit-set match under H180).
+const EQUIP_OFFSET = { x: -35.28, y: -97.16, z: 28.60 };
 let equipGroup = null, equipLoading = false, equipMeshes = [], equipMeta = null, equipPicked = null;
 
 window.toggleEquipment = () => {
@@ -1215,6 +1215,7 @@ window.toggleEquipment = () => {
   ]).then(([metaJson, gltf]) => {
     equipMeta = metaJson.elements || {};
     equipGroup = gltf.scene;
+    equipGroup.rotation.y = Math.PI;   // 180° frame difference — see EQUIP_OFFSET note
     equipGroup.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
     equipGroup.updateMatrixWorld(true);
     equipGroup.traverse(ch => {

@@ -686,33 +686,14 @@ bldgToggle.addEventListener('click', () => {
     gltfLoader.load('grimes-mep-compressed.glb', (gltf) => {
       buildingModel = gltf.scene;
 
-      const FT_TO_M = 0.3048;
-      buildingModel.scale.setScalar(FT_TO_M);
-      buildingModel.updateMatrixWorld(true);
-
-      // Z-up → Y-up rotation around model center
-      const preBox = new THREE.Box3().setFromObject(buildingModel);
-      const preCenter = preBox.getCenter(new THREE.Vector3());
-      buildingModel.position.sub(preCenter);
+      // DERIVED placement (2026-08-03) — same registration as grimes-bim-viewer:
+      // shell(ft,Z-up) → viewer(mep-only frame) is a pure translation after
+      // scale + Z-up→Y-up (the two 180° Y-rotations in the chain cancel).
+      // Anchors: Bolia furniture set (0.00 m residual) + conduit set.
+      buildingModel.scale.setScalar(0.3048);
       buildingModel.rotation.x = -Math.PI / 2;
+      buildingModel.position.set(-35.28, -97.16, 28.60);
       buildingModel.updateMatrixWorld(true);
-      const postBox = new THREE.Box3().setFromObject(buildingModel);
-      const postCenter = postBox.getCenter(new THREE.Vector3());
-      buildingModel.position.sub(postCenter);
-      buildingModel.updateMatrixWorld(true);
-
-      // Align to MEP bounding box
-      const mepBox = new THREE.Box3();
-      allMeshes.forEach(m => { m.updateWorldMatrix(true, false); mepBox.expandByObject(m); });
-      const mepCenter = mepBox.getCenter(new THREE.Vector3());
-      const bldgBox = new THREE.Box3().setFromObject(buildingModel);
-      const bldgCenter = bldgBox.getCenter(new THREE.Vector3());
-      buildingModel.position.x += (mepCenter.x - bldgCenter.x);
-      buildingModel.position.y += (mepCenter.y - bldgCenter.y);
-      buildingModel.position.z += (mepCenter.z - bldgCenter.z);
-      buildingModel.updateMatrixWorld(true);
-      const finalBox = new THREE.Box3().setFromObject(buildingModel);
-      buildingModel.position.y += (mepBox.min.y - finalBox.min.y);
 
       // Store original materials BEFORE applying ghost
       buildingModel.traverse(child => {
