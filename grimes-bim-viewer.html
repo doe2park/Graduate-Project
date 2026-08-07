@@ -523,26 +523,33 @@ window.toggleBuilding = () => {
   const btn = document.getElementById('bldgBtn');
   if (building) { building.visible = !building.visible; btn.classList.toggle('active', building.visible); return; }
   if (buildingLoading) return;
-  // Never auto-download 21 MB on a phone — stays opt-in behind an explicit confirm.
-  if (mobileMq.matches && !confirm('Building shell is a 21 MB download. Load it on this device?')) return;
+  // Never auto-download tens of MB on a phone — stays opt-in behind a confirm.
+  if (mobileMq.matches && !confirm(`Building shell is a ${SHELL_MB} MB download. Load it on this device?`)) return;
   loadShell();
 };
+// Shell v2 (default): architecture re-extracted from the element-identity
+// master — original Revit materials (glass, wood, fabric), 93 draw calls
+// (was 120+ with the legacy export). Fallback: append ?shell=old to the URL.
+const USE_OLD_SHELL = new URLSearchParams(location.search).get('shell') === 'old';
+const SHELL_URL = USE_OLD_SHELL ? 'grimes-mep-compressed.glb' : 'buildings/grimes/grimes-arch.glb';
+const SHELL_MB = USE_OLD_SHELL ? 21 : 32;
 function loadShell() {
   if (building || buildingLoading) return;
   const btn = document.getElementById('bldgBtn');
   buildingLoading = true;
-  btn.textContent = '⏳ 21 MB…';
-  loader.load('grimes-mep-compressed.glb', (gltf) => {
+  btn.textContent = `⏳ ${SHELL_MB} MB…`;
+  loader.load(SHELL_URL, (gltf) => {
     building = gltf.scene;
-    // DERIVED placement (2026-08-03) — replaces the old bbox-center heuristic.
-    // Registration chain, anchored on geometry present in multiple exports:
-    //   shell(ft,Z-up) → master(m,Y-up): scale·axis-flip + rotY(180°), T=0
-    //     (proven by the Bolia furniture set: 0.00 m residual, all axes)
-    //   master → viewer(mep-only frame): rotY(180°) + T=(-35.28,-97.16,28.60)
-    //     (conduit-set bbox match under the H180 hypothesis)
-    //   ⇒ shell → viewer: the two 180° rotations cancel — pure translation.
-    building.scale.setScalar(0.3048);
-    building.rotation.x = -Math.PI / 2;
+    // DERIVED placement (2026-08-03), anchored on geometry present in
+    // multiple exports (Bolia set 0.00 m residual; conduit set under H180):
+    //   old shell (ft, Z-up) → viewer: scale + rotX(-90°) + T  (rotations cancel)
+    //   arch v2 (master frame, m, Y-up) → viewer: rotY(180°) + T
+    if (USE_OLD_SHELL) {
+      building.scale.setScalar(0.3048);
+      building.rotation.x = -Math.PI / 2;
+    } else {
+      building.rotation.y = Math.PI;
+    }
     building.position.set(-35.28, -97.16, 28.60);
     building.updateMatrixWorld(true);
     // Ghost by default (Orbit): Lambert picks up scene light for subtle
@@ -579,7 +586,7 @@ function loadShell() {
     buildingLoading = false;
     btn.textContent = '🏢 Building shell';
     btn.classList.add('active');
-  }, p => { btn.textContent = `⏳ ${(p.loaded/1048576).toFixed(0)}/21 MB`; },
+  }, p => { btn.textContent = `⏳ ${(p.loaded/1048576).toFixed(0)}/${SHELL_MB} MB`; },
   () => { buildingLoading = false; btn.textContent = '⚠ shell failed'; });
 }
 
