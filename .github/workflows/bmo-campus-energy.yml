@@ -51,6 +51,10 @@ jobs:
       - name: TOWT weather-normalized baseline
         run: python scripts/towt_baseline.py || true
 
+      - name: Grimes M&V series (design vs actual)
+        # Counter-based measurement & verification for the performance page.
+        run: python scripts/build_mv.py || true
+
       - name: Archive daily snapshot
         run: |
           TODAY=$(date +'%Y-%m-%d')
