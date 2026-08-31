@@ -35,6 +35,35 @@ def main():
         if all(m in row for m in METERS):
             pts[date] = row
 
+    # daily peak (max 15-min total kW) per archive day
+    peak = {}
+    for f in sorted(glob.glob("data/archive/buildings_*.json")):
+        date = f.split("buildings_")[1][:10]
+        try:
+            d = json.load(open(f))
+        except Exception:
+            continue
+        acc = defaultdict(float)
+        for mid in METERS:
+            for p in (d.get("meters", {}).get(mid, {}).get("timeseries_kw") or []):
+                acc[p.get("t")] += p.get("v") or 0
+        if acc:
+            peak[date] = round(max(acc.values()), 1)
+
+    # hourly outdoor temp (degC) from the TOWT weather cache: key = hours since 2026-01-01
+    tmean = {}
+    try:
+        hrs = json.load(open("data/weather_cache.json")).get("hours", {})
+        byday = defaultdict(list)
+        for k, v in hrs.items():
+            byday[int(k) // 24].append(v)
+        y0 = dt.date(2026, 1, 1)
+        for dayidx, vals in byday.items():
+            if len(vals) >= 12:
+                tmean[(y0 + dt.timedelta(days=dayidx)).isoformat()] = round(sum(vals) / len(vals), 1)
+    except Exception:
+        pass
+
     daily = []
     prev = None
     for date in sorted(pts):
@@ -43,13 +72,19 @@ def main():
             if 0 < dd <= 3:
                 e = {m: (pts[date][m] - pts[prev][m]) / dd for m in METERS}
                 if all(v >= -5 for v in e.values()):  # tolerate tiny counter jitter
-                    daily.append({
+                    row = {
                         "d": date,
                         "t": round(sum(e.values()), 1),
                         "m3": round(e["3"], 1),
                         "m76": round(e["76"], 1),
                         "m77": round(e["77"], 1),
-                    })
+                        "we": dt.date.fromisoformat(date).weekday() >= 5,
+                    }
+                    if date in peak:
+                        row["pk"] = peak[date]
+                    if date in tmean:
+                        row["tc"] = tmean[date]
+                    daily.append(row)
         prev = date
 
     monthly = defaultdict(lambda: [0.0, 0])
@@ -71,7 +106,39 @@ def main():
         pass
 
     avg_daily = round(sum(r["t"] for r in daily) / len(daily)) if daily else 0
+    wd = [r["t"] for r in daily if not r["we"]]
+    we = [r["t"] for r in daily if r["we"]]
+    peak_row = max((r for r in daily if "pk" in r), key=lambda r: r["pk"], default=None)
+    # temperature sensitivity: OLS of kWh/day on mean outdoor temp
+    xy = [(r["tc"], r["t"]) for r in daily if "tc" in r]
+    fit = None
+    if len(xy) >= 10:
+        n = len(xy)
+        mx = sum(x for x, _ in xy) / n
+        my = sum(y for _, y in xy) / n
+        sxx = sum((x - mx) ** 2 for x, _ in xy)
+        sxy = sum((x - mx) * (y - my) for x, y in xy)
+        syy = sum((y - my) ** 2 for _, y in xy)
+        if sxx > 0 and syy > 0:
+            slope = sxy / sxx
+            fit = {"slope_kwh_per_degc": round(slope, 1), "intercept": round(my - slope * mx, 1),
+                   "r2": round((sxy * sxy) / (sxx * syy), 3), "n": n}
+    baseline_annual = (baseline_daily or 0) * 365
+    actual_annual = avg_daily * 365
+    avoided_kwh = max(0, baseline_annual - actual_annual)
     out = {
+        "peak_measured_kw": peak_row["pk"] if peak_row else None,
+        "peak_measured_date": peak_row["d"] if peak_row else None,
+        "peak_design_kw": leed["totals"].get("proposed_peak_kw") if design_daily else None,
+        "peak_baseline_kw": leed["totals"].get("baseline_peak_kw") if design_daily else None,
+        "weekday_avg_kwh": round(sum(wd) / len(wd)) if wd else None,
+        "weekend_avg_kwh": round(sum(we) / len(we)) if we else None,
+        "temp_fit": fit,
+        "avoided_vs_baseline": {
+            "mwh_yr": round(avoided_kwh / 1000),
+            "usd_yr": round(avoided_kwh * 0.15),          # PG&E commercial, as elsewhere in the pipeline
+            "tco2_yr": round(avoided_kwh * 0.21 / 1000, 1)  # CARB CA grid factor kg/kWh
+        } if baseline_daily else None,
         "_schema": "mv-grimes/1",
         "_doc": "Counter-based M&V for Grimes: daily kWh from cumulative kwh_delivered deltas vs LEED design figures.",
         "generated_at": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
