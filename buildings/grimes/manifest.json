@@ -66,9 +66,10 @@
     "equipment": {
       "path": "buildings/grimes/grimes-equipment.glb",
       "tier": "element",
-      "elements": 285,
+      "elements": 1143,
       "identity": "buildings/grimes/elements.json",
-      "frame": "APS master frame: rotY(pi) + (-35.28,-97.16,28.60) into the viewer frame (grimes-bim-viewer.html EQUIP_OFFSET)"
+      "frame": "APS master frame: rotY(pi) + (-35.28,-97.16,28.60) into the viewer frame (grimes-bim-viewer.html EQUIP_OFFSET)",
+      "note": "2026-09-01 targeted re-export: every element keeps its dbId; Revit design params (mark, location, flow, electrical data) in the sidecar"
     },
     "architecture": {
       "path": "buildings/grimes/grimes-arch.glb",
@@ -79,32 +80,48 @@
     "lighting": {
       "path": "buildings/grimes/grimes-lighting.glb",
       "tier": "element",
-      "elements": 309,
+      "elements": 1735,
       "identity": "buildings/grimes/lighting.elements.json",
       "frame": "same as equipment",
-      "survival": "309/1570 Lighting Fixtures (instancing dedup)"
+      "survival": "1735/1735 (targeted re-export)",
+      "note": "277 V fixtures \u2192 meter 76, 120 V \u2192 meter 77 (feedSource revit-voltage)"
     },
     "structural": {
       "path": "buildings/grimes/grimes-structural.glb",
       "tier": "element",
-      "elements": 2033,
+      "elements": 2420,
       "identity": "buildings/grimes/structural.elements.json",
       "frame": "same as equipment",
-      "note": "primary structure only (CDC cold-formed framing + noflyzone boxes excluded); meshopt-simplified 3.67M->0.82M tri, error 1%"
+      "note": "primary structure only (CDC cold-formed framing excluded); meshopt-simplified 4.15M\u21920.92M tri @1% error; Revit volume + material per element"
     },
     "conduit": {
       "path": "buildings/grimes/grimes-conduit.glb",
       "tier": "element",
-      "elements": 5570,
+      "elements": 11063,
       "identity": "buildings/grimes/conduit.elements.json",
       "frame": "same as equipment",
-      "note": "meshopt-simplified 4.2M->1.0M tri, error 1%"
+      "note": "all 8,142 fittings + 2,907 runs + supports + trays; simplified 4.32M\u21920.77M tri"
     },
     "_master": {
       "path": "(local) twin-outputs/grimes-elements.glb + .meta.json",
       "elements": 741797,
       "namedLeaves": 182583,
-      "note": "Revit-native sources: UCBBECH - A.rvt, 22-049 ENG_R22.rvt (electrical), Bechtel_Framing_R22.rvt; mechanical/plumbing/FP are DWG (no identity)"
+      "note": "Revit-native sources: UCBBECH - A.rvt, 22-049 ENG_R22.rvt (electrical), Bechtel_Framing_R22.rvt; mechanical/plumbing/FP are DWG (no identity); 2026-09-01 targeted subset (scripts/nwd_extract_subset.js, 92,445 named fragments for 29,684 elements) = twin-outputs/grimes-subset.glb; full Revit properties = twin-outputs/props_revit.json (55,631 categorized elements)"
+    },
+    "fixtures": {
+      "path": "buildings/grimes/grimes-fixtures.glb",
+      "tier": "element",
+      "elements": 4927,
+      "identity": "buildings/grimes/fixtures.elements.json",
+      "frame": "same as equipment",
+      "note": "receptacles, prefab device boxes, data/AV; Revit Electrical Data \u2192 design_volts / design_va; 31k fragments instanced at load (170 draw calls)"
+    },
+    "lifesafety": {
+      "path": "buildings/grimes/grimes-lifesafety.glb",
+      "tier": "element",
+      "elements": 553,
+      "identity": "buildings/grimes/lifesafety.elements.json",
+      "frame": "same as equipment"
     }
   }
 }

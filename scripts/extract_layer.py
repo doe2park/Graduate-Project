@@ -2,7 +2,13 @@
 """
 extract_layer.py — cut an element-tier web layer out of the APS master GLB.
 
-    python3 scripts/extract_layer.py master.glb master.meta.json LAYER out.glb out.elements.json
+    python3 scripts/extract_layer.py SRC1.glb[,SRC2.glb...] master.meta.json LAYER out.glb out.elements.json [props_revit.json]
+
+Sources are searched in order: a leaf dbId takes ALL its nodes from the first
+source that names it (the 2026-09-01 targeted subset — no dedup, every leaf
+named — goes first; the 2026-08-03 master second for categories the subset
+did not request, e.g. conduit runs). props_revit.json (optional) is the
+Revit property dump; selected design parameters are copied into the sidecar.
 
 Master = svf-utils export of the whole NWD (every geometry node named by its
 leaf dbId, ~182k named nodes) + the properties sidecar (dbId -> name /
@@ -33,8 +39,23 @@ LAYERS = {
     "lifesafety": ["Fire Alarm Devices", "Sprinklers", "Security Devices", "Specialty Equipment"],
     "fixtures":   ["Electrical Fixtures", "Data Devices", "Audio Visual Devices"],
     "furniture":  ["Furniture", "Casework"],
-    "equipment":  ["Electrical Equipment", "Mechanical Equipment", "Air Terminals", "Plumbing Fixtures", "Fire Alarm Devices"],
+    "equipment":  ["Electrical Equipment", "Mechanical Equipment", "Air Terminals", "Plumbing Fixtures"],
 }
+# Revit parameters worth carrying into the sidecar (group, key) -> sidecar field
+PROPS = [
+    ("Element", "Mark", "mark"), ("Element", "Location", "location"), ("Element", "Comments", "comments"),
+    ("Element", "Electrical Data", "electrical_data"), ("Element", "Watts", "watts"),
+    ("Element", "Flow", "flow"), ("Element", "System Classification", "system_classification"),
+    ("Element", "Pressure Drop", "pressure_drop"), ("Element", "Size", "size"),
+    ("Element", "Mains", "mains"), ("Element", "MCB Rating", "mcb_rating"), ("Element", "Total Connected", "total_connected"),
+    ("Element", "Volume", "volume"), ("Element", "Length", "length"), ("Element", "Area", "area"),
+    ("Element", "Structural Material", "structural_material"), ("Element", "Structural Usage", "structural_usage"),
+    ("Element", "Elevation from Level", "elevation_from_level"), ("Element", "Host", "host"),
+    ("Element", "Family", "family"), ("Element", "Type", "revit_type"), ("Element", "Workset", "workset"),
+    ("Element", "Phase Created", "phase"),
+]
+LEVEL_KEYS = [("Element", "Schedule Level"), ("Element", "Level"), ("Element", "Reference Level"),
+              ("Element", "Base Level"), ("Reference Level", "Name"), ("Schedule Level", "Name"), ("Level", "Name")]
 # family-name exclusions per layer (regex): structural keeps the PRIMARY structure —
 # CDC-* is cold-formed partition framing (studs/tracks, 4,532 elements, 8.7k leaves),
 # noflyzone-* are coordination clearance boxes. Both are legitimate Revit elements
@@ -81,125 +102,141 @@ def owners(meta):
     return owner
 
 
-def main(master, metap, layer, out_glb, out_json):
+def subset_from_source(g, bin_, keep, out, acc_list, bv_list, mesh_list, mat_list):
+    """Copy the meshes/accessors/bufferViews/materials that `keep` (node idx -> owner)
+    references from one source into the shared output lists; return new leaf nodes."""
+    nodes = g["nodes"]
+    mesh_map, acc_map, bv_map, mat_map = {}, {}, {}, {}
+
+    def take_bv(i):
+        if i not in bv_map:
+            bv = dict(g["bufferViews"][i])
+            off = bv.get("byteOffset", 0)
+            out.extend(b"\0" * (-len(out) % 4))
+            bv["byteOffset"] = len(out)
+            out.extend(bin_[off:off + bv["byteLength"]])
+            bv_map[i] = len(bv_list)
+            bv_list.append(bv)
+        return bv_map[i]
+
+    def take_acc(i):
+        if i not in acc_map:
+            a = dict(g["accessors"][i])
+            if "bufferView" in a:
+                a["bufferView"] = take_bv(a["bufferView"])
+            acc_map[i] = len(acc_list)
+            acc_list.append(a)
+        return acc_map[i]
+
+    def take_mat(i):
+        if i not in mat_map:
+            mat_map[i] = len(mat_list)
+            mat_list.append(g["materials"][i])
+        return mat_map[i]
+
+    def take_mesh(i):
+        if i not in mesh_map:
+            m = json.loads(json.dumps(g["meshes"][i]))
+            for p in m["primitives"]:
+                p["attributes"] = {k: take_acc(v) for k, v in p["attributes"].items()}
+                if "indices" in p:
+                    p["indices"] = take_acc(p["indices"])
+                if "material" in p:
+                    p["material"] = take_mat(p["material"])
+                d = p.get("extensions", {}).get("KHR_draco_mesh_compression")
+                if d:
+                    d["bufferView"] = take_bv(d["bufferView"])
+            mesh_map[i] = len(mesh_list)
+            mesh_list.append(m)
+        return mesh_map[i]
+
+    leaves = []
+    for i, o in keep.items():
+        n = {k: v for k, v in nodes[i].items() if k in ("translation", "rotation", "scale", "matrix")}
+        n["mesh"] = take_mesh(nodes[i]["mesh"])
+        n["name"] = o
+        leaves.append(n)
+    return leaves
+
+
+def main(sources, metap, layer, out_glb, out_json, propsp=None):
     cats = LAYERS[layer]
-    g, bin_ = read_glb(master)
     meta = json.load(open(metap))["elements"]
     owner = owners(meta)
-    nodes = g["nodes"]
+    props = json.load(open(propsp))["elements"] if propsp else {}
 
-    # select leaves whose owner is in the layer's categories
-    keep_leaf = {}            # node index -> owner id
     per_owner = defaultdict(list)
-    for i, n in enumerate(nodes):
-        nm = n.get("name")
-        if not nm or "mesh" not in n or nm not in meta:
-            continue
-        o = owner(nm)
-        if o and meta[o].get("category") in cats and not (
-                layer in EXCLUDE and re.match(EXCLUDE[layer], meta[o].get("name") or "")):
-            keep_leaf[i] = o
-            per_owner[o].append(nm)
+    claimed = set()                 # leaf dbIds already taken from an earlier source
+    root = None
+    out, acc_list, bv_list, mesh_list, mat_list, leaves = bytearray(), [], [], [], [], []
+    src_count = {}
+    for src in sources.split(","):
+        g, bin_ = read_glb(src)
+        if root is None:
+            root = {k: v for k, v in g["nodes"][g["scenes"][0]["nodes"][0]].items() if k != "children"}
+        else:
+            r2 = g["nodes"][g["scenes"][0]["nodes"][0]]
+            assert r2.get("rotation") == root.get("rotation") and r2.get("scale") == root.get("scale"), "source frames differ"
+        keep = {}
+        names_here = set()
+        for i, n in enumerate(g["nodes"]):
+            nm = n.get("name")
+            if not nm or "mesh" not in n or nm not in meta or nm in claimed:
+                continue
+            o = owner(nm)
+            if o and meta[o].get("category") in cats and not (
+                    layer in EXCLUDE and re.match(EXCLUDE[layer], meta[o].get("name") or "")):
+                keep[i] = o
+                names_here.add(nm)
+                per_owner[o].append(nm)
+        claimed |= names_here
+        leaves += subset_from_source(g, bin_, keep, out, acc_list, bv_list, mesh_list, mat_list)
+        src_count[src.split("/")[-1]] = len(keep)
+        del g, bin_
 
-    # rebuild node list: root(transform) -> group -> leaves (renamed to owner)
-    root = dict(nodes[g["scenes"][0]["nodes"][0]])
-    group_idx = root["children"][0]
-    new_nodes = [None, {"name": f"layer:{layer}", "children": []}]
+    new_nodes = [root, {"name": f"layer:{layer}", "children": list(range(2, 2 + len(leaves)))}] + leaves
     root["children"] = [1]
-    new_nodes[0] = root
-    for i, o in keep_leaf.items():
-        n = {k: v for k, v in nodes[i].items() if k in ("translation", "rotation", "scale", "matrix", "mesh")}
-        n["name"] = o
-        new_nodes[1]["children"].append(len(new_nodes))
-        new_nodes.append(n)
-    g["nodes"] = new_nodes
-    g["scenes"] = [{"nodes": [0]}]
-    g["scene"] = 0
-
-    # prune meshes -> accessors -> bufferViews -> materials, rebuild buffer
-    used_mesh = sorted({n["mesh"] for n in new_nodes[2:]})
-    mesh_remap = {o: i for i, o in enumerate(used_mesh)}
-    g["meshes"] = [g["meshes"][i] for i in used_mesh]
-    for n in new_nodes[2:]:
-        n["mesh"] = mesh_remap[n["mesh"]]
-    used_acc, used_mat = set(), set()
-    for m in g["meshes"]:
-        for p in m["primitives"]:
-            used_acc.update(p["attributes"].values())
-            if "indices" in p:
-                used_acc.add(p["indices"])
-            if "material" in p:
-                used_mat.add(p["material"])
-    acc_keep = sorted(used_acc)
-    acc_remap = {o: i for i, o in enumerate(acc_keep)}
-    g["accessors"] = [g["accessors"][i] for i in acc_keep]
-    mat_keep = sorted(used_mat)
-    mat_remap = {o: i for i, o in enumerate(mat_keep)}
-    g["materials"] = [g["materials"][i] for i in mat_keep]
-    for m in g["meshes"]:
-        for p in m["primitives"]:
-            p["attributes"] = {k: acc_remap[v] for k, v in p["attributes"].items()}
-            if "indices" in p:
-                p["indices"] = acc_remap[p["indices"]]
-            if "material" in p:
-                p["material"] = mat_remap[p["material"]]
-    used_bv = set()
-    for a in g["accessors"]:
-        if "bufferView" in a:
-            used_bv.add(a["bufferView"])
-    for m in g["meshes"]:
-        for p in m["primitives"]:
-            d = p.get("extensions", {}).get("KHR_draco_mesh_compression")
-            if d:
-                used_bv.add(d["bufferView"])
-    bv_keep = sorted(used_bv)
-    bv_remap = {o: i for i, o in enumerate(bv_keep)}
-    out = bytearray()
-    new_bvs = []
-    for i in bv_keep:
-        bv = dict(g["bufferViews"][i])
-        off = bv.get("byteOffset", 0)
-        out += b"\0" * (-len(out) % 4)
-        bv["byteOffset"] = len(out)
-        out += bin_[off:off + bv["byteLength"]]
-        new_bvs.append(bv)
-    g["bufferViews"] = new_bvs
-    for a in g["accessors"]:
-        if "bufferView" in a:
-            a["bufferView"] = bv_remap[a["bufferView"]]
-    for m in g["meshes"]:
-        for p in m["primitives"]:
-            d = p.get("extensions", {}).get("KHR_draco_mesh_compression")
-            if d:
-                d["bufferView"] = bv_remap[d["bufferView"]]
-    g["buffers"] = [{"byteLength": len(out)}]
-    for k in ("extensionsUsed", "extensionsRequired"):
-        if k in g:
-            g[k] = [e for e in g[k] if e != "EXT_mesh_gpu_instancing"]
-    for k in ("images", "textures", "samplers", "skins", "animations", "cameras"):
-        g.pop(k, None)
+    g = {"asset": {"version": "2.0", "generator": "extract_layer.py"}, "scene": 0, "scenes": [{"nodes": [0]}],
+         "nodes": new_nodes, "meshes": mesh_list, "accessors": acc_list, "bufferViews": bv_list,
+         "materials": mat_list, "buffers": [{"byteLength": len(out)}],
+         "extensionsUsed": ["KHR_draco_mesh_compression", "KHR_texture_transform"],
+         "extensionsRequired": ["KHR_draco_mesh_compression"]}
     write_glb(g, out, out_glb)
 
     # identity sidecar
     total = Counter(e["category"] for e in meta.values() if e.get("category") in cats)
     got = Counter(meta[o]["category"] for o in per_owner)
     els = {}
-    for o, leaves in per_owner.items():
+    for o, lv_leaves in per_owner.items():
         e = meta[o]
         lv = e.get("level")
         if isinstance(lv, str) and lv.startswith('Level "'):
             lv = lv.split('"')[1]
         els[o] = {"name": e.get("name"), "category": e.get("category"), "level": lv,
-                  "source_file": e.get("source_file"), "leaves": len(leaves)}
+                  "source_file": e.get("source_file"), "leaves": len(lv_leaves)}
+        pr = props.get(o)
+        if pr:
+            for grp, key, field in PROPS:
+                v = (pr.get(grp) or {}).get(key)
+                if v not in (None, "", "0 VA", "0 W"):
+                    els[o][field] = v
+            if not lv:
+                for grp, key in LEVEL_KEYS:
+                    v = (pr.get(grp) or {}).get(key)
+                    if isinstance(v, str) and v:
+                        els[o]["level"] = v.split('"')[1] if v.startswith('Level "') else v
+                        els[o]["levelFrom"] = f"{grp}/{key}"
+                        break
     doc = {"_schema": "twin-elements-binding/2", "layer": layer, "model": out_glb.split("/")[-1],
            "_doc": f"Element tier '{layer}': glb node name (= owner dbId) -> identity. Cut from the APS master by scripts/extract_layer.py.",
            "survival": {c: {"total": total[c], "with_geometry": got.get(c, 0)} for c in cats},
            "elements": els}
     json.dump(doc, open(out_json, "w"), indent=1)
-    print(f"{layer}: {len(els)} elements / {len(keep_leaf)} leaves / {len(g['meshes'])} meshes / "
-          f"{len(g['materials'])} materials / {len(out) / 1e6:.1f} MB bin; survival "
-          + ", ".join(f"{c} {got.get(c, 0)}/{total[c]}" for c in cats))
+    print(f"{layer}: {len(els)} elements / {len(leaves)} leaves / {len(mesh_list)} meshes / "
+          f"{len(mat_list)} materials / {len(out) / 1e6:.1f} MB bin; per source {src_count}; survival "
+          + ", ".join(f"{c} {got.get(c, 0)}/{total[c]}" for c in cats)
+          + (f"; props on {sum(1 for v in els.values() if 'family' in v)}" if props else ""))
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:6])
+    main(*sys.argv[1:7])

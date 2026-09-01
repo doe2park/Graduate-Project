@@ -33,6 +33,8 @@ LAYER_FILES = {   # layer -> (glb, identity json)
     "lighting":   ("buildings/grimes/grimes-lighting.glb",   "buildings/grimes/lighting.elements.json"),
     "structural": ("buildings/grimes/grimes-structural.glb", "buildings/grimes/structural.elements.json"),
     "conduit":    ("buildings/grimes/grimes-conduit.glb",    "buildings/grimes/conduit.elements.json"),
+    "fixtures":   ("buildings/grimes/grimes-fixtures.glb",   "buildings/grimes/fixtures.elements.json"),
+    "lifesafety": ("buildings/grimes/grimes-lifesafety.glb", "buildings/grimes/lifesafety.elements.json"),
 }
 EQUIP_OFFSET_Y = -97.16          # grimes-bim-viewer.html EQUIP_OFFSET
 LEVEL_NAMES = {
@@ -40,8 +42,11 @@ LEVEL_NAMES = {
     "LOWER LEVEL - KRESGE LANDING": "LOWER", "LEVEL 01 - LOWER": "LOWER",
     "B1 LEVEL - MEZZ": "MEZZ", "LEVEL B1 - MEZZ": "MEZZ",
     "LEVEL 01": "L1", "LEVEL 02": "L2", "LEVEL 02 - UPPER": "L2", "LEVEL 03": "L3", "CLERESTORY LEVEL": "L3",
-    "ROOF": "ROOF", "ROOF LEVEL": "ROOF",
+    "ROOF": "ROOF", "ROOF LEVEL": "ROOF", "T/STEEL 09": "ROOF",
+    # structural top-of-steel datums (framing Reference Level)
+    "T/STEEL RF (N)": "ROOF", "T/STEEL 03 (N)": "L3", "T/STEEL 02 (N)": "L2", "T/STEEL 01 (N)": "L1", "T/STEEL LANDING": "MEZZ",
 }
+LEVEL_NAMES.update({k.title(): v for k, v in list(LEVEL_NAMES.items())})   # "Level 01" spellings from Revit Level elements
 # feeder meters by level (same table as the panelboard mapping / viewer LVL2METERS)
 LEVEL_METERS = {
     "LOWER": ["bmo:meter:76:kw", "bmo:meter:77:kw"], "MEZZ": ["bmo:meter:76:kw", "bmo:meter:77:kw"],
@@ -51,6 +56,13 @@ LEVEL_METERS = {
 
 # (regex on family name, type, system)  — first match wins
 RULES = [
+    # life safety
+    (r"FIRE ALARM|Fire Alarm|Strobe|Horn|Pull Station|Smoke|Heat Detector", "Fire alarm device", "Life safety"),
+    (r"Sprinkler", "Sprinkler", "Life safety"),
+    (r"Exit Sign|EXIT", "Exit sign", "Life safety"),
+    (r"Fire Extinguisher", "Fire extinguisher cabinet", "Life safety"),
+    (r"Security|EMERGENCY CALL|Emergency Call", "Security / emergency call", "Life safety"),
+    (r"Toilet Partition|Grab Bar|Dispenser|Mirror|Clothes_Hook|Baby Changing|Locker|Hook", "Restroom accessory", "Specialty"),
     (r"^RT_BX_Pull_Can", "Junction box", "Electrical"),
     (r"Panelboard", "Panelboard", "Electrical"),
     (r"Disconnect", "Disconnect switch", "Electrical"),
@@ -59,7 +71,6 @@ RULES = [
     (r"Ground_Bar", "Ground bar", "Electrical"),
     (r"^RT_EQ_Pad", "Equipment pad", "Electrical"),
     (r"^RT_EQ_Access_Panel", "Access panel", "Electrical"),
-    (r"FIRE ALARM", "Fire alarm device", "Electrical"),
     (r"Air Grille & Access Panel", "Air grille / access panel", "HVAC Equipment"),
     (r"^Diffuser", "Diffuser", "Diffusers"),
     (r"^Grill", "Grille", "Diffusers"),
@@ -85,6 +96,13 @@ RULES = [
     (r"^Pile", "Pile", "Structural"),
     (r"^Footing|^Foundation|^Wall Foundation|^Wall", "Foundation", "Structural"),
     (r"GUSSET|A325|^Structural Connection|Structural Connections", "Connection", "Structural"),
+    # receptacles / devices (Electrical Fixtures) — prefab box families from the electrical contractor
+    (r"Receptacle.*Quad|Quadruplex", "Receptacle (quad)", "Electrical"),
+    (r"Receptacle|Duplex|GFCI|GFI", "Receptacle (duplex)", "Electrical"),
+    (r"Orbit_|RT_PF_|RT_EF_|RT_ASM|eE_ASM|MC_Dot|Appleton|T5B|ZRT|Prefab|Pre-Fab|In-Wall|In_Wall", "Device box (prefab)", "Electrical"),
+    (r"Wireless Access|WAP", "Wireless access point", "Electrical"),
+    (r"Data|Telecom|Jack", "Data outlet", "Electrical"),
+    (r"Speaker|Projector|Display|Screen|AV_|Audio|Camera", "AV / security device", "Electrical"),
     # conduit / cable tray
     (r"Cable Tray", "Cable tray", "Conduit"),
     (r"^Conduit", "Conduit run", "Conduit"),
@@ -92,7 +110,23 @@ RULES = [
     (r"Floor_Box|_BX_", "Box", "Conduit"),
     (r"Rod|Hanger|Strut|Banger|SEISMIC|Clamp|_SU_|_HW_|_ST_", "Support / hanger", "Conduit"),
 ]
-FEED_BY_SYSTEM = {"Lighting": (["bmo:meter:76:kw"], "voltage-class")}   # 277V lighting → meter 76
+FEED_BY_SYSTEM = {"Lighting": (["bmo:meter:76:kw"], "voltage-class")}   # 277V lighting → meter 76 (fallback when no Revit voltage)
+# Revit "Electrical Data" ("120 V/1-180 VA", "277 V/1-0 VA", "Primary 277 V/1-0 VA-Secondary ...") → feeder by voltage class:
+#   120/208/220 V loads sit on the 208/120 V service (meter 77); 277/480 V on the 480/277 V service (meter 76).
+ED_RX = re.compile(r"(\d{2,3})\s*V/(\d)-(\d+(?:\.\d+)?)\s*VA")
+
+
+def parse_electrical_data(s):
+    m = ED_RX.search(s or "")
+    if not m:
+        return None, None
+    return int(m.group(1)), float(m.group(3))
+
+
+def feed_by_voltage(volts):
+    if volts is None:
+        return None
+    return ["bmo:meter:76:kw"] if volts >= 277 else ["bmo:meter:77:kw"]
 
 
 def classify(name, category):
@@ -108,7 +142,11 @@ def classify(name, category):
                 "Structural Framing": ("Framing", "Structural"), "Structural Columns": ("Column", "Structural"),
                 "Structural Foundations": ("Foundation", "Structural"), "Structural Connections": ("Connection", "Structural"),
                 "Conduits": ("Conduit", "Conduit"), "Conduit Fittings": ("Conduit fitting", "Conduit"),
-                "Cable Trays": ("Cable tray", "Conduit"), "Cable Tray Fittings": ("Cable tray fitting", "Conduit")}
+                "Cable Trays": ("Cable tray", "Conduit"), "Cable Tray Fittings": ("Cable tray fitting", "Conduit"),
+                "Electrical Fixtures": ("Electrical device", "Electrical"), "Data Devices": ("Data outlet", "Electrical"),
+                "Audio Visual Devices": ("AV / security device", "Electrical"), "Security Devices": ("Security / emergency call", "Life safety"),
+                "Fire Alarm Devices": ("Fire alarm device", "Life safety"), "Sprinklers": ("Sprinkler", "Life safety"),
+                "Specialty Equipment": ("Specialty equipment", "Life safety")}
     return fallback.get(category, ("Element", "Electrical"))
 
 
@@ -155,19 +193,31 @@ def centroids(glb):
     return {k: np.mean(v, axis=0) for k, v in ys.items()}
 
 
-def knn_level(c, labelled, k=5, y_weight=3.0):
-    """Nearest-neighbour level vote among Revit-labelled elements. Elevation is
-    weighted 3x so a ceiling-mounted L1 box is not captured by the L2 floor above
-    it; XZ handles the partial mezzanine (a pure elevation band cannot)."""
-    d = [((np.hypot(c[0] - p[0], c[2] - p[2]) ** 2 + (y_weight * (c[1] - p[1])) ** 2), lv) for p, lv in labelled]
-    d.sort(key=lambda t: t[0])
-    votes = {}
-    for _, lv in d[:k]:
-        votes[lv] = votes.get(lv, 0) + 1
-    return max(votes.items(), key=lambda t: t[1])[0]
+class LevelKNN:
+    """5-NN level vote among Revit-labelled elements (numpy, all layers pooled).
+    Elevation is weighted 3x so a ceiling-mounted L1 box is not captured by the
+    L2 floor above it; XZ handles the partial mezzanine (a pure elevation band
+    cannot)."""
+    def __init__(self, labelled, k=5, y_weight=3.0):
+        self.P = np.array([c for c, _ in labelled], dtype=float)
+        self.P[:, 1] *= y_weight
+        self.L = np.array([lv for _, lv in labelled])
+        self.k, self.yw = k, y_weight
+
+    def predict(self, c, exclude=None):
+        q = np.array(c, dtype=float); q[1] *= self.yw
+        d = ((self.P - q) ** 2).sum(axis=1)
+        if exclude is not None:
+            d[exclude] = np.inf
+        idx = np.argpartition(d, self.k)[:self.k]
+        vals, cnt = np.unique(self.L[idx], return_counts=True)
+        return vals[cnt.argmax()]
+
+    def loo(self):
+        return sum(self.predict(self.P[i] / [1, self.yw, 1], exclude=i) == self.L[i] for i in range(len(self.L)))
 
 
-def enrich(layer, glb, path, labelled, cent):
+def enrich(layer, glb, path, knn, cent):
     doc = json.load(open(path))
     els = doc["elements"]
     elev = {k: round(float(v[1]) + EQUIP_OFFSET_Y, 2) for k, v in cent.items()}
@@ -180,18 +230,26 @@ def enrich(layer, glb, path, labelled, cent):
         if e.get("level") in LEVEL_NAMES:
             e["levelKey"], e["levelSource"] = LEVEL_NAMES[e["level"]], "revit"
         elif eid in cent:
-            e["levelKey"], e["levelSource"] = knn_level(cent[eid], labelled), "geometry"
+            e["levelKey"], e["levelSource"] = str(knn.predict(cent[eid])), "geometry"
         else:
             e.pop("levelKey", None); e.pop("levelSource", None)
-        # feeds: explicit (panel schedule) > system rule (voltage class) > level inference for electrical
+        # design electrical data from Revit (receptacles, lighting): voltage + VA
+        volts, va = parse_electrical_data(e.get("electrical_data"))
+        if volts is not None:
+            e["design_volts"] = volts
+            if va:
+                e["design_va"] = va
+        # feeds: explicit (panel schedule) > Revit voltage class > system rule > level inference for electrical
         if e.get("kind") == "panelboard" and e.get("isFedBy"):
             e["feedSource"] = "panel-schedule"
+        elif sys_ in ("Electrical", "Lighting") and feed_by_voltage(volts):
+            e["isFedBy"], e["feedSource"] = feed_by_voltage(volts), "revit-voltage"
         elif sys_ in FEED_BY_SYSTEM:
             e["isFedBy"], e["feedSource"] = FEED_BY_SYSTEM[sys_]
         elif sys_ == "Electrical" and e.get("levelKey") in LEVEL_METERS:
             e["isFedBy"], e["feedSource"] = LEVEL_METERS[e["levelKey"]], "level-inferred"
         else:
-            if e.get("feedSource") in ("level-inferred", "voltage-class"):
+            if e.get("feedSource") in ("level-inferred", "voltage-class", "revit-voltage"):
                 e.pop("isFedBy", None)
             e.pop("feedSource", None)
         for k in counts:
@@ -223,11 +281,12 @@ def main(argv):
             continue
         labelled += [(cents[layer][i], LEVEL_NAMES[e["level"]]) for i, e in els.items()
                      if e.get("level") in LEVEL_NAMES and i in cents[layer]]
-    loo = sum(knn_level(c, [t for t in labelled if t[0] is not c]) == lv for c, lv in labelled)
+    knn = LevelKNN(labelled)
+    loo = knn.loo()
     print(f"pooled kNN level inference, leave-one-out vs Revit: {loo}/{len(labelled)} = {loo / len(labelled):.0%}")
     for layer in layers:
         if layer in cents:
-            enrich(layer, *LAYER_FILES[layer], labelled, cents[layer])
+            enrich(layer, *LAYER_FILES[layer], knn, cents[layer])
 
 
 if __name__ == "__main__":

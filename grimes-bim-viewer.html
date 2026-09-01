@@ -207,10 +207,12 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   <div class="tb-dd" id="layersDd">
     <button class="tb-btn" id="layersBtn" onclick="toggleLayersMenu()" title="Element-tier layers cut from the 741k-element APS master — each element is clickable">⬡ Layers ▾</button>
     <div class="tb-menu" id="layersMenu" hidden>
-      <button class="tb-btn" id="layerBtn-equipment" onclick="toggleLayer('equipment')" title="Panelboards, junction boxes, air terminals, fixtures — tap any unit for identity + live feeder data">⚡ Equipment <small>0.9 MB · 285</small></button>
-      <button class="tb-btn" id="layerBtn-lighting" onclick="toggleLayer('lighting')" title="309 of 1,570 Revit fixtures survived the instancing export — 277V lighting rides meter 76">💡 Lighting <small>0.8 MB · 309</small></button>
-      <button class="tb-btn" id="layerBtn-structural" onclick="toggleLayer('structural')" title="Concrete beams/columns, steel framing, foundations, 108 SMA brace devices — the structural-monitoring tier">🏗 Structure <small>10.8 MB · 2,033</small></button>
-      <button class="tb-btn" id="layerBtn-conduit" onclick="toggleLayer('conduit')" title="Conduit runs, fittings, supports, cable trays — the physical electrical distribution paths">🔌 Conduit <small>10.6 MB · 5,570</small></button>
+      <button class="tb-btn" id="layerBtn-equipment" onclick="toggleLayer('equipment')" title="Panelboards, transformers, junction boxes, diffusers, plumbing fixtures — tap any unit for identity + live feeder data">⚡ Equipment <small>1.5 MB · 1,143</small></button>
+      <button class="tb-btn" id="layerBtn-fixtures" onclick="toggleLayer('fixtures')" title="Receptacles, prefab device boxes, data/AV outlets — each with its Revit design VA where modelled">⏻ Receptacles <small>6.2 MB · 4,927</small></button>
+      <button class="tb-btn" id="layerBtn-lighting" onclick="toggleLayer('lighting')" title="All 1,570 light fixtures + 165 lighting controls — 277 V fixtures ride meter 76, 120 V ride meter 77">💡 Lighting <small>2.3 MB · 1,735</small></button>
+      <button class="tb-btn" id="layerBtn-lifesafety" onclick="toggleLayer('lifesafety')" title="Fire alarm devices, sprinklers, exit signs, extinguisher cabinets, security / emergency call, WAPs">🧯 Life safety <small>0.5 MB · 553</small></button>
+      <button class="tb-btn" id="layerBtn-structural" onclick="toggleLayer('structural')" title="Primary structure: concrete beams/columns, steel framing, foundations, 108 SMA brace devices — with Revit volume + material">🏗 Structure <small>12.9 MB · 2,420</small></button>
+      <button class="tb-btn" id="layerBtn-conduit" onclick="toggleLayer('conduit')" title="Conduit runs, all 8,142 fittings, supports, cable trays — the physical electrical distribution paths">🔌 Conduit <small>11.0 MB · 11,063</small></button>
     </div>
   </div>
   <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
@@ -625,7 +627,7 @@ let plockActive = false, plockFailed = false, dragLook = false, _dragX = 0, _dra
 let yaw = 0, pitch = 0;
 const _floorRay = new THREE.Raycaster();
 const _centerVec = new THREE.Vector2(0, 0);
-let aimedMesh = null, _aimAcc = 0;
+let aimedMesh = null, aimedInstance = null, _aimAcc = 0;
 
 /* Center-ray aiming while pointer-locked: crosshair heats up over a pickable
    MEP system; click opens the twin panel (walking continues). */
@@ -639,6 +641,7 @@ function updateAim() {
   const targets = anyLayerVisible() ? visibleEquip().concat(allMeshes) : allMeshes;
   const hit = raycaster.intersectObjects(targets, false)[0];
   aimedMesh = hit ? hit.object : null;
+  aimedInstance = hit && hit.instanceId != null ? hit.instanceId : null;
   document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);
 }
 // No AxesHelper/GridHelper exists in this scene and both glbs are
@@ -842,7 +845,7 @@ renderer.domElement.addEventListener('click', () => {
   if (!walkMode || !plockActive) return;
   updateAim();
   if (!aimedMesh) { clearPick(); return; }
-  if (aimedMesh.userData && aimedMesh.userData.equipId) pickEquipment(aimedMesh);
+  if (aimedMesh.userData && aimedMesh.userData.ids) pickEquipment(aimedMesh, aimedInstance);
   else pickSystem(aimedMesh);
 });
 document.addEventListener('pointerlockerror', () => {
@@ -1195,7 +1198,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   // Equipment (element tier) wins first — small targets beat system blobs
   if (anyLayerVisible()) {
     const eqHit = raycaster.intersectObjects(visibleEquip(), false)[0];
-    if (eqHit) { pickEquipment(eqHit.object); return; }
+    if (eqHit) { pickEquipment(eqHit.object, eqHit.instanceId); return; }
   }
   // MEP systems win when overlapping; the shell is the fallback target
   const mepHit = raycaster.intersectObjects(allMeshes, false)[0];
@@ -1227,11 +1230,13 @@ window.clearPick = () => {
 // cannot detect a 180° rotation since sizes are preserved). Placement is
 // rotY(π) + this translation (conduit-set match under H180).
 const EQUIP_OFFSET = { x: -35.28, y: -97.16, z: 28.60 };
-const LAYERS = {
-  equipment:  { glb: 'buildings/grimes/grimes-equipment.glb',  json: 'buildings/grimes/elements.json',            label: '⚡ Equipment', mb: 0.9 },
-  lighting:   { glb: 'buildings/grimes/grimes-lighting.glb',   json: 'buildings/grimes/lighting.elements.json',   label: '💡 Lighting',  mb: 0.8 },
-  structural: { glb: 'buildings/grimes/grimes-structural.glb', json: 'buildings/grimes/structural.elements.json', label: '🏗 Structure', mb: 10.8 },
-  conduit:    { glb: 'buildings/grimes/grimes-conduit.glb',    json: 'buildings/grimes/conduit.elements.json',    label: '🔌 Conduit',   mb: 10.6 },
+const LAYERS = {   // all cut from the 2026-09-01 targeted SVF re-export (every element keeps its dbId) — see scripts/extract_layer.py
+  equipment:  { glb: 'buildings/grimes/grimes-equipment.glb',  json: 'buildings/grimes/elements.json',            label: '⚡ Equipment',   mb: 1.5 },
+  fixtures:   { glb: 'buildings/grimes/grimes-fixtures.glb',   json: 'buildings/grimes/fixtures.elements.json',   label: '⏻ Receptacles', mb: 6.2 },
+  lighting:   { glb: 'buildings/grimes/grimes-lighting.glb',   json: 'buildings/grimes/lighting.elements.json',   label: '💡 Lighting',    mb: 2.3 },
+  lifesafety: { glb: 'buildings/grimes/grimes-lifesafety.glb', json: 'buildings/grimes/lifesafety.elements.json', label: '🧯 Life safety', mb: 0.5 },
+  structural: { glb: 'buildings/grimes/grimes-structural.glb', json: 'buildings/grimes/structural.elements.json', label: '🏗 Structure',   mb: 12.9 },
+  conduit:    { glb: 'buildings/grimes/grimes-conduit.glb',    json: 'buildings/grimes/conduit.elements.json',    label: '🔌 Conduit',     mb: 11.0 },
 };
 const layerState = {};           // key -> { group, meshes, loading }
 let equipMeshes = [], equipMeta = {}, equipPicked = null;   // union across loaded layers
@@ -1243,7 +1248,7 @@ window.toggleLayer = (key) => {
   if (st.group) {
     st.group.visible = !st.group.visible;
     btn.classList.toggle('active', st.group.visible);
-    if (!st.group.visible && equipPicked && equipPicked.userData.layer === key) clearPick();
+    if (!st.group.visible && equipPicked && equipPicked.im.userData.layer === key) clearPick();
     buildEquipFilter();
     document.getElementById('equipFilter').hidden = !anyLayerVisible();
     return;
@@ -1265,17 +1270,35 @@ window.toggleLayer = (key) => {
     st.group.rotation.y = Math.PI;   // 180° frame difference — see EQUIP_OFFSET note
     st.group.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
     st.group.updateMatrixWorld(true);
-    st.meshes = [];
+    /* Draw-call budget: the targeted re-export is one node per fragment
+       (receptacles alone = 31k nodes sharing 173 meshes). Collapse every
+       (geometry, material) pair into ONE InstancedMesh; the instance index
+       maps back to the element id, so picking/highlight/filter stay
+       per-element. 92k nodes → a few hundred draw calls. */
+    const buckets = new Map();
+    st.group.updateMatrixWorld(true);
     st.group.traverse(ch => {
       if (!ch.isMesh) return;
-      ch.userData.equipId = findEquipId(ch);
-      ch.userData.layer = key;
-      if (ch.material) ch.material = ch.material.clone(); // per-mesh highlightable
-      if (key === 'structural' && ch.material && ch.material.emissive !== undefined) {
-        ch.material.emissive.setHex(0x1e293b); ch.material.emissiveIntensity = 0.25; // concrete reads black under the walk rig otherwise
-      }
-      st.meshes.push(ch); equipMeshes.push(ch);
+      const id = findEquipId(ch);
+      const k = ch.geometry.uuid + '|' + (ch.material ? ch.material.uuid : '');
+      let b = buckets.get(k);
+      if (!b) { b = { geo: ch.geometry, mat: ch.material, mats: [], ids: [] }; buckets.set(k, b); }
+      b.mats.push(ch.matrixWorld.clone()); b.ids.push(id);
     });
+    st.meshes = [];
+    const white = new THREE.Color(0xffffff);
+    for (const b of buckets.values()) {
+      const mat = b.mat ? b.mat.clone() : new THREE.MeshStandardMaterial();
+      if (key === 'structural' && mat.emissive !== undefined) { mat.emissive.setHex(0x1e293b); mat.emissiveIntensity = 0.25; }
+      const im = new THREE.InstancedMesh(b.geo, mat, b.mats.length);
+      b.mats.forEach((m, i) => { im.setMatrixAt(i, m); im.setColorAt(i, white); });
+      im.instanceMatrix.needsUpdate = true;
+      im.userData.ids = b.ids; im.userData.mats = b.mats; im.userData.layer = key;
+      im.frustumCulled = false;   // per-instance bounds are not computed; the building is small
+      st.meshes.push(im); equipMeshes.push(im);
+    }
+    st.group = new THREE.Group(); st.group.name = 'layer:' + key;   // world-space container (matrices already baked)
+    for (const im of st.meshes) st.group.add(im);
     scene.add(st.group);
     st.loading = false;
     btn.innerHTML = st.labelHtml;
@@ -1283,7 +1306,7 @@ window.toggleLayer = (key) => {
     document.getElementById('layersBtn').classList.add('active');
     buildEquipFilter();
     document.getElementById('equipFilter').hidden = false;
-    console.log(`[layer:${key}] loaded:`, st.meshes.length, 'meshes /', Object.keys(meta).length, 'elements');
+    console.log(`[layer:${key}] loaded:`, st.meshes.length, 'draw calls /', Object.keys(meta).length, 'elements /', st.meshes.reduce((a, m) => a + m.count, 0), 'instances');
   }).catch(e => {
     st.loading = false;
     btn.innerHTML = st.labelHtml;
@@ -1305,7 +1328,7 @@ document.addEventListener('pointerdown', e => {
 let equipTypeFilter = null;   // null = all
 const layerOn = m => { const st = layerState[m.userData.layer]; return st && st.group && st.group.visible; };
 // Raycaster ignores .visible — hidden layers and filtered-out meshes must be excluded explicitly.
-const visibleEquip = () => equipMeshes.filter(m => m.visible && layerOn(m));
+const visibleEquip = () => equipMeshes.filter(m => m.visible && layerOn(m));   // zero-scaled instances cannot be hit
 function buildEquipFilter() {
   const counts = {};
   for (const e of Object.values(equipMeta)) {
@@ -1326,12 +1349,20 @@ function buildEquipFilter() {
   mk('All', null, Object.values(counts).reduce((a, b) => a + b, 0));
   for (const [t, n] of types) mk(t, t, n);
 }
+const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
 function applyEquipFilter() {
-  for (const m of equipMeshes) {
-    const info = m.userData.equipId && equipMeta[m.userData.equipId];
-    m.visible = !equipTypeFilter || (info && info.type === equipTypeFilter);
+  for (const im of equipMeshes) {
+    let any = false;
+    im.userData.ids.forEach((id, i) => {
+      const info = id && equipMeta[id];
+      const on = !equipTypeFilter || (info && info.type === equipTypeFilter);
+      im.setMatrixAt(i, on ? im.userData.mats[i] : _zero);
+      if (on) any = true;
+    });
+    im.instanceMatrix.needsUpdate = true;
+    im.visible = any;
   }
-  if (equipPicked && !equipPicked.visible) clearPick();
+  if (equipPicked && equipTypeFilter && equipMeta[equipPicked.id] && equipMeta[equipPicked.id].type !== equipTypeFilter) clearPick();
 }
 function findEquipId(obj) {
   for (let o = obj; o; o = o.parent) {
@@ -1339,11 +1370,12 @@ function findEquipId(obj) {
   }
   return null;
 }
+const _white = new THREE.Color(0xffffff), _amber = new THREE.Color(0xfbbf24);
 function unhighlightEquip() {
-  if (equipPicked && equipPicked.material && equipPicked.material.emissive !== undefined
-      && equipPicked.userData.baseEmissive !== undefined) {
-    equipPicked.material.emissive.setHex(equipPicked.userData.baseEmissive);
-    equipPicked.material.emissiveIntensity = equipPicked.userData.baseEmissiveI ?? 1;
+  if (equipPicked) {
+    const { im, id } = equipPicked;
+    im.userData.ids.forEach((x, i) => { if (x === id) im.setColorAt(i, _white); });
+    im.instanceColor.needsUpdate = true;
   }
   equipPicked = null;
 }
@@ -1352,19 +1384,32 @@ const EQUIP_LABELS = {  // family name → human label
   'eE_EQ_Disconnect_v2': 'Disconnect switch', 'RT_EQ_Panel_TopHat': 'Panel (top hat)',
   'RT_EQ_Ground_Bar': 'Ground bar', 'RT_EQ_Access_Panel': 'Access panel', 'RT_EQ_Pad': 'Equipment pad',
 };
-async function pickEquipment(mesh) {
-  const id = mesh.userData.equipId || findEquipId(mesh);
+// Revit parameters carried by scripts/extract_layer.py from the full property dump
+const REVIT_FIELDS = [['mark', 'mark'], ['location', 'room / location'], ['electrical_data', 'electrical data'],
+  ['design_va', 'design load (VA)'], ['watts', 'watts'], ['flow', 'design airflow'], ['system_classification', 'system'],
+  ['pressure_drop', 'pressure drop'], ['size', 'size'], ['mains', 'mains'], ['mcb_rating', 'MCB rating'],
+  ['volume', 'volume'], ['length', 'length'], ['area', 'area'], ['structural_material', 'material'],
+  ['structural_usage', 'structural usage'], ['revit_type', 'type'], ['workset', 'workset'], ['phase', 'phase'], ['comments', 'comments']];
+function revitRows(info) {
+  const rows = REVIT_FIELDS.filter(([k]) => info[k] != null && info[k] !== '').map(([k, l]) => {
+    let v = String(info[k]).replace(/^Material "|", #\d+$/g, '');
+    return drow(l, esc(v));
+  });
+  return rows.length ? dsec('Revit (design)') + rows.join('') : '';
+}
+async function pickEquipment(mesh, instanceId) {
+  const id = mesh.userData.ids ? mesh.userData.ids[instanceId] : null;
   const info = id && equipMeta && equipMeta[id];
   if (!info) return;
   document.getElementById('clickHint').classList.remove('show');
   highlight(null);
   unhighlightEquip();
-  equipPicked = mesh; picked = mesh;
-  if (mesh.material && mesh.material.emissive !== undefined) {
-    mesh.userData.baseEmissive = mesh.material.emissive.getHex();
-    mesh.userData.baseEmissiveI = mesh.material.emissiveIntensity;
-    mesh.material.emissive.setHex(0xfbbf24);
-    mesh.material.emissiveIntensity = 0.9;
+  equipPicked = { im: mesh, id }; picked = mesh;
+  // tint every instance of this element (an element can span several fragments / buckets)
+  for (const im of equipMeshes) {
+    let hit = false;
+    im.userData.ids.forEach((x, i) => { if (x === id) { im.setColorAt(i, _amber); hit = true; } });
+    if (hit) im.instanceColor.needsUpdate = true;
   }
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
@@ -1388,6 +1433,7 @@ async function pickEquipment(mesh) {
         + (info.levelSource === 'geometry' ? ' <span class="mut">(inferred from position, 92% LOO)</span>' : '')) : '')
     + (info.elevation_m != null ? drow('elevation', info.elevation_m.toFixed(2) + ' m') : '')
     + (info.source_file ? drow('source model', esc(info.source_file)) : '')
+    + revitRows(info)
     + drow('dbId', esc(id) + (info.layer ? ' <span class="mut">· layer ' + esc(info.layer) + '</span>' : ''))
     + dsec('Source')
     + drow('geometry', 'APS SVF → element GLB (dbId-named nodes)')
@@ -1408,6 +1454,8 @@ async function pickEquipment(mesh) {
   badgeEl.textContent = '…'; badgeEl.className = 'badge na';
   srcEl.textContent = info.feedSource === 'level-inferred'
     ? 'Feeder meters serving this level (inferred from level, not a panel schedule) — no per-element metering.'
+    : info.feedSource === 'revit-voltage'
+    ? `Feeder by Revit voltage class (${info.design_volts} V → ${info.design_volts >= 277 ? '480/277 V service, meter 76' : '208/120 V service, meter 77'}); circuits were not modelled in the NWD.`
     : info.feedSource === 'voltage-class'
     ? '277V lighting feeder (meter 76, by voltage class) — no per-circuit metering.'
     : 'Feeder meter total — per-panel submetering not installed (93 panels identified for future sub-metering).';
