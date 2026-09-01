@@ -53,6 +53,12 @@ body.compare-on #syncPanel{display:block}
 #syncPanel input[type=number]{background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 4px;border-radius:3px;font:10px var(--mono)}
 #syncPanel .hint{font:italic 9.5px/1.4 var(--font);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
 #legend{position:fixed;left:14px;bottom:14px;z-index:50;background:rgba(8,12,24,.9);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font:10px/1.6 var(--mono);color:#94a3b8}
+#equipFilter{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:51;display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:min(92vw,720px);background:rgba(8,12,24,.92);border:1px solid var(--border);border-radius:6px;padding:6px 9px;font:10px/1.4 var(--mono);color:#94a3b8}
+#equipFilter .ef-title{font-weight:600;font-size:9px;letter-spacing:.5px;margin-right:4px}
+#equipFilter .ef{cursor:pointer;border:1px solid rgba(148,163,184,.25);border-radius:999px;padding:2px 8px;color:#cbd5e1;background:transparent;font:inherit}
+#equipFilter .ef.on{background:#fbbf24;color:#0b1020;border-color:#fbbf24}
+#equipFilter .ef small{opacity:.6;margin-left:3px}
+body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
 #legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 /* ── Twin panel: visual-first — big number + chart up top, prose folded into ⓘ.
    Three density levels: (1) headline kW/badge/chart, (2) compact rows, (3) details. ── */
@@ -192,7 +198,7 @@ body.compare-on #syncPanel{display:block}
   <span class="tb-spacer"></span>
   <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
   <button class="tb-btn" id="bldgBtn" onclick="toggleBuilding()" title="Show/hide the translucent building envelope around the systems">🏢 Building shell</button>
-  <button class="tb-btn" id="equipBtn" onclick="toggleEquipment()" title="Element-tier equipment layer (16 MB): panelboards, AHUs, air terminals — tap any unit for identity + live feeder data">⚡ Equipment</button>
+  <button class="tb-btn" id="equipBtn" onclick="toggleEquipment()" title="Element-tier equipment layer (0.9 MB): panelboards, junction boxes, air terminals, fixtures — tap any unit for identity + live feeder data; filter by type below">⚡ Equipment</button>
   <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
   <a class="tb-btn" href="grimes-xr.html" title="Open the immersive MEP sensor dashboards">▸ MEP dashboards</a>
   <a class="tb-btn" href="grimes-performance.html" title="Live design-vs-actual energy: LEED model vs measured meter counters">📉 Design vs Actual</a>
@@ -218,6 +224,7 @@ body.compare-on #syncPanel{display:block}
 </div>
 
 <div id="legend"></div>
+<div id="equipFilter" hidden><span class="ef-title">EQUIPMENT · filter</span></div>
 
 <div id="welcome">
   <div class="card">
@@ -616,7 +623,7 @@ function updateAim() {
   raycaster.setFromCamera(_centerVec, camera);
   // equipment elements are aimable in walk mode too — nearest hit wins
   const targets = (equipGroup && equipGroup.visible && equipMeshes.length)
-    ? equipMeshes.concat(allMeshes) : allMeshes;
+    ? visibleEquip().concat(allMeshes) : allMeshes;
   const hit = raycaster.intersectObjects(targets, false)[0];
   aimedMesh = hit ? hit.object : null;
   document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);
@@ -1174,7 +1181,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   raycaster.setFromCamera(_ptr, camera);
   // Equipment (element tier) wins first — small targets beat system blobs
   if (equipGroup && equipGroup.visible && equipMeshes.length) {
-    const eqHit = raycaster.intersectObjects(equipMeshes, false)[0];
+    const eqHit = raycaster.intersectObjects(visibleEquip(), false)[0];
     if (eqHit) { pickEquipment(eqHit.object); return; }
   }
   // MEP systems win when overlapping; the shell is the fallback target
@@ -1215,16 +1222,17 @@ window.toggleEquipment = () => {
   if (equipGroup) {
     equipGroup.visible = !equipGroup.visible;
     btn.classList.toggle('active', equipGroup.visible);
+    document.getElementById('equipFilter').hidden = !equipGroup.visible;
     if (!equipGroup.visible && equipPicked) clearPick();
     return;
   }
   if (equipLoading) return;
   equipLoading = true;
-  btn.textContent = '⏳ 16 MB…';
+  btn.textContent = '⏳ 0.9 MB…';
   Promise.all([
     cachedJson('buildings/grimes/elements.json'),
     new Promise((res, rej) => loader.load('buildings/grimes/grimes-equipment.glb', res,
-      p => { if (p.total) btn.textContent = `⏳ ${(p.loaded / 1048576).toFixed(0)}/16 MB`; }, rej)),
+      p => { if (p.total) btn.textContent = `⏳ ${(p.loaded / 1048576).toFixed(1)}/0.9 MB`; }, rej)),
   ]).then(([metaJson, gltf]) => {
     equipMeta = metaJson.elements || {};
     equipGroup = gltf.scene;
@@ -1241,6 +1249,8 @@ window.toggleEquipment = () => {
     equipLoading = false;
     btn.textContent = '⚡ Equipment';
     btn.classList.add('active');
+    buildEquipFilter();
+    document.getElementById('equipFilter').hidden = false;
     console.log('[equip] loaded:', equipMeshes.length, 'meshes /', Object.keys(equipMeta).length, 'elements');
   }).catch(e => {
     equipLoading = false;
@@ -1249,6 +1259,34 @@ window.toggleEquipment = () => {
   });
 };
 
+/* Type filter — elements.json v2 carries type/system/levelKey (see
+   scripts/classify_elements.py). Chips = the type taxonomy, ordered by count. */
+let equipTypeFilter = null;   // null = all
+// Raycaster ignores .visible — filtered-out meshes must be excluded explicitly.
+const visibleEquip = () => equipTypeFilter ? equipMeshes.filter(m => m.visible) : equipMeshes;
+function buildEquipFilter() {
+  const counts = {};
+  for (const e of Object.values(equipMeta)) if (e.type) counts[e.type] = (counts[e.type] || 0) + 1;
+  const types = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const box = document.getElementById('equipFilter');
+  box.querySelectorAll('.ef').forEach(n => n.remove());
+  const mk = (label, val, n) => {
+    const b = document.createElement('button');
+    b.className = 'ef' + (val === equipTypeFilter ? ' on' : '');
+    b.innerHTML = esc(label) + (n != null ? `<small>${n}</small>` : '');
+    b.onclick = () => { equipTypeFilter = val; applyEquipFilter(); buildEquipFilter(); };
+    box.appendChild(b);
+  };
+  mk('All', null, Object.keys(equipMeta).length);
+  for (const [t, n] of types) mk(t, t, n);
+}
+function applyEquipFilter() {
+  for (const m of equipMeshes) {
+    const info = m.userData.equipId && equipMeta[m.userData.equipId];
+    m.visible = !equipTypeFilter || (info && info.type === equipTypeFilter);
+  }
+  if (equipPicked && !equipPicked.visible) clearPick();
+}
 function findEquipId(obj) {
   for (let o = obj; o; o = o.parent) {
     if (o.name && equipMeta && equipMeta[o.name]) return o.name;
@@ -1284,7 +1322,7 @@ async function pickEquipment(mesh) {
   }
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
-  const label = EQUIP_LABELS[info.name] || info.name || 'Equipment';
+  const label = info.type || EQUIP_LABELS[info.name] || info.name || 'Equipment';
   document.getElementById('twinDot').style.background = '#fbbf24';
   document.getElementById('twinTitle').textContent = label + (info.level ? ' · ' + info.level : '');
   const ptsEl = document.getElementById('twinPoints');
@@ -1297,8 +1335,12 @@ async function pickEquipment(mesh) {
   detInfo.innerHTML =
     dsec('Identity')
     + drow('element', esc(label))
-    + (info.category ? drow('category', esc(info.category)) : '')
-    + (info.level ? drow('level', esc(info.level)) : '')
+    + drow('family', esc(info.name || '—'))
+    + (info.category ? drow('revit category', esc(info.category)) : '')
+    + (info.system ? drow('system', esc(info.system)) : '')
+    + (info.levelKey ? drow('level', esc(info.level || info.levelKey)
+        + (info.levelSource === 'geometry' ? ' <span class="mut">(inferred from position, 92% LOO)</span>' : '')) : '')
+    + (info.elevation_m != null ? drow('elevation', info.elevation_m.toFixed(2) + ' m') : '')
     + drow('dbId', esc(id))
     + dsec('Source')
     + drow('geometry', 'APS SVF → element GLB (dbId-named nodes)')
@@ -1310,11 +1352,13 @@ async function pickEquipment(mesh) {
     bigEl.innerHTML = '— <small>kW</small>';
     badgeEl.textContent = 'NO FEED'; badgeEl.className = 'badge na';
     srcEl.textContent = 'No meter mapping for this element yet (non-electrical or unmapped).';
-    ptsEl.innerHTML = '<div class="pt mut"><span>Identity-only element — live feed applies to panelboards.</span></div>';
+    ptsEl.innerHTML = '<div class="pt mut"><span>Identity-only element — no electrical feed (plumbing / air terminal).</span></div>';
     return;
   }
   badgeEl.textContent = '…'; badgeEl.className = 'badge na';
-  srcEl.textContent = 'Feeder meter total — per-panel submetering not installed (93 panels identified for future sub-metering).';
+  srcEl.textContent = info.feedSource === 'level-inferred'
+    ? 'Feeder meters serving this level (inferred from level, not a panel schedule) — no per-element metering.'
+    : 'Feeder meter total — per-panel submetering not installed (93 panels identified for future sub-metering).';
   try {
     const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
     const meters = bd.meters || {};

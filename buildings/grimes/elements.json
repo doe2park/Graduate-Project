@@ -1,397 +1,792 @@
 {
- "_schema": "twin-elements-binding/1",
- "_doc": "Element tier: glb node name (= Model Derivative dbId) -> identity + meter feed. Generated from grimes-elements.glb.meta.json 2026-08-03. Complements the system tier in binding.json.",
+ "_schema": "twin-elements-binding/2",
+ "_doc": "Element tier: glb node name (= Model Derivative dbId) -> identity + meter feed. Generated from grimes-elements.glb.meta.json 2026-08-03. Complements the system tier in binding.json. Enriched by scripts/classify_elements.py: type/system taxonomy from family names, levelKey (revit name or geometry-inferred from elevation), level-inferred feeder meters for electrical elements.",
  "model": "grimes-equipment.glb",
  "elements": {
   "576": {
    "name": "Commercial_Shower_System-American_Standard-TU662213.002",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 1.76,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "582": {
    "name": "T342.430",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 2.03,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "588": {
    "name": "Shower-Bath-American_Standard-Reliant3_TU385500_02-Series",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 1.75,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "594": {
    "name": "Showerhead-American_Standard-Flowise-1660.731",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 2.47,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "600": {
    "name": "Shower_Bar-Wall_Hung-American_Standard-1660.236_Series",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 1.8,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "606": {
    "name": "Hand_Shower_Hose-American_Standard-8888.035_Series",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 1.7,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "612": {
    "name": "Wall_Supply-Wall_Hung-American_Standard-8888.037_Series",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 2.03,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "618": {
    "name": "Vacuum_Breaker-Handshower-American_Standard-1660_Series",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 1.87,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "624": {
    "name": "Handshower-American_Standard-1660_Series",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Shower fitting",
+   "system": "Piping",
+   "elevation_m": 2.04,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "2073": {
    "name": "Diffuser - Return (I)",
    "category": "Air Terminals",
-   "level": "LEVEL B1"
+   "level": "LEVEL B1",
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 3.17,
+   "levelKey": "LOWER",
+   "levelSource": "revit"
   },
   "2077": {
    "name": "Diffuser - Return (I)",
    "category": "Air Terminals",
-   "level": "LEVEL B1"
+   "level": "LEVEL B1",
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 3.17,
+   "levelKey": "LOWER",
+   "levelSource": "revit"
   },
   "3865": {
    "name": "Sink - Mop - Square (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL B1"
+   "level": "LEVEL B1",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 0.84,
+   "levelKey": "LOWER",
+   "levelSource": "revit"
   },
   "3871": {
    "name": "Fountain - Drinking - High Low Square (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL B1"
+   "level": "LEVEL B1",
+   "type": "Drinking fountain",
+   "system": "Piping",
+   "elevation_m": 1.37,
+   "levelKey": "LOWER",
+   "levelSource": "revit"
   },
   "7249": {
    "name": "Grill - Return - Rectangular - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Grille",
+   "system": "Diffusers",
+   "elevation_m": 4.86,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "7253": {
    "name": "Grill - Return - Rectangular - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Grille",
+   "system": "Diffusers",
+   "elevation_m": 3.33,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "7257": {
    "name": "Grill - Return - Rectangular - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Grille",
+   "system": "Diffusers",
+   "elevation_m": 3.33,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "10266": {
    "name": "Sink - Mop - Square (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 5.25,
+   "levelKey": "L1",
+   "levelSource": "revit"
   },
   "10272": {
    "name": "Drain - Floor (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Floor drain",
+   "system": "Piping",
+   "elevation_m": 5.25,
+   "levelKey": "L1",
+   "levelSource": "revit"
   },
   "12453": {
    "name": "Lavatory - Wall Mounted (I)",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 10.23,
+   "levelKey": "L2",
+   "levelSource": "geometry"
   },
   "13839": {
    "name": "Grill - Return - Rectangular - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Grille",
+   "system": "Diffusers",
+   "elevation_m": 8.26,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "13843": {
    "name": "Grill - Return - Rectangular - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Grille",
+   "system": "Diffusers",
+   "elevation_m": 8.26,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "13847": {
    "name": "Grill - Return - Rectangular - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Grille",
+   "system": "Diffusers",
+   "elevation_m": 8.26,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "15527": {
    "name": "Diffuser - Return (I)",
    "category": "Air Terminals",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 7.89,
+   "levelKey": "L1",
+   "levelSource": "revit"
   },
   "15590": {
    "name": "Diffuser - Return Plenum - Linear Slot - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 8.06,
+   "levelKey": "L2",
+   "levelSource": "geometry"
   },
   "15717": {
    "name": "Diffuser - Supply - Plenum - Linear Slot - Hosted (M)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 8.02,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "15721": {
    "name": "Diffuser - Supply - Plenum - Linear Slot - Hosted (M)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 8.01,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "15725": {
    "name": "Diffuser - Supply - Plenum - Linear Slot - Hosted (M)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 7.91,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "23477": {
    "name": "Mechancial - Air Grille & Access Panel (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 8.04,
+   "levelKey": "LOWER",
+   "levelSource": "geometry"
   },
   "23481": {
    "name": "Mechancial - Air Grille & Access Panel (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 8.04,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "23485": {
    "name": "Mechancial - Air Grille & Access Panel (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 7.97,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "23491": {
    "name": "Mechanical - Air Grille & Access Panel  (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 7.87,
+   "levelKey": "L1",
+   "levelSource": "geometry"
   },
   "23650": {
    "name": "Fountain - Drinking - High Low Square (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Drinking fountain",
+   "system": "Piping",
+   "elevation_m": 5.94,
+   "levelKey": "L1",
+   "levelSource": "revit"
   },
   "23657": {
    "name": "Sink - Mop - Square (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 5.41,
+   "levelKey": "L1",
+   "levelSource": "revit"
   },
   "23663": {
    "name": "Drain - Floor (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Floor drain",
+   "system": "Piping",
+   "elevation_m": 5.25,
+   "levelKey": "L1",
+   "levelSource": "revit"
   },
   "23669": {
    "name": "Elkay_Drinking-Water_Bottle-Filling-Stations_EZ_Inwall_St1",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Drinking fountain",
+   "system": "Piping",
+   "elevation_m": 5.91,
+   "levelKey": "L1",
+   "levelSource": "revit"
   },
   "23675": {
    "name": "Combined EZ Family (In Wall St1)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 6.07,
+   "levelKey": "L1",
+   "levelSource": "revit"
   },
   "30114": {
    "name": "Toilet - Wall Hung (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.01,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30119": {
    "name": "Toilet - Wall Hung (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.01,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30125": {
    "name": "Toilet - Wall Hung (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.1,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30130": {
    "name": "Toilet - Wall Hung (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.1,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30135": {
    "name": "Toilet - Wall Hung (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.1,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30140": {
    "name": "Toilet - Wall Hung (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.1,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30147": {
    "name": "Sink - Oval - Undermount (I CH)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 10.12,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30151": {
    "name": "Sink - Oval - Undermount (I CH)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 10.12,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30155": {
    "name": "Sink - Oval - Undermount (I CH)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 10.12,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30175": {
    "name": "Counter - Sink - Herman Miller Casework - CG212 - Corian (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 10.2,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30231": {
    "name": "Sink - Mop - Square (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 9.68,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30237": {
    "name": "ez-lz_ootl8ws_s-l_k",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.04,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30243": {
    "name": "EZOOTL8WSLK_1 Base",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.18,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "30250": {
    "name": "EZOOTL8WSLK_1 Base",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.16,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "38151": {
    "name": "Grill - Return - Rectangular - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Grille",
+   "system": "Diffusers",
+   "elevation_m": 13.2,
+   "levelKey": "L3",
+   "levelSource": "geometry"
   },
   "38341": {
    "name": "Lavatory - Wall Mounted (I)",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 10.34,
+   "levelKey": "L2",
+   "levelSource": "geometry"
   },
   "63199": {
    "name": "Mechancial - Air Grille & Access Panel (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 12.62,
+   "levelKey": "L2",
+   "levelSource": "geometry"
   },
   "63203": {
    "name": "Mechancial - Air Grille & Access Panel (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 12.62,
+   "levelKey": "L2",
+   "levelSource": "geometry"
   },
   "63207": {
    "name": "Mechancial - Air Grille & Access Panel (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 12.62,
+   "levelKey": "L2",
+   "levelSource": "geometry"
   },
   "63214": {
    "name": "Toilet - Wall Hung (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.17,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63220": {
    "name": "Toilet - Wall Hung (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.17,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63283": {
    "name": "Counter - Sink - Herman Miller Casework - CG212 - Corian (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 11.1,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63288": {
    "name": "Counter - Sink - Herman Miller Casework - CG212 - Corian (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 10.39,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63309": {
    "name": "Sink - Mop - Square (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 9.68,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63315": {
    "name": "ez-lz_ootl8ws_s-l_k",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.04,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63321": {
    "name": "EZOOTL8WSLK_1",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.48,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63337": {
    "name": "EZOOTL8WSLK_2",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.44,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63346": {
    "name": "EZOOTL8WSLK_1 Base",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.21,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "63352": {
    "name": "EZOOTL8WSLK_1 Base",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 10.34,
+   "levelKey": "L2",
+   "levelSource": "revit"
   },
   "71506": {
    "name": "Diffuser - Return Plenum - Linear Slot - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 13.58,
+   "levelKey": "L3",
+   "levelSource": "geometry"
   },
   "76559": {
    "name": "Lavatory - Wall Mounted (I)",
    "category": "Plumbing Fixtures",
-   "level": null
+   "level": null,
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 15.21,
+   "levelKey": "L3",
+   "levelSource": "geometry"
   },
   "76771": {
    "name": "Diffuser - Wall - Linear Slot - Hosted",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Diffuser",
+   "system": "Diffusers",
+   "elevation_m": 17.59,
+   "levelKey": "L3",
+   "levelSource": "geometry"
   },
   "77487": {
    "name": "Grill - Return - Rectangular - Hosted (I)",
    "category": "Air Terminals",
-   "level": null
+   "level": null,
+   "type": "Grille",
+   "system": "Diffusers",
+   "elevation_m": 17.72,
+   "levelKey": "L3",
+   "levelSource": "geometry"
   },
   "109436": {
    "name": "Mechanical - Air Grille & Access Panel  (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 17.16,
+   "levelKey": "L3",
+   "levelSource": "geometry"
   },
   "109440": {
    "name": "Mechanical - Air Grille & Access Panel  (I SF)",
    "category": "Mechanical Equipment",
-   "level": null
+   "level": null,
+   "type": "Air grille / access panel",
+   "system": "HVAC Equipment",
+   "elevation_m": 17.47,
+   "levelKey": "L3",
+   "levelSource": "geometry"
   },
   "109527": {
    "name": "Sink - Mop - Square (I)",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Sink / lavatory",
+   "system": "Piping",
+   "elevation_m": 14.57,
+   "levelKey": "L3",
+   "levelSource": "revit"
   },
   "109547": {
    "name": "ez-lz_ootl8ws_s-l_k",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 14.92,
+   "levelKey": "L3",
+   "levelSource": "revit"
   },
   "109553": {
    "name": "EZOOTL8WSLK_1",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 15.36,
+   "levelKey": "L3",
+   "levelSource": "revit"
   },
   "109569": {
    "name": "EZOOTL8WSLK_2",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 15.31,
+   "levelKey": "L3",
+   "levelSource": "revit"
   },
   "109578": {
    "name": "EZOOTL8WSLK_1 Base",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 15.08,
+   "levelKey": "L3",
+   "levelSource": "revit"
   },
   "109584": {
    "name": "EZOOTL8WSLK_1 Base",
    "category": "Plumbing Fixtures",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Water closet / carrier",
+   "system": "Piping",
+   "elevation_m": 15.21,
+   "levelKey": "L3",
+   "levelSource": "revit"
   },
   "138752": {
    "name": "RT_EQ_Transformer",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Transformer",
+   "system": "Electrical",
+   "elevation_m": 2.86,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143082": {
    "name": "eE_EQ_Panelboard_v2",
@@ -401,147 +796,433 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 2.07,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "143091": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 1.13,
+   "levelKey": "LOWER",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143097": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.56,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143102": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.27,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143114": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.57,
+   "levelKey": "LOWER",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143141": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.81,
+   "levelKey": "LOWER",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143146": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 1.85,
+   "levelKey": "LOWER",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143152": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 1.13,
+   "levelKey": "LOWER",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143159": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 2.58,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143168": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 2.42,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143176": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 2.42,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143186": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.73,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143191": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.3,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143196": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.83,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143201": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.93,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143207": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.91,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143213": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.71,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143218": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.78,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143223": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.78,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143228": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.75,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143233": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.75,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143238": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.07,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143243": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.1,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143248": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.1,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143253": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.16,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143258": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.07,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143263": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.1,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143269": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.33,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "143274": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL"
+   "level": "LOWER LEVEL",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.33,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "150409": {
    "name": "eE_EQ_Panelboard_v2",
@@ -551,7 +1232,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 3.06,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "150417": {
    "name": "eE_EQ_Panelboard_v2",
@@ -561,47 +1248,133 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 3.06,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "150426": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 2.79,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "150435": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 3.41,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "150443": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 3.41,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "150451": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 3.41,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "150461": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.02,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "150466": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.03,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "150471": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 4.03,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "150477": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 3.49,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "151793": {
    "name": "eE_EQ_Panelboard_v2",
@@ -611,7 +1384,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 3.06,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "151800": {
    "name": "eE_EQ_Panelboard_v2",
@@ -621,7 +1400,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.28,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "151804": {
    "name": "eE_EQ_Panelboard_v2",
@@ -631,7 +1416,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.28,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "151809": {
    "name": "eE_EQ_Panelboard_v2",
@@ -641,7 +1432,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.28,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "151813": {
    "name": "eE_EQ_Panelboard_v2",
@@ -651,7 +1448,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.2,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "151817": {
    "name": "eE_EQ_Panelboard_v2",
@@ -661,7 +1464,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.28,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "151821": {
    "name": "eE_EQ_Panelboard_v2",
@@ -671,7 +1480,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.28,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "151825": {
    "name": "eE_EQ_Panelboard_v2",
@@ -681,102 +1496,298 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.28,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "151965": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.89,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "151970": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.96,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "151975": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.81,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "151980": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.2,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "151985": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.81,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "151990": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.82,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "151995": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.82,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "152000": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.82,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "152005": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.82,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "152010": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 2.82,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "152016": {
    "name": "RT_EQ_Panel_TopHat",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Panel (top hat)",
+   "system": "Electrical",
+   "elevation_m": 4.27,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "152328": {
    "name": "RT_EQ_Pad",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Equipment pad",
+   "system": "Electrical",
+   "elevation_m": 1.64,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "152332": {
    "name": "RT_EQ_Pad",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Equipment pad",
+   "system": "Electrical",
+   "elevation_m": 1.64,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "154958": {
    "name": "RT_FIRE ALARM DEVICES",
    "category": "Fire Alarm Devices",
-   "level": null
+   "level": null,
+   "type": "Fire alarm device",
+   "system": "Electrical",
+   "elevation_m": 2.51,
+   "levelKey": "LOWER",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "155456": {
    "name": "RT_FIRE ALARM DEVICES",
    "category": "Fire Alarm Devices",
-   "level": null
+   "level": null,
+   "type": "Fire alarm device",
+   "system": "Electrical",
+   "elevation_m": 3.88,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "155464": {
    "name": "RT_FIRE ALARM DEVICES",
    "category": "Fire Alarm Devices",
-   "level": null
+   "level": null,
+   "type": "Fire alarm device",
+   "system": "Electrical",
+   "elevation_m": 3.88,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "155658": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 6.24,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "155663": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 6.24,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "155668": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 6.24,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "157304": {
    "name": "eE_EQ_Panelboard_v2",
@@ -786,7 +1797,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.23,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "157309": {
    "name": "eE_EQ_Panelboard_v2",
@@ -796,32 +1813,88 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 5.23,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "157315": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 5.21,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "157320": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 5.21,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "157325": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 5.21,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "157331": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "B1 LEVEL - MEZZ"
+   "level": "B1 LEVEL - MEZZ",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 5.21,
+   "levelKey": "MEZZ",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160804": {
    "name": "RT_EQ_Ground_Bar",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Ground bar",
+   "system": "Electrical",
+   "elevation_m": 5.71,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160812": {
    "name": "eE_EQ_Panelboard_v2",
@@ -831,7 +1904,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 6.74,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "160819": {
    "name": "eE_EQ_Panelboard_v2",
@@ -841,7 +1920,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 6.82,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "160827": {
    "name": "eE_EQ_Panelboard_v2",
@@ -851,7 +1936,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 6.87,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "160834": {
    "name": "eE_EQ_Panelboard_v2",
@@ -861,7 +1952,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 6.84,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "160841": {
    "name": "eE_EQ_Panelboard_v2",
@@ -871,7 +1968,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 6.77,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "160848": {
    "name": "eE_EQ_Panelboard_v2",
@@ -881,7 +1984,13 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 6.77,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "160855": {
    "name": "eE_EQ_Panelboard_v2",
@@ -891,172 +2000,507 @@
    "isFedBy": [
     "bmo:meter:76:kw",
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 6.77,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "160874": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 7.13,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160879": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 6.19,
+   "levelKey": "LOWER",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160884": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 6.88,
+   "levelKey": "MEZZ",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160957": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 5.71,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160964": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 6.94,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160972": {
    "name": "eE_EQ_Disconnect_v2",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Disconnect switch",
+   "system": "Electrical",
+   "elevation_m": 6.94,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160982": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 9.16,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160988": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 9.16,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160994": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.76,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "160999": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.75,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161004": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.68,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161009": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.66,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161014": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.93,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161019": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.75,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161024": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.72,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161029": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.72,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161034": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.74,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161039": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.61,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161044": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.78,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161049": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.59,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161055": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.71,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161060": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.71,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161065": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.71,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161070": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 7.88,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "161076": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 8.63,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "163120": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 8.88,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "163124": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 8.88,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "163128": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 8.88,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "163132": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 8.87,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "170211": {
    "name": "RT_FIRE ALARM DEVICES",
    "category": "Fire Alarm Devices",
-   "level": null
+   "level": null,
+   "type": "Fire alarm device",
+   "system": "Electrical",
+   "elevation_m": 7.69,
+   "levelKey": "L1",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "172646": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 10.68,
+   "levelKey": "L2",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "172653": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 9.57,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "172658": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 01"
+   "level": "LEVEL 01",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 9.57,
+   "levelKey": "L1",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "178626": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1065,7 +2509,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 11.35,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "178633": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1074,7 +2524,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 11.24,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "178640": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1083,7 +2539,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 11.35,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "178647": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1092,7 +2554,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 10.99,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "178654": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1101,42 +2569,111 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 11.04,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "178690": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 9.97,
+   "levelKey": "L2",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "178697": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 13.89,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "178702": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 13.89,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "178707": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 13.94,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "178712": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 13.91,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "178717": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 13.98,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "178723": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 13.17,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179092": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1145,7 +2682,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 14.41,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "179096": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1154,7 +2697,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 14.41,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "179100": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1163,7 +2712,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 14.41,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "179104": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1172,7 +2727,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 14.41,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "179108": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1181,67 +2742,181 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 14.41,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "179166": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 13.98,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179170": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 13.98,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179241": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 14.02,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179246": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 13.98,
+   "levelKey": "L2",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179251": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 13.98,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179256": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 14.08,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179260": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 13.98,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179264": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 14.09,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "179268": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 14.09,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "185428": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 14.36,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "185433": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 14.36,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "185439": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 02"
+   "level": "LEVEL 02",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 14.36,
+   "levelKey": "L2",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "192954": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1250,7 +2925,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 16.22,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "192961": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1259,7 +2940,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 16.11,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "192968": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1268,7 +2955,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 16.22,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "192975": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1277,7 +2970,13 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 15.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "192982": {
    "name": "eE_EQ_Panelboard_v2",
@@ -1286,307 +2985,896 @@
    "kind": "panelboard",
    "isFedBy": [
     "bmo:meter:77:kw"
-   ]
+   ],
+   "type": "Panelboard",
+   "system": "Electrical",
+   "elevation_m": 15.94,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "feedSource": "panel-schedule"
   },
   "193022": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 15.92,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193079": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 14.61,
+   "levelKey": "L2",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193084": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 16.58,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193090": {
    "name": "RT_BX_Pull_Can_Recessed",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 15.61,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193097": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.54,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193103": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.49,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193109": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.57,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193114": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.57,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193119": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.5,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193124": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.57,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193130": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.63,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193135": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.89,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193140": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.98,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193146": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.89,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193151": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.69,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193198": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.98,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193203": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.98,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193208": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 17.98,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193334": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.73,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "193339": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.73,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "194612": {
    "name": "RT_EQ_Access_Panel",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Access panel",
+   "system": "Electrical",
+   "elevation_m": 18.65,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202276": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LOWER LEVEL - LOWER"
+   "level": "LOWER LEVEL - LOWER",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "LOWER",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:76:kw",
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202285": {
    "name": "RT_BX_Pull_Can_Surface",
    "category": "Electrical Equipment",
-   "level": null
+   "level": null,
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 20.59,
+   "levelKey": "L3",
+   "levelSource": "geometry",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202494": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.9,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202500": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.88,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202521": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.88,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202526": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.88,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202531": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.88,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202537": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.88,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202548": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202558": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202563": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202573": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202578": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202594": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202599": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.88,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202605": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202610": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202615": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202620": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202635": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202640": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202645": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202650": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202665": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202670": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202675": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202680": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202685": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202690": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202695": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202700": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202705": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202710": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202715": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202720": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202725": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.89,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202730": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.89,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202755": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
   },
   "202760": {
    "name": "RT_BX_Pull_Can_Rod",
    "category": "Electrical Equipment",
-   "level": "LEVEL 03"
+   "level": "LEVEL 03",
+   "type": "Junction box",
+   "system": "Electrical",
+   "elevation_m": 18.87,
+   "levelKey": "L3",
+   "levelSource": "revit",
+   "isFedBy": [
+    "bmo:meter:77:kw"
+   ],
+   "feedSource": "level-inferred"
+  }
+ },
+ "_taxonomy": {
+  "types": {
+   "Shower fitting": 9,
+   "Diffuser": 9,
+   "Sink / lavatory": 15,
+   "Drinking fountain": 3,
+   "Grille": 8,
+   "Floor drain": 2,
+   "Air grille / access panel": 9,
+   "Water closet / carrier": 22,
+   "Transformer": 1,
+   "Panelboard": 35,
+   "Junction box": 141,
+   "Disconnect switch": 9,
+   "Panel (top hat)": 1,
+   "Equipment pad": 2,
+   "Fire alarm device": 4,
+   "Ground bar": 1,
+   "Access panel": 14
+  },
+  "systems": {
+   "Piping": 51,
+   "Diffusers": 17,
+   "HVAC Equipment": 9,
+   "Electrical": 208
+  },
+  "levels": {
+   "LOWER": 47,
+   "L1": 67,
+   "L2": 48,
+   "L3": 89,
+   "MEZZ": 34
+  },
+  "levelSource": {
+   "geometry": 90,
+   "revit": 195
+  },
+  "feedSource": {
+   "level-inferred": 173,
+   "panel-schedule": 35
   }
  }
 }
