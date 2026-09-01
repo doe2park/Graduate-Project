@@ -342,6 +342,8 @@ def main():
                     help="If --skip-upload, supply the URN here")
     ap.add_argument("--no-dedup", action="store_true",
                     help="Keep one node per fragment (no GPU-instancing dedup) so every element keeps its dbId; ~2-3x larger")
+    ap.add_argument("--props-only", action="store_true",
+                    help="Only fetch the properties sidecars (.meta.json + full .props.json); no geometry")
     ap.add_argument("--skip-translate", action="store_true",
                     help="With --skip-upload: the derivative already exists — do not re-trigger translation")
     args = ap.parse_args()
@@ -375,7 +377,8 @@ def main():
         urn = trigger_translation(token, object_id)
         poll_translation(token, urn)
 
-    svf_to_glb(urn, token, Path(args.output), no_dedup=args.no_dedup)
+    if not args.props_only:
+        svf_to_glb(urn, token, Path(args.output), no_dedup=args.no_dedup)
     fetch_properties(urn, token, Path(args.output))
 
     print("\n────────────────────────────────────────────────────")
