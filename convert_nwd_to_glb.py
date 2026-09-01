@@ -25,6 +25,9 @@ ONE-TIME SETUP:
 
 USAGE:
     python convert_nwd_to_glb.py path/to/grimes.nwd
+    # re-extract from an existing derivative, keeping every element's identity,
+    # and dump the FULL Revit property set alongside (see fetch_properties):
+    python convert_nwd_to_glb.py x --skip-upload --skip-translate --urn <URN> --no-dedup --output ~/twin-nodedup/grimes-elements.glb
     # optional flags:
     python convert_nwd_to_glb.py grimes.nwd --output scans/grimes-full.glb --bucket my-bucket
 
@@ -221,7 +224,7 @@ def poll_translation(token: str, urn: str):
 
 
 # ─── SVF → glb (element identity) ──────────────────────────────────────────
-def svf_to_glb(urn: str, token: str, out_path: Path):
+def svf_to_glb(urn: str, token: str, out_path: Path, no_dedup: bool = False):
     """svf-utils' GLTFWriter names every output node by its dbId — that gives
     the element-tier identity the twin needs (the old mep-only export had only
     8 discipline meshes). Extract glTF, then pack to glb WITHOUT
@@ -240,8 +243,8 @@ def svf_to_glb(urn: str, token: str, out_path: Path):
         subprocess.run(["npm", "install", "--no-save", "svf-utils"],
                        cwd=str(here), check=True)
 
-    r = subprocess.run(["node", str(extractor), urn, str(workdir)],
-                       cwd=str(here), env=os.environ)
+    cmd = ["node", str(extractor), urn, str(workdir)] + (["--no-dedup"] if no_dedup else [])
+    r = subprocess.run(cmd, cwd=str(here), env=os.environ)
     if r.returncode != 0:
         sys.exit("SVF → glTF extraction failed (check output above)")
 
@@ -283,6 +286,25 @@ def fetch_properties(urn: str, token: str, out_path: Path):
     if props is None:
         sys.exit("properties extraction timed out")
 
+    # Full property set (every group / parameter the NWC export carried:
+    # Panel, Circuit Number, System Name, Room, Volume, ...). This is what the
+    # 2026-08-03 run threw away — it is the input for the electrical
+    # distribution tree and the auto-generated Brick graph.
+    full_path = Path(str(out_path) + ".props.json")
+    with open(full_path, "w") as f:
+        json.dump({"_schema": "twin-props/1", "_source": urn,
+                   "elements": {str(p["objectid"]): {"name": p.get("name", ""), "externalId": p.get("externalId", ""),
+                                                     "properties": p.get("properties", {}) or {}} for p in props}}, f)
+    keys = {}
+    for p in props:
+        for group, g in (p.get("properties", {}) or {}).items():
+            if isinstance(g, dict):
+                for k in g:
+                    keys[f"{group}/{k}"] = keys.get(f"{group}/{k}", 0) + 1
+    print(f"      ✓ full properties → {full_path} ({full_path.stat().st_size / 1e6:.0f} MB, {len(keys)} distinct group/parameter keys)")
+    for k, c in sorted(keys.items(), key=lambda x: -x[1])[:40]:
+        print(f"        {c:7d}  {k}")
+
     slim = {}
     for p in props:
         entry = {"name": p.get("name", ""), "externalId": p.get("externalId", "")}
@@ -318,6 +340,10 @@ def main():
                     help="Skip upload+translate (re-use existing URN, useful when re-extracting glb)")
     ap.add_argument("--urn", default=None,
                     help="If --skip-upload, supply the URN here")
+    ap.add_argument("--no-dedup", action="store_true",
+                    help="Keep one node per fragment (no GPU-instancing dedup) so every element keeps its dbId; ~2-3x larger")
+    ap.add_argument("--skip-translate", action="store_true",
+                    help="With --skip-upload: the derivative already exists — do not re-trigger translation")
     args = ap.parse_args()
 
     if not args.client_id or not args.client_secret:
@@ -334,19 +360,22 @@ def main():
         if not args.urn:
             sys.exit("--skip-upload requires --urn")
         urn = args.urn
-        print(f"[skip] Reusing URN {urn[:24]}... — will (re)trigger translation")
-        # Decode URN back to object_id so we can re-trigger translation
-        pad = '=' * (-len(urn) % 4)
-        object_id = base64.urlsafe_b64decode(urn + pad).decode()
-        urn = trigger_translation(token, object_id)
-        poll_translation(token, urn)
+        if args.skip_translate:
+            print(f"[skip] Reusing URN {urn[:24]}... and its existing derivative")
+        else:
+            print(f"[skip] Reusing URN {urn[:24]}... — will (re)trigger translation")
+            # Decode URN back to object_id so we can re-trigger translation
+            pad = '=' * (-len(urn) % 4)
+            object_id = base64.urlsafe_b64decode(urn + pad).decode()
+            urn = trigger_translation(token, object_id)
+            poll_translation(token, urn)
     else:
         ensure_bucket(token, bucket)
         object_id = upload(token, bucket, src)
         urn = trigger_translation(token, object_id)
         poll_translation(token, urn)
 
-    svf_to_glb(urn, token, Path(args.output))
+    svf_to_glb(urn, token, Path(args.output), no_dedup=args.no_dedup)
     fetch_properties(urn, token, Path(args.output))
 
     print("\n────────────────────────────────────────────────────")

@@ -9,7 +9,13 @@
  *
  * Usage:
  *   export APS_CLIENT_ID=... APS_CLIENT_SECRET=...
- *   node scripts/nwd_extract_elements.js <URN> <outdir>
+ *   node scripts/nwd_extract_elements.js <URN> <outdir> [--no-dedup]
+ *
+ * --no-dedup: keep one node per fragment instead of GPU-instancing repeated
+ * geometry. Dedup collapsed ~285k instances into 10k unnamed nodes in the
+ * 2026-08-03 master, which cost 99% of receptacles, 80% of light fixtures and
+ * 67% of electrical equipment their identity (Design Decisions Log 2026-09-01).
+ * Output is larger (expect ~2-3x) but every element keeps its dbId.
  *
  * Requires: npm install svf-utils   (Node 18+, uses global fetch)
  */
@@ -26,7 +32,9 @@ function findSvfViewables(derivative, found) {
 }
 
 async function main() {
-    const [urn, outdir] = process.argv.slice(2);
+    const args = process.argv.slice(2);
+    const noDedup = args.includes('--no-dedup');
+    const [urn, outdir] = args.filter(a => !a.startsWith('--'));
     if (!urn || !outdir) {
         console.error('Usage: node nwd_extract_elements.js <URN> <outdir>');
         process.exit(1);
@@ -59,13 +67,13 @@ async function main() {
         const reader = await SVFReader.FromDerivativeService(urn, guid, auth);
         const svf = await reader.read({ log: (msg) => console.log('  ', msg) });
         const writer = new GLTFWriter({
-            deduplicate: true,
+            deduplicate: !noDedup,
             skipUnusedUvs: true,
             center: false,          // keep original coords — calibration depends on them
             log: (msg) => console.log('  ', msg),
         });
         await writer.write(svf, dest);
-        console.log(`[svf] ✓ glTF written to ${dest} (nodes named by dbId)`);
+        console.log(`[svf] ✓ glTF written to ${dest} (nodes named by dbId, deduplicate=${!noDedup})`);
     }
 }
 

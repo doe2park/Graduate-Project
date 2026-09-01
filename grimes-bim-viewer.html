@@ -19,6 +19,12 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .tb-title{font-weight:600;color:#fff;letter-spacing:-.2px}
 .tb-sub{font:500 10.5px/1 var(--mono);color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
 .tb-spacer{flex:1}
+.tb-dd{position:relative}
+.tb-menu{position:absolute;top:34px;left:0;min-width:210px;display:flex;flex-direction:column;gap:4px;padding:6px;background:rgba(8,12,24,.97);border:1px solid var(--border);border-radius:6px;z-index:120}
+.tb-menu .tb-btn{text-align:left;display:flex;justify-content:space-between;gap:10px;white-space:nowrap}
+.tb-menu .tb-btn small{color:#6b7fa0;font:500 10px/1 var(--mono)}
+.tb-menu .tb-btn.active small{color:inherit;opacity:.7}
+@media(max-width:1150px){.tb-sub{display:none}}
 .tb-btn{padding:5px 11px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:#cbd5e1;border-radius:5px;cursor:pointer;font:500 11.5px/1 var(--font);transition:all .15s;text-decoration:none}
 .tb-btn:hover{border-color:rgba(34,211,238,.3);color:#67e8f9}
 .tb-btn.active{background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.4);color:#67e8f9}
@@ -198,7 +204,15 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   <span class="tb-spacer"></span>
   <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
   <button class="tb-btn" id="bldgBtn" onclick="toggleBuilding()" title="Show/hide the translucent building envelope around the systems">🏢 Building shell</button>
-  <button class="tb-btn" id="equipBtn" onclick="toggleEquipment()" title="Element-tier equipment layer (0.9 MB): panelboards, junction boxes, air terminals, fixtures — tap any unit for identity + live feeder data; filter by type below">⚡ Equipment</button>
+  <div class="tb-dd" id="layersDd">
+    <button class="tb-btn" id="layersBtn" onclick="toggleLayersMenu()" title="Element-tier layers cut from the 741k-element APS master — each element is clickable">⬡ Layers ▾</button>
+    <div class="tb-menu" id="layersMenu" hidden>
+      <button class="tb-btn" id="layerBtn-equipment" onclick="toggleLayer('equipment')" title="Panelboards, junction boxes, air terminals, fixtures — tap any unit for identity + live feeder data">⚡ Equipment <small>0.9 MB · 285</small></button>
+      <button class="tb-btn" id="layerBtn-lighting" onclick="toggleLayer('lighting')" title="309 of 1,570 Revit fixtures survived the instancing export — 277V lighting rides meter 76">💡 Lighting <small>0.8 MB · 309</small></button>
+      <button class="tb-btn" id="layerBtn-structural" onclick="toggleLayer('structural')" title="Concrete beams/columns, steel framing, foundations, 108 SMA brace devices — the structural-monitoring tier">🏗 Structure <small>10.8 MB · 2,033</small></button>
+      <button class="tb-btn" id="layerBtn-conduit" onclick="toggleLayer('conduit')" title="Conduit runs, fittings, supports, cable trays — the physical electrical distribution paths">🔌 Conduit <small>10.6 MB · 5,570</small></button>
+    </div>
+  </div>
   <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
   <a class="tb-btn" href="grimes-xr.html" title="Open the immersive MEP sensor dashboards">▸ MEP dashboards</a>
   <a class="tb-btn" href="grimes-performance.html" title="Live design-vs-actual energy: LEED model vs measured meter counters">📉 Design vs Actual</a>
@@ -622,8 +636,7 @@ function updateAim() {
   if (!plockActive) { aimedMesh = null; return; }
   raycaster.setFromCamera(_centerVec, camera);
   // equipment elements are aimable in walk mode too — nearest hit wins
-  const targets = (equipGroup && equipGroup.visible && equipMeshes.length)
-    ? visibleEquip().concat(allMeshes) : allMeshes;
+  const targets = anyLayerVisible() ? visibleEquip().concat(allMeshes) : allMeshes;
   const hit = raycaster.intersectObjects(targets, false)[0];
   aimedMesh = hit ? hit.object : null;
   document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);
@@ -1180,7 +1193,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   _ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   raycaster.setFromCamera(_ptr, camera);
   // Equipment (element tier) wins first — small targets beat system blobs
-  if (equipGroup && equipGroup.visible && equipMeshes.length) {
+  if (anyLayerVisible()) {
     const eqHit = raycaster.intersectObjects(visibleEquip(), false)[0];
     if (eqHit) { pickEquipment(eqHit.object); return; }
   }
@@ -1203,71 +1216,104 @@ window.clearPick = () => {
   document.body.classList.remove('twin-open');
 };
 
-/* ══════════ EQUIPMENT LAYER — element tier (Phase 2) ══════════
-   buildings/grimes/grimes-equipment.glb: 285 elements extracted from the
-   741k-element APS conversion, every node named by its dbId. elements.json
-   carries identity (name/category/level) + panelboard meter feeds.
-   Registration vs the viewer frame: the new APS export is meters/Y-up like
-   grimes-mep-only.glb, offset by a constant — derived by matching the
-   conduit-set bounding boxes in both files (X/Z exact, Y within ~0.3 m). */
-// DERIVED (2026-08-03): the new APS export is rotated 180° about Y relative
+/* ══════════ ELEMENT-TIER LAYERS (Phase 2) ══════════
+   Each layer is a GLB cut from the 741k-element APS master by
+   scripts/extract_layer.py (one node per geometry leaf, named by the OWNING
+   Revit element's dbId) + a <layer>.elements.json identity file enriched by
+   scripts/classify_elements.py (type / system / level provenance / feeds).
+   All layers share the master frame, so one registration serves all. */
+// DERIVED (2026-08-03): the APS master frame is rotated 180° about Y relative
 // to the viewer frame (asymmetric-anchor proof; bbox min/max matching alone
 // cannot detect a 180° rotation since sizes are preserved). Placement is
 // rotY(π) + this translation (conduit-set match under H180).
 const EQUIP_OFFSET = { x: -35.28, y: -97.16, z: 28.60 };
-let equipGroup = null, equipLoading = false, equipMeshes = [], equipMeta = null, equipPicked = null;
+const LAYERS = {
+  equipment:  { glb: 'buildings/grimes/grimes-equipment.glb',  json: 'buildings/grimes/elements.json',            label: '⚡ Equipment', mb: 0.9 },
+  lighting:   { glb: 'buildings/grimes/grimes-lighting.glb',   json: 'buildings/grimes/lighting.elements.json',   label: '💡 Lighting',  mb: 0.8 },
+  structural: { glb: 'buildings/grimes/grimes-structural.glb', json: 'buildings/grimes/structural.elements.json', label: '🏗 Structure', mb: 10.8 },
+  conduit:    { glb: 'buildings/grimes/grimes-conduit.glb',    json: 'buildings/grimes/conduit.elements.json',    label: '🔌 Conduit',   mb: 10.6 },
+};
+const layerState = {};           // key -> { group, meshes, loading }
+let equipMeshes = [], equipMeta = {}, equipPicked = null;   // union across loaded layers
+const anyLayerVisible = () => Object.values(layerState).some(l => l.group && l.group.visible);
 
-window.toggleEquipment = () => {
-  const btn = document.getElementById('equipBtn');
-  if (equipGroup) {
-    equipGroup.visible = !equipGroup.visible;
-    btn.classList.toggle('active', equipGroup.visible);
-    document.getElementById('equipFilter').hidden = !equipGroup.visible;
-    if (!equipGroup.visible && equipPicked) clearPick();
+window.toggleLayer = (key) => {
+  const L = LAYERS[key], st = layerState[key] || (layerState[key] = {});
+  const btn = document.getElementById('layerBtn-' + key);
+  if (st.group) {
+    st.group.visible = !st.group.visible;
+    btn.classList.toggle('active', st.group.visible);
+    if (!st.group.visible && equipPicked && equipPicked.userData.layer === key) clearPick();
+    buildEquipFilter();
+    document.getElementById('equipFilter').hidden = !anyLayerVisible();
     return;
   }
-  if (equipLoading) return;
-  equipLoading = true;
-  btn.textContent = '⏳ 0.9 MB…';
+  if (st.loading) return;
+  if (L.mb >= 5 && mobileMq.matches && !confirm(`${L.label.slice(2)} is ${L.mb} MB — load on mobile data?`)) return;
+  st.loading = true;
+  if (!st.labelHtml) st.labelHtml = btn.innerHTML;
+  btn.textContent = `⏳ ${L.mb} MB…`;
   Promise.all([
-    cachedJson('buildings/grimes/elements.json'),
-    new Promise((res, rej) => loader.load('buildings/grimes/grimes-equipment.glb', res,
-      p => { if (p.total) btn.textContent = `⏳ ${(p.loaded / 1048576).toFixed(1)}/0.9 MB`; }, rej)),
+    cachedJson(L.json),
+    new Promise((res, rej) => loader.load(L.glb, res,
+      p => { if (p.total) btn.textContent = `⏳ ${(p.loaded / 1048576).toFixed(1)}/${L.mb} MB`; }, rej)),
   ]).then(([metaJson, gltf]) => {
-    equipMeta = metaJson.elements || {};
-    equipGroup = gltf.scene;
-    equipGroup.rotation.y = Math.PI;   // 180° frame difference — see EQUIP_OFFSET note
-    equipGroup.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
-    equipGroup.updateMatrixWorld(true);
-    equipGroup.traverse(ch => {
+    const meta = metaJson.elements || {};
+    for (const [id, info] of Object.entries(meta)) { info.layer = key; equipMeta[id] = info; }
+    st.survival = metaJson.survival || null;
+    st.group = gltf.scene;
+    st.group.rotation.y = Math.PI;   // 180° frame difference — see EQUIP_OFFSET note
+    st.group.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
+    st.group.updateMatrixWorld(true);
+    st.meshes = [];
+    st.group.traverse(ch => {
       if (!ch.isMesh) return;
       ch.userData.equipId = findEquipId(ch);
+      ch.userData.layer = key;
       if (ch.material) ch.material = ch.material.clone(); // per-mesh highlightable
-      equipMeshes.push(ch);
+      if (key === 'structural' && ch.material && ch.material.emissive !== undefined) {
+        ch.material.emissive.setHex(0x1e293b); ch.material.emissiveIntensity = 0.25; // concrete reads black under the walk rig otherwise
+      }
+      st.meshes.push(ch); equipMeshes.push(ch);
     });
-    scene.add(equipGroup);
-    equipLoading = false;
-    btn.textContent = '⚡ Equipment';
+    scene.add(st.group);
+    st.loading = false;
+    btn.innerHTML = st.labelHtml;
     btn.classList.add('active');
+    document.getElementById('layersBtn').classList.add('active');
     buildEquipFilter();
     document.getElementById('equipFilter').hidden = false;
-    console.log('[equip] loaded:', equipMeshes.length, 'meshes /', Object.keys(equipMeta).length, 'elements');
+    console.log(`[layer:${key}] loaded:`, st.meshes.length, 'meshes /', Object.keys(meta).length, 'elements');
   }).catch(e => {
-    equipLoading = false;
-    btn.textContent = '⚡ Equipment';
-    console.error('[equip] load failed —', e);
+    st.loading = false;
+    btn.innerHTML = st.labelHtml;
+    console.error(`[layer:${key}] load failed —`, e);
   });
 };
+window.toggleEquipment = () => toggleLayer('equipment');   // legacy hook
+window.toggleLayersMenu = () => {
+  const m = document.getElementById('layersMenu');
+  m.hidden = !m.hidden;
+  document.getElementById('layersBtn').classList.toggle('active', !m.hidden);
+};
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('#layersDd')) { document.getElementById('layersMenu').hidden = true; document.getElementById('layersBtn').classList.remove('active'); }
+});
 
-/* Type filter — elements.json v2 carries type/system/levelKey (see
-   scripts/classify_elements.py). Chips = the type taxonomy, ordered by count. */
+/* Type filter — chips = the type taxonomy of every VISIBLE layer, ordered by
+   count. A chip hides everything else across layers. */
 let equipTypeFilter = null;   // null = all
-// Raycaster ignores .visible — filtered-out meshes must be excluded explicitly.
-const visibleEquip = () => equipTypeFilter ? equipMeshes.filter(m => m.visible) : equipMeshes;
+const layerOn = m => { const st = layerState[m.userData.layer]; return st && st.group && st.group.visible; };
+// Raycaster ignores .visible — hidden layers and filtered-out meshes must be excluded explicitly.
+const visibleEquip = () => equipMeshes.filter(m => m.visible && layerOn(m));
 function buildEquipFilter() {
   const counts = {};
-  for (const e of Object.values(equipMeta)) if (e.type) counts[e.type] = (counts[e.type] || 0) + 1;
+  for (const e of Object.values(equipMeta)) {
+    const st = layerState[e.layer];
+    if (st && st.group && st.group.visible && e.type) counts[e.type] = (counts[e.type] || 0) + 1;
+  }
   const types = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  if (equipTypeFilter && !counts[equipTypeFilter]) { equipTypeFilter = null; applyEquipFilter(); }
   const box = document.getElementById('equipFilter');
   box.querySelectorAll('.ef').forEach(n => n.remove());
   const mk = (label, val, n) => {
@@ -1277,7 +1323,7 @@ function buildEquipFilter() {
     b.onclick = () => { equipTypeFilter = val; applyEquipFilter(); buildEquipFilter(); };
     box.appendChild(b);
   };
-  mk('All', null, Object.keys(equipMeta).length);
+  mk('All', null, Object.values(counts).reduce((a, b) => a + b, 0));
   for (const [t, n] of types) mk(t, t, n);
 }
 function applyEquipFilter() {
@@ -1341,7 +1387,8 @@ async function pickEquipment(mesh) {
     + (info.levelKey ? drow('level', esc(info.level || info.levelKey)
         + (info.levelSource === 'geometry' ? ' <span class="mut">(inferred from position, 92% LOO)</span>' : '')) : '')
     + (info.elevation_m != null ? drow('elevation', info.elevation_m.toFixed(2) + ' m') : '')
-    + drow('dbId', esc(id))
+    + (info.source_file ? drow('source model', esc(info.source_file)) : '')
+    + drow('dbId', esc(id) + (info.layer ? ' <span class="mut">· layer ' + esc(info.layer) + '</span>' : ''))
     + dsec('Source')
     + drow('geometry', 'APS SVF → element GLB (dbId-named nodes)')
     + drow('identity file', 'buildings/grimes/elements.json');
@@ -1352,12 +1399,17 @@ async function pickEquipment(mesh) {
     bigEl.innerHTML = '— <small>kW</small>';
     badgeEl.textContent = 'NO FEED'; badgeEl.className = 'badge na';
     srcEl.textContent = 'No meter mapping for this element yet (non-electrical or unmapped).';
-    ptsEl.innerHTML = '<div class="pt mut"><span>Identity-only element — no electrical feed (plumbing / air terminal).</span></div>';
+    ptsEl.innerHTML = '<div class="pt mut"><span>' + (info.system === 'Structural'
+      ? 'Structural element — no sensor bound yet (candidate for strain / temperature instrumentation).'
+      : info.system === 'Conduit' ? 'Distribution path — carries circuits, no load of its own.'
+      : 'Identity-only element — no electrical feed (plumbing / air terminal).') + '</span></div>';
     return;
   }
   badgeEl.textContent = '…'; badgeEl.className = 'badge na';
   srcEl.textContent = info.feedSource === 'level-inferred'
     ? 'Feeder meters serving this level (inferred from level, not a panel schedule) — no per-element metering.'
+    : info.feedSource === 'voltage-class'
+    ? '277V lighting feeder (meter 76, by voltage class) — no per-circuit metering.'
     : 'Feeder meter total — per-panel submetering not installed (93 panels identified for future sub-metering).';
   try {
     const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');

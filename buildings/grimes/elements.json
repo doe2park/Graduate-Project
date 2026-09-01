@@ -1,6 +1,6 @@
 {
  "_schema": "twin-elements-binding/2",
- "_doc": "Element tier: glb node name (= Model Derivative dbId) -> identity + meter feed. Generated from grimes-elements.glb.meta.json 2026-08-03. Complements the system tier in binding.json. Enriched by scripts/classify_elements.py: type/system taxonomy from family names, levelKey (revit name or geometry-inferred from elevation), level-inferred feeder meters for electrical elements.",
+ "_doc": "Element tier: glb node name (= Model Derivative dbId) -> identity + meter feed. Generated from grimes-elements.glb.meta.json 2026-08-03. Complements the system tier in binding.json. Enriched by scripts/classify_elements.py: type/system taxonomy from family names, levelKey (revit name or 5-NN by position, pooled across layers), feeder meters by panel schedule / voltage class / level (feedSource).",
  "model": "grimes-equipment.glb",
  "elements": {
   "576": {
@@ -240,7 +240,7 @@
    "type": "Diffuser",
    "system": "Diffusers",
    "elevation_m": 8.06,
-   "levelKey": "L2",
+   "levelKey": "L1",
    "levelSource": "geometry"
   },
   "15717": {
@@ -280,7 +280,7 @@
    "type": "Air grille / access panel",
    "system": "HVAC Equipment",
    "elevation_m": 8.04,
-   "levelKey": "LOWER",
+   "levelKey": "L2",
    "levelSource": "geometry"
   },
   "23481": {
@@ -290,7 +290,7 @@
    "type": "Air grille / access panel",
    "system": "HVAC Equipment",
    "elevation_m": 8.04,
-   "levelKey": "L1",
+   "levelKey": "L2",
    "levelSource": "geometry"
   },
   "23485": {
@@ -310,7 +310,7 @@
    "type": "Air grille / access panel",
    "system": "HVAC Equipment",
    "elevation_m": 7.87,
-   "levelKey": "L1",
+   "levelKey": "L2",
    "levelSource": "geometry"
   },
   "23650": {
@@ -510,7 +510,7 @@
    "type": "Grille",
    "system": "Diffusers",
    "elevation_m": 13.2,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry"
   },
   "38341": {
@@ -660,7 +660,7 @@
    "type": "Diffuser",
    "system": "Diffusers",
    "elevation_m": 13.58,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry"
   },
   "76559": {
@@ -680,7 +680,7 @@
    "type": "Diffuser",
    "system": "Diffusers",
    "elevation_m": 17.59,
-   "levelKey": "L3",
+   "levelKey": "L1",
    "levelSource": "geometry"
   },
   "77487": {
@@ -1511,7 +1511,7 @@
    "type": "Junction box",
    "system": "Electrical",
    "elevation_m": 2.89,
-   "levelKey": "L1",
+   "levelKey": "MEZZ",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:76:kw",
@@ -1721,7 +1721,7 @@
    "type": "Fire alarm device",
    "system": "Electrical",
    "elevation_m": 3.88,
-   "levelKey": "MEZZ",
+   "levelKey": "LOWER",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:76:kw",
@@ -2030,7 +2030,7 @@
    "type": "Junction box",
    "system": "Electrical",
    "elevation_m": 6.19,
-   "levelKey": "LOWER",
+   "levelKey": "L1",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:76:kw",
@@ -2045,7 +2045,7 @@
    "type": "Junction box",
    "system": "Electrical",
    "elevation_m": 6.88,
-   "levelKey": "MEZZ",
+   "levelKey": "L1",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:76:kw",
@@ -2390,10 +2390,9 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 8.88,
-   "levelKey": "L1",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
-    "bmo:meter:76:kw",
     "bmo:meter:77:kw"
    ],
    "feedSource": "level-inferred"
@@ -2405,10 +2404,9 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 8.88,
-   "levelKey": "L1",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
-    "bmo:meter:76:kw",
     "bmo:meter:77:kw"
    ],
    "feedSource": "level-inferred"
@@ -2420,10 +2418,9 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 8.88,
-   "levelKey": "L1",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
-    "bmo:meter:76:kw",
     "bmo:meter:77:kw"
    ],
    "feedSource": "level-inferred"
@@ -2771,7 +2768,7 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 13.98,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -2785,7 +2782,7 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 14.02,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -2813,7 +2810,7 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 13.98,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -2827,7 +2824,7 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 14.08,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -2841,7 +2838,7 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 13.98,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -2855,7 +2852,7 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 14.09,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -2869,7 +2866,7 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 14.09,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -3000,7 +2997,7 @@
    "type": "Junction box",
    "system": "Electrical",
    "elevation_m": 15.92,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -3042,7 +3039,7 @@
    "type": "Junction box",
    "system": "Electrical",
    "elevation_m": 15.61,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -3056,7 +3053,7 @@
    "type": "Junction box",
    "system": "Electrical",
    "elevation_m": 18.54,
-   "levelKey": "L3",
+   "levelKey": "L2",
    "levelSource": "geometry",
    "isFedBy": [
     "bmo:meter:77:kw"
@@ -3280,10 +3277,10 @@
    "type": "Access panel",
    "system": "Electrical",
    "elevation_m": 18.65,
-   "levelKey": "L3",
+   "levelKey": "ROOF",
    "levelSource": "geometry",
    "isFedBy": [
-    "bmo:meter:77:kw"
+    "bmo:meter:3:kw"
    ],
    "feedSource": "level-inferred"
   },
@@ -3862,11 +3859,12 @@
    "Electrical": 208
   },
   "levels": {
-   "LOWER": 47,
-   "L1": 67,
-   "L2": 48,
-   "L3": 89,
-   "MEZZ": 34
+   "LOWER": 46,
+   "L1": 65,
+   "L2": 65,
+   "L3": 75,
+   "MEZZ": 33,
+   "ROOF": 1
   },
   "levelSource": {
    "geometry": 90,
@@ -3876,5 +3874,6 @@
    "level-inferred": 173,
    "panel-schedule": 35
   }
- }
+ },
+ "layer": "equipment"
 }

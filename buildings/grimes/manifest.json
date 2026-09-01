@@ -75,6 +75,36 @@
       "tier": "shell",
       "drawCalls": 93,
       "frame": "same as equipment"
+    },
+    "lighting": {
+      "path": "buildings/grimes/grimes-lighting.glb",
+      "tier": "element",
+      "elements": 309,
+      "identity": "buildings/grimes/lighting.elements.json",
+      "frame": "same as equipment",
+      "survival": "309/1570 Lighting Fixtures (instancing dedup)"
+    },
+    "structural": {
+      "path": "buildings/grimes/grimes-structural.glb",
+      "tier": "element",
+      "elements": 2033,
+      "identity": "buildings/grimes/structural.elements.json",
+      "frame": "same as equipment",
+      "note": "primary structure only (CDC cold-formed framing + noflyzone boxes excluded); meshopt-simplified 3.67M->0.82M tri, error 1%"
+    },
+    "conduit": {
+      "path": "buildings/grimes/grimes-conduit.glb",
+      "tier": "element",
+      "elements": 5570,
+      "identity": "buildings/grimes/conduit.elements.json",
+      "frame": "same as equipment",
+      "note": "meshopt-simplified 4.2M->1.0M tri, error 1%"
+    },
+    "_master": {
+      "path": "(local) twin-outputs/grimes-elements.glb + .meta.json",
+      "elements": 741797,
+      "namedLeaves": 182583,
+      "note": "Revit-native sources: UCBBECH - A.rvt, 22-049 ENG_R22.rvt (electrical), Bechtel_Framing_R22.rvt; mechanical/plumbing/FP are DWG (no identity)"
     }
   }
 }
