@@ -270,6 +270,38 @@ def enrich(layer, glb, path, knn, cent):
     print(f"[{layer}] types: " + ", ".join(f"{a} {b}" for a, b in sorted(counts["type"].items(), key=lambda x: -x[1])))
 
 
+def apportion(layers_done):
+    """Modelled apportionment of a feeder meter across the elements it serves —
+    NEVER a measurement; the viewer labels it 'modelled'. Two pools with a
+    defensible design-side weight:
+      meter 77 (208/120 V service) → every load with a Revit design VA on that
+        service (receptacles, 120 V lighting), weight = design VA
+      meter 3 (roof AHU electric)  → supply diffusers, weight = design CFM
+    Meter 76 mixes 277 V lighting with the mechanical plant and carries no
+    element-level design weight in the NWD → no apportionment (stated in UI)."""
+    docs = {L: json.load(open(LAYER_FILES[L][1])) for L in layers_done}
+    pools = {"77": [], "3": []}
+    for L, d in docs.items():
+        for eid, e in d["elements"].items():
+            if e.get("feedSource") == "revit-voltage" and e.get("design_volts", 999) < 277 and e.get("design_va"):
+                pools["77"].append((L, eid, e["design_va"]))
+            if e.get("type") == "Diffuser" and e.get("system_classification") == "Supply Air" and e.get("flow"):
+                m = re.match(r"([\d.]+)", e["flow"])
+                if m:
+                    pools["3"].append((L, eid, float(m.group(1))))
+    basis = {"77": "design VA", "3": "design CFM"}
+    for meter, rows in pools.items():
+        tot = sum(w for _, _, w in rows)
+        for L, eid, w in rows:
+            docs[L]["elements"][eid]["apportion"] = {"meter": meter, "basis": basis[meter], "weight": w,
+                                                    "share": round(w / tot, 6), "pool": len(rows)}
+    for L, d in docs.items():
+        n = sum(1 for e in d["elements"].values() if "apportion" in e)
+        d["_apportion"] = {"elements": n, "pools": {m: {"basis": basis[m], "n": len(r), "total": round(sum(w for _, _, w in r))} for m, r in pools.items()}}
+        json.dump(d, open(LAYER_FILES[L][1], "w"), indent=1)
+    print("apportionment pools: " + ", ".join(f"meter {m}: {len(r)} elements, total {round(sum(w for _, _, w in r))} {basis[m]}" for m, r in pools.items()))
+
+
 def main(argv):
     layers = [a for a in argv if a in LAYER_FILES] or list(LAYER_FILES)
     cents, labelled = {}, []
@@ -287,6 +319,7 @@ def main(argv):
     for layer in layers:
         if layer in cents:
             enrich(layer, *LAYER_FILES[layer], knn, cents[layer])
+    apportion([L for L in LAYER_FILES if L in cents])
 
 
 if __name__ == "__main__":

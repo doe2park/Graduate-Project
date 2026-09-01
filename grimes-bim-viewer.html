@@ -1277,7 +1277,15 @@ window.toggleLayer = (key) => {
        per-element. 92k nodes → a few hundred draw calls. */
     const buckets = new Map();
     st.group.updateMatrixWorld(true);
+    const lineObjs = [];
     st.group.traverse(ch => {
+      if (ch.isLine) {   // 2D-symbol elements (linear slot diffusers, floor drains): keep as lines, one object each
+        const id = findEquipId(ch);
+        const ln = ch.clone(); ln.material = ch.material.clone(); ln.material.color.setHex(0x9fb3c8);
+        ln.matrixAutoUpdate = false; ln.matrix.copy(ch.matrixWorld); ln.matrixWorld.copy(ch.matrixWorld);
+        ln.userData = { ids: [id], mats: [ch.matrixWorld.clone()], layer: key, isLine: true, baseColor: 0x9fb3c8 };
+        lineObjs.push(ln); return;
+      }
       if (!ch.isMesh) return;
       const id = findEquipId(ch);
       const k = ch.geometry.uuid + '|' + (ch.material ? ch.material.uuid : '');
@@ -1297,6 +1305,7 @@ window.toggleLayer = (key) => {
       im.frustumCulled = false;   // per-instance bounds are not computed; the building is small
       st.meshes.push(im); equipMeshes.push(im);
     }
+    for (const ln of lineObjs) { st.meshes.push(ln); equipMeshes.push(ln); }
     st.group = new THREE.Group(); st.group.name = 'layer:' + key;   // world-space container (matrices already baked)
     for (const im of st.meshes) st.group.add(im);
     scene.add(st.group);
@@ -1327,6 +1336,7 @@ document.addEventListener('pointerdown', e => {
    count. A chip hides everything else across layers. */
 let equipTypeFilter = null;   // null = all
 const layerOn = m => { const st = layerState[m.userData.layer]; return st && st.group && st.group.visible; };
+raycaster.params.Line = { threshold: 0.15 };   // 2D-symbol elements are pickable within 15 cm
 // Raycaster ignores .visible — hidden layers and filtered-out meshes must be excluded explicitly.
 const visibleEquip = () => equipMeshes.filter(m => m.visible && layerOn(m));   // zero-scaled instances cannot be hit
 function buildEquipFilter() {
@@ -1352,6 +1362,10 @@ function buildEquipFilter() {
 const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
 function applyEquipFilter() {
   for (const im of equipMeshes) {
+    if (im.userData.isLine) {
+      const info = im.userData.ids[0] && equipMeta[im.userData.ids[0]];
+      im.visible = !equipTypeFilter || (info && info.type === equipTypeFilter); continue;
+    }
     let any = false;
     im.userData.ids.forEach((id, i) => {
       const info = id && equipMeta[id];
@@ -1373,9 +1387,12 @@ function findEquipId(obj) {
 const _white = new THREE.Color(0xffffff), _amber = new THREE.Color(0xfbbf24);
 function unhighlightEquip() {
   if (equipPicked) {
-    const { im, id } = equipPicked;
-    im.userData.ids.forEach((x, i) => { if (x === id) im.setColorAt(i, _white); });
-    im.instanceColor.needsUpdate = true;
+    for (const im of equipMeshes) {
+      if (!im.userData.ids.includes(equipPicked.id)) continue;
+      if (im.userData.isLine) { im.material.color.setHex(im.userData.baseColor); continue; }
+      im.userData.ids.forEach((x, i) => { if (x === equipPicked.id) im.setColorAt(i, _white); });
+      im.instanceColor.needsUpdate = true;
+    }
   }
   equipPicked = null;
 }
@@ -1397,6 +1414,49 @@ function revitRows(info) {
   });
   return rows.length ? dsec('Revit (design)') + rows.join('') : '';
 }
+/* Element dashboard — neighbours (same room, else same level + type) and the
+   modelled apportionment. Selecting a neighbour re-picks it through the same
+   instanced path, so the panel is navigable without touching the 3D view. */
+window.selectElementById = (id) => {
+  for (const im of equipMeshes) {
+    const i = im.userData.ids.indexOf(id);
+    if (i >= 0) {
+      const st = layerState[im.userData.layer];
+      if (st && st.group && !st.group.visible) toggleLayer(im.userData.layer);
+      pickEquipment(im, i); return;
+    }
+  }
+  console.warn('[twin] element not in any loaded layer:', id, equipMeta[id] ? '(known, layer ' + equipMeta[id].layer + ')' : '(unknown id)');
+};
+function neighbourRows(id, info) {
+  const same = [];
+  const byRoom = !!info.location;
+  for (const [oid, o] of Object.entries(equipMeta)) {
+    if (oid === id) continue;
+    if (byRoom ? o.location === info.location : (o.levelKey === info.levelKey && o.type === info.type)) same.push([oid, o]);
+    if (same.length >= 60) break;
+  }
+  if (!same.length) return '';
+  const shown = same.slice(0, 8);
+  const head = byRoom ? `Same room · ${esc(info.location)} · ${same.length}${same.length >= 60 ? '+' : ''}`
+                      : `Same level · ${esc(info.type || '')} · ${same.length}${same.length >= 60 ? '+' : ''}`;
+  return dsec(head) + shown.map(([oid, o]) =>
+    `<div class="eqrow" onclick="selectElementById('${esc(oid)}')"><span class="eqtag">${esc(o.type || o.category || '')}</span>`
+    + `<span class="eqcat">${esc(o.mark ? 'mark ' + o.mark : (o.name || ''))}</span>`
+    + `<span class="eqspec">${o.design_va ? o.design_va + ' VA' : o.flow ? esc(o.flow) : (o.levelKey || '')}</span></div>`).join('')
+    + (same.length > 8 ? `<div class="pt mut"><span>… ${same.length - 8} more (use the type chips to isolate)</span></div>` : '');
+}
+function apportionRow(info, meters) {
+  const ap = info.apportion;
+  if (!ap) return '';
+  const m = meters[ap.meter];
+  const kw = m && m.latest && typeof m.latest.kw === 'number' ? m.latest.kw : null;
+  const est = kw != null ? kw * ap.share : null;
+  const fmt = w => w < 1 ? (w * 1000).toFixed(0) + ' W' : w.toFixed(2) + ' kW';
+  return `<div class="pt"><span>modelled share · meter ${esc(ap.meter)} × ${(ap.share * 100).toFixed(3)} %</span>`
+       + `<span class="v">${est != null ? '≈ ' + fmt(est) : 'offline'}</span></div>`
+       + `<div class="pt mut"><span>${esc(ap.basis)} ${esc(String(ap.weight))} of ${esc(String(ap.pool))} elements on this feeder — an apportionment of the meter, not a measurement of this element.</span></div>`;
+}
 async function pickEquipment(mesh, instanceId) {
   const id = mesh.userData.ids ? mesh.userData.ids[instanceId] : null;
   const info = id && equipMeta && equipMeta[id];
@@ -1407,9 +1467,10 @@ async function pickEquipment(mesh, instanceId) {
   equipPicked = { im: mesh, id }; picked = mesh;
   // tint every instance of this element (an element can span several fragments / buckets)
   for (const im of equipMeshes) {
-    let hit = false;
-    im.userData.ids.forEach((x, i) => { if (x === id) { im.setColorAt(i, _amber); hit = true; } });
-    if (hit) im.instanceColor.needsUpdate = true;
+    if (!im.userData.ids.includes(id)) continue;
+    if (im.userData.isLine) { im.material.color.set(_amber); continue; }
+    im.userData.ids.forEach((x, i) => { if (x === id) im.setColorAt(i, _amber); });
+    im.instanceColor.needsUpdate = true;
   }
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
@@ -1418,7 +1479,7 @@ async function pickEquipment(mesh, instanceId) {
   document.getElementById('twinTitle').textContent = label + (info.level ? ' · ' + info.level : '');
   const ptsEl = document.getElementById('twinPoints');
   const detInfo = document.getElementById('twinDetInfo');
-  document.getElementById('twinDetEquip').innerHTML = '';
+  document.getElementById('twinDetEquip').innerHTML = neighbourRows(id, info);
   document.getElementById('twinDetZ').innerHTML = '';
   document.getElementById('twinRange').classList.remove('on');
   document.getElementById('twinEvent').innerHTML = '';
@@ -1441,6 +1502,24 @@ async function pickEquipment(mesh, instanceId) {
   const bigEl = document.getElementById('twinBigKw'), badgeEl = document.getElementById('twinBadge');
   const srcEl = document.getElementById('twinSrc');
   const feeds = info.isFedBy || [];
+  if (!feeds.length && info.apportion) {
+    // diffusers: no electrical feed of their own, but a design-CFM share of the roof AHU meter
+    try {
+      const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+      const meters = bd.meters || {};
+      const m = meters[info.apportion.meter];
+      const kw = m && m.latest && typeof m.latest.kw === 'number' ? m.latest.kw : null;
+      bigEl.innerHTML = (kw != null ? kw.toFixed(1) : '—') + ' <small>kW roof AHU meter</small>';
+      badgeEl.textContent = kw != null ? 'MODELLED' : 'OFFLINE'; badgeEl.className = 'badge na';
+      srcEl.textContent = 'Supply diffuser — design airflow share of meter 3 (rooftop mechanical); no airflow sensor on the terminal.';
+      ptsEl.innerHTML = apportionRow(info, meters);
+      if (m && Array.isArray(m.timeseries_kw)) drawSpark(document.getElementById('twinSpark'), m.timeseries_kw.map(s => ({ t: s.t, v: s.v })));
+    } catch (e) {
+      badgeEl.textContent = 'OFFLINE'; badgeEl.className = 'badge na';
+      ptsEl.innerHTML = '<div class="pt mut"><span>Live feed unreachable — ' + esc(e.message) + '</span></div>';
+    }
+    return;
+  }
   if (!feeds.length) {
     bigEl.innerHTML = '— <small>kW</small>';
     badgeEl.textContent = 'NO FEED'; badgeEl.className = 'badge na';
@@ -1474,7 +1553,7 @@ async function pickEquipment(mesh, instanceId) {
     }
     bigEl.innerHTML = total.toFixed(1) + ' <small>kW feeders</small>';
     badgeEl.textContent = 'LIVE'; badgeEl.className = 'badge';
-    ptsEl.innerHTML = rows;
+    ptsEl.innerHTML = rows + apportionRow(info, meters);
     if (series.length) {
       const n = Math.min(...series.map(s => s.length));
       const sum = [];
