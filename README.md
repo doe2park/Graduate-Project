@@ -36,6 +36,7 @@ BMO Obvius Meters (154 devices, 26 online)
 | **Weekly Report** | [weekly-report.html](https://doe2park.github.io/Graduate-Project/weekly-report.html) | Vanilla JS |
 | **Grimes MEP Viewer** | [grimes-xr.html](https://doe2park.github.io/Graduate-Project/grimes-xr.html) | Three.js + WebXR |
 | **Bechtel Full BIM** | [grimes-bim-viewer.html](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | Three.js + GLB (self-hosted, no external BIM service) + Cupix 360° compare |
+| **Design vs Actual (LEED M&V)** | [grimes-performance.html](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | Measured meter counters vs the LEED v4 energy model — live, auto-updating |
 | **Comfort Dashboard** | [comfort-dashboard.html](https://doe2park.github.io/Graduate-Project/comfort-dashboard.html) | Vanilla JS |
 | **BIM-IoT Prototype** | [grimes-bim-iot/protoys.html](https://doe2park.github.io/Graduate-Project/grimes-bim-iot/protoys.html) | Physics-based sensor simulation (BAS-ready) |
 | **AI Chatbot** | [campus-chatbot.ucb-dt.workers.dev](https://campus-chatbot.ucb-dt.workers.dev) | Cloudflare Workers AI |
