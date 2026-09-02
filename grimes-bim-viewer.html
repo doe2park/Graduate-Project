@@ -448,10 +448,9 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   controls.target.copy(c);
   camera.position.set(c.x + 45, c.y + 30, c.z + 45);
   alignShellToMep(); // in case the shell finished loading before the MEP
-  // Desktop: shell is part of the default view — start the 21 MB download in
-  // the background once the MEP is up (progress shows on the topbar button).
-  // Mobile keeps the confirm-gated manual toggle.
-  if (!mobileMq.matches) loadShell();
+  // 2026-09: no auto-download. The element layers (⬡) carry the building's
+  // geometry now, so the 32 MB shell is opt-in — the topbar toggle, or Walk
+  // mode (which needs real slabs/walls and kicks off the load itself).
 }, p => { document.getElementById('loadSub').textContent = `MEP… ${(p.loaded/1048576).toFixed(1)} MB`; },
 () => {
   const el = document.getElementById('loading');
@@ -770,6 +769,7 @@ window.toggleWalk = () => {
   try { renderer.domElement.requestPointerLock(); } catch { plockFailed = true; showWalkHint(); }
 };
 function enterWalk() {
+  if (!building) loadShell(); // walk needs slabs/walls; arrival mid-walk is handled (setShellMode + floor re-detect)
   walkMode = true; thirdPerson = false;
   renderer.toneMappingExposure = EXPOSURE_WALK; // indoor: no direct sky view → lift exposure (no fog by design)
   savedCam = { pos: camera.position.clone(), quat: camera.quaternion.clone(), target: controls.target.clone() };
