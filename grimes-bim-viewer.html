@@ -20,7 +20,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .tb-sub{font:500 10.5px/1 var(--mono);color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
 .tb-spacer{flex:1}
 .tb-dd{position:relative}
-.tb-menu{position:absolute;top:34px;left:0;min-width:210px;display:flex;flex-direction:column;gap:4px;padding:6px;background:rgba(8,12,24,.97);border:1px solid var(--border);border-radius:6px;z-index:120}
+.tb-menu{position:absolute;top:34px;right:0;min-width:210px;max-height:calc(100vh - 100px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:6px;background:rgba(8,12,24,.97);border:1px solid var(--border);border-radius:6px;z-index:120}
 .tb-menu .tb-btn{text-align:left;display:flex;justify-content:space-between;gap:10px;white-space:nowrap}
 .tb-menu .tb-btn small{color:#6b7fa0;font:500 10px/1 var(--mono)}
 .tb-menu .tb-btn.active small{color:inherit;opacity:.7}
@@ -213,6 +213,10 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
       <button class="tb-btn" id="layerBtn-lifesafety" onclick="toggleLayer('lifesafety')" title="Fire alarm devices, sprinklers, exit signs, extinguisher cabinets, security / emergency call, WAPs">🧯 Life safety <small>0.5 MB · 553</small></button>
       <button class="tb-btn" id="layerBtn-structural" onclick="toggleLayer('structural')" title="Primary structure: concrete beams/columns, steel framing, foundations, 108 SMA brace devices — with Revit volume + material">🏗 Structure <small>12.9 MB · 2,420</small></button>
       <button class="tb-btn" id="layerBtn-conduit" onclick="toggleLayer('conduit')" title="Conduit runs, all 8,142 fittings, supports, cable trays — the physical electrical distribution paths">🔌 Conduit <small>11.0 MB · 11,063</small></button>
+      <button class="tb-btn" id="layerBtn-duct" onclick="toggleLayer('duct')" title="Sheet-metal ductwork from the per-floor fabrication models — every duct, elbow, transition, tap and hanger clickable">🌀 Ductwork <small>14.3 MB · 13,921</small></button>
+      <button class="tb-btn" id="layerBtn-hydronic" onclick="toggleLayer('hydronic')" title="Mechanical piping (copper, steel) from the FMB fabrication models — pipes, fittings, valves, hangers">♨ Mech piping <small>11.9 MB · 4,863</small></button>
+      <button class="tb-btn" id="layerBtn-plumbing" onclick="toggleLayer('plumbing')" title="Plumbing piping — cast-iron no-hub, ProPress copper, fittings and supports">🚰 Plumbing <small>15.3 MB · 2,621</small></button>
+      <button class="tb-btn" id="layerBtn-fire" onclick="toggleLayer('fire')" title="Fire-protection piping (Pribuss fabrication) — sprinkler mains, branch pipes, flex drops, seismic bracing. Heaviest layer.">🧨 Fire piping <small>53 MB · 3,861</small></button>
     </div>
   </div>
   <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
@@ -1236,6 +1240,11 @@ const LAYERS = {   // all cut from the 2026-09-01 targeted SVF re-export (every 
   lifesafety: { glb: 'buildings/grimes/grimes-lifesafety.glb', json: 'buildings/grimes/lifesafety.elements.json', label: '🧯 Life safety', mb: 0.5 },
   structural: { glb: 'buildings/grimes/grimes-structural.glb', json: 'buildings/grimes/structural.elements.json', label: '🏗 Structure',   mb: 12.9 },
   conduit:    { glb: 'buildings/grimes/grimes-conduit.glb',    json: 'buildings/grimes/conduit.elements.json',    label: '🔌 Conduit',     mb: 11.0 },
+  // MEP fabrication tiers (CAD entities, no Revit category) — scripts/extract_mep_layer.py
+  duct:       { glb: 'buildings/grimes/grimes-duct.glb',       json: 'buildings/grimes/duct.elements.json',       label: '🌀 Ductwork',    mb: 14.3 },
+  hydronic:   { glb: 'buildings/grimes/grimes-hydronic.glb',   json: 'buildings/grimes/hydronic.elements.json',   label: '♨ Mech piping', mb: 11.9 },
+  plumbing:   { glb: 'buildings/grimes/grimes-plumbing.glb',   json: 'buildings/grimes/plumbing.elements.json',   label: '🚰 Plumbing',    mb: 15.3 },
+  fire:       { glb: 'buildings/grimes/grimes-fire.glb',       json: 'buildings/grimes/fire.elements.json',       label: '🧨 Fire piping', mb: 53.1 },
 };
 const layerState = {};           // key -> { group, meshes, loading }
 let equipMeshes = [], equipMeta = {}, equipPicked = null;   // union across loaded layers
@@ -1314,7 +1323,7 @@ window.toggleLayer = (key) => {
     document.getElementById('layersBtn').classList.add('active');
     buildEquipFilter();
     document.getElementById('equipFilter').hidden = false;
-    console.log(`[layer:${key}] loaded:`, st.meshes.length, 'draw calls /', Object.keys(meta).length, 'elements /', st.meshes.reduce((a, m) => a + m.count, 0), 'instances');
+    console.log(`[layer:${key}] loaded:`, st.meshes.length, 'draw calls /', Object.keys(meta).length, 'elements /', st.meshes.reduce((a, m) => a + (m.count || 1), 0), 'instances');
   }).catch(e => {
     st.loading = false;
     btn.innerHTML = st.labelHtml;
