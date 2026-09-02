@@ -1335,6 +1335,18 @@ window.toggleLayersMenu = () => {
   const m = document.getElementById('layersMenu');
   m.hidden = !m.hidden;
   document.getElementById('layersBtn').classList.toggle('active', !m.hidden);
+  if (!m.hidden) {
+    // keep the menu clear of the element-dashboard panel (and the viewport edges)
+    m.style.right = '0px';
+    const mr = m.getBoundingClientRect(), tp = document.getElementById('twinPanel');
+    let shift = 0;
+    if (tp.classList.contains('show')) {
+      const tr = tp.getBoundingClientRect();
+      if (mr.right > tr.left - 8 && mr.top < tr.bottom && mr.bottom > tr.top) shift = mr.right - (tr.left - 8);
+    }
+    shift = Math.min(shift, mr.left - 8);            // never past the left edge
+    if (shift > 0) m.style.right = shift + 'px';
+  }
 };
 document.addEventListener('pointerdown', e => {
   if (!e.target.closest('#layersDd')) { document.getElementById('layersMenu').hidden = true; document.getElementById('layersBtn').classList.remove('active'); }
