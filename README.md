@@ -30,16 +30,13 @@ BMO Obvius Meters (154 devices, 26 online)
 
 | Interface | URL | Technology |
 |---|---|---|
-| **Campus Map** | [grimes-campus-map-arcgis.html](https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html) | ArcGIS JS SDK 4.29 |
-| **3D Campus View** | [campus-3d.html](https://doe2park.github.io/Graduate-Project/campus-3d.html) | CesiumJS + Google 3D Tiles |
+| **Campus Map** (hub) | [grimes-campus-map-arcgis.html](https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html) | ArcGIS JS SDK 4.29 |
+| **Grimes BIM Viewer** | [grimes-bim-viewer.html](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | Three.js + GLB element tier (per-element dashboards, live feeds) + Cupix 360° compare |
 | **Energy Dashboard** | [campus-energy-dashboard.html](https://doe2park.github.io/Graduate-Project/campus-energy-dashboard.html) | Chart.js 4.4 |
-| **Weekly Report** | [weekly-report.html](https://doe2park.github.io/Graduate-Project/weekly-report.html) | Vanilla JS |
-| **Grimes MEP Viewer** | [grimes-xr.html](https://doe2park.github.io/Graduate-Project/grimes-xr.html) | Three.js + WebXR |
-| **Bechtel Full BIM** | [grimes-bim-viewer.html](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | Three.js + GLB (self-hosted, no external BIM service) + Cupix 360° compare |
 | **Design vs Actual (LEED M&V)** | [grimes-performance.html](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | Measured meter counters vs the LEED v4 energy model — live, auto-updating |
-| **Comfort Dashboard** | [comfort-dashboard.html](https://doe2park.github.io/Graduate-Project/comfort-dashboard.html) | Vanilla JS |
-| **BIM-IoT Prototype** | [grimes-bim-iot/protoys.html](https://doe2park.github.io/Graduate-Project/grimes-bim-iot/protoys.html) | Physics-based sensor simulation (BAS-ready) |
 | **AI Chatbot** | [campus-chatbot.ucb-dt.workers.dev](https://campus-chatbot.ucb-dt.workers.dev) | Cloudflare Workers AI |
+
+*Consolidated 2026-09: `campus-3d`, `grimes-xr`, `weekly-report`, `comfort-dashboard`, `vote`, `leed-lca-preview`, `twin-viewer`, and `grimes-bim-iot/protoys` are now redirect stubs into the four interfaces above (old bookmarks keep working; the pages live in git history).*
 
 ---
 
@@ -241,14 +238,10 @@ Mechanical:     00/01/02/03/04-UCBBE-FMB-MECH DUCT.nwc
 ```
 Graduate-Project/
 ├── grimes-campus-map-arcgis.html    # Campus 2D map with chatbot (main entry)
-├── campus-3d.html                   # CesiumJS 3D viewer
 ├── campus-energy-dashboard.html     # Chart.js dashboard
-├── comfort-dashboard.html           # Comfort metrics view
-├── weekly-report.html               # Weekly report viewer
-├── grimes-xr.html                   # Grimes MEP 3D viewer (Three.js + WebXR + Cupix compare)
-├── grimes-bim-viewer.html           # Full Bechtel BIM — self-hosted Three.js + GLB + Cupix sync
-├── grimes-aps-viewer.html           # (deprecated stub — redirects to grimes-bim-viewer.html)
-├── grimes-bim-iot/protoys.html      # BIM-IoT sensor dashboard prototype (simulated, BAS-ready)
+├── grimes-bim-viewer.html           # Grimes element-tier BIM viewer — Three.js + GLB + Cupix sync
+├── grimes-performance.html          # Design vs Actual (LEED M&V) dashboard
+├── *.html (campus-3d, grimes-xr, …) # redirect stubs from the 2026-09 consolidation
 ├── grimes-mep-only.glb              # MEP 3D model (1.7 MB)
 ├── grimes-mep-compressed.glb        # Full building model (21 MB Draco+WebP, lazy-loaded overlay)
 ├── bmo_fetch.py                     # BMO fetcher — Grimes detail (building_data.json)

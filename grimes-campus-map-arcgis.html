@@ -526,8 +526,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
     <div class="sh-brand"><div class="sh-logo">DT</div><div><h1>UC Berkeley · Campus Digital Twin</h1><div class="sh-sub">ArcGIS Edition</div></div></div>
     <div class="sh-stats"><div class="sh-s"><b id="xb">0</b><small>Buildings</small></div><div class="sh-s"><b id="xm">0</b><small>BIM</small></div><div class="sh-s"><b id="xe">0</b><small>Energy</small></div></div>
     <a href="campus-energy-dashboard.html" style="display:block;margin:8px 14px 0;padding:8px;border-radius:8px;background:rgba(253,181,21,.1);border:1px solid rgba(253,181,21,.25);text-align:center;text-decoration:none;font-size:11px;font-weight:600;color:#FDB515">📊 Campus Energy Dashboard →</a>
-    <a href="comfort-dashboard.html" style="display:block;margin:4px 14px 0;padding:8px;border-radius:8px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);text-align:center;text-decoration:none;font-size:11px;font-weight:600;color:#f87171">🌡️ Live Comfort Pulse →</a>
-    <a href="weekly-report.html" style="display:block;margin:4px 14px 0;padding:8px;border-radius:8px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);text-align:center;text-decoration:none;font-size:11px;font-weight:600;color:#34d399">📋 Weekly Energy Report →</a>
+    <a href="grimes-performance.html" style="display:block;margin:4px 14px 0;padding:8px;border-radius:8px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);text-align:center;text-decoration:none;font-size:11px;font-weight:600;color:#34d399">📐 Design vs Actual (LEED M&V) →</a>
   </div>
   <div class="sf"><div class="sf-w"><input id="qi" placeholder="Search buildings..."></div></div>
   <div class="sfl" id="fl"></div>
@@ -535,8 +534,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 </div>
 <div id="ma">
   <button id="tb">☰</button>
-  <a href="campus-3d.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(45,212,191,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--cyan);font-size:10px;font-weight:600;text-decoration:none">🏛 3D View</a>
-  <a href="grimes-bim-viewer.html" style="position:absolute;top:12px;right:150px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(253,181,21,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--gold);font-size:10px;font-weight:600;text-decoration:none">🏗 Bechtel BIM</a>
+  <a href="grimes-bim-viewer.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(253,181,21,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--gold);font-size:10px;font-weight:600;text-decoration:none">🏗 Bechtel BIM</a>
 
   <!-- Campus Mood: one-line plain-language summary -->
   <div id="campusMood" title="How the campus compares to typical load at this hour">
@@ -638,7 +636,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 const D=[
   {id:'grimes',n:'Grimes Engineering Center',a:'Bechtel Center',lat:37.87410,lng:-122.25815,c:'Engineering',bim:1,nrg:1,kw:37.3,
    floors:4,sqft:'83,460',yr:1980,yrn:'1980 / 2025 renovation',mep:8,sensors:30,
-   xr:'https://doe2park.github.io/Graduate-Project/grimes-xr.html'},
+   xr:'https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html'},
   {id:'cory',n:'Cory Hall',a:'Electrical Engineering (EECS)',lat:37.87530,lng:-122.25725,c:'Engineering',nrg:1,yr:1950,floors:5},
   {id:'soda',n:'Soda Hall',a:'Computer Science (EECS)',lat:37.87583,lng:-122.25862,c:'Engineering',nrg:1,yr:1994,floors:7},
   {id:'davis',n:'Davis Hall',a:'Civil & Environmental Eng.',lat:37.87454,lng:-122.25830,c:'Engineering',nrg:1,yr:1968,floors:7},
@@ -1647,7 +1645,6 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     }
     var bUrl=getBerkeleyUrl(b.id);
     h += '<a class="pe-btn" href="'+bUrl+'" target="_blank">Campus Info</a>';
-    h += '<a class="pe-btn" href="comfort-dashboard.html">Comfort</a>';
     h += '</div>';
 
     h += '</div>'; // end .pe-body
@@ -2600,9 +2597,9 @@ function processQuery(q){
 
   case 'predict':var pr=o.filter(function(e){return e[1].predicted_kw}).slice(0,5);if(!pr.length)return "🔮 Need more data for predictions. Check back in a few hours.";return "🔮 <b>Predictions:</b><br>"+pr.map(function(e){return "• "+e[1].name+": "+e[1].kw+"kW → <b>~"+e[1].predicted_kw+"kW</b>"}).join("<br>");
 
-  case 'dashboard':return "📊 <a href='campus-energy-dashboard.html' style='color:var(--gold)'>📊 Live Dashboard →</a> — Charts, rankings, trends<br><a href='weekly-report.html' style='color:var(--green)'>📋 Weekly Report →</a> — 7-day analysis";
+  case 'dashboard':return "📊 <a href='campus-energy-dashboard.html' style='color:var(--gold)'>📊 Live Dashboard →</a> — Charts, rankings, trends";
 
-  case 'report':return "📋 <a href='weekly-report.html' style='color:var(--green)'>Open Weekly Report →</a><br>Daily trends, costs, CO₂ for the past 7 days.";
+  case 'report':return "📋 Weekly summaries now live in the <a href='campus-energy-dashboard.html' style='color:var(--gold)'>Energy Dashboard →</a>.";
 
   case 'howwork':return "⚙️ <b>System:</b><br>1️⃣ BMO meters → kW every 15min<br>2️⃣ GitHub Actions → Python fetch<br>3️⃣ JSON → GitHub Pages (free)<br>4️⃣ Map + Dashboard fetch live<br>💵 Cost: <b>$0/month</b><br><br>Built by Yoonsung Chung · UC Berkeley CEE";
 

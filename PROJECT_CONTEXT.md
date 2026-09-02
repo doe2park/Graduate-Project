@@ -298,3 +298,5 @@ After pulling latest, in a browser:
 4. Chatbot answers on the campus map (worker: chatbot-only since 2026-07)
 
 If broken at any step, that's the regression to fix first.
+
+> **2026-09-02 consolidation:** live interfaces reduced to four — campus map (hub), grimes-bim-viewer, energy dashboard, grimes-performance. campus-3d, grimes-xr, weekly-report, comfort-dashboard, vote, leed-lca-preview, twin-viewer and grimes-bim-iot/protoys are redirect stubs; their old code is in git history.
