@@ -20,7 +20,10 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .tb-sub{font:500 10.5px/1 var(--mono);color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
 .tb-spacer{flex:1}
 .tb-dd{position:relative}
-.tb-menu{position:absolute;top:34px;right:0;min-width:210px;max-height:calc(100vh - 100px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:6px;background:rgba(8,12,24,.97);border:1px solid var(--border);border-radius:6px;z-index:120}
+.tb-menu{position:fixed;top:62px;left:14px;width:238px;max-height:calc(100vh - 200px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(8,12,24,.95);border:1px solid var(--border);border-radius:6px;z-index:65}
+.tb-menu .lm-hdr{display:flex;align-items:center;justify-content:space-between;padding:1px 4px 6px;border-bottom:1px solid var(--border);margin-bottom:3px;font:600 10px/1 var(--mono);letter-spacing:.8px;color:#94a3b8}
+.tb-menu .lm-hdr button{background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;line-height:1;padding:2px}
+.tb-menu .lm-hdr button:hover{color:#cbd5e1}
 .tb-menu .tb-btn{text-align:left;display:flex;justify-content:space-between;gap:10px;white-space:nowrap}
 .tb-menu .tb-btn small{color:#6b7fa0;font:500 10px/1 var(--mono)}
 .tb-menu .tb-btn.active small{color:inherit;opacity:.7}
@@ -207,6 +210,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   <div class="tb-dd" id="layersDd">
     <button class="tb-btn" id="layersBtn" onclick="toggleLayersMenu()" title="Element-tier layers cut from the 741k-element APS master — each element is clickable">⬡ Layers ▾</button>
     <div class="tb-menu" id="layersMenu" hidden>
+      <div class="lm-hdr">ELEMENT LAYERS <button onclick="toggleLayersMenu()" title="Close">✕</button></div>
       <button class="tb-btn" id="layerBtn-equipment" onclick="toggleLayer('equipment')" title="Panelboards, transformers, junction boxes, diffusers, plumbing fixtures — tap any unit for identity + live feeder data">⚡ Equipment <small>1.5 MB · 1,143</small></button>
       <button class="tb-btn" id="layerBtn-fixtures" onclick="toggleLayer('fixtures')" title="Receptacles, prefab device boxes, data/AV outlets — each with its Revit design VA where modelled">⏻ Receptacles <small>6.2 MB · 4,927</small></button>
       <button class="tb-btn" id="layerBtn-lighting" onclick="toggleLayer('lighting')" title="All 1,570 light fixtures + 165 lighting controls — 277 V fixtures ride meter 76, 120 V ride meter 77">💡 Lighting <small>2.3 MB · 1,735</small></button>
@@ -1331,25 +1335,16 @@ window.toggleLayer = (key) => {
   });
 };
 window.toggleEquipment = () => toggleLayer('equipment');   // legacy hook
+/* The layer list is a fixed panel on the LEFT (the dashboard owns the right),
+   so the two can never overlap. It stays open while toggling layers; close
+   with the ✕, the Layers button, or Esc. */
 window.toggleLayersMenu = () => {
   const m = document.getElementById('layersMenu');
   m.hidden = !m.hidden;
   document.getElementById('layersBtn').classList.toggle('active', !m.hidden);
-  if (!m.hidden) {
-    // keep the menu clear of the element-dashboard panel (and the viewport edges)
-    m.style.right = '0px';
-    const mr = m.getBoundingClientRect(), tp = document.getElementById('twinPanel');
-    let shift = 0;
-    if (tp.classList.contains('show')) {
-      const tr = tp.getBoundingClientRect();
-      if (mr.right > tr.left - 8 && mr.top < tr.bottom && mr.bottom > tr.top) shift = mr.right - (tr.left - 8);
-    }
-    shift = Math.min(shift, mr.left - 8);            // never past the left edge
-    if (shift > 0) m.style.right = shift + 'px';
-  }
 };
-document.addEventListener('pointerdown', e => {
-  if (!e.target.closest('#layersDd')) { document.getElementById('layersMenu').hidden = true; document.getElementById('layersBtn').classList.remove('active'); }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('layersMenu').hidden) toggleLayersMenu();
 });
 
 /* Type filter — chips = the type taxonomy of every VISIBLE layer, ordered by
