@@ -20,10 +20,15 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .tb-sub{font:500 10.5px/1 var(--mono);color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
 .tb-spacer{flex:1}
 .tb-dd{position:relative}
-.tb-menu{position:fixed;top:62px;left:14px;width:238px;max-height:calc(100vh - 200px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(8,12,24,.95);border:1px solid var(--border);border-radius:6px;z-index:65}
+.tb-menu{position:fixed;top:62px;left:14px;width:258px;max-height:calc(100vh - 200px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(8,12,24,.95);border:1px solid var(--border);border-radius:6px;z-index:65}
 .tb-menu .lm-hdr{display:flex;align-items:center;justify-content:space-between;padding:1px 4px 6px;border-bottom:1px solid var(--border);margin-bottom:3px;font:600 10px/1 var(--mono);letter-spacing:.8px;color:#94a3b8}
 .tb-menu .lm-hdr button{background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;line-height:1;padding:2px}
 .tb-menu .lm-hdr button:hover{color:#cbd5e1}
+.lm-chips{display:flex;flex-wrap:wrap;gap:3px;padding:1px 2px 7px;border-bottom:1px dashed rgba(148,163,184,.15);font:10px/1.4 var(--mono)}
+.lm-chips .ef{cursor:pointer;border:1px solid rgba(148,163,184,.25);border-radius:999px;padding:1px 7px;color:#94a3b8;background:transparent;font:inherit}
+.lm-chips .ef:hover{color:#cbd5e1;border-color:rgba(148,163,184,.5)}
+.lm-chips .ef.on{background:#fbbf24;color:#0b1020;border-color:#fbbf24}
+.lm-chips .ef small{opacity:.6;margin-left:3px}
 .tb-menu .tb-btn{text-align:left;display:flex;justify-content:space-between;gap:10px;white-space:nowrap}
 .tb-menu .tb-btn small{color:#6b7fa0;font:500 10px/1 var(--mono)}
 .tb-menu .tb-btn.active small{color:inherit;opacity:.7}
@@ -212,15 +217,25 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
     <div class="tb-menu" id="layersMenu" hidden>
       <div class="lm-hdr">ELEMENT LAYERS <button onclick="toggleLayersMenu()" title="Close">✕</button></div>
       <button class="tb-btn" id="layerBtn-equipment" onclick="toggleLayer('equipment')" title="Panelboards, transformers, junction boxes, diffusers, plumbing fixtures — tap any unit for identity + live feeder data">⚡ Equipment <small>1.5 MB · 1,143</small></button>
+      <div class="lm-chips" id="chips-equipment" hidden></div>
       <button class="tb-btn" id="layerBtn-fixtures" onclick="toggleLayer('fixtures')" title="Receptacles, prefab device boxes, data/AV outlets — each with its Revit design VA where modelled">⏻ Receptacles <small>6.2 MB · 4,927</small></button>
+      <div class="lm-chips" id="chips-fixtures" hidden></div>
       <button class="tb-btn" id="layerBtn-lighting" onclick="toggleLayer('lighting')" title="All 1,570 light fixtures + 165 lighting controls — 277 V fixtures ride meter 76, 120 V ride meter 77">💡 Lighting <small>2.3 MB · 1,735</small></button>
+      <div class="lm-chips" id="chips-lighting" hidden></div>
       <button class="tb-btn" id="layerBtn-lifesafety" onclick="toggleLayer('lifesafety')" title="Fire alarm devices, sprinklers, exit signs, extinguisher cabinets, security / emergency call, WAPs">🧯 Life safety <small>0.5 MB · 553</small></button>
+      <div class="lm-chips" id="chips-lifesafety" hidden></div>
       <button class="tb-btn" id="layerBtn-structural" onclick="toggleLayer('structural')" title="Primary structure: concrete beams/columns, steel framing, foundations, 108 SMA brace devices — with Revit volume + material">🏗 Structure <small>12.9 MB · 2,420</small></button>
+      <div class="lm-chips" id="chips-structural" hidden></div>
       <button class="tb-btn" id="layerBtn-conduit" onclick="toggleLayer('conduit')" title="Conduit runs, all 8,142 fittings, supports, cable trays — the physical electrical distribution paths">🔌 Conduit <small>11.0 MB · 11,063</small></button>
+      <div class="lm-chips" id="chips-conduit" hidden></div>
       <button class="tb-btn" id="layerBtn-duct" onclick="toggleLayer('duct')" title="Sheet-metal ductwork from the per-floor fabrication models — every duct, elbow, transition, tap and hanger clickable">🌀 Ductwork <small>14.3 MB · 13,921</small></button>
+      <div class="lm-chips" id="chips-duct" hidden></div>
       <button class="tb-btn" id="layerBtn-hydronic" onclick="toggleLayer('hydronic')" title="Mechanical piping (copper, steel) from the FMB fabrication models — pipes, fittings, valves, hangers">♨ Mech piping <small>11.9 MB · 4,863</small></button>
+      <div class="lm-chips" id="chips-hydronic" hidden></div>
       <button class="tb-btn" id="layerBtn-plumbing" onclick="toggleLayer('plumbing')" title="Plumbing piping — cast-iron no-hub, ProPress copper, fittings and supports">🚰 Plumbing <small>15.3 MB · 2,621</small></button>
+      <div class="lm-chips" id="chips-plumbing" hidden></div>
       <button class="tb-btn" id="layerBtn-fire" onclick="toggleLayer('fire')" title="Fire-protection piping (Pribuss fabrication) — sprinkler mains, branch pipes, flex drops, seismic bracing. Heaviest layer.">🧨 Fire piping <small>53 MB · 3,861</small></button>
+      <div class="lm-chips" id="chips-fire" hidden></div>
     </div>
   </div>
   <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
@@ -247,7 +262,6 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
 </div>
 
 <div id="legend"></div>
-<div id="equipFilter" hidden><span class="ef-title">EQUIPMENT · filter</span></div>
 
 <div id="welcome">
   <div class="card">
@@ -1262,7 +1276,6 @@ window.toggleLayer = (key) => {
     btn.classList.toggle('active', st.group.visible);
     if (!st.group.visible && equipPicked && equipPicked.im.userData.layer === key) clearPick();
     buildEquipFilter();
-    document.getElementById('equipFilter').hidden = !anyLayerVisible();
     return;
   }
   if (st.loading) return;
@@ -1326,7 +1339,6 @@ window.toggleLayer = (key) => {
     btn.classList.add('active');
     document.getElementById('layersBtn').classList.add('active');
     buildEquipFilter();
-    document.getElementById('equipFilter').hidden = false;
     console.log(`[layer:${key}] loaded:`, st.meshes.length, 'draw calls /', Object.keys(meta).length, 'elements /', st.meshes.reduce((a, m) => a + (m.count || 1), 0), 'instances');
   }).catch(e => {
     st.loading = false;
@@ -1354,25 +1366,36 @@ const layerOn = m => { const st = layerState[m.userData.layer]; return st && st.
 raycaster.params.Line = { threshold: 0.15 };   // 2D-symbol elements are pickable within 15 cm
 // Raycaster ignores .visible — hidden layers and filtered-out meshes must be excluded explicitly.
 const visibleEquip = () => equipMeshes.filter(m => m.visible && layerOn(m));   // zero-scaled instances cannot be hit
+/* Type chips live INSIDE the left layers panel, one group under each visible
+   layer's button (they used to be one merged bar over the model). One filter
+   is active at a time; clicking the active chip — or a layer's "All" — clears it. */
 function buildEquipFilter() {
-  const counts = {};
+  const perLayer = {};   // layer -> {type: count}
   for (const e of Object.values(equipMeta)) {
     const st = layerState[e.layer];
-    if (st && st.group && st.group.visible && e.type) counts[e.type] = (counts[e.type] || 0) + 1;
+    if (st && st.group && st.group.visible && e.type)
+      (perLayer[e.layer] = perLayer[e.layer] || {})[e.type] = (perLayer[e.layer][e.type] || 0) + 1;
   }
-  const types = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  if (equipTypeFilter && !counts[equipTypeFilter]) { equipTypeFilter = null; applyEquipFilter(); }
-  const box = document.getElementById('equipFilter');
-  box.querySelectorAll('.ef').forEach(n => n.remove());
-  const mk = (label, val, n) => {
-    const b = document.createElement('button');
-    b.className = 'ef' + (val === equipTypeFilter ? ' on' : '');
-    b.innerHTML = esc(label) + (n != null ? `<small>${n}</small>` : '');
-    b.onclick = () => { equipTypeFilter = val; applyEquipFilter(); buildEquipFilter(); };
-    box.appendChild(b);
-  };
-  mk('All', null, Object.values(counts).reduce((a, b) => a + b, 0));
-  for (const [t, n] of types) mk(t, t, n);
+  const allCounts = {};
+  for (const c of Object.values(perLayer)) for (const [t, n] of Object.entries(c)) allCounts[t] = (allCounts[t] || 0) + n;
+  if (equipTypeFilter && !allCounts[equipTypeFilter]) { equipTypeFilter = null; applyEquipFilter(); }
+  for (const key of Object.keys(LAYERS)) {
+    const box = document.getElementById('chips-' + key);
+    if (!box) continue;
+    box.innerHTML = '';
+    const counts = perLayer[key];
+    box.hidden = !counts;
+    if (!counts) continue;
+    const mk = (label, val, n) => {
+      const b = document.createElement('button');
+      b.className = 'ef' + (val !== null && val === equipTypeFilter ? ' on' : '');
+      b.innerHTML = esc(label) + (n != null ? `<small>${n}</small>` : '');
+      b.onclick = () => { equipTypeFilter = (val === null || val === equipTypeFilter) ? null : val; applyEquipFilter(); buildEquipFilter(); };
+      box.appendChild(b);
+    };
+    mk('All', null, Object.values(counts).reduce((a, b) => a + b, 0));
+    for (const [t, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) mk(t, t, n);
+  }
 }
 const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
 function applyEquipFilter() {
