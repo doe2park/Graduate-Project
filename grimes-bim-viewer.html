@@ -216,6 +216,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
     <button class="tb-btn" id="layersBtn" onclick="toggleLayersMenu()" title="Element-tier layers cut from the 741k-element APS master — each element is clickable">⬡ Layers ▾</button>
     <div class="tb-menu" id="layersMenu" hidden>
       <div class="lm-hdr">ELEMENT LAYERS <button onclick="toggleLayersMenu()" title="Close">✕</button></div>
+      <button class="tb-btn" id="layerBtn-mep" onclick="toggleMepModel()" title="Legacy 8-mesh MEP overview (one mesh per discipline) — the colourful backdrop. Superseded by the per-element layers below but handy for a quick systems read.">🎨 MEP overview <small>1.7 MB · 8 systems</small></button>
       <button class="tb-btn" id="layerBtn-equipment" onclick="toggleLayer('equipment')" title="Panelboards, transformers, junction boxes, diffusers, plumbing fixtures — tap any unit for identity + live feeder data">⚡ Equipment <small>1.5 MB · 1,143</small></button>
       <div class="lm-chips" id="chips-equipment" hidden></div>
       <button class="tb-btn" id="layerBtn-fixtures" onclick="toggleLayer('fixtures')" title="Receptacles, prefab device boxes, data/AV outlets — each with its Revit design VA where modelled">⏻ Receptacles <small>6.2 MB · 4,927</small></button>
@@ -438,8 +439,10 @@ function bimBbox() {
   return _bimBboxCache;
 }
 
+let mepModel = null;
 loader.load('grimes-mep-only.glb', (gltf) => {
-  scene.add(gltf.scene);
+  mepModel = gltf.scene;
+  scene.add(mepModel);
   let idx = 0;
   gltf.scene.traverse(child => {
     if (!child.isMesh) return;
@@ -466,9 +469,17 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   controls.target.copy(c);
   camera.position.set(c.x + 45, c.y + 30, c.z + 45);
   alignShellToMep(); // in case the shell finished loading before the MEP
-  // 2026-09: no auto-download. The element layers (⬡) carry the building's
-  // geometry now, so the 32 MB shell is opt-in — the topbar toggle, or Walk
-  // mode (which needs real slabs/walls and kicks off the load itself).
+  // 2026-09: exterior-first. On desktop the ghost shell IS the default view
+  // and the legacy 8-mesh MEP overview starts hidden (its content now lives
+  // in the per-element layers) — toggle it back from the layers panel.
+  // Mobile keeps the old behaviour: MEP visible, shell confirm-gated.
+  if (!mobileMq.matches) {
+    mepModel.visible = false;
+    document.getElementById('legend').style.display = 'none';
+    loadShell();
+  } else {
+    document.getElementById('layerBtn-mep').classList.add('active');
+  }
 }, p => { document.getElementById('loadSub').textContent = `MEP… ${(p.loaded/1048576).toFixed(1)} MB`; },
 () => {
   const el = document.getElementById('loading');
@@ -658,7 +669,8 @@ function updateAim() {
   if (!plockActive) { aimedMesh = null; return; }
   raycaster.setFromCamera(_centerVec, camera);
   // equipment elements are aimable in walk mode too — nearest hit wins
-  const targets = anyLayerVisible() ? visibleEquip().concat(allMeshes) : allMeshes;
+  const mepTargets = (mepModel && mepModel.visible) ? allMeshes : [];
+  const targets = anyLayerVisible() ? visibleEquip().concat(mepTargets) : mepTargets;
   const hit = raycaster.intersectObjects(targets, false)[0];
   aimedMesh = hit ? hit.object : null;
   aimedInstance = hit && hit.instanceId != null ? hit.instanceId : null;
@@ -1222,7 +1234,7 @@ renderer.domElement.addEventListener('pointerup', e => {
     if (eqHit) { pickEquipment(eqHit.object, eqHit.instanceId); return; }
   }
   // MEP systems win when overlapping; the shell is the fallback target
-  const mepHit = raycaster.intersectObjects(allMeshes, false)[0];
+  const mepHit = (mepModel && mepModel.visible) ? raycaster.intersectObjects(allMeshes, false)[0] : null;
   if (mepHit) { pickSystem(mepHit.object); return; }
   const shellHit = (building && building.visible) ? raycaster.intersectObjects(shellMeshes, false)[0] : null;
   if (shellHit) pickBuilding(); else clearPick();
@@ -1347,6 +1359,13 @@ window.toggleLayer = (key) => {
   });
 };
 window.toggleEquipment = () => toggleLayer('equipment');   // legacy hook
+window.toggleMepModel = () => {
+  if (!mepModel) return;
+  mepModel.visible = !mepModel.visible;
+  document.getElementById('layerBtn-mep').classList.toggle('active', mepModel.visible);
+  document.getElementById('legend').style.display = mepModel.visible ? '' : 'none';
+  if (!mepModel.visible) clearPick();   // a picked discipline mesh is gone from view
+};
 /* The layer list is a fixed panel on the LEFT (the dashboard owns the right),
    so the two can never overlap. It stays open while toggling layers; close
    with the ✕, the Layers button, or Esc. */
