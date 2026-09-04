@@ -55,12 +55,26 @@ th,td{padding:4px 12px 4px 0;text-align:right;border-bottom:1px solid var(--grid
 th:first-child,td:first-child{text-align:left}
 th{color:var(--mute);font-weight:500}
 details summary{cursor:pointer;font-size:12.5px;color:var(--ink2)}
+/* ── LEED scorecard ── */
+.plat{display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:3px 10px;border-radius:999px;background:linear-gradient(135deg,#8e9aa8,#c8d2dc);color:#1c2b29;font:600 11.5px/1 var(--mono,monospace);letter-spacing:.5px;vertical-align:3px}
+.meter{position:relative;height:14px;border-radius:7px;background:var(--grid);margin:18px 0 26px;overflow:visible}
+.meter .fill{position:absolute;left:0;top:0;bottom:0;border-radius:7px;background:linear-gradient(90deg,var(--teal),#8e9aa8 92%);}
+.meter .tick{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--line)}
+.meter .tlab{position:absolute;top:18px;transform:translateX(-50%);font-size:9.5px;color:var(--mute);white-space:nowrap}
+.meter .score{position:absolute;top:-24px;transform:translateX(-50%);font:600 12px/1 var(--mono,monospace);color:var(--ink)}
+.lcat{display:grid;grid-template-columns:190px 1fr 52px;gap:6px 10px;align-items:center;font-size:12px}
+.lcat .nm{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lcat .pts{font:500 11.5px/1 var(--mono,monospace);color:var(--ink);text-align:right}
+.lbar{position:relative;height:9px;border-radius:5px;background:var(--grid)}
+.lbar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;display:block}
+.ea-note{margin-top:14px;padding:9px 12px;border-left:3px solid var(--teal);background:var(--band);font-size:12px;color:var(--ink2);border-radius:0 6px 6px 0}
+@media(max-width:560px){ .lcat{grid-template-columns:120px 1fr 48px} }
 @media(max-width:560px){ .wrap{padding:28px 14px 48px} }
 </style>
 
 <div class="wrap">
   <header>
-    <h1 id="headline">Grimes · design vs actual</h1>
+    <h1 id="headline">Grimes · design vs actual<span class="plat" title="LEED v4 BD+C: New Construction · awarded July 23, 2026 · 82/110 points">◆ LEED PLATINUM</span></h1>
     <p class="lede" id="lede">Measured electricity from the building's three revenue-grade meter counters,
     compared against the LEED v4 EAp2 energy model — the design-stage prediction this building was
     certified on. <b>Live: recomputed from the meter archive every 15 minutes.</b></p>
@@ -79,6 +93,33 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--ink2)}
     <div class="tile"><div class="k">Avoided vs code baseline</div><div class="v" id="tAv">—</div><div class="s" id="tAvS"></div></div>
     <div class="tile"><div class="k">Weather sensitivity</div><div class="v" id="tTc">—</div><div class="s" id="tTcS"></div></div>
   </div>
+
+  <section class="card">
+    <h2>LEED v4 Platinum scorecard</h2>
+    <p class="sub">BD+C: New Construction · awarded July 23, 2026 · USGBC project #1000171106</p>
+    <div class="meter">
+      <div class="fill" style="width:74.5%"></div>
+      <div class="score" style="left:74.5%">82 / 110</div>
+      <div class="tick" style="left:36.4%"></div><div class="tlab" style="left:36.4%">40 Certified</div>
+      <div class="tick" style="left:45.5%"></div><div class="tlab" style="left:45.5%">50 Silver</div>
+      <div class="tick" style="left:54.5%"></div><div class="tlab" style="left:54.5%">60 Gold</div>
+      <div class="tick" style="left:72.7%"></div><div class="tlab" style="left:72.7%">80 Platinum</div>
+    </div>
+    <div class="lcat">
+      <div class="nm" title="Optimize Energy Performance 17/18 · renewables 3/3 · green power 2/2">Energy & Atmosphere</div><div class="lbar" title="Energy & Atmosphere: 26 of 33 — Optimize Energy Performance 17/18 · renewables 3/3 · green power 2/2"><i style="width:79%;background:#d4a017"></i></div><div class="pts">26/33</div>
+      <div class="nm" title="Density 5/5 · transit 4/5 · high-priority site 2/2">Location & Transportation</div><div class="lbar" title="Location & Transportation: 14 of 16 — Density 5/5 · transit 4/5 · high-priority site 2/2"><i style="width:88%;background:#3f5fae"></i></div><div class="pts">14/16</div>
+      <div class="nm" title="Building life-cycle impact reduction 5/5 (structural reuse)">Materials & Resources</div><div class="lbar" title="Materials & Resources: 11 of 13 — Building life-cycle impact reduction 5/5 (structural reuse)"><i style="width:85%;background:#3a9e58"></i></div><div class="pts">11/13</div>
+      <div class="nm" title="Low-emitting materials 3/3 · daylight 2/3">Indoor Environmental Quality</div><div class="lbar" title="Indoor Environmental Quality: 10 of 16 — Low-emitting materials 3/3 · daylight 2/3"><i style="width:62%;background:#1899a8"></i></div><div class="pts">10/16</div>
+      <div class="nm" title="Heat island 2/2 · site development 1/2">Sustainable Sites</div><div class="lbar" title="Sustainable Sites: 6 of 10 — Heat island 2/2 · site development 1/2"><i style="width:60%;background:#7cb531"></i></div><div class="pts">6/10</div>
+      <div class="nm" title="Full marks incl. LEED AP">Innovation</div><div class="lbar" title="Innovation: 6 of 6 — Full marks incl. LEED AP"><i style="width:100%;background:#b34a4a"></i></div><div class="pts">6/6</div>
+      <div class="nm" title="Indoor water use reduction 3/6">Water Efficiency</div><div class="lbar" title="Water Efficiency: 5 of 11 — Indoor water use reduction 3/6"><i style="width:45%;background:#2f86d1"></i></div><div class="pts">5/11</div>
+      <div class="nm" title="Optimize energy · life-cycle · sourcing">Regional Priority</div><div class="lbar" title="Regional Priority: 3 of 4 — Optimize energy · life-cycle · sourcing"><i style="width:75%;background:#e2702d"></i></div><div class="pts">3/4</div>
+      <div class="nm" title="Integrative process 1/1">Integrative Process</div><div class="lbar" title="Integrative Process: 1 of 1 — Integrative process 1/1"><i style="width:100%;background:#2e7d72"></i></div><div class="pts">1/1</div>
+    </div>
+    <div class="ea-note"><b>Why this dashboard exists:</b> 26 of the 82 points came from Energy &amp; Atmosphere —
+    including <b>Optimize Energy Performance 17/18</b>, earned on the eQuest model above. The charts on this page
+    are the measured follow-through on that credit: design claimed it, the meters check it, live.</div>
+  </section>
 
   <section class="card">
     <h2>Daily electricity use</h2>
@@ -122,7 +163,7 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--ink2)}
   heating would set the annual maximum — the design-vs-measured peak gap is therefore a lower bound on the discrepancy for the
   observed season, not a full-year claim. Avoided cost/CO₂ use the pipeline's flat $0.15/kWh and 0.21 kg/kWh factors.</p>
   <p class="foot">Counters: BMO meters #3 (roof AHU), #76 (480/277 V HVAC + lighting), #77 (208/120 V plug/IT).
-  Design figures: LEED v4 EAp2 submittal, eQuest model, project #1000171106. <span id="gen"></span></p>
+  Design figures: LEED v4 EAp2 submittal, eQuest model, project #1000171106. Scorecard: USGBC, Platinum awarded 2026-07-23 (82/110). <span id="gen"></span></p>
 </div>
 
 <script>
