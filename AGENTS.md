@@ -44,19 +44,24 @@ identity sidecar under `buildings/grimes/`:
   `scripts/extract_layer.py` from a targeted no-dedup APS SVF re-export —
   100% element identity. GLB **node name = Revit element dbId**; the sidecar
   (`*.elements.json`) maps dbId → name/category/level/type/design params.
-- Four **MEP fabrication layers** (ductwork 13,921 · mech piping 4,863 ·
-  plumbing 2,621 · fire piping 3,861), cut by `scripts/extract_mep_layer.py`
-  from the dedup master export. These are CAD entities (per-floor DWG models,
+- Four **MEP fabrication layers** (ductwork 16,704 · mech piping 11,102 ·
+  plumbing 6,035 · fire piping 10,938), cut by `scripts/extract_mep_layer.py`
+  from the original APS SVF with no-dedup recovery (2026-09-07). These are CAD entities (per-floor DWG models,
   no Revit category); identity = depth-3 entity node in the Navisworks tree
-  (file → CAD layer → entity → geometry). Geometry survival is partial
-  (dedup ate repeated fittings) — honest counts in each sidecar's `survival`.
+  (file → CAD layer → entity → geometry). All eligible entities now have geometry. Sidecar `survival` separates total,
+  eligible, intentionally excluded and with_geometry counts; never count excluded
+  clearance volumes as missing geometry. See `docs/MEP_RECOVERY.md`.
 
 Viewer behaviour: desktop opens **exterior-first** (ghost shell auto-loads,
 legacy 8-mesh MEP overview hidden behind a "🎨 MEP overview" toggle); layer
 list is a fixed left panel with per-layer type-filter chips; clicking any
 element opens a dashboard (identity, Revit design data, live/modelled power,
-neighbours). Rendering is InstancedMesh per (geometry, material); line-only
-2D-symbol elements render as THREE.Line and are pickable.
+neighbours). Rendering uses runtime-only bounded merges by level/material/type, keeping
+strongly repeated geometry instanced. Triangle/line ranges resolve picks.
+GLTFLoader uniquifies node names: `bindElementSourceIds` reads the exact original
+`userData.name` before merging; parser associations alone are unsafe for clones.
+Source parser caches are released after batching; scene rendering pauses while
+a layer loads, to avoid rendering millions of triangles at every batching yield.
 
 **Data honesty ladder (a thesis principle — preserve it):**
 measured (3 building meters only) → **modelled** (meter 77 apportioned over
@@ -98,7 +103,9 @@ paste them into committed files, and never commit `claude-inbox-*.patch` /
   --props-only --urn <URN> --output out.glb` (full Revit property dump via
   Model Derivative); pack with `npx @gltf-transform/cli optimize in.gltf
   out.glb --compress draco --instance false --simplify false --palette false
-  --join false --flatten false` (the only safe gltf-transform invocation).
+  --join false --flatten false` (safe standard invocation for fresh raw exports; fire requires sequential
+  Draco on byte-deduplicated raw glTF to retain degenerate faces, documented in
+  `docs/MEP_RECOVERY.md`; never recompress an existing Draco GLB).
 - **Enrichment:** `scripts/classify_elements.py` (type taxonomy, feed tiers,
   kNN level inference, meter apportionment pools).
 - **Testing:** headless Playwright against `python3 -m http.server`; drive the
@@ -109,14 +116,17 @@ paste them into committed files, and never commit `claude-inbox-*.patch` /
 
 ## Current roadmap (agreed with the owner)
 
-1. **Draw-call merge tier**: merge geometry per (level, material) with a
+1. **Draw-call merge tier (implemented 2026-09-07; continue profiling)**: merge geometry per (level, material) with a
    triangle-range → element map so all ten layers render together without lag
-   (~100k draw calls today; fire piping 49k is worst). Keep per-element
-   picking via face index lookup. Interim cheap win: per-level display filter.
-2. Targeted no-dedup re-export for the four MEP fabrication layers → 100%
-   geometry survival (compute wanted dbIds from `extract_mep_layer.py`).
-3. Embodied-carbon card from structural volume × material (LEED MR
-   life-cycle credit 5/5 is the certification hook).
+   (historical ~100k draw calls; old fire-only geometry now 63 batches vs 49,104).
+   Per-element picking, floor/type filters, material and primitive counts remain intact.
+2. Targeted no-dedup recovery completed for all four MEP fabrication layers:
+   44,779 eligible entities (19,513 recovered). Use `scripts/plan_mep_recovery.py`
+   and `scripts/verify_mep_recovery.py` for future recovery.
+3. Embodied-carbon scenario card implemented for structural volume × material.
+   A material-matched EPD factor/source/lifecycle scope is still required; no
+   project factor or avoided-carbon claim is fabricated. LEED MR 5/5 is context,
+   not a substitute for an element EPD.
 4. WebXR AR MVP (Quest 3) on the same GLB+JSON chain; QR-code anchors.
 5. Campus M&V scale-out once more buildings' EAp2 submittals arrive.
 
@@ -125,3 +135,19 @@ paste them into committed files, and never commit `claude-inbox-*.patch` /
 English in code/docs, Korean in chat. Dense, terse, honest labelling;
 programmatic over manual calibration; diagnose-then-fix with evidence; verify
 against the live site before claiming something is deployed.
+
+## Validation and provenance additions (2026-09-07)
+
+- `node --test tests/viewer.test.cjs`; `node --test tests/render-tier.test.mjs`
+  (three@0.169.0 installed, or THREE_MODULE points to its build/three.module.js).
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests`; recovery
+  tests: `python3 -m unittest discover -s scripts -p test_mep_recovery.py`.
+- `scripts/enrich_element_provenance.py buildings/grimes --properties <full-properties>`
+  binds GUIDs, element tags, CAD handles and explicit fabrication Attributes.
+  CAD floors derive from filenames. Legacy panel associations without attached
+  `feedEvidence` are `legacy-unverified`, not panel-schedule evidence.
+- BMO naive timestamps are America/Los_Angeles wall time; ambiguous DST readings
+  show TIME UNKNOWN. Missing/partial/stale values never become LIVE zero.
+- Selection epochs cover element, system and building async UI writes.
+
+Fire streaming uses `grimes-fire.chunks.json` (five parts) to cap transient parser memory. The canonical `grimes-fire.glb` is preserved. Rebuild chunks with `scripts/split_element_glb.py`; never recompress the canonical geometry. Final validated runtime across all ten layers: 6,789 element batches, 66,620 identities.

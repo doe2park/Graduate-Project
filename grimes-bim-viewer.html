@@ -201,6 +201,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   body.compare-on #twinPanel{bottom:58px} /* clear the collapsed sync-panel header */
   body.twin-open #legend{display:none}
 }
+.carbon-form{display:grid;gap:8px;margin:10px 0}.carbon-form label{display:grid;gap:4px;font-size:11px}.carbon-form input,.carbon-form select,#elementFloor{background:#152131;color:#e2e8f0;border:1px solid #41516a;border-radius:4px;padding:6px;max-width:100%}.layer-coverage{font-size:10px;color:#a8b6c9;padding:4px 12px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -216,6 +217,8 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
     <button class="tb-btn" id="layersBtn" onclick="toggleLayersMenu()" title="Element-tier layers cut from the 741k-element APS master — each element is clickable">⬡ Layers ▾</button>
     <div class="tb-menu" id="layersMenu" hidden>
       <div class="lm-hdr">ELEMENT LAYERS <button onclick="toggleLayersMenu()" title="Close">✕</button></div>
+      <label class="layer-coverage" style="display:block">Element floor <select id="elementFloor" onchange="setElementFloor(this.value)"><option value="">All floors</option><option value="LOWER">Lower</option><option value="MEZZ">Mezzanine</option><option value="L1">Level 1</option><option value="L2">Level 2</option><option value="L3">Level 3</option><option value="L4">Level 4</option><option value="ROOF">Roof</option><option value="UNKNOWN">Unknown</option></select></label>
+      <div id="layerStats" class="layer-coverage" role="status"></div>
       <button class="tb-btn" id="layerBtn-mep" onclick="toggleMepModel()" title="Legacy 8-mesh MEP overview (one mesh per discipline) — the colourful backdrop. Superseded by the per-element layers below but handy for a quick systems read.">🎨 MEP overview <small>1.7 MB · 8 systems</small></button>
       <button class="tb-btn" id="layerBtn-equipment" onclick="toggleLayer('equipment')" title="Panelboards, transformers, junction boxes, diffusers, plumbing fixtures — tap any unit for identity + live feeder data">⚡ Equipment <small>1.5 MB · 1,143</small></button>
       <div class="lm-chips" id="chips-equipment" hidden></div>
@@ -229,11 +232,11 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
       <div class="lm-chips" id="chips-structural" hidden></div>
       <button class="tb-btn" id="layerBtn-conduit" onclick="toggleLayer('conduit')" title="Conduit runs, all 8,142 fittings, supports, cable trays — the physical electrical distribution paths">🔌 Conduit <small>11.0 MB · 11,063</small></button>
       <div class="lm-chips" id="chips-conduit" hidden></div>
-      <button class="tb-btn" id="layerBtn-duct" onclick="toggleLayer('duct')" title="Sheet-metal ductwork from the per-floor fabrication models — every duct, elbow, transition, tap and hanger clickable">🌀 Ductwork <small>14.3 MB · 13,921</small></button>
+      <button class="tb-btn" id="layerBtn-duct" onclick="toggleLayer('duct')" title="Sheet-metal ductwork from the per-floor fabrication models — every duct, elbow, transition, tap and hanger clickable">🌀 Ductwork <small>21.1 MB · 16,704</small></button>
       <div class="lm-chips" id="chips-duct" hidden></div>
-      <button class="tb-btn" id="layerBtn-hydronic" onclick="toggleLayer('hydronic')" title="Mechanical piping (copper, steel) from the FMB fabrication models — pipes, fittings, valves, hangers">♨ Mech piping <small>11.9 MB · 4,863</small></button>
+      <button class="tb-btn" id="layerBtn-hydronic" onclick="toggleLayer('hydronic')" title="Mechanical piping (copper, steel) from the FMB fabrication models — pipes, fittings, valves, hangers">♨ Mech piping <small>20.4 MB · 11,102</small></button>
       <div class="lm-chips" id="chips-hydronic" hidden></div>
-      <button class="tb-btn" id="layerBtn-plumbing" onclick="toggleLayer('plumbing')" title="Plumbing piping — cast-iron no-hub, ProPress copper, fittings and supports">🚰 Plumbing <small>15.3 MB · 2,621</small></button>
+      <button class="tb-btn" id="layerBtn-plumbing" onclick="toggleLayer('plumbing')" title="Plumbing piping — cast-iron no-hub, ProPress copper, fittings and supports">🚰 Plumbing <small>20.9 MB · 6,035</small></button>
       <div class="lm-chips" id="chips-plumbing" hidden></div>
       <button class="tb-btn" id="layerBtn-fire" onclick="toggleLayer('fire')" title="Fire-protection piping (Pribuss fabrication) — sprinkler mains, branch pipes, flex drops, seismic bracing. Heaviest layer.">🧨 Fire piping <small>53 MB · 3,861</small></button>
       <div class="lm-chips" id="chips-fire" hidden></div>
@@ -658,7 +661,7 @@ let plockActive = false, plockFailed = false, dragLook = false, _dragX = 0, _dra
 let yaw = 0, pitch = 0;
 const _floorRay = new THREE.Raycaster();
 const _centerVec = new THREE.Vector2(0, 0);
-let aimedMesh = null, aimedInstance = null, _aimAcc = 0;
+let aimedMesh = null, aimedInstance = null, aimedElementId = null, _aimAcc = 0;
 
 /* Center-ray aiming while pointer-locked: crosshair heats up over a pickable
    MEP system; click opens the twin panel (walking continues). */
@@ -674,12 +677,13 @@ function updateAim() {
   const hit = raycaster.intersectObjects(targets, false)[0];
   aimedMesh = hit ? hit.object : null;
   aimedInstance = hit && hit.instanceId != null ? hit.instanceId : null;
+  aimedElementId = hit ? resolveElementHit(hit.object, hit.instanceId, hit.faceIndex, hit.index) : null;
   document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);
 }
 // No AxesHelper/GridHelper exists in this scene and both glbs are
 // triangle-only, but hide any line/point objects defensively while walking.
 function setLinesVisible(v) {
-  scene.traverse(o => { if (o.isLine || o.isPoints) o.visible = v; });
+  scene.traverse(o => { if ((o.isLine || o.isPoints) && !o.userData.ids) o.visible = v; });
 }
 
 /* Slab detection: one-time downward multi-ray through the shell collects hit
@@ -878,7 +882,7 @@ renderer.domElement.addEventListener('click', () => {
   if (!walkMode || !plockActive) return;
   updateAim();
   if (!aimedMesh) { clearPick(); return; }
-  if (aimedMesh.userData && aimedMesh.userData.ids) pickEquipment(aimedMesh, aimedInstance);
+  if (aimedMesh.userData && aimedMesh.userData.ids) pickEquipment(aimedMesh, aimedInstance, aimedElementId);
   else pickSystem(aimedMesh);
 });
 document.addEventListener('pointerlockerror', () => {
@@ -1201,6 +1205,301 @@ document.getElementById('clickHint').addEventListener('click', e => e.currentTar
    Uses the shared twin/twin-resolver.js package logic (same as twin-viewer):
    glb node --binding--> Brick entity --isFedBy/hasPoint--> externalReference
    --sources adapter--> data/building_data.json live kW. */
+/* GLTFLoader uniquifies runtime names. r169 keeps the exact source name in
+   userData.name. Prefer that value: cloned mesh references may share one
+   associations record whose node index is overwritten by the last clone. */
+function bindElementSourceIds(gltf) {
+  let boundNodes = 0, associationNameConflicts = 0;
+  const associations = gltf.parser?.associations, nodes = gltf.parser?.json?.nodes;
+  if (!associations || !nodes) return { boundNodes, associationNameConflicts };
+  gltf.scene.traverse(object => {
+    const nodeIndex = associations.get(object)?.nodes;
+    if (!Number.isInteger(nodeIndex)) return;
+    const associatedName = nodes[nodeIndex]?.name;
+    const sourceName = object.userData.name;
+    const name = typeof sourceName === 'string' && sourceName ? sourceName : associatedName;
+    if (sourceName && associatedName && sourceName !== associatedName) associationNameConflicts++;
+    if (typeof name === 'string' && name) { object.userData.elementId = name; boundNodes++; }
+  });
+  return { boundNodes, associationNameConflicts };
+}
+/* Runtime-only draw-call tier. Source GLBs/geometries remain untouched.
+   Buckets retain level/type identity; merged index ranges resolve element picks.
+   Repeated geometry remains instanced to avoid expanding thousands of fittings. */
+async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey) {
+  const MAX_VERTICES = 180000, INSTANCE_REUSE = 8;
+  const fragments = [], repeated = new Map(), mergeBuckets = new Map(), meshes = [];
+  const stats = { sourceObjects: 0, unidentifiedObjects: 0, unidentifiedNames: [], sourceTriangles: 0, renderTriangles: 0, sourceSegments: 0, renderSegments: 0, mergedMeshes: 0, instancedMeshes: 0, instances: 0, drawCalls: 0 };
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+  const identity = object => {
+    for (let p = object; p; p = p.parent) {
+      const id = p.userData.elementId ?? p.name;
+      if (id && Object.prototype.hasOwnProperty.call(meta, id)) return id;
+    }
+    return null;
+  };
+  sceneGroup.traverse(object => {
+    if (!(object.isMesh || object.isLine) || !object.geometry?.attributes.position) return;
+    stats.sourceObjects++;
+    const id = identity(object), info = meta[id] || {}, geometry = object.geometry;
+    if (id === null) {
+      stats.unidentifiedObjects++;
+      if (stats.unidentifiedNames.length < 8) stats.unidentifiedNames.push(object.userData.elementId || object.name || '(unnamed)');
+    }
+    const isLine = !!object.isLine, indexedCount = geometry.index?.count ?? geometry.attributes.position.count;
+    const drawStart = Math.max(0, geometry.drawRange.start), drawEnd = Math.min(indexedCount, drawStart + geometry.drawRange.count);
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const groups = Array.isArray(object.material) ? geometry.groups : [{start: 0, count: indexedCount, materialIndex: 0}];
+    for (const group of groups) {
+      const material = materials[group.materialIndex || 0];
+      if (!material) continue;
+      const start = Math.max(drawStart, group.start), end = Math.min(drawEnd, group.start + group.count);
+      if (end <= start) continue;
+      const part = { object, geometry, material, id, levelKey: info.levelKey || '', type: info.type || '', isLine, start, end, matrix: object.matrixWorld.clone() };
+      part.key = JSON.stringify([material.uuid, part.levelKey, part.type, isLine, Object.entries(geometry.attributes).sort(([a],[b])=>a.localeCompare(b)).map(([name,a])=>[name,a.itemSize])]);
+      part.reuseKey = part.key + '|' + geometry.uuid;
+      // Three.js InstancedMesh does not support negatively scaled matrices.
+      part.canInstance = !isLine && part.matrix.determinant() > 0 && start === 0 && end === indexedCount && !Array.isArray(object.material);
+      if (part.canInstance) repeated.set(part.reuseKey, (repeated.get(part.reuseKey) || 0) + 1);
+      if (!isLine) stats.sourceTriangles += Math.floor((end-start)/3);
+      else stats.sourceSegments += object.isLineSegments ? Math.floor((end-start)/2) : Math.max(0,end-start-1) + (object.isLineLoop && end-start > 1 ? 1 : 0);
+      fragments.push(part);
+    }
+  });
+  const prepareMaterial = original => {
+    const material = original.clone();
+    if (layerKey === 'structural' && material.emissive) { material.emissive.setHex(0x1e293b); material.emissiveIntensity = 0.25; }
+    return material;
+  };
+  const decorate = (mesh, part, data) => {
+    mesh.name = 'elements:' + layerKey;
+    mesh.userData = { layer: layerKey, levelKey: part.levelKey, type: part.type, isLine: part.isLine, ...data };
+    meshes.push(mesh);
+    return mesh;
+  };
+  const instanceBuckets = new Map();
+  for (const part of fragments) {
+    const target = part.canInstance && repeated.get(part.reuseKey) >= INSTANCE_REUSE ? instanceBuckets : mergeBuckets;
+    const key = target === instanceBuckets ? part.reuseKey : part.key;
+    if (!target.has(key)) target.set(key, []);
+    target.get(key).push(part);
+  }
+  let work = 0;
+  for (const parts of instanceBuckets.values()) {
+    const p = parts[0], mesh = new THREE.InstancedMesh(p.geometry, prepareMaterial(p.material), parts.length);
+    const white = new THREE.Color(0xffffff);
+    parts.forEach((part,i)=>{mesh.setMatrixAt(i,part.matrix);mesh.setColorAt(i,white);});
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingBox(); mesh.computeBoundingSphere();
+    decorate(mesh,p,{ ids:parts.map(p=>p.id), renderTier:'instanced' });
+    stats.instancedMeshes++; stats.instances += parts.length;
+    stats.renderTriangles += Math.floor((p.end-p.start)/3)*parts.length;
+    if (++work % 100 === 0) await tick();
+  }
+  const normalMatrix = new THREE.Matrix3(), vector = new THREE.Vector3();
+  for (const parts of mergeBuckets.values()) {
+    let chunk = [], vertices = 0;
+    const flush = () => {
+      if (!chunk.length) return;
+      const p = chunk[0].part, sourceAttrs = p.geometry.attributes;
+      const geometry = new THREE.BufferGeometry(), arrays = {}, sizes = {};
+      for (const [name,attribute] of Object.entries(sourceAttrs)) { sizes[name]=attribute.itemSize; arrays[name]=new Float32Array(vertices*attribute.itemSize); }
+      if (!arrays.color) { sizes.color=3;arrays.color=new Float32Array(vertices*3);arrays.color.fill(1); }
+      const indexCount = chunk.reduce((n,c)=>n+c.indices.length,0), indices = new (vertices>65535?Uint32Array:Uint16Array)(indexCount);
+      const ranges = [];let vertexOffset=0,indexOffset=0;
+      for (const {part,indices:localIndices,sourceVertices} of chunk) {
+        normalMatrix.getNormalMatrix(part.matrix);
+        for (let i=0;i<sourceVertices.length;i++) {
+          const sourceIndex=sourceVertices[i], dest=vertexOffset+i;
+          for (const [name,attribute] of Object.entries(part.geometry.attributes)) {
+            const size=attribute.itemSize, array=arrays[name], at=dest*size;
+            for (let k=0;k<size;k++) array[at+k]=(name==='color'&&!part.material.vertexColors)?1:attribute.getComponent(sourceIndex,k);
+            if (name==='position') { vector.fromArray(array,at).applyMatrix4(part.matrix);vector.toArray(array,at); }
+            else if(name==='normal') { vector.fromArray(array,at).applyMatrix3(normalMatrix).normalize();vector.toArray(array,at); }
+            else if(name==='tangent') { vector.fromArray(array,at).transformDirection(part.matrix);vector.toArray(array,at);if(size===4 && part.matrix.determinant()<0)array[at+3]*=-1; }
+          }
+        }
+        for(let i=0;i<localIndices.length;i++) indices[indexOffset+i]=vertexOffset+localIndices[i];
+        if(!part.isLine && part.matrix.determinant()<0)for(let i=0;i<localIndices.length;i+=3){const at=indexOffset+i+1,tmp=indices[at];indices[at]=indices[at+1];indices[at+1]=tmp;}
+        ranges.push({id:part.id,start:indexOffset,count:localIndices.length,vertexStart:vertexOffset,vertexCount:sourceVertices.length});
+        indexOffset+=localIndices.length;vertexOffset+=sourceVertices.length;
+      }
+      for(const [name,array]of Object.entries(arrays))geometry.setAttribute(name,new THREE.BufferAttribute(array,sizes[name]));
+      geometry.setIndex(new THREE.BufferAttribute(indices,1));geometry.computeBoundingBox();geometry.computeBoundingSphere();
+      const material=prepareMaterial(p.material);material.vertexColors=true;
+      const mesh=p.isLine?new THREE.LineSegments(geometry,material):new THREE.Mesh(geometry,material);
+      decorate(mesh,p,{ids:[...new Set(ranges.map(r=>r.id))],ranges,renderTier:'merged',highlighted:new Map()});
+      stats.mergedMeshes++;
+      if(p.isLine)stats.renderSegments+=indexCount/2;else stats.renderTriangles+=indexCount/3;
+      chunk=[];vertices=0;
+    };
+    for(const part of parts) {
+      // Compact each fragment independently: no cross-element vertex sharing,
+      // so highlighting one identity cannot change its neighbours.
+      const localIndices=[],sourceVertices=[],remap=new Map();
+      const append = offset => {const source=part.geometry.index?part.geometry.index.getX(offset):offset;let local=remap.get(source);if(local===undefined){local=sourceVertices.length;remap.set(source,local);sourceVertices.push(source);}localIndices.push(local);};
+      if(part.isLine&&!part.object.isLineSegments){for(let i=part.start;i+1<part.end;i++){append(i);append(i+1);}if(part.object.isLineLoop&&part.end-part.start>1){append(part.end-1);append(part.start);}}
+      else {const step=part.isLine?2:3,end=part.end-(part.end-part.start)%step;for(let i=part.start;i<end;i++)append(i);}
+      const appendChunk = (indices, sourceVertices) => {
+        if(vertices+sourceVertices.length>MAX_VERTICES)flush();
+        chunk.push({part,indices,sourceVertices});vertices+=sourceVertices.length;
+      };
+      if(sourceVertices.length<=MAX_VERTICES)appendChunk(localIndices,sourceVertices);
+      else {
+        // Bound even one unusually large element; 180000 is divisible by both
+        // triangle and line primitive sizes, so no primitive is cut in half.
+        for(let start=0;start<localIndices.length;start+=MAX_VERTICES){
+          const subIndices=[],subVertices=[],subMap=new Map();
+          for(let i=start;i<Math.min(start+MAX_VERTICES,localIndices.length);i++){
+            const source=sourceVertices[localIndices[i]];let local=subMap.get(source);
+            if(local===undefined){local=subVertices.length;subMap.set(source,local);subVertices.push(source);}
+            subIndices.push(local);
+          }
+          appendChunk(subIndices,subVertices);
+          await tick();
+        }
+      }
+      if(++work%250===0)await tick();
+    }
+    flush();
+  }
+  stats.drawCalls=meshes.length;
+  return {meshes,stats};
+}
+function resolveElementHit(object,instanceId,faceIndex,index) {
+  if(!object?.userData?.ids)return null;
+  if(object.isInstancedMesh)return Number.isInteger(instanceId)?object.userData.ids[instanceId]??null:null;
+  const ranges=object.userData.ranges;
+  if(!ranges)return object.userData.ids.length===1?object.userData.ids[0]:null;
+  const offset=object.isLine?index:(Number.isInteger(faceIndex)?faceIndex*3:null);
+  if(!Number.isInteger(offset)||offset<0)return null;
+  let low=0,high=ranges.length-1;
+  // Three r169 Line.raycast returns the first vertex index, not index-buffer offset.
+  while(low<=high){const mid=(low+high)>>1,r=ranges[mid],start=object.isLine?r.vertexStart:r.start,count=object.isLine?r.vertexCount:r.count;if(offset<start)high=mid-1;else if(offset>=start+count)low=mid+1;else return r.id;}
+  return null;
+}
+function highlightElementRender(mesh,id,on,color) {
+  if(!id||!mesh.userData.ids?.includes(id))return;
+  if(mesh.isInstancedMesh){const value=mesh.material.color.clone().set(on?(color??0xfbbf24):0xffffff);mesh.userData.ids.forEach((x,i)=>{if(x===id)mesh.setColorAt(i,value);});mesh.instanceColor.needsUpdate=true;return;}
+  const attribute=mesh.geometry.getAttribute('color'),saved=mesh.userData.highlighted;
+  if(!attribute||!saved)return;
+  if(on){
+    if(saved.has(id))return;
+    const value=mesh.material.color.clone().set(color??0xfbbf24),snapshots=[];
+    for(const r of mesh.userData.ranges){if(r.id!==id)continue;const start=r.vertexStart*attribute.itemSize,end=(r.vertexStart+r.vertexCount)*attribute.itemSize;snapshots.push({start,values:attribute.array.slice(start,end)});for(let i=r.vertexStart;i<r.vertexStart+r.vertexCount;i++)attribute.setXYZ(i,value.r,value.g,value.b);}
+    saved.set(id,snapshots);
+  }else{for(const s of saved.get(id)||[])attribute.array.set(s.values,s.start);saved.delete(id);}
+  attribute.needsUpdate=true;
+}
+function setElementRenderVisible(mesh,levelFilter,typeFilter,meta) {
+  mesh.visible=(!levelFilter||mesh.userData.levelKey===levelFilter)&&(!typeFilter||mesh.userData.type===typeFilter);
+  return mesh.visible;
+}
+function findElementSelection(mesh,id) {
+  if(mesh.isInstancedMesh){const i=mesh.userData.ids.indexOf(id);return i<0?null:{id,instanceId:i};}
+  const r=mesh.userData.ranges?.find(r=>r.id===id);return r?{id,faceIndex:mesh.isLine?undefined:r.start/3,index:mesh.isLine?r.vertexStart:undefined}:null;
+}
+/* Call in finally after building this static runtime tier. Do not dispose
+   source geometry/textures: live instances/material clones still share them. */
+function releaseElementSource(gltf) {
+  if (!gltf) return;
+  gltf.parser?.cache?.removeAll();
+  gltf.parser?.associations?.clear();
+  for (const source of gltf.scenes || []) source.clear();
+  gltf.scene?.clear();
+  gltf.scenes = [];
+  gltf.scene = null;
+  gltf.parser = null;
+}
+
+/* ELEMENT DATA HELPERS */
+let elementPickEpoch = 0;
+function elementLevel(info) {
+  if (info.levelKey && info.levelKey !== 'UNKNOWN') return info.levelKey;
+  const name = String(info.level || '').toUpperCase();
+  if (/MEZZ/.test(name)) return 'MEZZ';
+  if (/LOWER|B1/.test(name)) return 'LOWER';
+  if (/ROOF/.test(name)) return 'ROOF';
+  const m = name.match(/^LEVEL 0?([1-4])$/);
+  return m ? 'L' + m[1] : null;
+}
+function bmoTimestamp(raw) {
+  const text = String(raw || '').trim();
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(text)) return Date.parse(text);
+  const m = text.match(/^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)(?::(\d\d))?$/);
+  if (!m) return NaN;
+  const target = Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));
+  const fmt = new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  const wall = at => { const p=Object.fromEntries(fmt.formatToParts(at).map(x=>[x.type,x.value]));return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second); };
+  let at=target;
+  for(let i=0;i<3;i++) at+=target-wall(at);
+  // Naive readings during a DST fold cannot identify which occurrence was measured.
+  if(wall(at)!==target || wall(at-3600000)===target || wall(at+3600000)===target) return NaN;
+  return at;
+}
+
+function meterReading(m) {
+  const kw = m?.latest?.kw;
+  const value = Number.isFinite(kw) ? kw : null;
+  const raw = m?.latest?.t || m?.latest?.timestamp;
+  const at = bmoTimestamp(raw);
+  const age = Date.now() - at;
+  return {value, at, state: value == null ? 'OFFLINE' : !Number.isFinite(at) ? 'TIME UNKNOWN'
+    : age > 45 * 60 * 1000 || age < -5 * 60 * 1000 ? 'STALE' : 'LIVE'};
+}
+function alignedMeterSeries(meters) {
+  const maps = meters.map(m => new Map((m?.timeseries_kw || []).filter(p => Number.isFinite(p.v)).map(p => [p.t,p.v])));
+  if (!maps.length) return [];
+  return [...maps[0]].filter(([t]) => maps.every(m => m.has(t)))
+    .map(([t]) => ({t,v:maps.reduce((sum,m)=>sum+m.get(t),0)})).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
+}
+function volumeM3(raw) {
+  const m = String(raw ?? '').trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*(ft\^?3|ft³|m\^?3|m³)$/i);
+  if (!m) return null;
+  const n = Number(m[1]) * (/^ft/i.test(m[2]) ? 0.028316846592 : 1);
+  return Number.isFinite(n) ? n : null;
+}
+function carbonEstimate(info, factor) {
+  const volume = volumeM3(info.volume);
+  if (volume == null || !info.structural_material || !factor || !Number.isFinite(factor.value) || factor.value < 0
+      || !String(factor.source || '').trim() || !['A1-A3','A1-A5','A-C'].includes(factor.scope)) return null;
+  const result = volume * factor.value;
+  return Number.isFinite(result) ? result : null;
+}
+function carbonRows(info) {
+  if (info.system !== 'Structural') return '';
+  const volume = volumeM3(info.volume);
+  return dsec('Embodied carbon · MODELLED')
+    + drow('volume', volume == null ? 'unavailable / unsupported units' : volume.toFixed(3) + ' m³ (Revit design)')
+    + drow('material', esc(info.structural_material || 'unavailable'))
+    + '<div class="pt mut"><span>No project EPD factor is bound. Enter a material-matched factor and evidence to calculate a scenario. This is not a measured emission, a whole-building LCA, or avoided-carbon credit.</span></div>'
+    + (volume == null || !info.structural_material ? '' : `<form id="carbonForm" class="carbon-form" onsubmit="calculateElementCarbon(event)">
+      <label>Factor · kgCO₂e / m³ <input id="carbonFactor" type="number" min="0" step="any" required></label>
+      <label>EPD / factor source <input id="carbonSource" type="text" maxlength="500" required placeholder="Document, product and declared unit conversion"></label>
+      <label>Lifecycle scope <select id="carbonScope"><option>A1-A3</option><option>A1-A5</option><option>A-C</option></select></label>
+      <button type="submit" class="tb-btn">Calculate scenario</button><div id="carbonResult" role="status"></div>
+      </form>`);
+}
+
+async function assembleElementParts(paths, loadPart, buildPart, releasePart) {
+  const result = {meshes:[],stats:{},identityBinding:{}};
+  for (const path of paths) {
+    const source = await loadPart(path);
+    let part;
+    try { part = await buildPart(source); }
+    finally { releasePart(source); }
+    result.meshes.push(...part.meshes);
+    for (const [key,value] of Object.entries(part.stats)) {
+      if (typeof value === 'number') result.stats[key] = (result.stats[key] || 0) + value;
+      else if (Array.isArray(value)) result.stats[key] = [...(result.stats[key] || []),...value].slice(0,8);
+    }
+    for (const [key,value] of Object.entries(part.identityBinding || {})) result.identityBinding[key] = (result.identityBinding[key] || 0) + value;
+  }
+  return result;
+}
+
+/* END ELEMENT DATA HELPERS */
+
 const fetchJson = u => fetch(u, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
 const _jsonCache = {};
 const cachedJson = u => {
@@ -1210,6 +1509,16 @@ const cachedJson = u => {
   _jsonCache[u] = { at: Date.now(), p };
   p.catch(() => delete _jsonCache[u]);
   return p;
+};
+window.calculateElementCarbon = event => {
+  event.preventDefault();
+  const info = equipPicked && equipMeta[equipPicked.id];
+  if (!info) return;
+  const raw = document.getElementById('carbonFactor').value;
+  const factor = {value: raw.trim() ? Number(raw) : NaN, source: document.getElementById('carbonSource').value.trim(), scope: document.getElementById('carbonScope').value};
+  const kg = carbonEstimate(info, factor);
+  document.getElementById('carbonResult').textContent = kg == null ? 'Cannot estimate: verify volume, material, factor and source.'
+    : `MODELLED scenario · ${kg.toLocaleString(undefined,{maximumFractionDigits:1})} kgCO₂e · ${factor.scope} · factor ${factor.value} kgCO₂e/m³ · source: ${factor.source}`;
 };
 let twinPkg = null;
 if (window.TwinResolver) {
@@ -1231,7 +1540,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   // Equipment (element tier) wins first — small targets beat system blobs
   if (anyLayerVisible()) {
     const eqHit = raycaster.intersectObjects(visibleEquip(), false)[0];
-    if (eqHit) { pickEquipment(eqHit.object, eqHit.instanceId); return; }
+    if (eqHit) { pickEquipment(eqHit.object, eqHit.instanceId, resolveElementHit(eqHit.object, eqHit.instanceId, eqHit.faceIndex, eqHit.index)); return; }
   }
   // MEP systems win when overlapping; the shell is the fallback target
   const mepHit = (mepModel && mepModel.visible) ? raycaster.intersectObjects(allMeshes, false)[0] : null;
@@ -1245,6 +1554,7 @@ function highlight(mesh) {
   allMeshes.forEach(m => { m.material.opacity = mesh ? (m === mesh ? 1 : 0.12) : base; });
 }
 window.clearPick = () => {
+  elementPickEpoch++;
   picked = null;
   highlight(null);
   unhighlightEquip();
@@ -1271,10 +1581,10 @@ const LAYERS = {   // all cut from the 2026-09-01 targeted SVF re-export (every 
   structural: { glb: 'buildings/grimes/grimes-structural.glb', json: 'buildings/grimes/structural.elements.json', label: '🏗 Structure',   mb: 12.9 },
   conduit:    { glb: 'buildings/grimes/grimes-conduit.glb',    json: 'buildings/grimes/conduit.elements.json',    label: '🔌 Conduit',     mb: 11.0 },
   // MEP fabrication tiers (CAD entities, no Revit category) — scripts/extract_mep_layer.py
-  duct:       { glb: 'buildings/grimes/grimes-duct.glb',       json: 'buildings/grimes/duct.elements.json',       label: '🌀 Ductwork',    mb: 14.3 },
-  hydronic:   { glb: 'buildings/grimes/grimes-hydronic.glb',   json: 'buildings/grimes/hydronic.elements.json',   label: '♨ Mech piping', mb: 11.9 },
-  plumbing:   { glb: 'buildings/grimes/grimes-plumbing.glb',   json: 'buildings/grimes/plumbing.elements.json',   label: '🚰 Plumbing',    mb: 15.3 },
-  fire:       { glb: 'buildings/grimes/grimes-fire.glb',       json: 'buildings/grimes/fire.elements.json',       label: '🧨 Fire piping', mb: 53.1 },
+  duct:       { glb: 'buildings/grimes/grimes-duct.glb',       json: 'buildings/grimes/duct.elements.json',       label: '🌀 Ductwork',    mb: 21.1 },
+  hydronic:   { glb: 'buildings/grimes/grimes-hydronic.glb',   json: 'buildings/grimes/hydronic.elements.json',   label: '♨ Mech piping', mb: 20.4 },
+  plumbing:   { glb: 'buildings/grimes/grimes-plumbing.glb',   json: 'buildings/grimes/plumbing.elements.json',   label: '🚰 Plumbing',    mb: 20.9 },
+  fire:       { glb: 'buildings/grimes/grimes-fire.glb', partsManifest: 'buildings/grimes/grimes-fire.chunks.json',       json: 'buildings/grimes/fire.elements.json',       label: '🧨 Fire piping', mb: 85.9 },
 };
 const layerState = {};           // key -> { group, meshes, loading }
 let equipMeshes = [], equipMeta = {}, equipPicked = null;   // union across loaded layers
@@ -1283,9 +1593,11 @@ const anyLayerVisible = () => Object.values(layerState).some(l => l.group && l.g
 window.toggleLayer = (key) => {
   const L = LAYERS[key], st = layerState[key] || (layerState[key] = {});
   const btn = document.getElementById('layerBtn-' + key);
+  if (st.loading) return;
   if (st.group) {
     st.group.visible = !st.group.visible;
     btn.classList.toggle('active', st.group.visible);
+    applyEquipFilter();
     if (!st.group.visible && equipPicked && equipPicked.im.userData.layer === key) clearPick();
     buildEquipFilter();
     return;
@@ -1293,67 +1605,43 @@ window.toggleLayer = (key) => {
   if (st.loading) return;
   if (L.mb >= 5 && mobileMq.matches && !confirm(`${L.label.slice(2)} is ${L.mb} MB — load on mobile data?`)) return;
   st.loading = true;
+  btn.disabled = true; btn.setAttribute('aria-busy','true');
   if (!st.labelHtml) st.labelHtml = btn.innerHTML;
   btn.textContent = `⏳ ${L.mb} MB…`;
-  Promise.all([
-    cachedJson(L.json),
-    new Promise((res, rej) => loader.load(L.glb, res,
-      p => { if (p.total) btn.textContent = `⏳ ${(p.loaded / 1048576).toFixed(1)}/${L.mb} MB`; }, rej)),
-  ]).then(([metaJson, gltf]) => {
+  cachedJson(L.json).then(async metaJson => {
     const meta = metaJson.elements || {};
+    for (const info of Object.values(meta)) info.levelKey = elementLevel(info) || 'UNKNOWN';
     for (const [id, info] of Object.entries(meta)) { info.layer = key; equipMeta[id] = info; }
     st.survival = metaJson.survival || null;
-    st.group = gltf.scene;
-    st.group.rotation.y = Math.PI;   // 180° frame difference — see EQUIP_OFFSET note
-    st.group.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
-    st.group.updateMatrixWorld(true);
-    /* Draw-call budget: the targeted re-export is one node per fragment
-       (receptacles alone = 31k nodes sharing 173 meshes). Collapse every
-       (geometry, material) pair into ONE InstancedMesh; the instance index
-       maps back to the element id, so picking/highlight/filter stay
-       per-element. 92k nodes → a few hundred draw calls. */
-    const buckets = new Map();
-    st.group.updateMatrixWorld(true);
-    const lineObjs = [];
-    st.group.traverse(ch => {
-      if (ch.isLine) {   // 2D-symbol elements (linear slot diffusers, floor drains): keep as lines, one object each
-        const id = findEquipId(ch);
-        const ln = ch.clone(); ln.material = ch.material.clone(); ln.material.color.setHex(0x9fb3c8);
-        ln.matrixAutoUpdate = false; ln.matrix.copy(ch.matrixWorld); ln.matrixWorld.copy(ch.matrixWorld);
-        ln.userData = { ids: [id], mats: [ch.matrixWorld.clone()], layer: key, isLine: true, baseColor: 0x9fb3c8 };
-        lineObjs.push(ln); return;
-      }
-      if (!ch.isMesh) return;
-      const id = findEquipId(ch);
-      const k = ch.geometry.uuid + '|' + (ch.material ? ch.material.uuid : '');
-      let b = buckets.get(k);
-      if (!b) { b = { geo: ch.geometry, mat: ch.material, mats: [], ids: [] }; buckets.set(k, b); }
-      b.mats.push(ch.matrixWorld.clone()); b.ids.push(id);
-    });
-    st.meshes = [];
-    const white = new THREE.Color(0xffffff);
-    for (const b of buckets.values()) {
-      const mat = b.mat ? b.mat.clone() : new THREE.MeshStandardMaterial();
-      if (key === 'structural' && mat.emissive !== undefined) { mat.emissive.setHex(0x1e293b); mat.emissiveIntensity = 0.25; }
-      const im = new THREE.InstancedMesh(b.geo, mat, b.mats.length);
-      b.mats.forEach((m, i) => { im.setMatrixAt(i, m); im.setColorAt(i, white); });
-      im.instanceMatrix.needsUpdate = true;
-      im.userData.ids = b.ids; im.userData.mats = b.mats; im.userData.layer = key;
-      im.frustumCulled = false;   // per-instance bounds are not computed; the building is small
-      st.meshes.push(im); equipMeshes.push(im);
-    }
-    for (const ln of lineObjs) { st.meshes.push(ln); equipMeshes.push(ln); }
+    const partPaths = L.partsManifest ? (await cachedJson(L.partsManifest)).chunks.map(c => 'buildings/grimes/' + c.file) : [L.glb];
+    const tier = await assembleElementParts(partPaths,
+      path => new Promise((resolve,reject) => loader.load(path, resolve,
+        p => { if (p.total) btn.textContent = `⏳ ${(p.loaded / 1000000).toFixed(1)} MB…`; }, reject)),
+      async gltf => {
+        const sourceGroup = gltf.scene;
+        sourceGroup.rotation.y = Math.PI;
+        sourceGroup.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
+        sourceGroup.updateMatrixWorld(true);
+        const identityBinding = bindElementSourceIds(gltf);
+        const built = await buildElementRenderTier(THREE, sourceGroup, meta, key);
+        return {...built, identityBinding};
+      }, releaseElementSource);
+    st.meshes = tier.meshes; st.renderStats = tier.stats; st.identityBinding = tier.identityBinding;
+    equipMeshes.push(...tier.meshes);
     st.group = new THREE.Group(); st.group.name = 'layer:' + key;   // world-space container (matrices already baked)
     for (const im of st.meshes) st.group.add(im);
     scene.add(st.group);
     st.loading = false;
+    btn.disabled = false; btn.removeAttribute('aria-busy');
     btn.innerHTML = st.labelHtml;
     btn.classList.add('active');
     document.getElementById('layersBtn').classList.add('active');
+    applyEquipFilter();
     buildEquipFilter();
     console.log(`[layer:${key}] loaded:`, st.meshes.length, 'draw calls /', Object.keys(meta).length, 'elements /', st.meshes.reduce((a, m) => a + (m.count || 1), 0), 'instances');
   }).catch(e => {
     st.loading = false;
+    btn.disabled = false; btn.removeAttribute('aria-busy');
     btn.innerHTML = st.labelHtml;
     console.error(`[layer:${key}] load failed —`, e);
   });
@@ -1380,6 +1668,8 @@ document.addEventListener('keydown', e => {
 
 /* Type filter — chips = the type taxonomy of every VISIBLE layer, ordered by
    count. A chip hides everything else across layers. */
+let equipLevelFilter = null;
+window.setElementFloor = value => { equipLevelFilter = value || null; applyEquipFilter(); buildEquipFilter(); };
 let equipTypeFilter = null;   // null = all
 const layerOn = m => { const st = layerState[m.userData.layer]; return st && st.group && st.group.visible; };
 raycaster.params.Line = { threshold: 0.15 };   // 2D-symbol elements are pickable within 15 cm
@@ -1392,7 +1682,7 @@ function buildEquipFilter() {
   const perLayer = {};   // layer -> {type: count}
   for (const e of Object.values(equipMeta)) {
     const st = layerState[e.layer];
-    if (st && st.group && st.group.visible && e.type)
+    if (st && st.group && st.group.visible && e.type && (!equipLevelFilter || (elementLevel(e) || 'UNKNOWN') === equipLevelFilter))
       (perLayer[e.layer] = perLayer[e.layer] || {})[e.type] = (perLayer[e.layer][e.type] || 0) + 1;
   }
   const allCounts = {};
@@ -1402,6 +1692,18 @@ function buildEquipFilter() {
     const box = document.getElementById('chips-' + key);
     if (!box) continue;
     box.innerHTML = '';
+    let coverage = document.getElementById('coverage-' + key);
+    if (!coverage) { coverage = document.createElement('div'); coverage.id = 'coverage-' + key; coverage.className = 'layer-coverage'; box.before(coverage); }
+    const st = layerState[key];
+    coverage.hidden = !st?.group?.visible;
+    if (st?.survival) {
+      const totals = Object.values(st.survival).reduce((a,c) => ({shown:a.shown+c.with_geometry, total:a.total+(c.eligible ?? c.total), excluded:a.excluded+(c.excluded || 0)}),{shown:0,total:0,excluded:0});
+      const detail = Object.entries(st.survival).map(([name,c]) => {
+      const denominator = c.eligible ?? c.total;
+      return `${name}: ${c.with_geometry.toLocaleString()} / ${denominator.toLocaleString()} ${c.eligible != null ? 'eligible' : 'source'} elements with geometry` + (c.excluded ? ` · ${c.excluded.toLocaleString()} intentionally excluded` : '') + (c.eligible == null ? ' (exclusions not separated)' : '');
+      }).join('; ');
+      coverage.innerHTML = `<details><summary>Geometry ${totals.shown.toLocaleString()} / ${totals.total.toLocaleString()}${totals.excluded ? ' · '+totals.excluded.toLocaleString()+' excluded' : ''}</summary>${esc(detail)}</details>`;
+    }
     const counts = perLayer[key];
     box.hidden = !counts;
     if (!counts) continue;
@@ -1418,23 +1720,17 @@ function buildEquipFilter() {
 }
 const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
 function applyEquipFilter() {
-  for (const im of equipMeshes) {
-    if (im.userData.isLine) {
-      const info = im.userData.ids[0] && equipMeta[im.userData.ids[0]];
-      im.visible = !equipTypeFilter || (info && info.type === equipTypeFilter); continue;
-    }
-    let any = false;
-    im.userData.ids.forEach((id, i) => {
-      const info = id && equipMeta[id];
-      const on = !equipTypeFilter || (info && info.type === equipTypeFilter);
-      im.setMatrixAt(i, on ? im.userData.mats[i] : _zero);
-      if (on) any = true;
-    });
-    im.instanceMatrix.needsUpdate = true;
-    im.visible = any;
+  for (const mesh of equipMeshes) setElementRenderVisible(mesh, equipLevelFilter, equipTypeFilter, equipMeta);
+  if (equipPicked) {
+    const info = equipMeta[equipPicked.id];
+    if ((equipTypeFilter && info?.type !== equipTypeFilter) || (equipLevelFilter && (elementLevel(info) || 'UNKNOWN') !== equipLevelFilter)) clearPick();
   }
-  if (equipPicked && equipTypeFilter && equipMeta[equipPicked.id] && equipMeta[equipPicked.id].type !== equipTypeFilter) clearPick();
+  const visible = visibleEquip();
+  const ids = new Set();
+  for (const mesh of visible) for (const id of mesh.userData.ids) if (id) ids.add(id);
+  document.getElementById('layerStats').textContent = ids.size.toLocaleString() + ' elements · current floor / type selection';
 }
+
 function findEquipId(obj) {
   for (let o = obj; o; o = o.parent) {
     if (o.name && equipMeta && equipMeta[o.name]) return o.name;
@@ -1443,16 +1739,10 @@ function findEquipId(obj) {
 }
 const _white = new THREE.Color(0xffffff), _amber = new THREE.Color(0xfbbf24);
 function unhighlightEquip() {
-  if (equipPicked) {
-    for (const im of equipMeshes) {
-      if (!im.userData.ids.includes(equipPicked.id)) continue;
-      if (im.userData.isLine) { im.material.color.setHex(im.userData.baseColor); continue; }
-      im.userData.ids.forEach((x, i) => { if (x === equipPicked.id) im.setColorAt(i, _white); });
-      im.instanceColor.needsUpdate = true;
-    }
-  }
+  if (equipPicked) for (const mesh of equipMeshes) highlightElementRender(mesh, equipPicked.id, false);
   equipPicked = null;
 }
+
 const EQUIP_LABELS = {  // family name → human label
   'eE_EQ_Panelboard_v2': 'Panelboard', 'RT_EQ_Transformer': 'Transformer',
   'eE_EQ_Disconnect_v2': 'Disconnect switch', 'RT_EQ_Panel_TopHat': 'Panel (top hat)',
@@ -1475,22 +1765,28 @@ function revitRows(info) {
    modelled apportionment. Selecting a neighbour re-picks it through the same
    instanced path, so the panel is navigable without touching the 3D view. */
 window.selectElementById = (id) => {
-  for (const im of equipMeshes) {
-    const i = im.userData.ids.indexOf(id);
-    if (i >= 0) {
-      const st = layerState[im.userData.layer];
-      if (st && st.group && !st.group.visible) toggleLayer(im.userData.layer);
-      pickEquipment(im, i); return;
-    }
+  for (const mesh of equipMeshes) {
+    const hit = findElementSelection(mesh, id);
+    if (!hit) continue;
+    const st = layerState[mesh.userData.layer];
+    if (st?.group && !st.group.visible) toggleLayer(mesh.userData.layer);
+    const info = equipMeta[id];
+    if (equipTypeFilter && info.type !== equipTypeFilter) equipTypeFilter = null;
+    if (equipLevelFilter && elementLevel(info) !== equipLevelFilter) { equipLevelFilter = null; document.getElementById('elementFloor').value = ''; }
+    applyEquipFilter(); buildEquipFilter();
+    pickEquipment(mesh, hit.instanceId, id); return;
   }
-  console.warn('[twin] element not in any loaded layer:', id, equipMeta[id] ? '(known, layer ' + equipMeta[id].layer + ')' : '(unknown id)');
+  console.warn('[twin] element not in any loaded layer:', id);
 };
+
 function neighbourRows(id, info) {
   const same = [];
   const byRoom = !!info.location;
+  const level = elementLevel(info);
+  if (!byRoom && (!level || !info.type)) return "";
   for (const [oid, o] of Object.entries(equipMeta)) {
     if (oid === id) continue;
-    if (byRoom ? o.location === info.location : (o.levelKey === info.levelKey && o.type === info.type)) same.push([oid, o]);
+    if (byRoom ? o.location === info.location && (!level || !elementLevel(o) || elementLevel(o) === level) : (elementLevel(o) === level && o.type === info.type)) same.push([oid, o]);
     if (same.length >= 60) break;
   }
   if (!same.length) return '';
@@ -1510,25 +1806,20 @@ function apportionRow(info, meters) {
   const kw = m && m.latest && typeof m.latest.kw === 'number' ? m.latest.kw : null;
   const est = kw != null ? kw * ap.share : null;
   const fmt = w => w < 1 ? (w * 1000).toFixed(0) + ' W' : w.toFixed(2) + ' kW';
-  return `<div class="pt"><span>modelled share · meter ${esc(ap.meter)} × ${(ap.share * 100).toFixed(3)} %</span>`
+  return `<div class="pt"><span>MODELLED share · meter ${esc(ap.meter)} × ${(ap.share * 100).toFixed(3)} %</span>`
        + `<span class="v">${est != null ? '≈ ' + fmt(est) : 'offline'}</span></div>`
        + `<div class="pt mut"><span>${esc(ap.basis)} ${esc(String(ap.weight))} of ${esc(String(ap.pool))} elements on this feeder — an apportionment of the meter, not a measurement of this element.</span></div>`;
 }
-async function pickEquipment(mesh, instanceId) {
-  const id = mesh.userData.ids ? mesh.userData.ids[instanceId] : null;
+async function pickEquipment(mesh, instanceId, explicitId = null) {
+  const id = explicitId || (mesh.userData.ids ? mesh.userData.ids[mesh.userData.isLine ? 0 : instanceId] : null);
   const info = id && equipMeta && equipMeta[id];
   if (!info) return;
+  const epoch = ++elementPickEpoch;
   document.getElementById('clickHint').classList.remove('show');
   highlight(null);
   unhighlightEquip();
   equipPicked = { im: mesh, id }; picked = mesh;
-  // tint every instance of this element (an element can span several fragments / buckets)
-  for (const im of equipMeshes) {
-    if (!im.userData.ids.includes(id)) continue;
-    if (im.userData.isLine) { im.material.color.set(_amber); continue; }
-    im.userData.ids.forEach((x, i) => { if (x === id) im.setColorAt(i, _amber); });
-    im.instanceColor.needsUpdate = true;
-  }
+  for (const mesh of equipMeshes) highlightElementRender(mesh, id, true, _amber);
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
   const label = info.type || EQUIP_LABELS[info.name] || info.name || 'Equipment';
@@ -1545,83 +1836,73 @@ async function pickEquipment(mesh, instanceId) {
     dsec('Identity')
     + drow('element', esc(label))
     + drow('family', esc(info.name || '—'))
+    + (info.element_tag ? drow('element tag', esc(info.element_tag)) : '')
+    + (info.source_guid ? drow('source GUID', esc(info.source_guid)) : '')
+    + (info.cad_handle ? drow('CAD handle', esc(info.cad_handle)) : '')
     + (info.category ? drow('revit category', esc(info.category)) : '')
     + (info.system ? drow('system', esc(info.system)) : '')
-    + (info.levelKey ? drow('level', esc(info.level || info.levelKey)
-        + (info.levelSource === 'geometry' ? ' <span class="mut">(inferred from position, 92% LOO)</span>' : '')) : '')
+    + (elementLevel(info) ? drow('level', esc(info.level || elementLevel(info))
+        + (info.levelSource === 'geometry' ? ' <span class="mut">(inferred from position; pooled validation, not element certainty)</span>' : info.levelSource === 'source-file' ? ' <span class="mut">(from source filename)</span>' : '')) : '')
     + (info.elevation_m != null ? drow('elevation', info.elevation_m.toFixed(2) + ' m') : '')
     + (info.source_file ? drow('source model', esc(info.source_file)) : '')
     + revitRows(info)
+    + carbonRows(info)
+    + (info.fabrication ? dsec('Fabrication attributes · source design') + Object.entries(info.fabrication).map(([k,v])=>drow(esc(k),esc(String(v)))).join('') : '')
     + drow('dbId', esc(id) + (info.layer ? ' <span class="mut">· layer ' + esc(info.layer) + '</span>' : ''))
     + dsec('Source')
     + drow('geometry', 'APS SVF → element GLB (dbId-named nodes)')
-    + drow('identity file', 'buildings/grimes/elements.json');
+    + drow('identity file', esc(LAYERS[info.layer]?.json || 'unavailable'));
   const bigEl = document.getElementById('twinBigKw'), badgeEl = document.getElementById('twinBadge');
   const srcEl = document.getElementById('twinSrc');
+  bigEl.style.color = '';
+  document.getElementById('chartKey').innerHTML = '';
+  const baseCanvas = document.getElementById('twinBaseSpark');
+  baseCanvas._chart = null; baseCanvas.style.display = 'none';
+  drawSpark(baseCanvas, []);
   const feeds = info.isFedBy || [];
-  if (!feeds.length && info.apportion) {
-    // diffusers: no electrical feed of their own, but a design-CFM share of the roof AHU meter
-    try {
-      const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
-      const meters = bd.meters || {};
-      const m = meters[info.apportion.meter];
-      const kw = m && m.latest && typeof m.latest.kw === 'number' ? m.latest.kw : null;
-      bigEl.innerHTML = (kw != null ? kw.toFixed(1) : '—') + ' <small>kW roof AHU meter</small>';
-      badgeEl.textContent = kw != null ? 'MODELLED' : 'OFFLINE'; badgeEl.className = 'badge na';
-      srcEl.textContent = 'Supply diffuser — design airflow share of meter 3 (rooftop mechanical); no airflow sensor on the terminal.';
-      ptsEl.innerHTML = apportionRow(info, meters);
-      if (m && Array.isArray(m.timeseries_kw)) drawSpark(document.getElementById('twinSpark'), m.timeseries_kw.map(s => ({ t: s.t, v: s.v })));
-    } catch (e) {
-      badgeEl.textContent = 'OFFLINE'; badgeEl.className = 'badge na';
-      ptsEl.innerHTML = '<div class="pt mut"><span>Live feed unreachable — ' + esc(e.message) + '</span></div>';
-    }
-    return;
-  }
-  if (!feeds.length) {
-    bigEl.innerHTML = '— <small>kW</small>';
-    badgeEl.textContent = 'NO FEED'; badgeEl.className = 'badge na';
-    srcEl.textContent = 'No meter mapping for this element yet (non-electrical or unmapped).';
+  bigEl.innerHTML = '— <small>kW</small>';
+  badgeEl.textContent = 'LOADING'; badgeEl.className = 'badge na';
+  ptsEl.innerHTML = '';
+  if (!feeds.length && !info.apportion) {
+    badgeEl.textContent = 'NO FEED';
+    srcEl.textContent = 'No measured feed bound to this element.';
     ptsEl.innerHTML = '<div class="pt mut"><span>' + (info.system === 'Structural'
-      ? 'Structural element — no sensor bound yet (candidate for strain / temperature instrumentation).'
-      : info.system === 'Conduit' ? 'Distribution path — carries circuits, no load of its own.'
-      : 'Identity-only element — no electrical feed (plumbing / air terminal).') + '</span></div>';
+      ? 'Design geometry and material only; no element sensor installed.'
+      : 'Identity and design information only; no element telemetry.') + '</span></div>';
     return;
   }
-  badgeEl.textContent = '…'; badgeEl.className = 'badge na';
-  srcEl.textContent = info.feedSource === 'level-inferred'
-    ? 'Feeder meters serving this level (inferred from level, not a panel schedule) — no per-element metering.'
-    : info.feedSource === 'revit-voltage'
-    ? `Feeder by Revit voltage class (${info.design_volts} V → ${info.design_volts >= 277 ? '480/277 V service, meter 76' : '208/120 V service, meter 77'}); circuits were not modelled in the NWD.`
-    : info.feedSource === 'voltage-class'
-    ? '277V lighting feeder (meter 76, by voltage class) — no per-circuit metering.'
-    : 'Feeder meter total — per-panel submetering not installed (93 panels identified for future sub-metering).';
+  srcEl.textContent = !feeds.length ? 'Roof AHU electricity allocated by design CFM; no airflow sensor on this terminal.'
+    : info.feedSource === 'level-inferred' ? 'Feeder association inferred from floor; no verified circuit topology.'
+    : info.feedSource === 'revit-voltage' ? `Feeder associated by Revit voltage (${info.design_volts} V); not a verified circuit connection.`
+    : info.feedSource === 'voltage-class' ? 'Lighting feeder associated by voltage class; no per-circuit measurement.'
+    : info.feedSource === 'panel-schedule' ? 'Feeder association from the documented panel schedule; meter totals are not element measurements.'
+    : 'Legacy feeder association, unverified; meter totals are not element measurements.';
   try {
     const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+    if (epoch !== elementPickEpoch) return;
     const meters = bd.meters || {};
-    let total = 0, rows = '', series = [];
-    for (const ref of feeds) {
-      const mid = String(ref).split(':')[2];          // bmo:meter:76:kw → 76
-      const m = meters[mid];
-      const kw = m && m.latest && typeof m.latest.kw === 'number' ? m.latest.kw : null;
-      if (kw != null) total += kw;
-      const mlabel = mid === '3' ? 'Roof Electric' : mid === '76' ? '480/277V (HVAC/Ltg)' : mid === '77' ? '208/120V (Plug/IT)' : 'Meter ' + mid;
-      rows += `<div class="pt"><span>feeder · ${esc(mlabel)}</span><span class="v">${kw != null ? kw.toFixed(1) + ' kW' : 'offline'}</span></div>`;
-      if (m && Array.isArray(m.timeseries_kw)) series.push(m.timeseries_kw.map(s => ({ t: s.t, v: s.v })));
-    }
-    bigEl.innerHTML = total.toFixed(1) + ' <small>kW feeders</small>';
-    badgeEl.textContent = 'LIVE'; badgeEl.className = 'badge';
-    ptsEl.innerHTML = rows + apportionRow(info, meters);
-    if (series.length) {
-      const n = Math.min(...series.map(s => s.length));
-      const sum = [];
-      for (let i = 0; i < n; i++) {
-        let v = 0; for (const s of series) v += s[s.length - n + i].v || 0;
-        sum.push({ t: series[0][series[0].length - n + i].t, v });
-      }
-      drawSpark(document.getElementById('twinSpark'), sum);
-    }
+    const ids = [...new Set(feeds.length ? feeds.map(ref => String(ref).split(':')[2]) : [info.apportion.meter])];
+    const readings = ids.map(id => meterReading(meters[id]));
+    const available = readings.filter(r => r.value != null);
+    const complete = available.length === ids.length;
+    const state = !available.length ? 'OFFLINE' : !complete ? 'PARTIAL'
+      : readings.some(r => r.state === 'STALE') ? 'STALE'
+      : readings.some(r => r.state === 'TIME UNKNOWN') ? 'TIME UNKNOWN' : 'LIVE';
+    const total = available.reduce((sum,r)=>sum+r.value,0);
+    bigEl.innerHTML = (complete ? total.toFixed(1) : '—') + ' <small>kW ' + (feeds.length ? 'feeders' : 'roof meter') + '</small>';
+    badgeEl.textContent = state; badgeEl.className = state === 'LIVE' ? 'badge' : 'badge na';
+    const labels = {'3':'Roof Electric','76':'480/277 V (HVAC / lighting)','77':'208/120 V (plug / IT)'};
+    ptsEl.innerHTML = ids.map((id,i) => {
+      const r = readings[i];
+      return `<div class="pt"><span>Measured feeder · ${esc(labels[id] || id)}</span><span class="v">${r.value == null ? 'unavailable' : r.value.toFixed(1)+' kW'}</span></div>`
+        + `<div class="pt mut"><span>${esc(r.state)} · ${Number.isFinite(r.at) ? esc(new Date(r.at).toISOString()) : 'timestamp unavailable'}</span></div>`;
+    }).join('') + apportionRow(info,meters)
+      + (ids.includes('76') ? '<div class="pt mut"><span>Meter 76 is not apportioned: mixed lighting / plant loads, without defensible element weights.</span></div>' : '');
+    drawSpark(document.getElementById('twinSpark'), alignedMeterSeries(ids.map(id=>meters[id])));
   } catch (e) {
+    if (epoch !== elementPickEpoch) return;
     badgeEl.textContent = 'OFFLINE'; badgeEl.className = 'badge na';
+    bigEl.innerHTML = '— <small>kW</small>';
     ptsEl.innerHTML = '<div class="pt mut"><span>Live feed unreachable — ' + esc(e.message) + '</span></div>';
   }
 }
@@ -1718,6 +1999,8 @@ function channelRows(sysName, live) {
 const BUILDING_PICK = {};
 window.selectSysByIndex = i => { const m = sysMesh[i]; if (m) pickSystem(m); };
 function pickBuilding() {
+  elementPickEpoch++;
+  unhighlightEquip();
   picked = BUILDING_PICK;
   highlight(null);
   document.getElementById('clickHint').classList.remove('show');
@@ -1772,6 +2055,8 @@ async function renderDesignVsActual() {
 }
 
 async function pickSystem(mesh) {
+  const epoch = ++elementPickEpoch;
+  unhighlightEquip();
   picked = mesh;
   highlight(mesh);
   document.getElementById('clickHint').classList.remove('show'); // hint served its purpose
@@ -1820,14 +2105,16 @@ async function pickSystem(mesh) {
     + '<div class="dnote">BAS/IoT sensor integration will populate the remaining channels.</div>'
     + `<div class="duri">${esc(res.uri)}</div>`;
   if (!res.points.length) {
-    ptsEl.innerHTML = channelRows(sysName, await liveChannels(sysName, null))
+    const channels = await liveChannels(sysName, null);
+    if (epoch !== elementPickEpoch) return;
+    ptsEl.innerHTML = channelRows(sysName, channels)
       + '<div class="pt mut"><span>No meter on this system'
       + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection is unmetered)' : '') + '</span></div>';
     return;
   }
   try {
     const vals = await TwinResolver.fetchValues(twinPkg, res.points, cachedJson);
-    if (picked !== mesh) return; // user picked something else meanwhile
+    if (epoch !== elementPickEpoch) return;
     let total = 0;
     const rows = res.points.map(p => {
       const v = vals[p.ref] || {};
@@ -1843,6 +2130,7 @@ async function pickSystem(mesh) {
         + `<div class="morebtn" onclick="toggleTwinMore('twinPtsMore')">… ${rows.length - 3} more</div>`;
     }
     const chans = channelRows(sysName, await liveChannels(sysName, total));
+    if (epoch !== elementPickEpoch) return;
     if (isPiping) {
       // flow-first: electricity proxy is secondary → lives in More details
       ptsEl.innerHTML = chans;
@@ -1852,7 +2140,7 @@ async function pickSystem(mesh) {
     }
     drawSpark(document.getElementById('twinSpark'), sumSeries(vals, res.points)); // 24h feed, in details
   } catch (e) {
-    if (picked === mesh) ptsEl.innerHTML = '<div class="pt mut"><span>⚠ live data unavailable</span></div>';
+    if (epoch === elementPickEpoch) ptsEl.innerHTML = '<div class="pt mut"><span>⚠ live data unavailable</span></div>';
   }
 }
 
@@ -1886,9 +2174,11 @@ const fmtSpec = (k, v) => _specFmt[k] ? _specFmt[k](v)
   : String(k).replace(/_/g, ' ') + ' ' + (Array.isArray(v) ? v.join('/') : v);
 let _eqUid = 0;
 async function renderEquip(sysName) {
+  const epoch = elementPickEpoch;
   const el = document.getElementById('twinDetEquip'); // lives inside ⓘ details
   try {
     const reg = await cachedJson('buildings/grimes/equipment.json');
+    if (epoch !== elementPickEpoch) return;
     const items = (reg.equipment || []).filter(it => NORM(it.system || '') === NORM(sysName || ''));
     if (!items.length) throw new Error('no entry');
     el.innerHTML = dsec('Design equipment · ' + items.length)
@@ -1911,6 +2201,7 @@ async function renderEquip(sysName) {
           + `<div id="${id}" class="eqdet" style="display:none">${det}</div>`;
       }).join('');
   } catch {
+    if (epoch !== elementPickEpoch) return;
     el.innerHTML = 'no element registry — GLB is system-tier geometry; NWD re-export needed for per-element data';
   }
 }
@@ -1935,9 +2226,11 @@ const CHARTKEY_FLOW = '<span class="k"><i class="ln" style="background:#60a5fa">
 /* Flow-first headline for Plumbing: GPM big number, 24 h flow chart (blue),
    steam/irrigation companion rows. Electricity proxy moves to details. */
 async function renderFlowHeadline() {
+  const epoch = elementPickEpoch;
   const big = document.getElementById('twinBigKw'), badge = document.getElementById('twinBadge'),
         srcEl = document.getElementById('twinSrc'), evEl = document.getElementById('twinEvent'),
         cv = document.getElementById('twinBaseSpark');
+  cv.style.display = '';
   big.innerHTML = '— <small>GPM</small>'; big.style.color = '#93c5fd';
   badge.textContent = '…'; badge.className = 'badge na';
   srcEl.textContent = ''; evEl.innerHTML = '';
@@ -1947,6 +2240,7 @@ async function renderFlowHeadline() {
   cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   try {
     const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+    if (epoch !== elementPickEpoch) return;
     const w = bd && bd.water, L = w && w.latest;
     if (!L) { srcEl.textContent = 'no flow data available'; return; }
     const gpm = ((L.water1_rate_cfm || 0) + (L.water2_rate_cfm || 0)) * 7.481;
@@ -1997,9 +2291,11 @@ function drawFlowChart(cv, series) {
 }
 
 async function renderBaseline() {
+  const epoch = elementPickEpoch;
   const big = document.getElementById('twinBigKw'), badge = document.getElementById('twinBadge'),
         srcEl = document.getElementById('twinSrc'), evEl = document.getElementById('twinEvent'),
         cv = document.getElementById('twinBaseSpark');
+  cv.style.display = '';
   big.innerHTML = '— <small>kW</small>'; big.style.color = '';
   badge.textContent = '…'; badge.className = 'badge na';
   srcEl.textContent = ''; evEl.innerHTML = '';
@@ -2008,15 +2304,18 @@ async function renderBaseline() {
   cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   try {
     const eb = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/energy_baseline.json');
+    if (epoch !== elementPickEpoch) return;
     const med = eb && eb.buildings && eb.buildings.grimes;
     // TOWT (weather-normalized) preferred when its quality flag passes; both
     // files share the current/recent24 shape so the source is just swapped.
     let src = med, srcName = 'median';
     try {
       const tw = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/towt_baseline.json');
+    if (epoch !== elementPickEpoch) return;
       const tg = tw && tw.buildings && tw.buildings.grimes;
       if (tg && tg.use_towt && tg.recent24 && tg.recent24.length) { src = tg; srcName = 'weather-normalized'; }
     } catch {} // towt file is optional
+    if (epoch !== elementPickEpoch) return;
     if (!src || !src.recent24 || !src.recent24.length) return;
     const c = src.current || {}, z = typeof c.z === 'number' ? c.z : null;
     const zt = (eb && eb.z_threshold) || 3;
@@ -2050,6 +2349,7 @@ async function renderBaseline() {
     // latest anomaly event (one line) + staggered-start sim callout; rest folds
     let sim = null;
     try { sim = await cachedJson('data/startup_sim.json'); } catch {}
+    if (epoch !== elementPickEpoch) return;
     const evs = ((med && med.events) || []).slice().reverse();
     if (evs.length) {
       const ev = evs[0];
@@ -2210,7 +2510,9 @@ renderer.setAnimationLoop((t) => {
     // (same fix as grimes-xr commit d913737).
     controls.update();
   }
-  renderer.render(scene, camera);
+  // Keep the last frame while decoding/batching a layer. Hundreds of async
+  // batching yields must not submit the existing multi-million-triangle scene.
+  if (!Object.values(layerState).some(st => st.loading)) renderer.render(scene, camera);
 });
 </script>
 
