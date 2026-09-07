@@ -70,7 +70,13 @@ meter 76 deliberately NOT split) → inferred (level via kNN). Every number in
 the UI is labelled with its tier (LIVE / MODELLED / NO FEED). Never present
 an apportionment as a measurement. The electrical model is **not circuited**
 (no panel→circuit tree — verified against the full property dump); the
-panel-schedule PDFs + BACnet read access have been requested from Facilities.
+panel-schedule PDFs + BACnet read access are still needed. The owner confirmed
+on 2026-09-07 that the email to the professor has not yet been sent; do not
+claim that these materials/access have already been requested or received.
+Current feeder associations are provisional: voltage/floor/system rules do not
+prove circuit membership, and design VA/CFM allocations are uncalibrated scenarios.
+A meter total shown in an element card is building/feeder context, not an
+element measurement. No documentary feedEvidence is currently attached.
 
 ## Hard-won invariants — do not violate
 
