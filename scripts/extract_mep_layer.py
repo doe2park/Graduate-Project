@@ -116,6 +116,8 @@ def main(master_glb, metap, layer, out_glb, out_json):
         cad_layer = meta.get(byext.get("/".join(parts[:2]), ""), {}).get("name")
         return owner, type_of(oe.get("name") or "", cad_layer)
 
+    eligible_entities = {did for did in total_entities if owner_type(meta[did], did)[1] is not None}
+
     for i, n in enumerate(g["nodes"]):
         nm = n.get("name")
         if not nm or "mesh" not in n:
@@ -124,7 +126,7 @@ def main(master_glb, metap, layer, out_glb, out_json):
         if not e or not wanted(e):
             continue
         owner, t = owner_type(e, nm)
-        if not owner or t is None:
+        if owner not in eligible_entities or t is None:
             continue                        # excluded (centerlines, coordination volumes)
         keep[i] = owner
         per_owner[owner] += 1
@@ -153,7 +155,7 @@ def main(master_glb, metap, layer, out_glb, out_json):
     doc = {"_schema": "twin-elements-binding/2", "layer": layer, "model": out_glb.split("/")[-1],
            "_doc": f"MEP fabrication tier '{layer}': glb node name (= entity dbId) -> identity. "
                    "Cut from the APS master by scripts/extract_mep_layer.py (CAD entities, no Revit category).",
-           "survival": {CATEGORY[layer]: {"total": len(total_entities), "with_geometry": len(els)}},
+           "survival": {CATEGORY[layer]: {"total": len(total_entities), "eligible": len(eligible_entities), "excluded": len(total_entities - eligible_entities), "with_geometry": len(els)}},
            "elements": els}
     json.dump(doc, open(out_json, "w"), indent=1)
     print(f"{layer}: {len(els)}/{len(total_entities)} entities / {len(leaves)} leaves / {len(mesh)} meshes / "

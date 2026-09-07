@@ -205,6 +205,7 @@ def main(sources, metap, layer, out_glb, out_json, propsp=None):
 
     # identity sidecar
     total = Counter(e["category"] for e in meta.values() if e.get("category") in cats)
+    excluded = Counter(e["category"] for e in meta.values() if e.get("category") in cats and re.search(EXCLUDE.get(layer, r"(?!)"), e.get("name") or ""))
     got = Counter(meta[o]["category"] for o in per_owner)
     els = {}
     for o, lv_leaves in per_owner.items():
@@ -229,7 +230,7 @@ def main(sources, metap, layer, out_glb, out_json, propsp=None):
                         break
     doc = {"_schema": "twin-elements-binding/2", "layer": layer, "model": out_glb.split("/")[-1],
            "_doc": f"Element tier '{layer}': glb node name (= owner dbId) -> identity. Cut from the APS master by scripts/extract_layer.py.",
-           "survival": {c: {"total": total[c], "with_geometry": got.get(c, 0)} for c in cats},
+           "survival": {c: {"total": total[c], "eligible": total[c] - excluded[c], "excluded": excluded[c], "with_geometry": got.get(c, 0)} for c in cats},
            "elements": els}
     json.dump(doc, open(out_json, "w"), indent=1)
     print(f"{layer}: {len(els)} elements / {len(leaves)} leaves / {len(mesh_list)} meshes / "

@@ -1,0 +1,168 @@
+{
+  "schema": "grimes-recovery-summary/1",
+  "source": {
+    "filename": "ALL - UCBBE - COMBINED.nwd",
+    "bytes": 193249492,
+    "sha256": "36ed1f8d3f1cc4aa99294353c9254b2704578ad918c60446e73c671adae8767c",
+    "identicalLocalCopies": 4,
+    "metadataElements": 741797,
+    "originalAPSTranslationReused": true,
+    "baselineIdsAndNamesCompatible": true
+  },
+  "layers": {
+    "duct": {
+      "file": "grimes-duct.glb",
+      "total": 17110,
+      "excluded": 406,
+      "eligible": 16704,
+      "previousWithGeometry": 13921,
+      "recoveredWithGeometry": 16704,
+      "bytes": 21106072,
+      "checks": {
+        "mesh_nodes": 44609,
+        "raw_to_final_primitive_count_mismatches": 0,
+        "final_identity_matches_sidecar": true,
+        "packed_root_exactly_matches_old": true,
+        "final_bufferViews_copied_byte_verbatim": true,
+        "raw_final_bounds_max_abs_error_m": 4.263256414560601e-14,
+        "below_file_size_limit": true
+      }
+    },
+    "hydronic": {
+      "file": "grimes-hydronic.glb",
+      "total": 12229,
+      "excluded": 1127,
+      "eligible": 11102,
+      "previousWithGeometry": 4863,
+      "recoveredWithGeometry": 11102,
+      "bytes": 20424640,
+      "checks": {
+        "mesh_nodes": 48316,
+        "raw_to_final_primitive_count_mismatches": 0,
+        "final_identity_matches_sidecar": true,
+        "packed_root_exactly_matches_old": true,
+        "final_bufferViews_copied_byte_verbatim": true,
+        "raw_final_bounds_max_abs_error_m": 4.263256414560601e-14,
+        "below_file_size_limit": true
+      }
+    },
+    "plumbing": {
+      "file": "grimes-plumbing.glb",
+      "total": 6791,
+      "excluded": 756,
+      "eligible": 6035,
+      "previousWithGeometry": 2621,
+      "recoveredWithGeometry": 6035,
+      "bytes": 20907444,
+      "checks": {
+        "mesh_nodes": 35593,
+        "raw_to_final_primitive_count_mismatches": 0,
+        "final_identity_matches_sidecar": true,
+        "packed_root_exactly_matches_old": true,
+        "final_bufferViews_copied_byte_verbatim": true,
+        "raw_final_bounds_max_abs_error_m": 1.4562431260856101e-09,
+        "below_file_size_limit": true
+      }
+    },
+    "fire": {
+      "file": "grimes-fire.glb",
+      "total": 10938,
+      "excluded": 0,
+      "eligible": 10938,
+      "previousWithGeometry": 3861,
+      "recoveredWithGeometry": 10938,
+      "bytes": 83819916,
+      "checks": {
+        "mesh_nodes": 123848,
+        "raw_to_final_primitive_count_mismatches": 0,
+        "final_identity_matches_sidecar": true,
+        "packed_root_exactly_matches_old": true,
+        "final_bufferViews_copied_byte_verbatim": true,
+        "raw_final_bounds_max_abs_error_m": 5.105675882077776e-10,
+        "below_file_size_limit": true
+      }
+    }
+  },
+  "fireChunks": {
+    "schema": "element-glb-chunks/1",
+    "canonical": "grimes-fire.glb",
+    "maxMeshNodes": 30000,
+    "checks": {
+      "identityUnionExact": true,
+      "perOwnerPrimitiveCountsExact": true,
+      "bufferViewsByteIdentical": true,
+      "rootFrameExact": true,
+      "ownersUnsplit": true
+    },
+    "chunks": [
+      {
+        "file": "grimes-fire-lower.glb",
+        "levelKey": "LOWER",
+        "meshNodes": 24064,
+        "elements": 2550,
+        "bytes": 12756384
+      },
+      {
+        "file": "grimes-fire-l1-1.glb",
+        "levelKey": "L1",
+        "meshNodes": 29991,
+        "elements": 2176,
+        "bytes": 24202924
+      },
+      {
+        "file": "grimes-fire-l1-2.glb",
+        "levelKey": "L1",
+        "meshNodes": 15470,
+        "elements": 417,
+        "bytes": 17616448
+      },
+      {
+        "file": "grimes-fire-l2.glb",
+        "levelKey": "L2",
+        "meshNodes": 28038,
+        "elements": 2096,
+        "bytes": 16206948
+      },
+      {
+        "file": "grimes-fire-l3.glb",
+        "levelKey": "L3",
+        "meshNodes": 26285,
+        "elements": 3699,
+        "bytes": 15156016
+      }
+    ],
+    "roundTripChecks": {
+      "identityUnionExact": true,
+      "perOwnerPrimitiveCountsExact": true,
+      "everyNodeTransformExact": true,
+      "bufferViewsByteIdentical": true,
+      "rootFrameExact": true,
+      "boundsUnionMaxErrorMeters": 0.0,
+      "meshNodes": 123848,
+      "elements": 10938,
+      "canonicalBytes": 83819916,
+      "canonicalSHA256": "958dce11647883f886975d10931c6cd9c32e0db9248ee18ac28c06d4b96f2517"
+    }
+  },
+  "tests": {
+    "genericToolTestsPassed": 12
+  },
+  "notes": [
+    "Full metadata/properties remain local; credentials and model URN omitted.",
+    "Fire sequential Draco preserves degenerate triangle indices; default edgebreaker candidate was rejected.",
+    "Final subsets and chunks copy compressed bytes verbatim; no existing GLB re-encoding.",
+    "Bounds checks use accessor extents transformed through scene hierarchy, not independent Draco vertex decoding."
+  ],
+  "processes": {
+    "activeRecoveryOptimizers": 0,
+    "supersededOptimizerTerminated": true
+  },
+  "repoToolInstallList": [
+    "scripts/plan_mep_recovery.py",
+    "scripts/verify_mep_recovery.py",
+    "scripts/dedup_raw_gltf.py",
+    "scripts/split_element_glb.py",
+    "scripts/test_mep_recovery.py",
+    "scripts/test_split_element_glb.py"
+  ]
+}

@@ -241,7 +241,7 @@ def enrich(layer, glb, path, knn, cent):
                 e["design_va"] = va
         # feeds: explicit (panel schedule) > Revit voltage class > system rule > level inference for electrical
         if e.get("kind") == "panelboard" and e.get("isFedBy"):
-            e["feedSource"] = "panel-schedule"
+            e["feedSource"] = "panel-schedule" if e.get("feedEvidence") else "legacy-unverified"
         elif sys_ in ("Electrical", "Lighting") and feed_by_voltage(volts):
             e["isFedBy"], e["feedSource"] = feed_by_voltage(volts), "revit-voltage"
         elif sys_ in FEED_BY_SYSTEM:
