@@ -1,0 +1,5 @@
+# Historical registration computation
+
+These scripts and outputs were recovered from the local analysis directory on 2026-09-10 and copied verbatim. See [method and limitations](../../docs/SCAN_BIM_REGISTRATION.md). They retain historical paths and dependencies (NumPy, SciPy, Playwright, Three.js). Do not run them expecting a standalone pipeline. `register-scan.py` contains the shared ICP fitter and an earlier, superseded search. `register-full-plan.py` performs the later full-scan plan search. `refine-full-registration.py` imports the fitter and produces the accepted candidates. `validate-full-registration.py` checks spatial subsets.
+
+The intermediate `full-scan.npz` and `scan-reference-surfaces.json` are not included in this public archive. End-to-end regeneration still requires recovering or regenerating these samples and adapting local paths. Output files preserve the numerical evidence; provenance.json hashes this archive. No new registration was computed as part of this documentation update.

@@ -157,3 +157,5 @@ Fire streaming uses `grimes-fire.chunks.json` (five parts) to cap transient pars
 ## Public registered comparison (2026-09-10)
 
 `scan-compare.html` is the registered 3D scan/BIM companion to the main viewer; `scan-bim.html` supplies the two panes. Both panes drive the same accepted rigid registration. Runtime scan and interior GLBs are copied byte-for-byte, with hashes in `scan-assets/provenance.json`; raw capture/account inventory is not published. The main viewer now links to this comparison instead of opening the legacy Cupix split. `Show all elements` / `Hide all elements` controls all ten layers independently of floor selection and loads missing layers sequentially; hiding during a load cancels the queue and keeps its late result hidden. The comparison also toggles its interior groups. See `docs/PUBLIC_SCAN_COMPARISON.md`.
+
+Registration methodology and archived computation: `docs/SCAN_BIM_REGISTRATION.md`. The old Cupix -135-degree calibration is not the exported scan GLB registration. Internal nearest-point residuals (median ~0.13 m) are not surveyed accuracy.
