@@ -808,6 +808,14 @@ function rotToBim(tm) {
   return new THREE.Quaternion().setFromRotationMatrix(m);
 }
 
+// Cupix documents fov as vertical degrees, matching Three.js PerspectiveCamera.
+function cupixProjection(p) {
+  if (!p || p.orthoMode || !Number.isFinite(p.fov) || p.fov <= 0 || p.fov >= 180) return null;
+  const zoom = p.zoom === undefined ? 1 : p.zoom;
+  if (!Number.isFinite(zoom) || zoom <= 0) return null;
+  return { fov: p.fov, zoom };
+}
+let lastProjection = null, savedCompareProjection = null;
 // user-override: hand-driving the BIM pauses sync for 2.5 s
 let userUntil = 0;
 const bump = () => { userUntil = Date.now() + 2500; };
@@ -832,6 +840,9 @@ function applyCupix(tm, force) {
   lastSyncAt = Date.now();
   if (document.getElementById('syncPos').checked) camera.position.copy(p);
   if (document.getElementById('syncRot').checked) camera.quaternion.copy(rotToBim(tm));
+  if (lastProjection && document.getElementById('syncRot').checked) {
+    camera.fov = lastProjection.fov; camera.zoom = lastProjection.zoom; camera.updateProjectionMatrix();
+  }
   controls.target.copy(p.clone().add(new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).multiplyScalar(2)));
   applyCount++;
   document.getElementById('applyCount').textContent = applyCount;
@@ -848,6 +859,8 @@ window.addEventListener('message', (e) => {
   if (typeof e.data === 'string') { try { msg = JSON.parse(e.data); } catch { return; } }
   else if (e.data && typeof e.data === 'object') msg = e.data;
   if (!msg) return;
+  const parameters = msg.response?.cameraParameters;
+  if (parameters) lastProjection = cupixProjection(parameters);
   let tm = findTm(msg);
   if (Array.isArray(tm) && tm.length === 16) {
     tm = normalizeTm(tm);
@@ -918,6 +931,8 @@ window.toggleCompare = () => {
   const frame = document.getElementById('cupixFrame');
   document.getElementById('compareBtn').classList.toggle('active', on);
   if (on) {
+    savedCompareProjection = { fov: camera.fov, zoom: camera.zoom };
+    lastProjection = null;
     paneEl.classList.add('show');
     applySplit();
     if (!frame.src) frame.src = CUPIX_URL;
@@ -925,6 +940,8 @@ window.toggleCompare = () => {
   } else {
     paneEl.classList.remove('show');
     stopPolling();
+    if (savedCompareProjection) { camera.fov = savedCompareProjection.fov; camera.zoom = savedCompareProjection.zoom; camera.updateProjectionMatrix(); }
+    savedCompareProjection = null; lastProjection = null;
   }
   setTimeout(fitLayout, 100);
 };
