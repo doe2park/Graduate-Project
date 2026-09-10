@@ -27,3 +27,7 @@ The browser test injects inspection hooks into its HTML response only, uses dete
 ## Mobile QR interaction smoke test
 
 `PLAYWRIGHT_MODULE=/path/to/playwright CHROME_EXECUTABLE=/path/to/chrome node tests/mobile-browser.cjs` checks the public QR destinations with actual published data (no meter fixtures). Optional `VIEWER_BASE_URL` changes the site; `STAGED_DIR` replaces only the two HTML responses while retaining real assets. `VALIDATION_OUTPUT` selects screenshots. It verifies menu closing, touch Walk movement/release and drag look, rotation to landscape, retained viewpoint, source-ID object search and the performance table. Chrome mobile emulation is not physical iOS/Safari certification.
+
+## Registered comparison
+
+Run `node --test tests/layer-visibility.test.cjs` for sequential bulk visibility, cancellation and latest-intent checks. `tests/registered-comparison.cjs` loads the actual scan, interior and ten BIM layers, verifies the accepted camera transform in both directions, and checks all-element visibility including interior while retaining the floor. It accepts `PLAYWRIGHT_MODULE`, `CHROME_EXECUTABLE`, `THREE_MODULE`, `VIEWER_BASE_URL` and `VALIDATION_OUTPUT`; see the browser test setup above. It uses real public data, not meter fixtures.
