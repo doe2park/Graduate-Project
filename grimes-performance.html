@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grimes · Design vs Actual</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
@@ -41,13 +42,13 @@ h1{font:600 clamp(24px,4vw,32px)/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI"
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin:6px 0 2px}
 .legend .it{display:flex;align-items:center;gap:6px}
 .sw{width:10px;height:10px;border-radius:3px}
-.chartbox{position:relative;overflow-x:auto;touch-action:pan-y}
+.chartbox{position:relative;overflow-x:auto;touch-action:pan-x pan-y}.chartbox svg{min-width:540px}.card,.tiles,.tile{min-width:0}
 .card details summary{font-weight:500}
 .dl{font:500 12px "JetBrains Mono",ui-monospace,monospace;color:var(--teal);text-decoration:none;margin-right:12px}
 svg{display:block}
-.tt{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:6px;
+.tt{max-width:calc(100% - 8px);white-space:normal;position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:6px;
     padding:7px 10px;font:12px/1.5 "JetBrains Mono",ui-monospace,monospace;color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.12);
-    display:none;white-space:nowrap;z-index:5}
+    display:none;z-index:5}
 .note{font-size:12.5px;color:var(--ink2);border-left:2px solid var(--line);padding:2px 0 2px 12px;max-width:70ch}
 .foot{font-size:12px;color:var(--mute)}
 table{border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}

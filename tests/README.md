@@ -23,3 +23,7 @@ PLAYWRIGHT_MODULE=/tmp/grimes-validation-tools/node_modules/playwright node test
 `CHROME_EXECUTABLE` can select an existing Chrome executable. `VIEWER_BASE_URL` defaults to http://127.0.0.1:8765; `VALIDATION_OUTPUT` selects the screenshots/report directory (default system temp/grimes-validation).
 
 The browser test injects inspection hooks into its HTML response only, uses deterministic test meter readings, loads all ten layers together, checks every rendered ID plus exact primitive counts, floor filters, a real raycast, the carbon scenario calculation, mobile overflow and page errors. It uses the actual served GLBs. It does not claim availability of the live BMO feed. Full-model testing is intentionally substantial; a phone with less GPU/memory can require floor/type filtering.
+
+## Mobile QR interaction smoke test
+
+`PLAYWRIGHT_MODULE=/path/to/playwright CHROME_EXECUTABLE=/path/to/chrome node tests/mobile-browser.cjs` checks the public QR destinations with actual published data (no meter fixtures). Optional `VIEWER_BASE_URL` changes the site; `STAGED_DIR` replaces only the two HTML responses while retaining real assets. `VALIDATION_OUTPUT` selects screenshots. It verifies menu closing, touch Walk movement/release and drag look, rotation to landscape, retained viewpoint, source-ID object search and the performance table. Chrome mobile emulation is not physical iOS/Safari certification.

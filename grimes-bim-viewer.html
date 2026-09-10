@@ -21,6 +21,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .tb-spacer{flex:1}
 .tb-dd{position:relative}
 .tb-menu{position:fixed;top:62px;left:14px;width:258px;max-height:calc(100vh - 200px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(8,12,24,.95);border:1px solid var(--border);border-radius:6px;z-index:65}
+#layersMenu[hidden],.lm-chips[hidden],#mobileElementBrowser[hidden]{display:none!important}
 .tb-menu .lm-hdr{display:flex;align-items:center;justify-content:space-between;padding:1px 4px 6px;border-bottom:1px solid var(--border);margin-bottom:3px;font:600 10px/1 var(--mono);letter-spacing:.8px;color:#94a3b8}
 .tb-menu .lm-hdr button{background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;line-height:1;padding:2px}
 .tb-menu .lm-hdr button:hover{color:#cbd5e1}
@@ -178,13 +179,13 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
 /* ── Walk mode hint overlay ── */
 #walkHint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;background:rgba(8,12,24,.92);border:1px solid rgba(34,211,238,.35);border-radius:8px;padding:10px 16px;font:10.5px/1.7 var(--mono);color:#94a3b8;display:none;pointer-events:none;transition:opacity .6s;text-align:center;white-space:nowrap}
 #walkHint b{color:#67e8f9;font-weight:600}
-/* ── Mobile (<768px) — same breakpoint as grimes-xr.html ── */
-@media(max-width:768px){
+/* Small screens and touch devices, including landscape phones. */
+@media(max-width:768px), (pointer:coarse){
   #topbar{padding:0 10px;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
   #topbar>*{flex-shrink:0}
   .tb-sub{display:none}
   .tb-btn{padding:5px 8px;font-size:10.5px}
-  #walkBtn{display:none} /* walk mode is desktop-only (pointer lock + WASD) */
+  #walkBtn{display:inline-flex;min-height:36px;align-items:center}
   /* Cupix Compare: side-by-side halves are unusable on a phone → stack vertically */
   #main{flex-direction:column}
   #cupixPane.show{flex:none;height:50%;border-right:none;border-bottom:2px solid var(--cyan)}
@@ -202,6 +203,29 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   body.twin-open #legend{display:none}
 }
 .carbon-form{display:grid;gap:8px;margin:10px 0}.carbon-form label{display:grid;gap:4px;font-size:11px}.carbon-form input,.carbon-form select,#elementFloor{background:#152131;color:#e2e8f0;border:1px solid #41516a;border-radius:4px;padding:6px;max-width:100%}.layer-coverage{font-size:10px;color:#a8b6c9;padding:4px 12px;line-height:1.5}
+
+#mobileTools,#mobileWalkPad{display:none}
+#mobileElementBrowser{position:fixed;inset:64px 14px 16px;z-index:120;background:#101b2b;border:1px solid #64748b;border-radius:10px;padding:14px;max-width:460px;color:#e2e8f0;overflow:auto}
+#mobileElementBrowser header{display:flex;align-items:center;justify-content:space-between;font-size:17px;margin-bottom:12px}
+#mobileElementBrowser button,#mobileTools button,#mobileWalkPad button{min-height:44px;border:1px solid #526d87;border-radius:7px;background:#17344b;color:#e2e8f0;font:600 13px var(--font);padding:8px;touch-action:none}
+#mobileElementSearch{width:100%;font:16px var(--font);padding:12px;color:white;background:#091423;border:1px solid #526d87;border-radius:6px;margin:6px 0}
+#mobileElementStatus{font-size:12px;color:#a8b6c9;padding:8px 0}
+#mobileElementResults{display:grid;gap:7px}#mobileElementResults button{text-align:left;white-space:normal}#mobileElementResults small{display:block;color:#a8b6c9;font-size:11px;margin-top:4px}
+@media(max-width:768px), (pointer:coarse){
+ #layersMenu{top:58px;left:8px;max-height:calc(100dvh - 135px);width:min(330px,calc(100vw - 16px))}
+ #layersMenu .tb-btn{min-height:38px;white-space:normal;align-items:center}.lm-chips .ef{min-height:30px}
+ #mobileTools{display:flex;position:fixed;bottom:max(12px,env(safe-area-inset-bottom));right:10px;z-index:85;gap:6px}
+ #legend{bottom:70px;max-height:30vh;overflow:auto}
+ #mobileWalkPad{position:fixed;left:10px;right:10px;bottom:max(12px,env(safe-area-inset-bottom));z-index:85;justify-content:space-between;gap:14px;pointer-events:none}
+ #mobileWalkPad .walk-move{display:grid;grid-template-columns:repeat(3,44px);gap:5px;pointer-events:auto}
+ #mobileWalkPad .walk-actions{display:grid;grid-template-columns:repeat(2,minmax(52px,1fr));gap:5px;pointer-events:auto}
+ body.mobile-walking #mobileWalkPad{display:flex}body.mobile-walking #mobileTools,body.mobile-walking #legend{display:none}
+ body.mobile-walking #walkHint{bottom:122px;white-space:normal;width:calc(100% - 30px);max-width:430px;font-size:11px;padding:6px}
+ body.mobile-walking #levelBadge{top:58px;max-width:calc(100% - 20px)}
+ body.mobile-walking #twinPanel{bottom:120px;max-height:38vh}#twinPanel{bottom:65px;max-height:50vh}
+ #mobileElementBrowser{inset:58px 8px 8px;max-width:none}
+}
+@media(max-height:480px) and (max-width:900px){#walkHint{display:none!important}#mobileElementBrowser{inset:54px 8px 8px}#twinPanel{max-height:66vh}}
 </style>
 </head>
 <body>
@@ -277,6 +301,9 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
 </div>
 <div id="clickHint">💡 Click any colored system to see live data</div>
 
+<div id="mobileTools"><button id="mobileBrowse">Objects</button><button id="mobileFit">Fit model</button></div>
+<div id="mobileWalkPad" aria-label="Touch Walk controls"><div class="walk-move"><span></span><button data-walk-key="KeyW" aria-label="Move forward">↑</button><span></span><button data-walk-key="KeyA" aria-label="Move left">←</button><button data-walk-key="KeyS" aria-label="Move backward">↓</button><button data-walk-key="KeyD" aria-label="Move right">→</button></div><div class="walk-actions"><button id="mobileHeightUp" aria-label="Raise eye height">Height +</button><button id="mobileHeightDown" aria-label="Lower eye height">Height −</button><button id="mobileInspect">Inspect</button><button id="mobileWalkExit">Exit Walk</button></div></div>
+<section id="mobileElementBrowser" hidden role="dialog" aria-modal="true" aria-label="Find BIM element"><header><b>Find a BIM element</b><button id="mobileElementClose" aria-label="Close object search">Close</button></header><label for="mobileElementSearch">Name, tag or element ID</label><input id="mobileElementSearch" type="search" placeholder="Search equipment…" autocomplete="off"><div id="mobileElementStatus" role="status"></div><div id="mobileElementResults"></div></section>
 <div id="levelBadge"></div>
 <div id="walkHint"><b>WASD</b> move · <b>mouse</b> look · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>Esc</b> exit</div>
 
@@ -401,7 +428,7 @@ fitLayout();
 // browser must not claim the gestures for scroll/zoom first.
 renderer.domElement.style.touchAction = 'none';
 
-const mobileMq = window.matchMedia('(max-width:768px)');
+const mobileMq = window.matchMedia('(max-width:768px), (pointer:coarse)');
 
 /* ══════════ MODELS ══════════ */
 // Same assets + same placement math as grimes-xr.html, so the calibration in
@@ -495,10 +522,10 @@ let aimedMesh = null, aimedInstance = null, aimedElementId = null, _aimAcc = 0;
 /* Center-ray aiming while pointer-locked: crosshair heats up over a pickable
    MEP system; click opens the twin panel (walking continues). */
 function updateCrosshair() {
-  document.getElementById('crosshair').style.display = (walkMode && plockActive) ? 'block' : 'none';
+  document.getElementById('crosshair').style.display = walkMode ? 'block' : 'none';
 }
 function updateAim() {
-  if (!plockActive) { aimedMesh = null; return; }
+  if (!walkMode) { aimedMesh = null; return; }
   raycaster.setFromCamera(_centerVec, camera);
   // equipment elements are aimable in walk mode too — nearest hit wins
   const mepTargets = (mepModel && mepModel.visible) ? allMeshes : [];
@@ -508,6 +535,7 @@ function updateAim() {
   aimedInstance = hit && hit.instanceId != null ? hit.instanceId : null;
   aimedElementId = hit ? resolveElementHit(hit.object, hit.instanceId, hit.faceIndex, hit.index) : null;
   document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);
+  document.getElementById('crosshair').dataset.elementId=aimedElementId||'';
 }
 // No AxesHelper/GridHelper exists in this scene and both glbs are
 // triangle-only, but hide any line/point objects defensively while walking.
@@ -565,7 +593,7 @@ scene.add(avatar);
 
 function showWalkHint() {
   const el = document.getElementById('walkHint');
-  el.innerHTML = (plockFailed
+  el.innerHTML = mobileMq.matches ? 'Hold arrows to move · drag to look · aim + Inspect · Objects offers a searchable list' : (plockFailed
       ? '<b>drag mouse</b> to look (pointer lock unavailable) · '
       : '<b>mouse</b> look · ')
     + '<b>WASD</b> move · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>click</b> inspect · <b>Esc</b> exit';
@@ -585,13 +613,16 @@ window.toggleWalk = () => {
     exitWalk();
     return;
   }
-  if (mobileMq.matches) return;                  // desktop-only
   enterWalk();
+  if (mobileMq.matches) { ensureMobileEquipment().catch(()=>{}); return; }
   // Synchronously inside the click gesture — no awaits/timeouts before this.
   try { renderer.domElement.requestPointerLock(); } catch { plockFailed = true; showWalkHint(); }
 };
 function enterWalk() {
   walkMode = true; thirdPerson = false;
+  document.body.classList.toggle('mobile-walking',mobileMq.matches);
+  document.getElementById('layersMenu').hidden=true;
+  document.getElementById('layersBtn').classList.remove('active');
   renderer.toneMappingExposure = EXPOSURE_WALK; // indoor: no direct sky view → lift exposure (no fog by design)
   savedCam = { pos: camera.position.clone(), quat: camera.quaternion.clone(), target: controls.target.clone() };
   // seed yaw/pitch from the current view so entry doesn't snap the camera
@@ -604,10 +635,11 @@ function enterWalk() {
   // Perf: walking is fill-rate-bound on laptops/phones — cap DPR while inside.
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
   ensureFloors();
-  levelIdx = floorLevels ? nearestLevelIdx(0) : 0;
-  floorTargetY = floorLevels ? floorLevels[levelIdx] : 0;
+  const inside = !bb.isEmpty() && bb.containsPoint(camera.position);
+  levelIdx = floorLevels ? nearestLevelIdx(inside ? camera.position.y-EYE : 4.7) : 0;
+  floorTargetY = floorLevels ? floorLevels[levelIdx] : Math.max(0,Math.min(FLOOR_MAX,inside?camera.position.y-EYE:4.7));
   floorY = floorTargetY;
-  playerPos.set(c.x, floorY, c.z);               // spawn at model center, ground floor
+  if (inside) playerPos.set(camera.position.x,floorY,camera.position.z); else playerPos.set(c.x, floorY, c.z);               // spawn at model center, ground floor
   camera.position.set(playerPos.x, floorY + EYE, playerPos.z);
   controls.enabled = false;                      // Orbit fully off while walking
   document.getElementById('walkBtn').classList.add('active');
@@ -624,14 +656,12 @@ function enterWalk() {
 function exitWalk() {
   if (!walkMode) return;
   walkMode = false; thirdPerson = false; dragLook = false;
+  document.body.classList.remove('mobile-walking');
+  clearMobileMotion();
   renderer.toneMappingExposure = EXPOSURE_ORBIT;
   avatar.visible = false;
   for (const k in keys) keys[k] = false;
-  if (savedCam) {
-    camera.position.copy(savedCam.pos);
-    camera.quaternion.copy(savedCam.quat);
-    controls.target.copy(savedCam.target);
-  }
+  controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),8);
   controls.enabled = true;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   document.getElementById('walkBtn').classList.remove('active');
@@ -649,13 +679,14 @@ document.addEventListener('pointerlockchange', () => {
   if (!plockActive && walkMode) exitWalk();      // Esc / lock lost → exit walk
 });
 // center-ray inspect: while locked, a click picks whatever the crosshair is on
-renderer.domElement.addEventListener('click', () => {
-  if (!walkMode || !plockActive) return;
+function inspectWalkAim(){
+  if(!walkMode)return;
   updateAim();
-  if (!aimedMesh) { clearPick(); return; }
-  if (aimedMesh.userData && aimedMesh.userData.ids) pickEquipment(aimedMesh, aimedInstance, aimedElementId);
-  else pickSystem(aimedMesh);
-});
+  if(!aimedMesh){showWalkHint();return;}
+  clearMobileMotion();
+  if(aimedMesh.userData?.ids)pickEquipment(aimedMesh,aimedInstance,aimedElementId);else pickSystem(aimedMesh);
+}
+renderer.domElement.addEventListener('click',()=>{if(walkMode&&plockActive)inspectWalkAim();});
 document.addEventListener('pointerlockerror', () => {
   plockFailed = true;
   if (walkMode) showWalkHint();                  // stay in walk, advertise drag-look
@@ -663,15 +694,29 @@ document.addEventListener('pointerlockerror', () => {
 document.addEventListener('mousemove', e => {
   if (walkMode && plockActive) rotateLook(e.movementX || 0, e.movementY || 0);
 });
+let lookPointerId=null;
 renderer.domElement.addEventListener('pointerdown', e => {
-  if (walkMode && !plockActive) { dragLook = true; _dragX = e.clientX; _dragY = e.clientY; }
+  if (walkMode && !plockActive && lookPointerId===null) { dragLook = true;lookPointerId=e.pointerId;_dragX=e.clientX;_dragY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId); }
 });
 window.addEventListener('pointermove', e => {
-  if (!dragLook) return;
+  if (!dragLook || e.pointerId!==lookPointerId) return;
   rotateLook(e.clientX - _dragX, e.clientY - _dragY);
   _dragX = e.clientX; _dragY = e.clientY;
 });
-window.addEventListener('pointerup', () => { dragLook = false; });
+function releaseLook(e){if(e.pointerId===lookPointerId){dragLook=false;lookPointerId=null;}}
+window.addEventListener('pointerup',releaseLook);window.addEventListener('pointercancel',releaseLook);
+function clearMobileMotion(){for(const k in keys)keys[k]=false;dragLook=false;lookPointerId=null;}
+window.addEventListener('blur',clearMobileMotion);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearMobileMotion();});
+for(const button of document.querySelectorAll('[data-walk-key]')){
+ const stop=()=>{keys[button.dataset.walkKey]=false;};
+ button.addEventListener('pointerdown',e=>{if(!walkMode)return;e.preventDefault();button.setPointerCapture(e.pointerId);keys[button.dataset.walkKey]=true;});
+ for(const name of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(name,stop);
+}
+document.getElementById('mobileHeightUp').onclick=()=>stepFloor(1);
+document.getElementById('mobileHeightDown').onclick=()=>stepFloor(-1);
+document.getElementById('mobileWalkExit').onclick=()=>exitWalk();
+document.getElementById('mobileInspect').onclick=inspectWalkAim;
+mobileMq.addEventListener('change',()=>{clearMobileMotion();document.body.classList.toggle('mobile-walking',walkMode&&mobileMq.matches);});
 
 document.addEventListener('keydown', e => {
   if (!walkMode) return;
@@ -1317,7 +1362,7 @@ const raycaster = new THREE.Raycaster(), _ptr = new THREE.Vector2();
 let _downX = 0, _downY = 0, picked = null;
 renderer.domElement.addEventListener('pointerdown', e => { _downX = e.clientX; _downY = e.clientY; });
 renderer.domElement.addEventListener('pointerup', e => {
-  if (walkMode && plockActive) return; // locked → the center-ray click pick handles it
+  if (walkMode && (plockActive || mobileMq.matches)) return; // Touch Walk uses Inspect; desktop fallback retains click picking.
   // (drag-look fallback keeps normal click picks: >6 px movement means a drag)
   if (Math.hypot(e.clientX - _downX, e.clientY - _downY) > 6) return; // drag, not a tap
   const r = renderer.domElement.getBoundingClientRect();
@@ -2284,6 +2329,40 @@ window.exportNotes = () => {
 };
 renderNotes();
 
+// Lightweight, source-ID-based alternative to selecting small targets on a phone.
+async function ensureMobileEquipment(){
+ const st=layerState.equipment;
+ if(!st?.group&&!st?.loading)toggleLayer('equipment');
+ for(let i=0;i<240;i++){
+  if(layerState.equipment?.group){if(!layerState.equipment.group.visible)toggleLayer('equipment');return;}
+  if(!layerState.equipment?.loading)throw Error('Equipment could not load. Check the connection and try Objects again.');
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ throw Error('Equipment is still loading. Try Objects again shortly.');
+}
+function renderMobileElements(){
+ const q=document.getElementById('mobileElementSearch').value.trim().toLowerCase(),list=document.getElementById('mobileElementResults');list.replaceChildren();
+ let total=0;const entries=equipMeta[q]?[[q,equipMeta[q]]]:Object.entries(equipMeta);
+ for(const [id,info] of entries){
+  if(!layerState[info.layer]?.group?.visible)continue;
+  if(equipLevelFilter&&elementLevel(info)!==equipLevelFilter)continue;
+  const label=info.element_tag||info.mark||info.name||info.family||info.type||'Element';
+  const searchable=[id,label,info.name,info.family,info.type,info.mark,info.location,info.level].join(' ').toLowerCase();
+  if(q&&!searchable.includes(q))continue;
+  total++;if(total>80)continue;
+  const btn=document.createElement('button');btn.dataset.elementId=id;btn.append(document.createTextNode(String(label)));
+  const detail=document.createElement('small');detail.textContent=[info.type||info.category,elementLevel(info)||info.level,'ID '+id].filter(Boolean).join(' · ');btn.append(detail);
+  btn.onclick=()=>{selectElementById(id);document.getElementById('mobileElementBrowser').hidden=true;document.getElementById('twinDetails').classList.add('open');document.getElementById('twinInfoBtn').textContent='▾ Less';};list.append(btn);
+ }
+ document.getElementById('mobileElementStatus').textContent=total?`${total.toLocaleString()} matches · showing ${Math.min(total,80)}. Search to narrow the list.`:'No matching loaded elements. Try a name, tag or source ID.';
+}
+document.getElementById('mobileBrowse').onclick=async()=>{
+ if(walkMode)exitWalk();document.getElementById('mobileElementBrowser').hidden=false;document.getElementById('mobileElementStatus').textContent='Loading equipment (1.5 MB)…';
+ try{await ensureMobileEquipment();renderMobileElements();}catch(e){document.getElementById('mobileElementStatus').textContent=e.message;}
+};
+let mobileSearchTimer;document.getElementById('mobileElementSearch').oninput=()=>{clearTimeout(mobileSearchTimer);mobileSearchTimer=setTimeout(renderMobileElements,100);};
+document.getElementById('mobileElementClose').onclick=()=>{document.getElementById('mobileElementBrowser').hidden=true;};
+document.getElementById('mobileFit').onclick=()=>{if(walkMode)exitWalk();clearPick();const bb=bimBbox();if(bb.isEmpty())return;const c=bb.getCenter(new THREE.Vector3()),r=bb.getSize(new THREE.Vector3()).length()/2;const angle=Math.min(camera.fov*Math.PI/180,2*Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect));controls.target.copy(c);camera.position.copy(c).addScaledVector(new THREE.Vector3(1,.7,1).normalize(),r/Math.sin(angle/2)*1.05);controls.update();};
 let _lastT = 0;
 renderer.setAnimationLoop((t) => {
   const dt = Math.min(0.1, (t - _lastT) / 1000) || 0.016;
