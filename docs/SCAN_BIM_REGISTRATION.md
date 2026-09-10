@@ -61,3 +61,5 @@ Obtain independently measured, well-distributed fixed control points across Leve
 ## Suggested spoken answer
 
 “I used geometry-based registration. After converting the scan to the viewer coordinate convention, I used constrained ICP to estimate horizontal rotation and three-dimensional translation, with scale fixed. I then applied that transform to both camera position and orientation to keep the views aligned. The median internal nearest-point distance was about 13 centimetres, but independent survey control points are still needed to establish real-world accuracy.”
+
+Vendor reconstruction versus our registration, with current export options and continuity plan: [Cupix investigation](CUPIX_CONTINUITY_RESEARCH.md).
