@@ -9,3 +9,9 @@ Level 1 source interior groups are included for context. Geometry registration i
 The main BIM viewer offers Show all elements / Hide all elements independently of All floors. It clears the element type restriction, retains the selected floor and loads missing layers sequentially. Hide all during loading stops the queue after the current decode; its late result stays hidden. The comparison toggle includes its interior groups. Its default desktop view loads all layers; touch devices initially load Equipment plus interior and may request all layers explicitly.
 
 The comparison adds approximately 118 MB of static assets; the scan alone is approximately 97 MB. First load depends on network and hardware. Existing BIM assets are reused. Source IDs and JSON bindings remain unchanged.
+
+## Mobile texture budget (2026-09-10)
+
+Touch/narrow devices use scan-assets/mobile texture derivatives (maximum edge 512 px), DPR capped at 1, no MSAA, and one Draco decoder worker. Original texture GPU allocation including mipmaps was approximately 776 MB; derivatives need 81 MB. Downloads fall from 97 MB to 20 MB. Geometry, node identities, UVs and accepted registration are unchanged; the mobile derivative preserves all non-image bufferViews byte-for-byte. Sources remain untouched. Rebuild with scripts/build_mobile_scan.py scan-assets (Pillow), verify with python3 tests/mobile-scan-assets.py. Mobile textures are less detailed. Browser emulation does not establish stability on every physical phone.
+
+WebGL context loss shows a reload action instead of silently leaving a blank canvas. Existing all-element controls remain opt-in on mobile and can increase memory use substantially.

@@ -359,6 +359,8 @@ body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;
 import * as THREE from 'three';
 const splitPane=new URLSearchParams(location.search).get('pane');
 document.body.dataset.pane=splitPane||'overlay';
+const mobileQuality=matchMedia('(max-width:768px), (pointer:coarse)').matches;
+document.body.dataset.quality=mobileQuality?'mobile':'full';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -370,8 +372,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0f1a);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
 camera.position.set(35, 25, 35);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: !mobileQuality });
+renderer.setPixelRatio(Math.min(devicePixelRatio, mobileQuality ? 1 : 2));
 /* ── Render-quality pass (lighting/material/tonemapping only — NO postprocessing:
    the 21 MB shell is ~120 draw calls, SSAO etc. would tank it) ── */
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -379,6 +381,12 @@ const EXPOSURE_ORBIT = 1.15, EXPOSURE_WALK = 1.45; // interiors read dark otherw
 renderer.toneMappingExposure = EXPOSURE_ORBIT;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 pane.appendChild(renderer.domElement);
+renderer.domElement.addEventListener('webglcontextlost',event=>{
+ event.preventDefault();
+ const warning=document.createElement('div');warning.setAttribute('role','alert');
+ warning.style.cssText='position:absolute;inset:25% 12px auto;z-index:200;padding:16px;background:#12283e;color:white';
+ warning.textContent='3D memory limit reached. Reload this view to recover. ';const retry=document.createElement('button');retry.textContent='Reload view';retry.onclick=()=>location.reload();warning.append(retry);pane.append(warning);
+});
 // Sky/ground hemisphere + warm key + cool fill — replaces the old flat
 // ambient-only rig that made every shell face read the same tone.
 scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x46403a, 0.9));
@@ -438,6 +446,7 @@ const NORM = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
 const NAME_TO_SYS_N = Object.fromEntries(SYSTEMS.map((s, i) => [NORM(s.name), i]));
 
 const draco = new DRACOLoader();
+draco.setWorkerLimit(mobileQuality ? 1 : 4);
 draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
 
@@ -657,7 +666,7 @@ function exitWalk() {
   controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),8);
   if(splitPane==='bim')document.getElementById('bimNavigate').textContent='Walk BIM';
   controls.enabled = true;
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, mobileQuality ? 1 : 2));
   document.getElementById('walkBtn').classList.remove('active');
   document.getElementById('levelBadge').style.display = 'none';
   setLinesVisible(true);
@@ -2367,8 +2376,8 @@ document.getElementById('showAllLayersQuick').onclick=()=>toggleAllElements();
 document.getElementById('scanFit').onclick=()=>{claimCamera();fitScan()};
 document.getElementById('scanAlpha').oninput=e=>scanRoot.traverse(o=>{if(o.isMesh)o.material.opacity=Number(e.target.value)});
 document.getElementById('scanOnly').onclick=e=>{scanOnly=!scanOnly;for(const st of Object.values(layerState))if(st.group){if(scanOnly){st.scanPriorVisible=st.group.visible;st.group.visible=false}else st.group.visible=st.scanPriorVisible??st.group.visible}if(mepModel)mepModel.visible=false;e.target.textContent=scanOnly?'Restore BIM':'Scan only'};
-async function loadScanDataset(unused,onLoad,onProgress,onError){try{const combined=new THREE.Group();const paths=['scan-assets/level1-scan-2026-05-06.glb','scan-assets/level1-scan-2026-05-06-part2.glb'];for(let i=0;i<paths.length;i++){document.getElementById('scanStatus').textContent=`Loading scan part ${i+1}/${paths.length}…`;const g=await loader.loadAsync(paths[i]);combined.add(g.scene);}onLoad({scene:combined});document.body.dataset.scanParts='2';}catch(e){onError(e);}}
-if(splitPane!=='bim')loadScanDataset('scan-assets/level1-scan-2026-05-06.glb',g=>{const axes=new THREE.Group();axes.rotation.x=-Math.PI/2;axes.add(g.scene);scanRoot.add(axes);g.scene.traverse(o=>{if(o.isMesh){const old=o.material;o.material=new THREE.MeshBasicMaterial({map:old.map,toneMapped:false,transparent:true,opacity:.65,depthWrite:false,side:THREE.DoubleSide});old.dispose()}});scanReady=true;if(splitPane==='scan'){Object.assign(scanConfig,{x:0,y:0,z:0,yaw:0});document.getElementById('scanAlpha').value=1;scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}})}updateScanTransform();fitScan();document.getElementById('scanStatus').textContent='Not registered · Do not use overlay for device location';if(splitPane==='scan')document.getElementById('scanStatus').textContent=camerasLinked?'Captured geometry · Views aligned':'Captured geometry · Independent camera';document.body.dataset.scanReady='true';},undefined,e=>{document.getElementById('scanStatus').textContent='Scan load failed: '+e.message});
+async function loadScanDataset(unused,onLoad,onProgress,onError){try{const combined=new THREE.Group();const prefix=mobileQuality?'scan-assets/mobile/':'scan-assets/';const paths=['level1-scan-2026-05-06.glb','level1-scan-2026-05-06-part2.glb'].map(name=>prefix+name);for(let i=0;i<paths.length;i++){document.getElementById('scanStatus').textContent=`Loading scan part ${i+1}/${paths.length}…`;const g=await loader.loadAsync(paths[i]);combined.add(g.scene);g.parser.cache.removeAll();}onLoad({scene:combined});document.body.dataset.scanParts='2';}catch(e){onError(e);}}
+if(splitPane!=='bim')loadScanDataset('scan-assets/level1-scan-2026-05-06.glb',g=>{const axes=new THREE.Group();axes.rotation.x=-Math.PI/2;axes.add(g.scene);scanRoot.add(axes);g.scene.traverse(o=>{if(o.isMesh){const old=o.material;o.material=new THREE.MeshBasicMaterial({map:old.map,toneMapped:false,transparent:splitPane!=='scan',opacity:splitPane==='scan'?1:.65,depthWrite:splitPane==='scan',side:THREE.DoubleSide});old.dispose()}});scanReady=true;if(splitPane==='scan'){Object.assign(scanConfig,{x:0,y:0,z:0,yaw:0});document.getElementById('scanAlpha').value=1;scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}})}updateScanTransform();fitScan();document.getElementById('scanStatus').textContent='Not registered · Do not use overlay for device location';if(splitPane==='scan')document.getElementById('scanStatus').textContent=camerasLinked?'Captured geometry · Views aligned':'Captured geometry · Independent camera';document.body.dataset.scanReady='true';},undefined,e=>{document.getElementById('scanStatus').textContent='Scan load failed: '+e.message});
 
 function solveScanPairs(pairs){
  if(pairs.length<3)throw new Error('Select at least 3 matching landmark pairs.');
