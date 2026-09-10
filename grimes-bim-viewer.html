@@ -212,7 +212,6 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   <span class="tb-sub">Three.js · GLB · no external BIM service</span>
   <span class="tb-spacer"></span>
   <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
-  <button class="tb-btn" id="bldgBtn" onclick="toggleBuilding()" title="Show/hide the translucent building envelope around the systems">🏢 Building shell</button>
   <div class="tb-dd" id="layersDd">
     <button class="tb-btn" id="layersBtn" onclick="toggleLayersMenu()" title="Element-tier layers cut from the 741k-element APS master — each element is clickable">⬡ Layers ▾</button>
     <div class="tb-menu" id="layersMenu" hidden>
@@ -430,7 +429,6 @@ draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
 
 const allMeshes = [];
-const shellMeshes = [];            // building-shell meshes (pickable, lower priority)
 const sysMesh = {};                // system index → representative MEP mesh
 let _bimBboxCache = null;
 function bimBbox() {
@@ -471,182 +469,14 @@ loader.load('grimes-mep-only.glb', (gltf) => {
   const bb = bimBbox(), c = bb.getCenter(new THREE.Vector3());
   controls.target.copy(c);
   camera.position.set(c.x + 45, c.y + 30, c.z + 45);
-  alignShellToMep(); // in case the shell finished loading before the MEP
-  // 2026-09: exterior-first. On desktop the ghost shell IS the default view
-  // and the legacy 8-mesh MEP overview starts hidden (its content now lives
-  // in the per-element layers) — toggle it back from the layers panel.
-  // Mobile keeps the old behaviour: MEP visible, shell confirm-gated.
-  if (!mobileMq.matches) {
-    mepModel.visible = false;
-    document.getElementById('legend').style.display = 'none';
-    loadShell();
-  } else {
-    document.getElementById('layerBtn-mep').classList.add('active');
-  }
+  // Systems-first on every device; the optional architectural shell was removed.
+  document.getElementById('layerBtn-mep').classList.add('active');
 }, p => { document.getElementById('loadSub').textContent = `MEP… ${(p.loaded/1048576).toFixed(1)} MB`; },
 () => {
   const el = document.getElementById('loading');
   el.querySelector('.msg').textContent = 'Error loading grimes-mep-only.glb';
   el.querySelector('.spinner').style.animation = 'none';
 });
-
-// Full building shell (21 MB, Draco+WebP, material-preserving join) — lazy toggle, identical transform to grimes-xr:
-// feet→meters, Z-up→Y-up, recentered — so it lands in the same frame as the MEP glb.
-let building = null, buildingLoading = false;
-// Shell materials: translucent ghost for Orbit (MEP stays visible), original
-// GLB materials (or a plain opaque wall tone) for Walk mode realism.
-const shellGhostMat = new THREE.MeshLambertMaterial({ color: 0x9fb2c8, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false });
-const shellSolidMat = new THREE.MeshLambertMaterial({ color: 0xb8bfc9, side: THREE.DoubleSide });
-
-/* ── Shell material upgrade (in place, per unique material) ──
-   The Navisworks export names each node after its Revit material
-   ("Wood_(White_Oak_Rift_Cut)", "UCBBECH_-_GL-3A", "Concrete_-_Cast-in-Place…")
-   and keeps real base colors, but flattens PBR to metalness .2 / roughness .4
-   and — crucially — exports glass with alphaMode OPAQUE, so glazing rendered
-   as solid pale slabs. This pass fixes transparency and assigns plausible
-   metal/wood/concrete/gypsum/fabric responses from the names. Materials are
-   shared across meshes; the _upgraded flag makes the pass run once each. */
-const GLASS_TINT = new THREE.Color(0x9cc4dd);
-function upgradeShellMaterial(mat, nodeName) {
-  if (!mat || mat.userData._upgraded) return;
-  mat.userData._upgraded = true;
-  if (!('metalness' in mat)) return; // only PBR materials from the GLB
-  const n = String(nodeName).toLowerCase();
-  const isGlass = mat.opacity < 0.999 || /glass|glazing|_gl-|-gl-|vitr|curtain/.test(n);
-  if (isGlass) {
-    mat.transparent = true;
-    mat.depthWrite = false;
-    mat.opacity = Math.min(0.5, Math.max(0.18, mat.opacity < 0.999 ? mat.opacity + 0.08 : 0.35));
-    mat.metalness = 0; mat.roughness = 0.06;
-    mat.envMapIntensity = 1.3;
-    // near-white/grey glass → cool blue tint (colored glass keeps its color)
-    const c = mat.color, lum = (c.r + c.g + c.b) / 3;
-    if (lum > 0.55 && Math.abs(c.r - c.b) < 0.15) c.lerp(GLASS_TINT, 0.65);
-    mat.side = THREE.DoubleSide;
-  } else if (/chrome|stainless|polished/.test(n)) {
-    mat.metalness = 0.95; mat.roughness = 0.18; mat.envMapIntensity = 1.1;
-  } else if (/metal|steel|alum|_mtl|stl-|hndrl|guardrail|handrail|stud|caster|frame/.test(n)) {
-    mat.metalness = 0.75; mat.roughness = 0.42; mat.envMapIntensity = 0.8;
-  } else if (/wood|oak|birch|maple|timber|_wd/.test(n)) {
-    mat.metalness = 0; mat.roughness = 0.55; mat.envMapIntensity = 0.5;
-  } else if (/concrete|cement|masonry|cmu|brick|terrazzo|stone/.test(n)) {
-    mat.metalness = 0; mat.roughness = 0.95; mat.envMapIntensity = 0.3;
-  } else if (/gypsum|gwb|plaster|paint|wall|ceiling|acous/.test(n)) {
-    mat.metalness = 0; mat.roughness = 0.9; mat.envMapIntensity = 0.35;
-    // dead-grey default walls → subtle warm off-white so rooms don't feel concrete-boxed
-    if (/default_wall/.test(n)) mat.color.lerp(new THREE.Color(0xd8d2c6), 0.5);
-  } else if (/fabric|upholstery|carpet|cloth|felt/.test(n)) {
-    mat.metalness = 0; mat.roughness = 1.0; mat.envMapIntensity = 0.25;
-  } else {
-    mat.metalness = 0.05; mat.roughness = 0.7; mat.envMapIntensity = 0.45;
-  }
-}
-const shellBounds = []; // {mesh, box} — cheap XZ prefilter for ground raycasts
-/* Walk mode: MEP fades to translucent context (architecture is the star).
-   Orbit mode: MEP back to the saturated SCADA look. */
-function setMepGhost(ghost) {
-  allMeshes.forEach(m => {
-    if (!m.material) return;
-    m.material.opacity = ghost ? 0.30 : 0.85;
-    m.material.depthWrite = !ghost;
-    m.material.emissiveIntensity = ghost ? 0.15 : 0.35;
-  });
-}
-function setShellMode(solid) {
-  if (!building) return;
-  building.traverse(ch => {
-    if (!ch.isMesh) return;
-    if (solid) {
-      ch.material = ch.userData.origMat || shellSolidMat;
-      ch.renderOrder = 0;
-    } else {
-      ch.material = shellGhostMat;
-      ch.renderOrder = -1;
-    }
-  });
-}
-function alignShellToMep() {
-  if (!building) return;
-  const bb = bimBbox();
-  if (bb.isEmpty()) return; // MEP not loaded yet — realigned from the MEP callback
-  const mepC = bb.getCenter(new THREE.Vector3());
-  const sc = new THREE.Box3().setFromObject(building).getCenter(new THREE.Vector3());
-  building.position.add(mepC.sub(sc));
-  building.updateMatrixWorld(true);
-  const fin = new THREE.Box3().setFromObject(building);
-  building.position.y += bb.min.y - fin.min.y; // both floors on the same line
-  building.updateMatrixWorld(true);
-}
-window.toggleBuilding = () => {
-  const btn = document.getElementById('bldgBtn');
-  if (building) { building.visible = !building.visible; btn.classList.toggle('active', building.visible); return; }
-  if (buildingLoading) return;
-  // Never auto-download tens of MB on a phone — stays opt-in behind a confirm.
-  if (mobileMq.matches && !confirm(`Building shell is a ${SHELL_MB} MB download. Load it on this device?`)) return;
-  loadShell();
-};
-// Shell v2 (default): architecture re-extracted from the element-identity
-// master — original Revit materials (glass, wood, fabric), 93 draw calls
-// (was 120+ with the legacy export). Fallback: append ?shell=old to the URL.
-const USE_OLD_SHELL = new URLSearchParams(location.search).get('shell') === 'old';
-const SHELL_URL = USE_OLD_SHELL ? 'grimes-mep-compressed.glb' : 'buildings/grimes/grimes-arch.glb';
-const SHELL_MB = USE_OLD_SHELL ? 21 : 32;
-function loadShell() {
-  if (building || buildingLoading) return;
-  const btn = document.getElementById('bldgBtn');
-  buildingLoading = true;
-  btn.textContent = `⏳ ${SHELL_MB} MB…`;
-  loader.load(SHELL_URL, (gltf) => {
-    building = gltf.scene;
-    // DERIVED placement (2026-08-03), anchored on geometry present in
-    // multiple exports (Bolia set 0.00 m residual; conduit set under H180):
-    //   old shell (ft, Z-up) → viewer: scale + rotX(-90°) + T  (rotations cancel)
-    //   arch v2 (master frame, m, Y-up) → viewer: rotY(180°) + T
-    if (USE_OLD_SHELL) {
-      building.scale.setScalar(0.3048);
-      building.rotation.x = -Math.PI / 2;
-    } else {
-      building.rotation.y = Math.PI;
-    }
-    building.position.set(-35.28, -97.16, 28.60);
-    building.updateMatrixWorld(true);
-    // Ghost by default (Orbit): Lambert picks up scene light for subtle
-    // shading; 0.24 keeps MEP visible. Original GLB materials are kept on
-    // each mesh for Walk mode's opaque look (setShellMode toggles).
-    building.traverse(ch => {
-      if (!ch.isMesh) return;
-      const nm = ch.name || (ch.parent && ch.parent.name) || '';
-      // Revit datum geometry (grid/level lines + bubbles) came along in the
-      // export — annotation, not building. Hide it and keep it out of the
-      // floor-detection raycasts.
-      if (/^grid$|^level\b|datum/i.test(nm)) { ch.visible = false; return; }
-      upgradeShellMaterial(ch.material, nm);
-      ch.userData.origMat = ch.material;
-      ch.material = shellGhostMat;
-      ch.renderOrder = -1;
-      shellMeshes.push(ch);
-    });
-    shellBounds.length = 0;
-    building.updateMatrixWorld(true);
-    shellMeshes.forEach(msh => shellBounds.push({ mesh: msh, box: new THREE.Box3().setFromObject(msh) }));
-    floorLevels = undefined; // (re)detect slab heights on next walk enter
-    scene.add(building);
-    if (walkMode) {
-      // shell arrived mid-walk: go opaque and snap onto real slab heights
-      setShellMode(true);
-      ensureFloors();
-      if (floorLevels) {
-        levelIdx = nearestLevelIdx(floorTargetY);
-        floorTargetY = floorLevels[levelIdx];
-      }
-      updateLevelBadge();
-    }
-    buildingLoading = false;
-    btn.textContent = '🏢 Building shell';
-    btn.classList.add('active');
-  }, p => { btn.textContent = `⏳ ${(p.loaded/1048576).toFixed(0)}/${SHELL_MB} MB`; },
-  () => { buildingLoading = false; btn.textContent = '⚠ shell failed'; });
-}
 
 /* ══════════ WALK MODE — first/third-person walkthrough (desktop) ══════════
    Look is implemented directly (no PointerLockControls): pointer lock is
@@ -656,10 +486,9 @@ function loadShell() {
    Movement/positioning is ours, so 1st↔3rd person is just a camera offset.
    No wall collision by design; eye = floor + 1.6 m, floors step 3.5 m. */
 let walkMode = false, thirdPerson = false, floorY = 0, floorTargetY = 0;
-let floorLevels, levelIdx = 0, _groundAcc = 0, _shellWasVisible = true;
+let floorLevels, levelIdx = 0;
 let plockActive = false, plockFailed = false, dragLook = false, _dragX = 0, _dragY = 0;
 let yaw = 0, pitch = 0;
-const _floorRay = new THREE.Raycaster();
 const _centerVec = new THREE.Vector2(0, 0);
 let aimedMesh = null, aimedInstance = null, aimedElementId = null, _aimAcc = 0;
 
@@ -686,28 +515,8 @@ function setLinesVisible(v) {
   scene.traverse(o => { if ((o.isLine || o.isPoints) && !o.userData.ids) o.visible = v; });
 }
 
-/* Slab detection: one-time downward multi-ray through the shell collects hit
-   heights, clustered into a floor list. Falls back to 3.5 m steps if the
-   shell isn't loaded or the result looks degenerate. */
-function detectFloors() {
-  if (!building || !shellMeshes.length) return null;
-  const bb = new THREE.Box3().setFromObject(building);
-  const c = bb.getCenter(new THREE.Vector3());
-  const ys = [];
-  for (const [dx, dz] of [[0, 0], [8, 8], [-8, 8], [8, -8], [-8, -8]]) {
-    _floorRay.set(new THREE.Vector3(c.x + dx, bb.max.y + 2, c.z + dz), new THREE.Vector3(0, -1, 0));
-    _floorRay.far = Infinity;
-    _floorRay.intersectObjects(shellMeshes, false).forEach(h => ys.push(h.point.y));
-  }
-  if (!ys.length) return null;
-  ys.sort((a, b) => a - b);
-  const levels = [];
-  for (const y of ys) {
-    if (!levels.length || y - levels[levels.length - 1] > 1.4) levels.push(y);
-  }
-  const inside = levels.filter(y => y < bb.max.y - 1.5); // roof isn't a floor
-  return inside.length >= 2 ? inside : null;
-}
+// Without architectural slabs, walk heights are explicitly user-stepped.
+function detectFloors() { return null; }
 function ensureFloors() {
   if (floorLevels === undefined) floorLevels = detectFloors();
 }
@@ -731,27 +540,6 @@ function stepFloor(dir) {
     floorTargetY = Math.max(0, Math.min(FLOOR_MAX, floorTargetY + dir * FLOOR_STEP));
   }
   updateLevelBadge();
-}
-/* Ground-follow (ramps/steps within a storey): throttled 10 Hz raycast just
-   under the player, prefiltered by per-mesh bounding boxes so we only test
-   the handful of meshes under the XZ position. */
-function groundFollow() {
-  if (!floorLevels || !shellBounds.length) return;
-  const px = playerPos.x, pz = playerPos.z, top = floorY + 2.0;
-  const cand = [];
-  for (const { mesh, box } of shellBounds) {
-    if (px < box.min.x - 1 || px > box.max.x + 1 || pz < box.min.z - 1 || pz > box.max.z + 1) continue;
-    if (box.max.y < floorY - 1.6 || box.min.y > top) continue;
-    cand.push(mesh);
-  }
-  if (!cand.length) return;
-  _floorRay.set(new THREE.Vector3(px, top, pz), new THREE.Vector3(0, -1, 0));
-  _floorRay.far = 4.0;
-  const hit = _floorRay.intersectObjects(cand, false)[0];
-  if (hit && Math.abs(hit.point.y - floorTargetY) > 0.03 && Math.abs(hit.point.y - floorTargetY) < 1.5) {
-    floorTargetY = hit.point.y;
-    updateLevelBadge();
-  }
 }
 const playerPos = new THREE.Vector3();
 const keys = {};
@@ -803,7 +591,6 @@ window.toggleWalk = () => {
   try { renderer.domElement.requestPointerLock(); } catch { plockFailed = true; showWalkHint(); }
 };
 function enterWalk() {
-  if (!building) loadShell(); // walk needs slabs/walls; arrival mid-walk is handled (setShellMode + floor re-detect)
   walkMode = true; thirdPerson = false;
   renderer.toneMappingExposure = EXPOSURE_WALK; // indoor: no direct sky view → lift exposure (no fog by design)
   savedCam = { pos: camera.position.clone(), quat: camera.quaternion.clone(), target: controls.target.clone() };
@@ -814,17 +601,6 @@ function enterWalk() {
   applyLook();
   const bb = bimBbox();
   const c = bb.isEmpty() ? new THREE.Vector3() : bb.getCenter(new THREE.Vector3());
-  // shell goes opaque for the walkthrough (auto-loads if not yet in)
-  if (!building) loadShell();
-  else {
-    _shellWasVisible = building.visible;
-    building.visible = true;
-    setShellMode(true);
-  }
-  // Architecture-first walkthrough: the building (walls/stairs/glass) is the
-  // primary surface, MEP systems become translucent context so the space
-  // reads as a space, not a pile of colored blocks.
-  setMepGhost(true);
   // Perf: walking is fill-rate-bound on laptops/phones — cap DPR while inside.
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
   ensureFloors();
@@ -857,11 +633,6 @@ function exitWalk() {
     controls.target.copy(savedCam.target);
   }
   controls.enabled = true;
-  if (building) {
-    setShellMode(false);                         // back to the MEP-friendly ghost
-    building.visible = _shellWasVisible;
-  }
-  setMepGhost(false);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   document.getElementById('walkBtn').classList.remove('active');
   document.getElementById('levelBadge').style.display = 'none';
@@ -927,8 +698,6 @@ function updateWalk(dt) {
   if (_move.lengthSq()) _move.normalize().multiplyScalar(speed * dt);
   playerPos.add(_move);
   // in-storey ground follow (ramps/steps), throttled to ~10 Hz
-  _groundAcc += dt;
-  if (_groundAcc > 0.1) { _groundAcc = 0; groundFollow(); }
   // crosshair aim feedback, ~8 Hz (MEP glb is light — 8 meshes)
   _aimAcc += dt;
   if (_aimAcc > 0.12) { _aimAcc = 0; updateAim(); }
@@ -1542,11 +1311,10 @@ renderer.domElement.addEventListener('pointerup', e => {
     const eqHit = raycaster.intersectObjects(visibleEquip(), false)[0];
     if (eqHit) { pickEquipment(eqHit.object, eqHit.instanceId, resolveElementHit(eqHit.object, eqHit.instanceId, eqHit.faceIndex, eqHit.index)); return; }
   }
-  // MEP systems win when overlapping; the shell is the fallback target
+  // Resolve systems after element picking; empty space clears the selection.
   const mepHit = (mepModel && mepModel.visible) ? raycaster.intersectObjects(allMeshes, false)[0] : null;
   if (mepHit) { pickSystem(mepHit.object); return; }
-  const shellHit = (building && building.visible) ? raycaster.intersectObjects(shellMeshes, false)[0] : null;
-  if (shellHit) pickBuilding(); else clearPick();
+  clearPick();
 });
 
 function highlight(mesh) {
@@ -1995,7 +1763,7 @@ function channelRows(sysName, live) {
   }).join('');
 }
 
-// Shell/wall click → building-level panel: load + baseline + system directory.
+// Building-level panel: load + baseline + system directory.
 const BUILDING_PICK = {};
 window.selectSysByIndex = i => { const m = sysMesh[i]; if (m) pickSystem(m); };
 function pickBuilding() {
@@ -2022,7 +1790,7 @@ function pickBuilding() {
     + drow('brick class', bEnt ? esc(String(bEnt.type).replace('brick:', '')) : 'Building')
     + drow('campus', 'UC Berkeley')
     + dsec('About')
-    + '<div class="dnote">The shell is architectural context — the colored systems carry the live meter feeds.</div>'
+    + '<div class="dnote">Meter values are building or feeder context; element allocations remain modelled.</div>'
     + '<div class="duri">grimes:Grimes</div>';
   renderDesignVsActual();
 }

@@ -52,11 +52,7 @@ identity sidecar under `buildings/grimes/`:
   eligible, intentionally excluded and with_geometry counts; never count excluded
   clearance volumes as missing geometry. See `docs/MEP_RECOVERY.md`.
 
-Viewer behaviour: desktop opens **exterior-first** (ghost shell auto-loads,
-legacy 8-mesh MEP overview hidden behind a "🎨 MEP overview" toggle); layer
-list is a fixed left panel with per-layer type-filter chips; clicking any
-element opens a dashboard (identity, Revit design data, live/modelled power,
-neighbours). Rendering uses runtime-only bounded merges by level/material/type, keeping
+Viewer behaviour: the architectural Building Shell feature was removed at the owner's request on 2026-09-09, including its controls, loaders and Walk auto-load path. The lightweight MEP overview is initially visible on all devices. Ten element layers and their structural geometry remain available. Walk uses explicitly stepped heights without shell slab-following. The layer list has per-layer type-filter chips; clicking an element opens its dashboard. Rendering uses runtime-only bounded merges by level/material/type, keeping
 strongly repeated geometry instanced. Triangle/line ranges resolve picks.
 GLTFLoader uniquifies node names: `bindElementSourceIds` reads the exact original
 `userData.name` before merging; parser associations alone are unsafe for clones.
