@@ -1,0 +1,2551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>if(!["scan","bim"].includes(new URLSearchParams(location.search).get("pane")))location.replace("scan-compare.html");</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scan + UC Berkeley · Bechtel Full BIM (Three.js)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#FDB515;--bg:#060a12;--text:#e0e7f1;--dim:#6b7fa0;
+  --cyan:#22d3ee;--green:#34d399;--red:#f87171;
+  --border:rgba(255,255,255,.08);
+  --mono:'JetBrains Mono',monospace;--font:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden}
+#topbar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(8,12,24,.94);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:14px;z-index:100;font-size:13px}
+#topbar a.back{color:var(--cyan);text-decoration:none;font:500 12px/1 var(--font)}
+.tb-title{font-weight:600;color:#fff;letter-spacing:-.2px}
+.tb-sub{font:500 10.5px/1 var(--mono);color:#6b7fa0;letter-spacing:.4px;text-transform:uppercase}
+.tb-spacer{flex:1}
+.tb-dd{position:relative}
+.tb-menu{position:fixed;top:62px;left:14px;width:258px;max-height:calc(100vh - 200px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(8,12,24,.95);border:1px solid var(--border);border-radius:6px;z-index:65}
+.tb-menu .lm-hdr{display:flex;align-items:center;justify-content:space-between;padding:1px 4px 6px;border-bottom:1px solid var(--border);margin-bottom:3px;font:600 10px/1 var(--mono);letter-spacing:.8px;color:#94a3b8}
+.tb-menu .lm-hdr button{background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;line-height:1;padding:2px}
+.tb-menu .lm-hdr button:hover{color:#cbd5e1}
+.lm-chips{display:flex;flex-wrap:wrap;gap:3px;padding:1px 2px 7px;border-bottom:1px dashed rgba(148,163,184,.15);font:10px/1.4 var(--mono)}
+.lm-chips .ef{cursor:pointer;border:1px solid rgba(148,163,184,.25);border-radius:999px;padding:1px 7px;color:#94a3b8;background:transparent;font:inherit}
+.lm-chips .ef:hover{color:#cbd5e1;border-color:rgba(148,163,184,.5)}
+.lm-chips .ef.on{background:#fbbf24;color:#0b1020;border-color:#fbbf24}
+.lm-chips .ef small{opacity:.6;margin-left:3px}
+.tb-menu .tb-btn{text-align:left;display:flex;justify-content:space-between;gap:10px;white-space:nowrap}
+.tb-menu .tb-btn small{color:#6b7fa0;font:500 10px/1 var(--mono)}
+.tb-menu .tb-btn.active small{color:inherit;opacity:.7}
+@media(max-width:1150px){.tb-sub{display:none}}
+.tb-btn{padding:5px 11px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:#cbd5e1;border-radius:5px;cursor:pointer;font:500 11.5px/1 var(--font);transition:all .15s;text-decoration:none}
+.tb-btn:hover{border-color:rgba(34,211,238,.3);color:#67e8f9}
+.tb-btn.active{background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.4);color:#67e8f9}
+#main{position:fixed;top:48px;left:0;right:0;bottom:0;display:flex}
+#cupixPane{display:none;flex:1 1 50%;height:100%;background:#000;flex-direction:column;min-width:0}
+#cupixPane.show{display:flex}
+/* Draggable split divider (desktop Compare mode) */
+#splitDivider{display:none;flex:0 0 6px;height:100%;cursor:col-resize;background:rgba(34,211,238,.28);touch-action:none;position:relative;z-index:40}
+#splitDivider:hover,#splitDivider.dragging{background:rgba(34,211,238,.6)}
+body.compare-on #splitDivider{display:block}
+#cupixHdr{padding:7px 12px;background:rgba(8,12,24,.85);border-bottom:1px solid rgba(34,211,238,.2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;font-size:11px}
+#cupixHdr span{font:600 10px/1 var(--mono);color:var(--cyan);letter-spacing:.5px;text-transform:uppercase}
+#cupixFrame{flex:1;border:0;background:#000;width:100%}
+/* min-width:0 is load-bearing: without it the flex item's min-width is the
+   canvas's own width (auto), so the viewer pane refused to shrink and the
+   Cupix pane collapsed to a sliver instead of a 50/50 split. */
+#viewerPane{flex:1 1 50%;height:100%;position:relative;background:#0a0f1a;min-width:0;min-height:0}
+#viewerPane canvas{display:block}
+#loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#cbd5e1;z-index:10;pointer-events:none}
+#loading .spinner{width:42px;height:42px;border:3px solid rgba(34,211,238,.15);border-top-color:var(--cyan);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading .msg{font:500 13px/1.4 var(--font);color:#94a3b8}
+#loading .sub{font:500 10.5px/1.4 var(--mono);color:#475569;margin-top:6px}
+#syncPanel{position:fixed;right:14px;bottom:14px;z-index:60;width:238px;background:rgba(8,12,24,.95);border:1px solid rgba(34,211,238,.3);border-radius:6px;padding:9px 12px;display:none;font:11px/1.4 var(--font);color:#cbd5e1}
+body.compare-on #syncPanel{display:block}
+#syncPanel .hdr{font:600 10px/1 var(--mono);color:var(--cyan);letter-spacing:.4px;text-transform:uppercase;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(34,211,238,.15);display:flex;justify-content:space-between}
+#syncPanel .stat{display:flex;justify-content:space-between;font:10px/1.3 var(--mono);color:#94a3b8;padding:2px 0}
+#syncPanel .stat .k{color:#64748b}
+#syncPanel .stat .v{color:#cbd5e1}
+#syncPanel .row{display:flex;gap:8px;margin-top:6px;font-size:10px;align-items:center}
+#syncPanel .row label{display:flex;align-items:center;gap:4px;cursor:pointer;color:#94a3b8}
+#syncPanel input[type=number]{background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.3);color:#cbd5e1;padding:2px 4px;border-radius:3px;font:10px var(--mono)}
+#syncPanel .hint{font:italic 9.5px/1.4 var(--font);color:#475569;margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.08)}
+#legend{position:fixed;left:14px;bottom:14px;z-index:50;background:rgba(8,12,24,.9);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font:10px/1.6 var(--mono);color:#94a3b8}
+#equipFilter{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:51;display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:min(92vw,720px);background:rgba(8,12,24,.92);border:1px solid var(--border);border-radius:6px;padding:6px 9px;font:10px/1.4 var(--mono);color:#94a3b8}
+#equipFilter .ef-title{font-weight:600;font-size:9px;letter-spacing:.5px;margin-right:4px}
+#equipFilter .ef{cursor:pointer;border:1px solid rgba(148,163,184,.25);border-radius:999px;padding:2px 8px;color:#cbd5e1;background:transparent;font:inherit}
+#equipFilter .ef.on{background:#fbbf24;color:#0b1020;border-color:#fbbf24}
+#equipFilter .ef small{opacity:.6;margin-left:3px}
+body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
+#legend .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+/* ── Twin panel: visual-first — big number + chart up top, prose folded into ⓘ.
+   Three density levels: (1) headline kW/badge/chart, (2) compact rows, (3) details. ── */
+#twinPanel{position:fixed;right:14px;top:62px;z-index:70;width:320px;background:rgba(8,12,24,.95);border:1px solid rgba(52,211,153,.35);border-radius:6px;padding:10px 12px;display:none;font:11px/1.45 var(--font);color:#cbd5e1}
+#chartTip{position:absolute;z-index:5;display:none;background:rgba(6,10,20,.96);border:1px solid rgba(148,163,184,.3);border-radius:5px;padding:5px 8px;font:9.5px/1.5 var(--mono);color:#cbd5e1;pointer-events:none;white-space:nowrap}
+#twinPanel.show{display:block}
+#twinPanel .thdr{display:flex;align-items:center;gap:8px;padding-bottom:7px;margin-bottom:4px;border-bottom:1px solid rgba(52,211,153,.15);font:600 12px/1.2 var(--font);color:#e8eef7}
+#twinPanel .thdr .sysdot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:#64748b}
+#twinPanel .thdr #twinTitle{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#twinPanel .thdr button{background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;line-height:1;padding:2px}
+#twinPanel .thdr button.on{color:#67e8f9}
+#twinPanel .bigrow{display:flex;align-items:baseline;gap:10px;margin:6px 0 0}
+#twinPanel .bigkw{font:700 26px/1 var(--mono);color:#fff}
+#twinPanel .bigkw small{font:600 12px var(--mono);color:#64748b}
+#twinPanel .badge{font:700 9.5px/1 var(--mono);padding:3px 7px;border-radius:4px;background:rgba(52,211,153,.15);color:#34d399;letter-spacing:.3px}
+#twinPanel .badge.hi{background:rgba(248,113,113,.18);color:#f87171}
+#twinPanel .badge.lo{background:rgba(96,165,250,.18);color:#93c5fd}
+#twinPanel .badge.na{background:rgba(148,163,184,.12);color:#94a3b8}
+#twinPanel .srcnote{font:9px/1.4 var(--mono);color:#475569;margin:3px 0 5px}
+#twinPanel canvas{width:100%;height:90px;border-radius:4px;background:rgba(0,0,0,.25);display:block}
+#twinPanel .pt{display:flex;justify-content:space-between;gap:8px;font:10.5px/1.6 var(--mono);padding:1px 0;color:#94a3b8}
+#twinPanel .pt .v{color:#e0e7f1;font-weight:600;white-space:nowrap}
+#twinPanel .mut{color:#475569;font-style:italic}
+#twinPanel .morebtn{font:9.5px/1.6 var(--mono);color:#64748b;cursor:pointer;user-select:none}
+#twinPanel .morebtn:hover{color:#94a3b8}
+#twinPanel .sec{font:600 8.5px/1 var(--mono);color:#64748b;letter-spacing:.5px;margin:7px 0 3px;text-transform:uppercase}
+#twinPanel .pt.ch-off{color:#41506a}
+#twinPanel .pt.ch-off span:last-child{font-style:italic;color:#3c4a63;font-weight:400}
+#twinPanel .livedot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:5px;vertical-align:1px}
+#twinPanel .pt.sysrow{cursor:pointer}
+#twinPanel .pt.sysrow:hover{color:#e0e7f1}
+#twinPanel .pt.sysrow .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+/* micro-legend under the chart so first-timers can read it instantly */
+#twinPanel .chartkey{display:flex;gap:10px;font:9px/1 var(--mono);color:#64748b;margin:4px 0 2px}
+#twinPanel .chartkey .k{display:flex;align-items:center;gap:4px}
+#twinPanel .chartkey i{display:inline-block}
+#twinPanel .chartkey .ln{width:10px;height:2px;background:#34d399}
+#twinPanel .chartkey .bd{width:8px;height:6px;background:rgba(253,181,21,.28);border-radius:1px}
+#twinPanel .chartkey .dt{width:6px;height:6px;background:#f87171;border-radius:50%}
+#twinPanel .evline{display:flex;justify-content:space-between;gap:8px;font:10px/1.6 var(--mono);color:#94a3b8;margin-top:6px;padding-top:5px;border-top:1px solid rgba(148,163,184,.1)}
+#twinPanel .simline{font:9.5px/1.5 var(--mono);color:#34d399}
+#twinDetails{display:none;margin-top:7px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12);font:9.5px/1.7 var(--mono);color:#64748b}
+#twinDetails.open{display:block}
+#twinDetails canvas{height:36px;margin-top:4px}
+/* details typographic hierarchy: grouped label–value rows, URI demoted */
+#twinDetails .dsec{font:600 8px/1 var(--mono);color:#526078;letter-spacing:.6px;text-transform:uppercase;margin:9px 0 4px;padding-top:7px;border-top:1px solid rgba(148,163,184,.08)}
+#twinDetails .dsec:first-child{margin-top:0;padding-top:0;border-top:none}
+#twinDetails .drow{display:flex;justify-content:space-between;gap:10px;font:10px/1.8 var(--mono)}
+#twinDetails .drow .dk{color:#526078;flex-shrink:0}
+#twinDetails .drow .dv{color:#a8b6cc;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#twinDetails .dnote{font:9.5px/1.6 var(--mono);color:#64748b;margin:2px 0}
+#twinDetails .duri{font:8.5px/1.5 var(--mono);color:#3c4a63;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* design-equipment rows (tag · category · headline spec, click to unfold) */
+#twinDetEquip .eqrow{display:flex;gap:6px;align-items:baseline;font:10px/1.8 var(--mono);cursor:pointer;user-select:none}
+#twinDetEquip .eqrow:hover .eqcat{color:#e0e7f1}
+#twinDetEquip .eqtag{color:#67e8f9;font-weight:600;flex-shrink:0}
+#twinDetEquip .eqcat{color:#a8b6cc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#twinDetEquip .eqspec{margin-left:auto;color:#94a3b8;flex-shrink:0;text-align:right}
+#twinDetEquip .eqdet{margin:0 0 4px 2px;padding:2px 0 3px 8px;border-left:1px solid rgba(148,163,184,.15)}
+/* design-vs-actual bars (building panel) */
+#twinPanel .dvarow{display:flex;align-items:center;gap:6px;font:10px/1.7 var(--mono);color:#94a3b8;padding:1px 0}
+#twinPanel .dvarow .dvak{width:46px;flex-shrink:0}
+#twinPanel .dvarow .dvav{flex-shrink:0;color:#e0e7f1;font-weight:600}
+#twinPanel .dvabar{flex:1;height:9px;background:rgba(0,0,0,.3);border-radius:3px;position:relative;overflow:hidden}
+#twinPanel .dvabar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+#twinPanel .dvabar i.rng{background:rgba(52,211,153,.35);border-radius:0 3px 3px 0}
+/* expected-range line: visible without hovering the chart */
+#twinPanel .rangeline{font:10px/1.5 var(--mono);color:#94a3b8;margin:2px 0 4px;display:none}
+#twinPanel .rangeline.on{display:block}
+#twinPanel .rangeline b{color:#e0e7f1;font-weight:600}
+#twinPanel .rangeline.anom{color:#fca5a5}
+#twinPanel .rangeline.anom b{color:#f87171}
+/* ── As-built discrepancy notes (inside sync panel, compare mode) ── */
+#notesSec{margin-top:8px;padding-top:6px;border-top:1px solid rgba(34,211,238,.15)}
+#notesSec .nhdr{font:600 10px/1 var(--mono);color:#fbbf24;letter-spacing:.4px;text-transform:uppercase;display:flex;justify-content:space-between}
+#notesSec .nbtns{display:flex;gap:6px;margin:6px 0}
+#notesSec .nbtns button{flex:1;padding:4px 6px;border-radius:4px;font:600 9.5px/1 var(--font);cursor:pointer;border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:#fbbf24}
+#notesSec .nbtns button.exp{border-color:rgba(148,163,184,.3);background:rgba(255,255,255,.03);color:#94a3b8}
+#notesList{max-height:110px;overflow-y:auto}
+#notesList .note{display:flex;gap:6px;align-items:baseline;font:9.5px/1.5 var(--mono);color:#94a3b8;padding:2px 0;cursor:pointer}
+#notesList .note:hover{color:#e0e7f1}
+#notesList .note .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#notesList .note .del{margin-left:auto;color:#64748b}
+/* ── First-visit welcome + persistent click hint ── */
+#welcome{position:fixed;inset:0;z-index:200;background:rgba(4,8,16,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
+#welcome.show{display:flex}
+#welcome .card{max-width:400px;margin:20px;background:rgba(10,16,30,.97);border:1px solid rgba(34,211,238,.35);border-radius:12px;padding:22px 24px;font:13px/1.65 var(--font);color:#cbd5e1;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#welcome h2{font:600 16px/1.3 var(--font);color:#fff;margin-bottom:10px}
+#welcome .em{color:#67e8f9}
+#welcome button{margin-top:14px;width:100%;padding:9px;border:1px solid rgba(34,211,238,.5);background:rgba(34,211,238,.15);color:#67e8f9;font:600 12px var(--font);border-radius:7px;cursor:pointer}
+#clickHint{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);z-index:55;background:rgba(8,12,24,.9);border:1px solid rgba(253,181,21,.35);border-radius:20px;padding:7px 14px;font:500 11px/1 var(--font);color:#fbbf24;cursor:pointer;display:none;white-space:nowrap}
+#clickHint.show{display:block}
+#legend .lg-title{font:600 9px/1 var(--mono);color:#94a3b8;letter-spacing:.5px;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid rgba(148,163,184,.15)}
+/* calibration panel is engineer tooling — collapsed (header only) by default */
+#syncPanel .hdr{cursor:pointer}
+#syncPanel.collapsed>:not(.hdr){display:none}
+#syncPanel.collapsed .hdr{margin-bottom:0;padding-bottom:0;border-bottom:none}
+/* ── Walk mode: center crosshair (pointer-locked aiming) ── */
+#crosshair{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;pointer-events:none;font:300 24px/1 var(--font);color:rgba(226,232,240,.75);transition:transform .12s,color .12s;text-shadow:0 0 6px rgba(0,0,0,.8)}
+#crosshair.hot{color:#34d399;transform:translate(-50%,-50%) scale(1.4)}
+/* ── Walk mode: current-floor badge ── */
+#levelBadge{display:none;position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:80;background:rgba(8,12,24,.9);border:1px solid rgba(34,211,238,.3);border-radius:14px;padding:5px 14px;font:600 11px/1 var(--mono);color:#67e8f9;pointer-events:none;letter-spacing:.3px}
+/* ── Walk mode hint overlay ── */
+#walkHint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;background:rgba(8,12,24,.92);border:1px solid rgba(34,211,238,.35);border-radius:8px;padding:10px 16px;font:10.5px/1.7 var(--mono);color:#94a3b8;display:none;pointer-events:none;transition:opacity .6s;text-align:center;white-space:nowrap}
+#walkHint b{color:#67e8f9;font-weight:600}
+/* ── Mobile (<768px) — same breakpoint as grimes-xr.html ── */
+@media(max-width:768px), (pointer:coarse){
+  #topbar{padding:0 10px;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+  #topbar>*{flex-shrink:0}
+  .tb-sub{display:none}
+  .tb-btn{padding:5px 8px;font-size:10.5px}
+  #walkBtn{display:none} /* walk mode is desktop-only (pointer lock + WASD) */
+  /* Cupix Compare: side-by-side halves are unusable on a phone → stack vertically */
+  #main{flex-direction:column}
+  #cupixPane.show{flex:none;height:50%;border-right:none;border-bottom:2px solid var(--cyan)}
+  #splitDivider{display:none!important} /* stacked layout: no drag divider */
+  #viewerPane{height:auto;min-height:0}
+  #legend{left:10px;bottom:10px;padding:6px 8px;font-size:9px;line-height:1.5;max-width:46vw}
+  body.compare-on #legend{display:none}
+  #syncPanel{left:10px;right:10px;bottom:10px;width:auto;max-height:42vh;overflow-y:auto}
+  #syncPanel .hdr{cursor:pointer}
+  #syncPanel.collapsed>:not(.hdr){display:none}
+  #syncPanel.collapsed .hdr{margin-bottom:0;padding-bottom:0;border-bottom:none}
+  #syncPanel input[type=number]{font-size:16px} /* prevent iOS focus zoom */
+  #twinPanel{left:10px;right:10px;top:auto;bottom:10px;width:auto;max-height:44vh;overflow-y:auto}
+  body.compare-on #twinPanel{bottom:58px} /* clear the collapsed sync-panel header */
+  body.twin-open #legend{display:none}
+}
+.carbon-form{display:grid;gap:8px;margin:10px 0}.carbon-form label{display:grid;gap:4px;font-size:11px}.carbon-form input,.carbon-form select,#elementFloor{background:#152131;color:#e2e8f0;border:1px solid #41516a;border-radius:4px;padding:6px;max-width:100%}.layer-coverage{font-size:10px;color:#a8b6c9;padding:4px 12px;line-height:1.5}
+</style>
+<style>#layersMenu[hidden],#pauseScanLayers[hidden],#fitBimQuick[hidden]{display:none!important}#scanQuickActions{position:absolute;top:55px;left:300px;z-index:90;display:flex;align-items:center;gap:12px;padding:8px 12px;background:#12283ef2;border:1px solid #607d98;border-radius:8px;color:white;font:13px Arial}#scanQuickActions button{background:#1b6f96;color:white;border:1px solid #8bc;padding:8px 12px;border-radius:5px;cursor:pointer}#scanQuickActions button:disabled{opacity:.6}#scanQuickActions label{display:flex;gap:7px;align-items:center;white-space:nowrap}#scanQuickActions input{width:18px;height:18px}#scanTools{top:112px!important}@media(max-width:768px), (pointer:coarse){#scanQuickActions{left:8px;right:8px;top:52px;justify-content:space-between;font-size:12px}#scanQuickActions button{padding:8px}#scanTools{top:110px!important}}#compareBtn{display:none}#walkPad{display:none;position:absolute;bottom:50px;right:18px;z-index:80;grid-template-columns:repeat(3,44px);gap:5px}#walkPad button{height:42px;background:#18364c;color:white;border:1px solid #8bc;border-radius:6px;touch-action:none}body.scan-walking #walkPad{display:grid}body.scan-walking #scanTools{display:none}#walkBtn{display:inline-flex!important}#layerLoadStatus{padding:8px;font-size:11px;color:#bcd;line-height:1.6}body.twin-open #scanTools{display:none}#scanTools{position:absolute;top:60px;right:12px;z-index:65;background:#112236ed;border:1px solid #567;padding:12px;border-radius:8px;color:#fff;font:12px Arial;max-width:340px}#scanTools button{padding:6px;margin:3px;color:white;background:#294664;border:1px solid #789;border-radius:4px}#scanTools label{display:inline-block;margin:4px}#scanTools input[type=number]{width:62px}#scanTools details{margin-top:8px}#scanStatus{max-width:310px;margin:6px 0;color:#fcd77d}@media(max-width:768px), (pointer:coarse){#scanTools{top:56px;max-width:230px;font-size:11px}}</style><style>
+body[data-pane] #scanQuickActions{left:12px;right:auto}
+body[data-pane="scan"] #scanQuickActions,body[data-pane="scan"] #layersBtn,body[data-pane="scan"] #layersMenu,body[data-pane="scan"] #legend,body[data-pane="scan"] #clickHint,body[data-pane="scan"] #loading,body[data-pane="scan"] #scanOnly,body[data-pane="scan"] #scanShow,body[data-pane="scan"] #scanTools details,body[data-pane="scan"] #scanTools>label,body[data-pane="scan"] #scanTools>div:not(#scanStatus){display:none!important}
+body[data-pane="scan"] #scanTools{top:60px!important;left:12px;right:auto}
+body[data-pane="bim"] #scanTools,body[data-pane="bim"] #scanQuickActions label,body[data-pane="bim"] #walkBtn{display:none!important}
+body[data-pane="bim"] #layersMenu{top:108px;max-height:calc(100dvh - 180px)}
+</style><style>
+#interiorTools{display:none;position:absolute;left:12px;top:109px;z-index:85;padding:8px 10px;border:1px solid #607d98;border-radius:8px;background:#12283ef2;color:#eef6fc;font:12px Arial;max-width:calc(100% - 24px)}
+body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;gap:6px;align-items:center}#interiorTools button{border:1px solid #7895aa;color:#dfebf4;background:#1b3448;border-radius:5px;padding:7px 10px;cursor:pointer}#interiorTools button[aria-pressed="true"]{background:#dbeaf0;color:#183144}#interiorTools summary{cursor:pointer;padding:7px}.interior-options{display:grid;gap:9px;padding:12px;position:absolute;left:0;top:45px;width:260px;max-width:80vw;background:#12283efa;border:1px solid #607d98;border-radius:6px}.interior-options label{display:flex;gap:8px;align-items:center}.interior-options small{color:#a9bfd0;line-height:1.4}#interiorStatus{font-size:10px;color:#b5cddd;margin-top:6px}body.twin-open #interiorTools{display:none}
+</style><style>.lm-chips[hidden]{display:none!important}#scanQuickActions{flex-wrap:wrap;gap:6px}#scanQuickActions button{min-height:36px}#pauseScanLayers{display:none!important}body.scan-walking #interiorTools{display:none}body[data-pane="scan"] #scanInspect{display:none}@media(max-width:768px), (pointer:coarse){#scanQuickActions{justify-content:flex-start}body[data-pane="bim"] #interiorTools{top:155px}#walkHint{display:none!important}body.scan-walking #twinPanel{bottom:105px;max-height:35vh}#walkPad{bottom:10px}#scanQuickActions button{font-size:11px;padding:6px}}</style></head>
+<body>
+
+<div id="topbar">
+  <a href="https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html" class="back">◂ Campus</a>
+  <span class="tb-title">Bechtel · Full BIM</span>
+  <span class="tb-sub">Three.js · GLB · no external BIM service</span>
+  <span class="tb-spacer"></span>
+  <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
+  <div class="tb-dd" id="layersDd">
+    <button class="tb-btn" id="layersBtn" onclick="toggleLayersMenu()" title="Element-tier layers cut from the 741k-element APS master — each element is clickable">⬡ Layers ▾</button>
+    <div class="tb-menu" id="layersMenu" hidden>
+      <div class="lm-hdr">ELEMENT LAYERS <button onclick="toggleLayersMenu()" title="Close">✕</button></div>
+<div id="layerLoadStatus">Loading layer state…</div><button class="tb-btn" id="loadAllScanLayers">Show all 10 layers</button><button class="tb-btn" id="pauseScanLayers" hidden>Pause loading</button>
+      <label class="layer-coverage" style="display:block">Element floor <select id="elementFloor" onchange="setElementFloor(this.value)"><option value="">All floors</option><option value="LOWER">Lower</option><option value="MEZZ">Mezzanine</option><option value="L1">Level 1</option><option value="L2">Level 2</option><option value="L3">Level 3</option><option value="L4">Level 4</option><option value="ROOF">Roof</option><option value="UNKNOWN">Unknown</option></select></label>
+      <div id="layerStats" class="layer-coverage" role="status"></div>
+      <button class="tb-btn" id="layerBtn-mep" onclick="toggleMepModel()" title="Legacy 8-mesh MEP overview (one mesh per discipline) — the colourful backdrop. Superseded by the per-element layers below but handy for a quick systems read.">🎨 MEP overview <small>1.7 MB · 8 systems</small></button>
+      <button class="tb-btn" id="layerBtn-equipment" onclick="toggleLayer('equipment')" title="Panelboards, transformers, junction boxes, diffusers, plumbing fixtures — tap any unit for identity + live feeder data">⚡ Equipment <small>1.5 MB · 1,143</small></button>
+      <div class="lm-chips" id="chips-equipment" hidden></div>
+      <button class="tb-btn" id="layerBtn-fixtures" onclick="toggleLayer('fixtures')" title="Receptacles, prefab device boxes, data/AV outlets — each with its Revit design VA where modelled">⏻ Receptacles <small>6.2 MB · 4,927</small></button>
+      <div class="lm-chips" id="chips-fixtures" hidden></div>
+      <button class="tb-btn" id="layerBtn-lighting" onclick="toggleLayer('lighting')" title="All 1,570 light fixtures + 165 lighting controls — 277 V fixtures ride meter 76, 120 V ride meter 77">💡 Lighting <small>2.3 MB · 1,735</small></button>
+      <div class="lm-chips" id="chips-lighting" hidden></div>
+      <button class="tb-btn" id="layerBtn-lifesafety" onclick="toggleLayer('lifesafety')" title="Fire alarm devices, sprinklers, exit signs, extinguisher cabinets, security / emergency call, WAPs">🧯 Life safety <small>0.5 MB · 553</small></button>
+      <div class="lm-chips" id="chips-lifesafety" hidden></div>
+      <button class="tb-btn" id="layerBtn-structural" onclick="toggleLayer('structural')" title="Primary structure: concrete beams/columns, steel framing, foundations, 108 SMA brace devices — with Revit volume + material">🏗 Structure <small>12.9 MB · 2,420</small></button>
+      <div class="lm-chips" id="chips-structural" hidden></div>
+      <button class="tb-btn" id="layerBtn-conduit" onclick="toggleLayer('conduit')" title="Conduit runs, all 8,142 fittings, supports, cable trays — the physical electrical distribution paths">🔌 Conduit <small>11.0 MB · 11,063</small></button>
+      <div class="lm-chips" id="chips-conduit" hidden></div>
+      <button class="tb-btn" id="layerBtn-duct" onclick="toggleLayer('duct')" title="Sheet-metal ductwork from the per-floor fabrication models — every duct, elbow, transition, tap and hanger clickable">🌀 Ductwork <small>21.1 MB · 16,704</small></button>
+      <div class="lm-chips" id="chips-duct" hidden></div>
+      <button class="tb-btn" id="layerBtn-hydronic" onclick="toggleLayer('hydronic')" title="Mechanical piping (copper, steel) from the FMB fabrication models — pipes, fittings, valves, hangers">♨ Mech piping <small>20.4 MB · 11,102</small></button>
+      <div class="lm-chips" id="chips-hydronic" hidden></div>
+      <button class="tb-btn" id="layerBtn-plumbing" onclick="toggleLayer('plumbing')" title="Plumbing piping — cast-iron no-hub, ProPress copper, fittings and supports">🚰 Plumbing <small>20.9 MB · 6,035</small></button>
+      <div class="lm-chips" id="chips-plumbing" hidden></div>
+      <button class="tb-btn" id="layerBtn-fire" onclick="toggleLayer('fire')" title="Fire-protection piping (Pribuss fabrication) — sprinkler mains, branch pipes, flex drops, seismic bracing. Heaviest layer.">🧨 Fire piping <small>85.9 MB · 10,938</small></button>
+      <div class="lm-chips" id="chips-fire" hidden></div>
+    </div>
+  </div>
+  <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
+  <a class="tb-btn" href="grimes-performance.html" title="Live design-vs-actual energy: LEED model vs measured meter counters">📉 Design vs Actual</a>
+</div>
+
+<div id="main">
+  <div id="cupixPane">
+    <div id="cupixHdr">
+      <span>📷 360° walk · Cupix</span>
+      <button class="tb-btn" onclick="toggleCompare()" style="padding:3px 9px;font-size:10px">✕ Exit</button>
+    </div>
+    <iframe id="cupixFrame" allow="fullscreen; xr-spatial-tracking; clipboard-write; autoplay" allowfullscreen></iframe>
+  </div>
+  <div id="splitDivider" title="drag to resize"></div>
+  <div id="viewerPane">
+    <div id="crosshair">+</div>
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="msg">Loading Bechtel MEP model…</div>
+      <div class="sub" id="loadSub">grimes-mep-only.glb · 1.7 MB</div>
+    </div>
+  </div>
+</div>
+
+<div id="legend"></div>
+
+<div id="welcome">
+  <div class="card">
+    <h2>🏛️ Bechtel Engineering Center — Live Digital Twin</h2>
+    This is a live digital twin of an operating campus building.<br><br>
+    <span class="em">Colored pipes &amp; ducts</span> are the building's real systems — <b>click one</b> to see its live energy data.<br><br>
+    <span class="em">🚶 Walk</span> explores the building like a game · <span class="em">🪞 Compare</span> walks the real 360° site photos side-by-side.
+    <button onclick="dismissWelcome()">Got it — let me explore</button>
+  </div>
+</div>
+<div id="clickHint">💡 Click any colored system to see live data</div>
+
+<div id="levelBadge"></div>
+<div id="walkPad"><button id="scanInspect">Inspect</button><button data-move="KeyW">↑</button><button id="scanWalkExit">Exit</button><button data-move="KeyA">←</button><button data-move="KeyS">↓</button><button data-move="KeyD">→</button></div><div id="walkHint"><b>WASD</b> move · <b>mouse</b> look · <b>Shift</b> run · Scan floor follow · <b>Esc</b> exit</div>
+
+<div id="twinPanel">
+  <div class="thdr">
+    <span class="sysdot" id="twinDot"></span>
+    <span id="twinTitle">System</span>
+    <button onclick="clearPick()" title="close">✕</button>
+  </div>
+  <div class="bigrow"><span class="bigkw" id="twinBigKw">— <small>kW</small></span><span class="badge na" id="twinBadge">…</span></div>
+  <div class="srcnote" id="twinSrc"></div>
+  <div class="rangeline" id="twinRange"></div>
+  <canvas id="twinBaseSpark" width="640" height="180"></canvas>
+  <div id="chartTip"></div>
+  <div class="chartkey" id="chartKey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
+  <div id="twinPoints"></div>
+  <div id="twinEvent"></div>
+  <div class="morebtn" id="twinInfoBtn" onclick="toggleTwinInfo()">▸ More details</div>
+  <div id="twinDetails">
+    <div id="twinDetZ" class="dnote"></div>
+    <div id="twinDetInfo"></div>
+    <div id="twinDetEquip" class="dnote"></div>
+    <canvas id="twinSpark" width="480" height="72"></canvas>
+  </div>
+</div>
+
+<div id="syncPanel">
+  <div class="hdr" title="Engineer tooling — click to expand"><span>⚙ calibration · Cupix → BIM</span><span id="msgCount">0 msgs</span></div>
+  <div class="stat"><span class="k">tm msgs / applied</span><span class="v"><span id="tmCount">0</span> / <span id="applyCount">0</span></span></div>
+  <div class="stat"><span class="k">cupix pos</span><span class="v" id="cupixPos">—</span></div>
+  <div class="stat"><span class="k">bim cam</span><span class="v" id="bimPos">—</span></div>
+  <div class="stat" id="skipRow" style="display:none;color:#fbbf24"><span class="k">skip</span><span class="v" id="skipReason"></span></div>
+  <div class="row">
+    <label><input type="checkbox" id="syncPos" checked> position</label>
+    <label><input type="checkbox" id="syncRot" checked> rotation</label>
+  </div>
+  <div class="row">
+    <label style="flex:1">yaw ° <input type="number" id="yawDeg" step="0.5" style="width:56px"></label>
+    <label>scale <input type="number" id="scaleIn" step="0.0001" style="width:56px"></label>
+  </div>
+  <div class="row" style="gap:4px">
+    <label>off X <input type="number" id="offX" step="0.1" style="width:48px"></label>
+    <label>Y <input type="number" id="offY" step="0.1" style="width:48px"></label>
+    <label>Z <input type="number" id="offZ" step="0.1" style="width:48px"></label>
+  </div>
+  <div class="row">
+    <button onclick="reloadCalib()" style="flex:1;padding:4px 8px;border:1px solid rgba(52,211,153,.3);background:rgba(52,211,153,.08);color:#34d399;border-radius:4px;font:600 10px/1 var(--font);cursor:pointer">↧ Reload cupix_calib.json</button>
+  </div>
+  <div id="notesSec">
+    <div class="nhdr"><span>⚑ As-built notes</span><span id="noteCount">0</span></div>
+    <div class="nbtns">
+      <button onclick="flagNote()">⚑ Flag discrepancy</button>
+      <button class="exp" onclick="exportNotes()">⇩ Export JSON</button>
+    </div>
+    <div id="notesList"></div>
+  </div>
+  <div class="hint">Calibration auto-loads from <b>data/cupix_calib.json</b> (same registration grimes-xr uses: yaw −135°, swap+flip, camMat). Local tweaks persist in this browser.</div>
+</div>
+
+<div id="scanQuickActions"><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate">Walk BIM</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><section id="interiorTools" aria-label="Interior appearance"><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></section><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+const splitPane=new URLSearchParams(location.search).get('pane');
+document.body.dataset.pane=splitPane||'overlay';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ══════════ SCENE ══════════ */
+const pane = document.getElementById('viewerPane');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0f1a);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
+camera.position.set(35, 25, 35);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/* ── Render-quality pass (lighting/material/tonemapping only — NO postprocessing:
+   the 21 MB shell is ~120 draw calls, SSAO etc. would tank it) ── */
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const EXPOSURE_ORBIT = 1.15, EXPOSURE_WALK = 1.45; // interiors read dark otherwise
+renderer.toneMappingExposure = EXPOSURE_ORBIT;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+pane.appendChild(renderer.domElement);
+// Sky/ground hemisphere + warm key + cool fill — replaces the old flat
+// ambient-only rig that made every shell face read the same tone.
+scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x46403a, 0.9));
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+const dl = new THREE.DirectionalLight(0xfff1dc, 1.5); dl.position.set(50, 80, 30); scene.add(dl);
+const dlFill = new THREE.DirectionalLight(0x9db8dc, 0.45); dlFill.position.set(-45, 35, -55); scene.add(dlFill);
+// Neutral studio environment (PMREM) — the shell GLB carries real
+// MeshStandardMaterials (metalness .2 / roughness .4), so image-based
+// lighting is what makes metals/glass stop looking like flat plastic.
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+}
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 8, 0);
+
+function fitLayout() {
+  const w = pane.clientWidth, h = pane.clientHeight;
+  if (!w || !h) return;
+  // updateStyle=true: keep the canvas CSS size at w×h. With `false` the canvas
+  // has no CSS size and lays out at buffer size (w×DPR) — on DPR>1 phones it
+  // rendered 2–3× larger than the pane (the "broken" mobile layout).
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', fitLayout);
+window.addEventListener('orientationchange', () => setTimeout(fitLayout, 250));
+if (window.ResizeObserver) new ResizeObserver(fitLayout).observe(pane);
+fitLayout();
+// Touch controls: OrbitControls handles touch via pointer events, but the
+// browser must not claim the gestures for scroll/zoom first.
+renderer.domElement.style.touchAction = 'none';
+
+const mobileMq = window.matchMedia('(max-width:768px), (pointer:coarse)');
+
+/* ══════════ MODELS ══════════ */
+// Same assets + same placement math as grimes-xr.html, so the calibration in
+// data/cupix_calib.json applies to THIS viewer's world frame unchanged.
+// Trade-convention palette (dark-bg adjusted), grouped: electrical → air →
+// water → fire. Yellow = electrical, greens/teal = air side, blue = water,
+// purple = pumps/valves, red = fire protection.
+const SYSTEMS = [
+  { name:'Conduit',        label:'Electrical',         hex:0xfacc15 },
+  { name:'HVAC Duct',      label:'HVAC Ductwork',      hex:0x34d399 },
+  { name:'HVAC Equipment', label:'HVAC Equipment',     hex:0x0ea87a },
+  { name:'Diffusers',      label:'Diffusers / Grilles',hex:0x86efac },
+  { name:'Electrical',     label:'Spiral Ductwork',    hex:0x2dd4bf },
+  { name:'Piping',         label:'Plumbing / Piping',  hex:0x60a5fa },
+  { name:'Pumps/Valves',   label:'Pumps / Valves',     hex:0xc084fc },
+  { name:'Sprinkler',      label:'Fire Protection',    hex:0xf87171 },
+];
+const NAME_TO_SYS = Object.fromEntries(SYSTEMS.map((s, i) => [s.name, i]));
+// glb exporters sanitize names ("HVAC Duct" → "HVAC_Duct") — match normalized.
+const NORM = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+const NAME_TO_SYS_N = Object.fromEntries(SYSTEMS.map((s, i) => [NORM(s.name), i]));
+
+const draco = new DRACOLoader();
+draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
+
+const allMeshes = [];
+const sysMesh = {};                // system index → representative MEP mesh
+let _bimBboxCache = null;
+function bimBbox() {
+  if (!_bimBboxCache || _bimBboxCache.isEmpty()) {
+    const b = new THREE.Box3();
+    allMeshes.forEach(m => b.expandByObject(m));
+    _bimBboxCache = b;
+  }
+  return _bimBboxCache;
+}
+
+let mepModel = null;
+if(splitPane!=='scan')loader.load('grimes-mep-only.glb', (gltf) => {
+  mepModel = gltf.scene;
+  scene.add(mepModel);
+  let idx = 0;
+  gltf.scene.traverse(child => {
+    if (!child.isMesh) return;
+    allMeshes.push(child);
+    const nm = child.name || (child.parent && child.parent.name) || '';
+    let si = NAME_TO_SYS[nm] ?? NAME_TO_SYS_N[NORM(nm)];
+    if (si === undefined) { console.warn('[glb] unknown node', nm); si = Math.min(idx, SYSTEMS.length - 1); }
+    if (!(si in sysMesh)) sysMesh[si] = child;
+    // The source glb ships without normals; unlit MeshBasic made every system
+    // read as a flat color block (worst in Walk mode). Compute normals once
+    // and shade with Lambert — emissive tint keeps the legend color identity.
+    if (!child.geometry.attributes.normal) child.geometry.computeVertexNormals();
+    child.material = new THREE.MeshLambertMaterial({
+      color: SYSTEMS[si].hex, side: THREE.DoubleSide, transparent: true, opacity: 0.85,
+      toneMapped: false, emissive: SYSTEMS[si].hex, emissiveIntensity: 0.35,
+    });
+    idx++;
+  });
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('legend').innerHTML =
+    '<div class="lg-title">BUILDING SYSTEMS · click to inspect</div>' + SYSTEMS.map(s =>
+    `<div><span class="sw" style="background:#${s.hex.toString(16).padStart(6,'0')}"></span>${s.label}</div>`).join('');
+  const bb = bimBbox(), c = bb.getCenter(new THREE.Vector3());
+  if(!linkedPose){controls.target.copy(c);camera.position.set(c.x + 45, c.y + 30, c.z + 45);}
+  // Systems-first on every device; the optional architectural shell was removed.
+  document.getElementById('layerBtn-mep').classList.add('active');
+}, p => { document.getElementById('loadSub').textContent = `MEP… ${(p.loaded/1048576).toFixed(1)} MB`; },
+() => {
+  const el = document.getElementById('loading');
+  el.querySelector('.msg').textContent = 'Error loading grimes-mep-only.glb';
+  el.querySelector('.spinner').style.animation = 'none';
+});
+
+/* ══════════ WALK MODE — first/third-person walkthrough (desktop) ══════════
+   Look is implemented directly (no PointerLockControls): pointer lock is
+   requested synchronously inside the button's click handler, and if the lock
+   fails or is unavailable (pointerlockerror never surfaces in PLC — the
+   likely cause of "mouse look does nothing"), we fall back to drag-to-look.
+   Movement/positioning is ours, so 1st↔3rd person is just a camera offset.
+   No wall collision by design; eye = floor + 1.6 m, floors step 3.5 m. */
+let walkMode = false, thirdPerson = false, floorY = 0, floorTargetY = 0;
+let floorLevels, levelIdx = 0;
+let plockActive = false, plockFailed = false, dragLook = false, _dragX = 0, _dragY = 0;
+let yaw = 0, pitch = 0;
+const _centerVec = new THREE.Vector2(0, 0);
+let aimedMesh = null, aimedInstance = null, aimedElementId = null, _aimAcc = 0;
+
+/* Center-ray aiming while pointer-locked: crosshair heats up over a pickable
+   MEP system; click opens the twin panel (walking continues). */
+function updateCrosshair() {
+  document.getElementById('crosshair').style.display = walkMode ? 'block' : 'none';
+}
+function updateAim() {
+  if (!walkMode) { aimedMesh = null; return; }
+  raycaster.setFromCamera(_centerVec, camera);
+  // equipment elements are aimable in walk mode too — nearest hit wins
+  const mepTargets = (mepModel && mepModel.visible) ? allMeshes : [];
+  const targets = anyLayerVisible() ? visibleEquip().concat(mepTargets) : mepTargets;
+  let hit = raycaster.intersectObjects(targets, false)[0];
+  if(hit&&interiorBlocksRay(hit.distance))hit=null;
+  aimedMesh = hit ? hit.object : null;
+  aimedInstance = hit && hit.instanceId != null ? hit.instanceId : null;
+  aimedElementId = hit ? resolveElementHit(hit.object, hit.instanceId, hit.faceIndex, hit.index) : null;
+  document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);document.getElementById('crosshair').dataset.elementId=aimedElementId||'';
+}
+// A visible wall or floor must not expose a device hidden behind it.
+function interiorBlocksRay(distance){
+ const objects=Object.values(interiorState.groups).filter(st=>st.group.visible).flatMap(st=>st.group.children).filter(m=>m.visible&&m.material?.opacity>=.95);
+ const far=raycaster.far;raycaster.far=Math.max(0,distance-.02);
+ try{return raycaster.intersectObjects(objects,false).some(h=>h.point.y>=4.3&&h.point.y<=10.3);}finally{raycaster.far=far;}
+}
+// No AxesHelper/GridHelper exists in this scene and both glbs are
+// triangle-only, but hide any line/point objects defensively while walking.
+function setLinesVisible(v) {
+  scene.traverse(o => { if ((o.isLine || o.isPoints) && !o.userData.ids) o.visible = v; });
+}
+
+// Without architectural slabs, walk heights are explicitly user-stepped.
+function detectFloors() { return null; }
+function ensureFloors() {
+  if (floorLevels === undefined) floorLevels = detectFloors();
+}
+function nearestLevelIdx(y) {
+  let best = 0;
+  (floorLevels || []).forEach((v, i) => { if (Math.abs(v - y) < Math.abs(floorLevels[best] - y)) best = i; });
+  return best;
+}
+function updateLevelBadge() {
+  const el = document.getElementById('levelBadge');
+  if(splitPane==='bim'){el.textContent='BIM inspection · '+(floorTargetY+EYE).toFixed(2)+' m eye height';return;}
+  if(scanReady){el.textContent='Scan floor · '+floorTargetY.toFixed(2)+' m';return;}
+  el.textContent = floorLevels
+    ? (levelIdx === 0 ? 'Ground floor' : 'Level ' + levelIdx) + ' · ' + floorTargetY.toFixed(1) + ' m'
+    : 'height ' + floorTargetY.toFixed(1) + ' m';
+}
+function stepFloor(dir) {
+  ensureFloors();
+  if (floorLevels) {
+    levelIdx = Math.max(0, Math.min(floorLevels.length - 1, levelIdx + dir));
+    floorTargetY = floorLevels[levelIdx];
+  } else {
+    floorTargetY = Math.max(0, Math.min(FLOOR_MAX, floorTargetY + dir * FLOOR_STEP));
+  }
+  updateLevelBadge();
+}
+const playerPos = new THREE.Vector3();
+const keys = {};
+let savedCam = null, _hintTimer = null;
+const WALK_SPEED = 3.0, RUN_SPEED = 8.0, EYE = 1.6, FLOOR_STEP = 3.5, FLOOR_MAX = 21;
+const LOOK_SENS = 0.002, MAX_PITCH = 89 * Math.PI / 180;
+
+const _lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+function applyLook() {
+  _lookEuler.set(pitch, yaw, 0, 'YXZ');
+  camera.quaternion.setFromEuler(_lookEuler);
+}
+function rotateLook(dx, dy) {
+  yaw -= dx * LOOK_SENS;
+  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch - dy * LOOK_SENS));
+  applyLook();
+}
+const avatar = new THREE.Mesh(
+  new THREE.CapsuleGeometry(0.3, 1.0, 4, 12),
+  new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.85 }));
+avatar.visible = false;
+scene.add(avatar);
+
+function showWalkHint() {
+  const el = document.getElementById('walkHint');
+  el.innerHTML = (plockFailed
+      ? '<b>drag mouse</b> to look (pointer lock unavailable) · '
+      : '<b>mouse</b> look · ')
+    + '<b>WASD</b> move · <b>Shift</b> run · Scan floor follow · <b>click</b> inspect · <b>Esc</b> exit';
+  el.style.display = 'block'; el.style.opacity = '1';
+  clearTimeout(_hintTimer);
+  _hintTimer = setTimeout(() => { el.style.opacity = '0'; }, 6000);
+}
+function hideWalkHint() {
+  const el = document.getElementById('walkHint');
+  el.style.display = 'none';
+  clearTimeout(_hintTimer);
+}
+
+window.toggleWalk = () => {
+  claimCamera();
+  if (walkMode) {
+    if (plockActive) { try { document.exitPointerLock(); } catch {} } // change-handler also exits; exitWalk below is idempotent
+    exitWalk();
+    return;
+  }
+  if (splitPane!=='bim' && !scanReady) return;
+  enterWalk();
+  if(!walkMode)return;
+  if(mobileMq.matches)return;
+  // Synchronously inside the click gesture — no awaits/timeouts before this.
+  try { renderer.domElement.requestPointerLock(); } catch { plockFailed = true; showWalkHint(); }
+};
+function enterWalk() {
+  walkMode = true; thirdPerson = false;
+  renderer.toneMappingExposure = EXPOSURE_WALK; // indoor: no direct sky view → lift exposure (no fog by design)
+  savedCam = { pos: camera.position.clone(), quat: camera.quaternion.clone(), target: controls.target.clone() };
+  // seed yaw/pitch from the current view so entry doesn't snap the camera
+  _lookEuler.setFromQuaternion(camera.quaternion, 'YXZ');
+  yaw = _lookEuler.y;
+  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, _lookEuler.x));
+  applyLook();
+  const bb = bimBbox();
+  const c = bb.isEmpty() ? new THREE.Vector3() : bb.getCenter(new THREE.Vector3());
+  // Perf: walking is fill-rate-bound on laptops/phones — cap DPR while inside.
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
+  if(splitPane==='bim')releaseBimCamera();
+  const spawn=splitPane==='bim'?new THREE.Vector3(camera.position.x,camera.position.y-EYE,camera.position.z):findScanSpawn();
+  if(!spawn){walkMode=false;renderer.toneMappingExposure=EXPOSURE_ORBIT;document.getElementById('scanStatus').textContent='No supported scan floor found. Choose another area.';return;}
+  floorTargetY=spawn.y;floorY=spawn.y;playerPos.copy(spawn);
+  if(splitPane!=='bim'){pitch=0;yaw=scanEntryYaw;}applyLook();document.body.classList.add('scan-walking');
+  scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}});
+  camera.position.set(playerPos.x, floorY + EYE, playerPos.z);
+  controls.enabled = false;                      // Orbit fully off while walking
+  document.getElementById('walkBtn').classList.add('active');
+  document.getElementById('levelBadge').style.display = 'block';
+  updateLevelBadge();
+  setLinesVisible(false);
+  updateCrosshair();
+  showWalkHint();
+  if (document.body.classList.contains('compare-on')) {
+    document.getElementById('skipRow').style.display = '';
+    document.getElementById('skipReason').textContent = 'sync paused — walk mode';
+  }
+}
+function exitWalk() {
+  if (!walkMode) return;
+  walkMode = false; thirdPerson = false; dragLook = false;
+  document.body.classList.remove('scan-walking');
+  scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=Number(document.getElementById('scanAlpha').value);o.material.depthWrite=false}});
+  renderer.toneMappingExposure = EXPOSURE_ORBIT;
+  avatar.visible = false;
+  for (const k in keys) keys[k] = false;
+  controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),8);
+  if(splitPane==='bim')document.getElementById('bimNavigate').textContent='Walk BIM';
+  controls.enabled = true;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  document.getElementById('walkBtn').classList.remove('active');
+  document.getElementById('levelBadge').style.display = 'none';
+  setLinesVisible(true);
+  updateCrosshair();
+  hideWalkHint();
+  document.getElementById('skipRow').style.display = 'none';
+}
+
+/* pointer-lock state machine + drag-to-look fallback */
+document.addEventListener('pointerlockchange', () => {
+  plockActive = document.pointerLockElement === renderer.domElement;
+  updateCrosshair();
+  if (!plockActive && walkMode) exitWalk();      // Esc / lock lost → exit walk
+});
+// center-ray inspect: while locked, a click picks whatever the crosshair is on
+function inspectScanAim(){if(!walkMode)return;updateAim();if(!aimedMesh)return;for(const k in keys)keys[k]=false;if(aimedMesh.userData?.ids)pickEquipment(aimedMesh,aimedInstance,aimedElementId);else pickSystem(aimedMesh);}
+document.getElementById('scanInspect').onclick=inspectScanAim;
+renderer.domElement.addEventListener('click',()=>{if(walkMode&&(plockActive||splitPane==='bim')&&(plockActive||Math.hypot(_dragX-_downX,_dragY-_downY)<=6))inspectScanAim();});
+document.addEventListener('pointerlockerror', () => {
+  plockFailed = true;
+  if (walkMode) showWalkHint();                  // stay in walk, advertise drag-look
+});
+document.addEventListener('mousemove', e => {
+  if (walkMode && plockActive) rotateLook(e.movementX || 0, e.movementY || 0);
+});
+let lookPointerId=null;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (walkMode && !plockActive && lookPointerId===null) { dragLook = true;lookPointerId=e.pointerId;renderer.domElement.setPointerCapture(e.pointerId); _dragX = e.clientX; _dragY = e.clientY; }
+});
+window.addEventListener('pointermove', e => {
+  if (!dragLook || e.pointerId!==lookPointerId) return;
+  rotateLook(e.clientX - _dragX, e.clientY - _dragY);
+  _dragX = e.clientX; _dragY = e.clientY;
+});
+function releaseLook(e){if(e.pointerId===lookPointerId){dragLook=false;lookPointerId=null;}}window.addEventListener('pointerup',releaseLook);window.addEventListener('pointercancel',releaseLook);
+
+document.addEventListener('keydown', e => {
+  if (!walkMode || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+  if (e.code === 'Escape' && !plockActive) { exitWalk(); return; } // fallback-mode Esc
+  keys[e.code] = true;
+
+
+
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+const _fwd = new THREE.Vector3(), _rightV = new THREE.Vector3(), _upV = new THREE.Vector3(0, 1, 0), _move = new THREE.Vector3(), _look = new THREE.Vector3();
+function updateWalk(dt) {
+  camera.getWorldDirection(_look);               // full look dir (yaw+pitch)
+  _fwd.copy(_look); _fwd.y = 0;
+  if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1); else _fwd.normalize();
+  _rightV.crossVectors(_fwd, _upV);
+  const speed = (keys.ShiftLeft || keys.ShiftRight) ? RUN_SPEED : WALK_SPEED;
+  _move.set(0, 0, 0);
+  if (keys.KeyW || keys.ArrowUp) _move.add(_fwd);
+  if (keys.KeyS || keys.ArrowDown) _move.sub(_fwd);
+  if (keys.KeyD || keys.ArrowRight) _move.add(_rightV);
+  if (keys.KeyA || keys.ArrowLeft) _move.sub(_rightV);
+  if (_move.lengthSq()) _move.normalize().multiplyScalar(speed * dt);
+  if(_move.lengthSq()){
+    if(splitPane==='bim'){playerPos.add(_move);}else{
+    const candidate=playerPos.clone().add(_move),floor=scanFloorAt(candidate.x,candidate.z,floorY+.45,1.05);
+    if(floor!==null&&!scanWallBetween(playerPos,_move)){playerPos.x=candidate.x;playerPos.z=candidate.z;floorTargetY=floor;}
+    }
+  }
+  if(splitPane==='bim'){floorTargetY+=((keys.KeyE?1:0)-(keys.KeyQ?1:0))*speed*dt;}
+  // in-storey ground follow (ramps/steps), throttled to ~10 Hz
+  // crosshair aim feedback, ~8 Hz (MEP glb is light — 8 meshes)
+  _aimAcc += dt;
+  if (_aimAcc > 0.12) { _aimAcc = 0; updateAim(); }
+  // smooth floor easing (~0.6 s exponential approach)
+  floorY += (floorTargetY - floorY) * Math.min(1, dt * 7);
+  if (Math.abs(floorTargetY - floorY) < 0.005) floorY = floorTargetY;
+  updateLevelBadge();
+  playerPos.y = floorY;                          // floor-height lock, no wall collision
+  if (thirdPerson) {
+    avatar.visible = true;
+    avatar.position.set(playerPos.x, floorY + 0.8, playerPos.z);
+    avatar.rotation.y = Math.atan2(_fwd.x, _fwd.z);
+    camera.position.set(playerPos.x, floorY + EYE, playerPos.z)
+      .addScaledVector(_look, -4.5)
+      .add(new THREE.Vector3(0, 1.2, 0));        // follow cam behind + above
+  } else {
+    avatar.visible = false;
+    camera.position.set(playerPos.x, floorY + EYE, playerPos.z);
+  }
+}
+
+/* ══════════ CUPIX SYNC — ported verbatim from grimes-xr.html ══════════ */
+const LS_KEY = 'bimViewerCupixSync.v1';
+const calib = {
+  enabled: true, syncPos: true, syncRot: true,
+  swapYZ: true, flipZ: true, camMat: null,
+  scale: 1.0, yRotation: -135, offset: { x: 16.9, y: 6.096, z: 10.8 },
+};
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+  if (saved) Object.assign(calib, saved, { offset: Object.assign({}, calib.offset, saved.offset || {}) });
+} catch {}
+function saveCalib() { try { localStorage.setItem(LS_KEY, JSON.stringify(calib)); } catch {} }
+
+let CUPIX_URL = 'https://herrero.cupix.works/v2/sv/q7qk7m?svpl=basic&svv=4&qp=2QtKby0x5DjQCH1Yrdk5rr&ql=83000';
+fetch('data/grimes-interior.json').then(r => r.json())
+  .then(j => { if (j?.cupix?.default_url) CUPIX_URL = j.cupix.default_url; }).catch(() => {});
+
+// Remote calibration file — single source shared with grimes-xr.
+let _calibVersion = null;
+async function fetchCalibFile(force) {
+  try {
+    const r = await fetch('data/cupix_calib.json?ts=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j?.calib) return;
+    if (!force && j.version !== undefined && j.version === _calibVersion) return;
+    _calibVersion = j.version;
+    Object.assign(calib, j.calib, { offset: Object.assign({}, calib.offset, j.calib.offset || {}) });
+    saveCalib(); syncPanelInputs();
+    console.log('[calib] loaded version', j.version, JSON.stringify(j.calib));
+    if (lastTm) applyCupix(lastTm, true);
+  } catch {}
+}
+window.reloadCalib = () => fetchCalibFile(true);
+fetchCalibFile(true);
+setInterval(() => { if (document.body.classList.contains('compare-on')) fetchCalibFile(false); }, 10000);
+
+// tm helpers (identical logic to grimes-xr)
+function findTm(o, depth = 0) {
+  if (!o || typeof o !== 'object' || depth > 4) return null;
+  const t = o.tm;
+  if (t) {
+    if (Array.isArray(t) && t.length === 16 && t.every(n => typeof n === 'number')) return t;
+    if (Array.isArray(t.elements) && t.elements.length === 16) return t.elements;
+  }
+  for (const k in o) {
+    const v = o[k];
+    if (!v || typeof v !== 'object') continue;
+    if (Array.isArray(v) && v.length > 64) continue;
+    const r = findTm(v, depth + 1);
+    if (r) return r;
+  }
+  return null;
+}
+function normalizeTm(tm) {
+  const colMajor = tm[3] === 0 && tm[7] === 0 && tm[11] === 0 && (tm[12] !== 0 || tm[13] !== 0 || tm[14] !== 0);
+  if (!colMajor) return tm;
+  return [tm[0],tm[4],tm[8],tm[12], tm[1],tm[5],tm[9],tm[13], tm[2],tm[6],tm[10],tm[14], tm[3],tm[7],tm[11],tm[15]];
+}
+
+// position: swap → flipZ → scale → yaw(Y) → offset
+function pointToBim(px, py, pz) {
+  let x = px, y = py, z = pz;
+  if (calib.swapYZ) { const t = y; y = z; z = t; }
+  if (calib.flipZ) z = -z;
+  x *= calib.scale; y *= calib.scale; z *= calib.scale;
+  if (calib.yRotation) {
+    const r = calib.yRotation * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+    const nx = c * x + s * z, nz = -s * x + c * z;
+    x = nx; z = nz;
+  }
+  return new THREE.Vector3(x + calib.offset.x, y + calib.offset.y, z + calib.offset.z);
+}
+function axisConvMatrix() {
+  if (!calib.swapYZ) return new THREE.Matrix4();
+  return new THREE.Matrix4().set(1,0,0,0, 0,0,1,0, 0,(calib.flipZ?-1:1),0,0, 0,0,0,1);
+}
+function rotToBim(tm) {
+  const W = axisConvMatrix();
+  if (calib.yRotation) W.premultiply(new THREE.Matrix4().makeRotationY(calib.yRotation * Math.PI / 180));
+  const R = new THREE.Matrix4().set(tm[0],tm[1],tm[2],0, tm[4],tm[5],tm[6],0, tm[8],tm[9],tm[10],0, 0,0,0,1);
+  const m = W.multiply(R);
+  if (Array.isArray(calib.camMat) && calib.camMat.length === 16) {
+    m.multiply(new THREE.Matrix4().fromArray(calib.camMat));
+  } else if (!calib.flipZ) {
+    m.multiply(axisConvMatrix().invert());
+  }
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+// Cupix documents fov as vertical degrees, matching Three.js PerspectiveCamera.
+function cupixProjection(p) {
+  if (!p || p.orthoMode || !Number.isFinite(p.fov) || p.fov <= 0 || p.fov >= 180) return null;
+  const zoom = p.zoom === undefined ? 1 : p.zoom;
+  if (!Number.isFinite(zoom) || zoom <= 0) return null;
+  return { fov: p.fov, zoom };
+}
+let lastProjection = null, savedCompareProjection = null;
+// user-override: hand-driving the BIM pauses sync for 2.5 s
+let userUntil = 0;
+const bump = () => { userUntil = Date.now() + 2500; };
+renderer.domElement.addEventListener('pointerdown', bump);
+renderer.domElement.addEventListener('wheel', bump, { passive: true });
+
+let msgCount = 0, tmCount = 0, applyCount = 0, lastTm = null, lastSyncAt = 0;
+function applyCupix(tm, force) {
+  if (walkMode) return; // walk mode owns the camera — sync resumes on exit
+  if (!force && Date.now() < userUntil) return;
+  if (!document.getElementById('syncPos').checked && !document.getElementById('syncRot').checked) return;
+  const p = pointToBim(tm[3], tm[7], tm[11]);
+  const skipEl = document.getElementById('skipRow');
+  if (!isFinite(p.x + p.y + p.z)) return;
+  const bb = bimBbox(), M = 40;
+  if (!bb.isEmpty() && (p.x < bb.min.x-M || p.x > bb.max.x+M || p.y < bb.min.y-M || p.y > bb.max.y+M || p.z < bb.min.z-M || p.z > bb.max.z+M)) {
+    skipEl.style.display = '';
+    document.getElementById('skipReason').textContent = 'outside model — check calib';
+    return;
+  }
+  skipEl.style.display = 'none';
+  lastSyncAt = Date.now();
+  if (document.getElementById('syncPos').checked) camera.position.copy(p);
+  if (document.getElementById('syncRot').checked) camera.quaternion.copy(rotToBim(tm));
+  if (lastProjection && document.getElementById('syncRot').checked) {
+    camera.fov = lastProjection.fov; camera.zoom = lastProjection.zoom; camera.updateProjectionMatrix();
+  }
+  controls.target.copy(p.clone().add(new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).multiplyScalar(2)));
+  applyCount++;
+  document.getElementById('applyCount').textContent = applyCount;
+  document.getElementById('bimPos').textContent = `${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}`;
+}
+
+window.addEventListener('message', (e) => {
+  let host = '';
+  try { host = new URL(e.origin || 'http://x/').hostname; } catch {}
+  if (!/cupix\.works$/i.test(host)) return;
+  msgCount++;
+  document.getElementById('msgCount').textContent = msgCount + ' msgs';
+  let msg = null;
+  if (typeof e.data === 'string') { try { msg = JSON.parse(e.data); } catch { return; } }
+  else if (e.data && typeof e.data === 'object') msg = e.data;
+  if (!msg) return;
+  const parameters = msg.response?.cameraParameters;
+  if (parameters) lastProjection = cupixProjection(parameters);
+  let tm = findTm(msg);
+  if (Array.isArray(tm) && tm.length === 16) {
+    tm = normalizeTm(tm);
+    tmCount++; lastTm = tm;
+    document.getElementById('tmCount').textContent = tmCount;
+    document.getElementById('cupixPos').textContent = `${tm[3].toFixed(1)}, ${tm[7].toFixed(1)}, ${tm[11].toFixed(1)}`;
+    applyCupix(tm, false);
+    if (tmCount % 30 === 1) console.log('[sync] raw', tm[3].toFixed(2), tm[7].toFixed(2), tm[11].toFixed(2),
+      '→', camera.position.x.toFixed(2), camera.position.y.toFixed(2), camera.position.z.toFixed(2),
+      '· calib', { yaw: calib.yRotation, scale: calib.scale, off: calib.offset, swap: calib.swapYZ, flipZ: calib.flipZ, camMat: !!calib.camMat });
+  }
+});
+
+// Official CupixWorks SiteView embed API — handshake + 2 Hz camera polling
+let apiUuid = 1, pollTimer = null;
+function apiSend(operationType) {
+  const w = document.getElementById('cupixFrame').contentWindow;
+  if (!w) return false;
+  try { w.postMessage({ operationType, header: 'CUPIXWORKS_API', uuid: String(apiUuid++), timestamp: Date.now() }, '*'); } catch { return false; }
+  return true;
+}
+function startPolling() {
+  stopPolling();
+  apiSend('APP_API_START');
+  pollTimer = setInterval(() => {
+    if (!document.body.classList.contains('compare-on')) { stopPolling(); return; }
+    if (tmCount === 0) apiSend('APP_API_START');
+    apiSend('GET_CAMERA_PARAMETERS');
+  }, 500);
+}
+function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+/* ══════════ UI ══════════ */
+// Draggable Compare split (desktop). Ratio persists in localStorage.
+const SPLIT_KEY = 'bimViewer.splitPct.v1';
+const dividerEl = document.getElementById('splitDivider');
+const cupixPaneEl = document.getElementById('cupixPane');
+function applySplit() {
+  if (mobileMq.matches) { cupixPaneEl.style.flexBasis = ''; return; } // stacked on mobile
+  let pct = parseFloat(localStorage.getItem(SPLIT_KEY));
+  if (!isFinite(pct)) pct = 50;
+  cupixPaneEl.style.flexBasis = Math.min(80, Math.max(20, pct)) + '%';
+}
+let _dragging = false;
+dividerEl.addEventListener('pointerdown', e => {
+  _dragging = true;
+  dividerEl.classList.add('dragging');
+  dividerEl.setPointerCapture(e.pointerId); // keeps events even over the iframe
+  e.preventDefault();
+});
+dividerEl.addEventListener('pointermove', e => {
+  if (!_dragging) return;
+  const pct = Math.min(80, Math.max(20, e.clientX / window.innerWidth * 100));
+  cupixPaneEl.style.flexBasis = pct + '%';
+  fitLayout();
+});
+dividerEl.addEventListener('pointerup', () => {
+  if (!_dragging) return;
+  _dragging = false;
+  dividerEl.classList.remove('dragging');
+  try { localStorage.setItem(SPLIT_KEY, String(parseFloat(cupixPaneEl.style.flexBasis) || 50)); } catch {}
+  fitLayout();
+});
+
+window.toggleCompare = () => {
+  const on = document.body.classList.toggle('compare-on');
+  const paneEl = document.getElementById('cupixPane');
+  const frame = document.getElementById('cupixFrame');
+  document.getElementById('compareBtn').classList.toggle('active', on);
+  if (on) {
+    savedCompareProjection = { fov: camera.fov, zoom: camera.zoom };
+    lastProjection = null;
+    paneEl.classList.add('show');
+    applySplit();
+    if (!frame.src) frame.src = CUPIX_URL;
+    startPolling();
+  } else {
+    paneEl.classList.remove('show');
+    stopPolling();
+    if (savedCompareProjection) { camera.fov = savedCompareProjection.fov; camera.zoom = savedCompareProjection.zoom; camera.updateProjectionMatrix(); }
+    savedCompareProjection = null; lastProjection = null;
+  }
+  setTimeout(fitLayout, 100);
+};
+
+function syncPanelInputs() {
+  document.getElementById('yawDeg').value = calib.yRotation;
+  document.getElementById('scaleIn').value = calib.scale;
+  document.getElementById('offX').value = calib.offset.x;
+  document.getElementById('offY').value = calib.offset.y;
+  document.getElementById('offZ').value = calib.offset.z;
+}
+syncPanelInputs();
+// On phones the sync panel starts collapsed (header only) — tap header to expand.
+// Desktop keeps the always-open panel unchanged.
+// Calibration is engineer tooling — collapsed by default on every device;
+// the ⚙ header toggles it (kept out of sight during public Compare demos).
+const syncPanelEl = document.getElementById('syncPanel');
+syncPanelEl.classList.add('collapsed');
+syncPanelEl.querySelector('.hdr').addEventListener('click', () => syncPanelEl.classList.toggle('collapsed'));
+
+/* ── First-visit welcome (once, localStorage) + click hint ── */
+window.dismissWelcome = () => {
+  document.getElementById('welcome').classList.remove('show');
+  try { localStorage.setItem('bimViewer.welcomed.v1', '1'); } catch {}
+  showClickHint();
+};
+function showClickHint() {
+  // runs at startup (nothing picked yet); pickSystem removes the hint later
+  document.getElementById('clickHint').classList.add('show');
+}
+let welcomed = false;
+try { welcomed = !!localStorage.getItem('bimViewer.welcomed.v1'); } catch {}
+if (welcomed) showClickHint();
+else document.getElementById('welcome').classList.add('show');
+document.getElementById('clickHint').addEventListener('click', e => e.currentTarget.classList.remove('show'));
+[['yawDeg', v => calib.yRotation = v], ['scaleIn', v => calib.scale = v],
+ ['offX', v => calib.offset.x = v], ['offY', v => calib.offset.y = v], ['offZ', v => calib.offset.z = v]]
+.forEach(([id, set]) => {
+  document.getElementById(id).addEventListener('change', e => {
+    set(parseFloat(e.target.value) || 0);
+    saveCalib();
+    if (lastTm) applyCupix(lastTm, true);
+  });
+});
+
+/* ══════════ TWIN: click a system → Brick entity → live BMO data ══════════
+   Uses the shared twin/twin-resolver.js package logic (same as twin-viewer):
+   glb node --binding--> Brick entity --isFedBy/hasPoint--> externalReference
+   --sources adapter--> data/building_data.json live kW. */
+/* GLTFLoader uniquifies runtime names. r169 keeps the exact source name in
+   userData.name. Prefer that value: cloned mesh references may share one
+   associations record whose node index is overwritten by the last clone. */
+function bindElementSourceIds(gltf) {
+  let boundNodes = 0, associationNameConflicts = 0;
+  const associations = gltf.parser?.associations, nodes = gltf.parser?.json?.nodes;
+  if (!associations || !nodes) return { boundNodes, associationNameConflicts };
+  gltf.scene.traverse(object => {
+    const nodeIndex = associations.get(object)?.nodes;
+    if (!Number.isInteger(nodeIndex)) return;
+    const associatedName = nodes[nodeIndex]?.name;
+    const sourceName = object.userData.name;
+    const name = typeof sourceName === 'string' && sourceName ? sourceName : associatedName;
+    if (sourceName && associatedName && sourceName !== associatedName) associationNameConflicts++;
+    if (typeof name === 'string' && name) { object.userData.elementId = name; boundNodes++; }
+  });
+  return { boundNodes, associationNameConflicts };
+}
+/* Runtime-only draw-call tier. Source GLBs/geometries remain untouched.
+   Buckets retain level/type identity; merged index ranges resolve element picks.
+   Repeated geometry remains instanced to avoid expanding thousands of fittings. */
+async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey) {
+  const MAX_VERTICES = 180000, INSTANCE_REUSE = 8;
+  const fragments = [], repeated = new Map(), mergeBuckets = new Map(), meshes = [];
+  const stats = { sourceObjects: 0, unidentifiedObjects: 0, unidentifiedNames: [], sourceTriangles: 0, renderTriangles: 0, sourceSegments: 0, renderSegments: 0, mergedMeshes: 0, instancedMeshes: 0, instances: 0, drawCalls: 0 };
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+  const identity = object => {
+    for (let p = object; p; p = p.parent) {
+      const id = p.userData.elementId ?? p.name;
+      if (id && Object.prototype.hasOwnProperty.call(meta, id)) return id;
+    }
+    return null;
+  };
+  sceneGroup.traverse(object => {
+    if (!(object.isMesh || object.isLine) || !object.geometry?.attributes.position) return;
+    stats.sourceObjects++;
+    const id = identity(object), info = meta[id] || {}, geometry = object.geometry;
+    if (id === null) {
+      stats.unidentifiedObjects++;
+      if (stats.unidentifiedNames.length < 8) stats.unidentifiedNames.push(object.userData.elementId || object.name || '(unnamed)');
+    }
+    const isLine = !!object.isLine, indexedCount = geometry.index?.count ?? geometry.attributes.position.count;
+    const drawStart = Math.max(0, geometry.drawRange.start), drawEnd = Math.min(indexedCount, drawStart + geometry.drawRange.count);
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const groups = Array.isArray(object.material) ? geometry.groups : [{start: 0, count: indexedCount, materialIndex: 0}];
+    for (const group of groups) {
+      const material = materials[group.materialIndex || 0];
+      if (!material) continue;
+      const start = Math.max(drawStart, group.start), end = Math.min(drawEnd, group.start + group.count);
+      if (end <= start) continue;
+      const part = { object, geometry, material, id, levelKey: info.levelKey || '', type: info.type || '', isLine, start, end, matrix: object.matrixWorld.clone() };
+      part.key = JSON.stringify([material.uuid, part.levelKey, part.type, isLine, Object.entries(geometry.attributes).sort(([a],[b])=>a.localeCompare(b)).map(([name,a])=>[name,a.itemSize])]);
+      part.reuseKey = part.key + '|' + geometry.uuid;
+      // Three.js InstancedMesh does not support negatively scaled matrices.
+      part.canInstance = !isLine && part.matrix.determinant() > 0 && start === 0 && end === indexedCount && !Array.isArray(object.material);
+      if (part.canInstance) repeated.set(part.reuseKey, (repeated.get(part.reuseKey) || 0) + 1);
+      if (!isLine) stats.sourceTriangles += Math.floor((end-start)/3);
+      else stats.sourceSegments += object.isLineSegments ? Math.floor((end-start)/2) : Math.max(0,end-start-1) + (object.isLineLoop && end-start > 1 ? 1 : 0);
+      fragments.push(part);
+    }
+  });
+  const prepareMaterial = original => {
+    const material = original.clone();
+    if (layerKey === 'structural' && material.emissive) { material.emissive.setHex(0x1e293b); material.emissiveIntensity = 0.25; }
+    return material;
+  };
+  const decorate = (mesh, part, data) => {
+    mesh.name = 'elements:' + layerKey;
+    mesh.userData = { layer: layerKey, levelKey: part.levelKey, type: part.type, isLine: part.isLine, ...data };
+    meshes.push(mesh);
+    return mesh;
+  };
+  const instanceBuckets = new Map();
+  for (const part of fragments) {
+    const target = part.canInstance && repeated.get(part.reuseKey) >= INSTANCE_REUSE ? instanceBuckets : mergeBuckets;
+    const key = target === instanceBuckets ? part.reuseKey : part.key;
+    if (!target.has(key)) target.set(key, []);
+    target.get(key).push(part);
+  }
+  let work = 0;
+  for (const parts of instanceBuckets.values()) {
+    const p = parts[0], mesh = new THREE.InstancedMesh(p.geometry, prepareMaterial(p.material), parts.length);
+    const white = new THREE.Color(0xffffff);
+    parts.forEach((part,i)=>{mesh.setMatrixAt(i,part.matrix);mesh.setColorAt(i,white);});
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingBox(); mesh.computeBoundingSphere();
+    decorate(mesh,p,{ ids:parts.map(p=>p.id), renderTier:'instanced' });
+    stats.instancedMeshes++; stats.instances += parts.length;
+    stats.renderTriangles += Math.floor((p.end-p.start)/3)*parts.length;
+    if (++work % 100 === 0) await tick();
+  }
+  const normalMatrix = new THREE.Matrix3(), vector = new THREE.Vector3();
+  for (const parts of mergeBuckets.values()) {
+    let chunk = [], vertices = 0;
+    const flush = () => {
+      if (!chunk.length) return;
+      const p = chunk[0].part, sourceAttrs = p.geometry.attributes;
+      const geometry = new THREE.BufferGeometry(), arrays = {}, sizes = {};
+      for (const [name,attribute] of Object.entries(sourceAttrs)) { sizes[name]=attribute.itemSize; arrays[name]=new Float32Array(vertices*attribute.itemSize); }
+      if (!arrays.color) { sizes.color=3;arrays.color=new Float32Array(vertices*3);arrays.color.fill(1); }
+      const indexCount = chunk.reduce((n,c)=>n+c.indices.length,0), indices = new (vertices>65535?Uint32Array:Uint16Array)(indexCount);
+      const ranges = [];let vertexOffset=0,indexOffset=0;
+      for (const {part,indices:localIndices,sourceVertices} of chunk) {
+        normalMatrix.getNormalMatrix(part.matrix);
+        for (let i=0;i<sourceVertices.length;i++) {
+          const sourceIndex=sourceVertices[i], dest=vertexOffset+i;
+          for (const [name,attribute] of Object.entries(part.geometry.attributes)) {
+            const size=attribute.itemSize, array=arrays[name], at=dest*size;
+            for (let k=0;k<size;k++) array[at+k]=(name==='color'&&!part.material.vertexColors)?1:attribute.getComponent(sourceIndex,k);
+            if (name==='position') { vector.fromArray(array,at).applyMatrix4(part.matrix);vector.toArray(array,at); }
+            else if(name==='normal') { vector.fromArray(array,at).applyMatrix3(normalMatrix).normalize();vector.toArray(array,at); }
+            else if(name==='tangent') { vector.fromArray(array,at).transformDirection(part.matrix);vector.toArray(array,at);if(size===4 && part.matrix.determinant()<0)array[at+3]*=-1; }
+          }
+        }
+        for(let i=0;i<localIndices.length;i++) indices[indexOffset+i]=vertexOffset+localIndices[i];
+        if(!part.isLine && part.matrix.determinant()<0)for(let i=0;i<localIndices.length;i+=3){const at=indexOffset+i+1,tmp=indices[at];indices[at]=indices[at+1];indices[at+1]=tmp;}
+        ranges.push({id:part.id,start:indexOffset,count:localIndices.length,vertexStart:vertexOffset,vertexCount:sourceVertices.length});
+        indexOffset+=localIndices.length;vertexOffset+=sourceVertices.length;
+      }
+      for(const [name,array]of Object.entries(arrays))geometry.setAttribute(name,new THREE.BufferAttribute(array,sizes[name]));
+      geometry.setIndex(new THREE.BufferAttribute(indices,1));geometry.computeBoundingBox();geometry.computeBoundingSphere();
+      const material=prepareMaterial(p.material);material.vertexColors=true;
+      const mesh=p.isLine?new THREE.LineSegments(geometry,material):new THREE.Mesh(geometry,material);
+      decorate(mesh,p,{ids:[...new Set(ranges.map(r=>r.id))],ranges,renderTier:'merged',highlighted:new Map()});
+      stats.mergedMeshes++;
+      if(p.isLine)stats.renderSegments+=indexCount/2;else stats.renderTriangles+=indexCount/3;
+      chunk=[];vertices=0;
+    };
+    for(const part of parts) {
+      // Compact each fragment independently: no cross-element vertex sharing,
+      // so highlighting one identity cannot change its neighbours.
+      const localIndices=[],sourceVertices=[],remap=new Map();
+      const append = offset => {const source=part.geometry.index?part.geometry.index.getX(offset):offset;let local=remap.get(source);if(local===undefined){local=sourceVertices.length;remap.set(source,local);sourceVertices.push(source);}localIndices.push(local);};
+      if(part.isLine&&!part.object.isLineSegments){for(let i=part.start;i+1<part.end;i++){append(i);append(i+1);}if(part.object.isLineLoop&&part.end-part.start>1){append(part.end-1);append(part.start);}}
+      else {const step=part.isLine?2:3,end=part.end-(part.end-part.start)%step;for(let i=part.start;i<end;i++)append(i);}
+      const appendChunk = (indices, sourceVertices) => {
+        if(vertices+sourceVertices.length>MAX_VERTICES)flush();
+        chunk.push({part,indices,sourceVertices});vertices+=sourceVertices.length;
+      };
+      if(sourceVertices.length<=MAX_VERTICES)appendChunk(localIndices,sourceVertices);
+      else {
+        // Bound even one unusually large element; 180000 is divisible by both
+        // triangle and line primitive sizes, so no primitive is cut in half.
+        for(let start=0;start<localIndices.length;start+=MAX_VERTICES){
+          const subIndices=[],subVertices=[],subMap=new Map();
+          for(let i=start;i<Math.min(start+MAX_VERTICES,localIndices.length);i++){
+            const source=sourceVertices[localIndices[i]];let local=subMap.get(source);
+            if(local===undefined){local=subVertices.length;subMap.set(source,local);subVertices.push(source);}
+            subIndices.push(local);
+          }
+          appendChunk(subIndices,subVertices);
+          await tick();
+        }
+      }
+      if(++work%250===0)await tick();
+    }
+    flush();
+  }
+  stats.drawCalls=meshes.length;
+  return {meshes,stats};
+}
+function resolveElementHit(object,instanceId,faceIndex,index) {
+  if(!object?.userData?.ids)return null;
+  if(object.isInstancedMesh)return Number.isInteger(instanceId)?object.userData.ids[instanceId]??null:null;
+  const ranges=object.userData.ranges;
+  if(!ranges)return object.userData.ids.length===1?object.userData.ids[0]:null;
+  const offset=object.isLine?index:(Number.isInteger(faceIndex)?faceIndex*3:null);
+  if(!Number.isInteger(offset)||offset<0)return null;
+  let low=0,high=ranges.length-1;
+  // Three r169 Line.raycast returns the first vertex index, not index-buffer offset.
+  while(low<=high){const mid=(low+high)>>1,r=ranges[mid],start=object.isLine?r.vertexStart:r.start,count=object.isLine?r.vertexCount:r.count;if(offset<start)high=mid-1;else if(offset>=start+count)low=mid+1;else return r.id;}
+  return null;
+}
+function highlightElementRender(mesh,id,on,color) {
+  if(!id||!mesh.userData.ids?.includes(id))return;
+  if(mesh.isInstancedMesh){const value=mesh.material.color.clone().set(on?(color??0xfbbf24):0xffffff);mesh.userData.ids.forEach((x,i)=>{if(x===id)mesh.setColorAt(i,value);});mesh.instanceColor.needsUpdate=true;return;}
+  const attribute=mesh.geometry.getAttribute('color'),saved=mesh.userData.highlighted;
+  if(!attribute||!saved)return;
+  if(on){
+    if(saved.has(id))return;
+    const value=mesh.material.color.clone().set(color??0xfbbf24),snapshots=[];
+    for(const r of mesh.userData.ranges){if(r.id!==id)continue;const start=r.vertexStart*attribute.itemSize,end=(r.vertexStart+r.vertexCount)*attribute.itemSize;snapshots.push({start,values:attribute.array.slice(start,end)});for(let i=r.vertexStart;i<r.vertexStart+r.vertexCount;i++)attribute.setXYZ(i,value.r,value.g,value.b);}
+    saved.set(id,snapshots);
+  }else{for(const s of saved.get(id)||[])attribute.array.set(s.values,s.start);saved.delete(id);}
+  attribute.needsUpdate=true;
+}
+function setElementRenderVisible(mesh,levelFilter,typeFilter,meta) {
+  mesh.visible=(!levelFilter||mesh.userData.levelKey===levelFilter)&&(!typeFilter||mesh.userData.type===typeFilter);
+  return mesh.visible;
+}
+function findElementSelection(mesh,id) {
+  if(mesh.isInstancedMesh){const i=mesh.userData.ids.indexOf(id);return i<0?null:{id,instanceId:i};}
+  const r=mesh.userData.ranges?.find(r=>r.id===id);return r?{id,faceIndex:mesh.isLine?undefined:r.start/3,index:mesh.isLine?r.vertexStart:undefined}:null;
+}
+/* Call in finally after building this static runtime tier. Do not dispose
+   source geometry/textures: live instances/material clones still share them. */
+function releaseElementSource(gltf) {
+  if (!gltf) return;
+  gltf.parser?.cache?.removeAll();
+  gltf.parser?.associations?.clear();
+  for (const source of gltf.scenes || []) source.clear();
+  gltf.scene?.clear();
+  gltf.scenes = [];
+  gltf.scene = null;
+  gltf.parser = null;
+}
+
+/* ELEMENT DATA HELPERS */
+let elementPickEpoch = 0;
+function elementLevel(info) {
+  if (info.levelKey && info.levelKey !== 'UNKNOWN') return info.levelKey;
+  const name = String(info.level || '').toUpperCase();
+  if (/MEZZ/.test(name)) return 'MEZZ';
+  if (/LOWER|B1/.test(name)) return 'LOWER';
+  if (/ROOF/.test(name)) return 'ROOF';
+  const m = name.match(/^LEVEL 0?([1-4])$/);
+  return m ? 'L' + m[1] : null;
+}
+function bmoTimestamp(raw) {
+  const text = String(raw || '').trim();
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(text)) return Date.parse(text);
+  const m = text.match(/^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)(?::(\d\d))?$/);
+  if (!m) return NaN;
+  const target = Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));
+  const fmt = new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  const wall = at => { const p=Object.fromEntries(fmt.formatToParts(at).map(x=>[x.type,x.value]));return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second); };
+  let at=target;
+  for(let i=0;i<3;i++) at+=target-wall(at);
+  // Naive readings during a DST fold cannot identify which occurrence was measured.
+  if(wall(at)!==target || wall(at-3600000)===target || wall(at+3600000)===target) return NaN;
+  return at;
+}
+
+function meterReading(m) {
+  const kw = m?.latest?.kw;
+  const value = Number.isFinite(kw) ? kw : null;
+  const raw = m?.latest?.t || m?.latest?.timestamp;
+  const at = bmoTimestamp(raw);
+  const age = Date.now() - at;
+  return {value, at, state: value == null ? 'OFFLINE' : !Number.isFinite(at) ? 'TIME UNKNOWN'
+    : age > 45 * 60 * 1000 || age < -5 * 60 * 1000 ? 'STALE' : 'LIVE'};
+}
+function alignedMeterSeries(meters) {
+  const maps = meters.map(m => new Map((m?.timeseries_kw || []).filter(p => Number.isFinite(p.v)).map(p => [p.t,p.v])));
+  if (!maps.length) return [];
+  return [...maps[0]].filter(([t]) => maps.every(m => m.has(t)))
+    .map(([t]) => ({t,v:maps.reduce((sum,m)=>sum+m.get(t),0)})).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
+}
+function volumeM3(raw) {
+  const m = String(raw ?? '').trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*(ft\^?3|ft³|m\^?3|m³)$/i);
+  if (!m) return null;
+  const n = Number(m[1]) * (/^ft/i.test(m[2]) ? 0.028316846592 : 1);
+  return Number.isFinite(n) ? n : null;
+}
+function carbonEstimate(info, factor) {
+  const volume = volumeM3(info.volume);
+  if (volume == null || !info.structural_material || !factor || !Number.isFinite(factor.value) || factor.value < 0
+      || !String(factor.source || '').trim() || !['A1-A3','A1-A5','A-C'].includes(factor.scope)) return null;
+  const result = volume * factor.value;
+  return Number.isFinite(result) ? result : null;
+}
+function carbonRows(info) {
+  if (info.system !== 'Structural') return '';
+  const volume = volumeM3(info.volume);
+  return dsec('Embodied carbon · MODELLED')
+    + drow('volume', volume == null ? 'unavailable / unsupported units' : volume.toFixed(3) + ' m³ (Revit design)')
+    + drow('material', esc(info.structural_material || 'unavailable'))
+    + '<div class="pt mut"><span>No project EPD factor is bound. Enter a material-matched factor and evidence to calculate a scenario. This is not a measured emission, a whole-building LCA, or avoided-carbon credit.</span></div>'
+    + (volume == null || !info.structural_material ? '' : `<form id="carbonForm" class="carbon-form" onsubmit="calculateElementCarbon(event)">
+      <label>Factor · kgCO₂e / m³ <input id="carbonFactor" type="number" min="0" step="any" required></label>
+      <label>EPD / factor source <input id="carbonSource" type="text" maxlength="500" required placeholder="Document, product and declared unit conversion"></label>
+      <label>Lifecycle scope <select id="carbonScope"><option>A1-A3</option><option>A1-A5</option><option>A-C</option></select></label>
+      <button type="submit" class="tb-btn">Calculate scenario</button><div id="carbonResult" role="status"></div>
+      </form>`);
+}
+
+async function assembleElementParts(paths, loadPart, buildPart, releasePart) {
+  const result = {meshes:[],stats:{},identityBinding:{}};
+  for (const path of paths) {
+    const source = await loadPart(path);
+    let part;
+    try { part = await buildPart(source); }
+    finally { releasePart(source); }
+    result.meshes.push(...part.meshes);
+    for (const [key,value] of Object.entries(part.stats)) {
+      if (typeof value === 'number') result.stats[key] = (result.stats[key] || 0) + value;
+      else if (Array.isArray(value)) result.stats[key] = [...(result.stats[key] || []),...value].slice(0,8);
+    }
+    for (const [key,value] of Object.entries(part.identityBinding || {})) result.identityBinding[key] = (result.identityBinding[key] || 0) + value;
+  }
+  return result;
+}
+
+/* END ELEMENT DATA HELPERS */
+
+const fetchJson = u => fetch(u, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
+const _jsonCache = {};
+const cachedJson = u => {
+  const c = _jsonCache[u];
+  if (c && Date.now() - c.at < 60000) return c.p;
+  const p = fetchJson(u);
+  _jsonCache[u] = { at: Date.now(), p };
+  p.catch(() => delete _jsonCache[u]);
+  return p;
+};
+window.calculateElementCarbon = event => {
+  event.preventDefault();
+  const info = equipPicked && equipMeta[equipPicked.id];
+  if (!info) return;
+  const raw = document.getElementById('carbonFactor').value;
+  const factor = {value: raw.trim() ? Number(raw) : NaN, source: document.getElementById('carbonSource').value.trim(), scope: document.getElementById('carbonScope').value};
+  const kg = carbonEstimate(info, factor);
+  document.getElementById('carbonResult').textContent = kg == null ? 'Cannot estimate: verify volume, material, factor and source.'
+    : `MODELLED scenario · ${kg.toLocaleString(undefined,{maximumFractionDigits:1})} kgCO₂e · ${factor.scope} · factor ${factor.value} kgCO₂e/m³ · source: ${factor.source}`;
+};
+let twinPkg = null;
+if (window.TwinResolver) {
+  TwinResolver.loadPackage('buildings/grimes/manifest.json', fetchJson)
+    .then(p => { twinPkg = p; console.log('[twin] package loaded:', p.manifest.name); })
+    .catch(e => console.warn('[twin] package load failed —', e.message));
+}
+
+const raycaster = new THREE.Raycaster(), _ptr = new THREE.Vector2();
+let _downX = 0, _downY = 0, picked = null;
+renderer.domElement.addEventListener('pointerdown', e => { _downX = e.clientX; _downY = e.clientY; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (walkMode && (plockActive||splitPane==='bim')) return; // center aiming → the center-ray click pick handles it
+  // (drag-look fallback keeps normal click picks: >6 px movement means a drag)
+  if (Math.hypot(e.clientX - _downX, e.clientY - _downY) > 6) return; // drag, not a tap
+  const r = renderer.domElement.getBoundingClientRect();
+  _ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(_ptr, camera);
+  // Equipment (element tier) wins first — small targets beat system blobs
+  if (anyLayerVisible()) {
+    const eqHit = raycaster.intersectObjects(visibleEquip(), false)[0];
+    if (eqHit && !interiorBlocksRay(eqHit.distance)) { pickEquipment(eqHit.object, eqHit.instanceId, resolveElementHit(eqHit.object, eqHit.instanceId, eqHit.faceIndex, eqHit.index)); return; }
+  }
+  // Resolve systems after element picking; empty space clears the selection.
+  const mepHit = (mepModel && mepModel.visible) ? raycaster.intersectObjects(allMeshes, false)[0] : null;
+  if (mepHit) { pickSystem(mepHit.object); return; }
+  clearPick();
+});
+
+function highlight(mesh) {
+  const base = walkMode ? 0.30 : 0.85;   // walk keeps MEP as translucent context
+  allMeshes.forEach(m => { m.material.opacity = mesh ? (m === mesh ? 1 : 0.12) : base; });
+}
+window.clearPick = () => {
+  elementPickEpoch++;
+  picked = null;
+  highlight(null);
+  unhighlightEquip();
+  document.getElementById('twinPanel').classList.remove('show');
+  document.body.classList.remove('twin-open');
+};
+
+/* ══════════ ELEMENT-TIER LAYERS (Phase 2) ══════════
+   Each layer is a GLB cut from the 741k-element APS master by
+   scripts/extract_layer.py (one node per geometry leaf, named by the OWNING
+   Revit element's dbId) + a <layer>.elements.json identity file enriched by
+   scripts/classify_elements.py (type / system / level provenance / feeds).
+   All layers share the master frame, so one registration serves all. */
+// DERIVED (2026-08-03): the APS master frame is rotated 180° about Y relative
+// to the viewer frame (asymmetric-anchor proof; bbox min/max matching alone
+// cannot detect a 180° rotation since sizes are preserved). Placement is
+// rotY(π) + this translation (conduit-set match under H180).
+const EQUIP_OFFSET = { x: -35.28, y: -97.16, z: 28.60 };
+const LAYERS = {   // all cut from the 2026-09-01 targeted SVF re-export (every element keeps its dbId) — see scripts/extract_layer.py
+  equipment:  { glb: 'buildings/grimes/grimes-equipment.glb',  json: 'buildings/grimes/elements.json',            label: '⚡ Equipment',   mb: 1.5 },
+  fixtures:   { glb: 'buildings/grimes/grimes-fixtures.glb',   json: 'buildings/grimes/fixtures.elements.json',   label: '⏻ Receptacles', mb: 6.2 },
+  lighting:   { glb: 'buildings/grimes/grimes-lighting.glb',   json: 'buildings/grimes/lighting.elements.json',   label: '💡 Lighting',    mb: 2.3 },
+  lifesafety: { glb: 'buildings/grimes/grimes-lifesafety.glb', json: 'buildings/grimes/lifesafety.elements.json', label: '🧯 Life safety', mb: 0.5 },
+  structural: { glb: 'buildings/grimes/grimes-structural.glb', json: 'buildings/grimes/structural.elements.json', label: '🏗 Structure',   mb: 12.9 },
+  conduit:    { glb: 'buildings/grimes/grimes-conduit.glb',    json: 'buildings/grimes/conduit.elements.json',    label: '🔌 Conduit',     mb: 11.0 },
+  // MEP fabrication tiers (CAD entities, no Revit category) — scripts/extract_mep_layer.py
+  duct:       { glb: 'buildings/grimes/grimes-duct.glb',       json: 'buildings/grimes/duct.elements.json',       label: '🌀 Ductwork',    mb: 21.1 },
+  hydronic:   { glb: 'buildings/grimes/grimes-hydronic.glb',   json: 'buildings/grimes/hydronic.elements.json',   label: '♨ Mech piping', mb: 20.4 },
+  plumbing:   { glb: 'buildings/grimes/grimes-plumbing.glb',   json: 'buildings/grimes/plumbing.elements.json',   label: '🚰 Plumbing',    mb: 20.9 },
+  fire:       { glb: 'buildings/grimes/grimes-fire.glb', partsManifest: 'buildings/grimes/grimes-fire.chunks.json',       json: 'buildings/grimes/fire.elements.json',       label: '🧨 Fire piping', mb: 85.9 },
+};
+let bulkScanLayers=false;
+const layerState = {};           // key -> { group, meshes, loading }
+let equipMeshes = [], equipMeta = {}, equipPicked = null;   // union across loaded layers
+const anyLayerVisible = () => Object.values(layerState).some(l => l.group && l.group.visible);
+
+window.toggleLayer = (key, {bulk=false}={}) => {
+  const L = LAYERS[key], st = layerState[key] || (layerState[key] = {});
+  const btn = document.getElementById('layerBtn-' + key);
+  if (st.loading) return st.pending;
+  if (st.group) {
+    st.group.visible = !st.group.visible; st.desiredVisible=st.group.visible;
+    btn.classList.toggle('active', st.group.visible);
+    applyEquipFilter();
+    if (!st.group.visible && equipPicked && equipPicked.im.userData.layer === key) clearPick();
+    buildEquipFilter(); updateAllElementsButton();
+    return Promise.resolve(true);
+  }
+  if (st.loading) return st.pending;
+  if (!bulk && L.mb >= 5 && mobileMq.matches && !confirm(`${L.label.slice(2)} is ${L.mb} MB — load on mobile data?`)) return;
+  st.loading = true;st.desiredVisible=true;
+  btn.disabled = true; btn.setAttribute('aria-busy','true');
+  if (!st.labelHtml) st.labelHtml = btn.innerHTML;
+  btn.textContent = `⏳ ${L.mb} MB…`;
+  st.pending = cachedJson(L.json).then(async metaJson => {
+    const meta = metaJson.elements || {};
+    for (const info of Object.values(meta)) info.levelKey = elementLevel(info) || 'UNKNOWN';
+    for (const [id, info] of Object.entries(meta)) { info.layer = key; equipMeta[id] = info; }
+    st.survival = metaJson.survival || null;
+    const partPaths = L.partsManifest ? (await cachedJson(L.partsManifest)).chunks.map(c => 'buildings/grimes/' + c.file) : [L.glb];
+    const tier = await assembleElementParts(partPaths,
+      path => new Promise((resolve,reject) => loader.load(path, resolve,
+        p => { if (p.total) btn.textContent = `⏳ ${(p.loaded / 1000000).toFixed(1)} MB…`; }, reject)),
+      async gltf => {
+        const sourceGroup = gltf.scene;
+        sourceGroup.rotation.y = Math.PI;
+        sourceGroup.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
+        sourceGroup.updateMatrixWorld(true);
+        const identityBinding = bindElementSourceIds(gltf);
+        const built = await buildElementRenderTier(THREE, sourceGroup, meta, key);
+        return {...built, identityBinding};
+      }, releaseElementSource);
+    st.meshes = tier.meshes; st.renderStats = tier.stats; st.identityBinding = tier.identityBinding;
+    equipMeshes.push(...tier.meshes);
+    st.group = new THREE.Group(); st.group.name = 'layer:' + key;   // world-space container (matrices already baked)
+    for (const im of st.meshes) st.group.add(im);
+    st.group.visible=st.desiredVisible!==false;
+    scene.add(st.group);
+    if(scanOnly){st.scanPriorVisible=true;st.group.visible=false;}
+    st.loading = false;
+    btn.disabled = false; btn.removeAttribute('aria-busy');
+    btn.innerHTML = st.labelHtml;
+    btn.classList.toggle('active',st.group.visible);
+    document.getElementById('layersBtn').classList.add('active');
+    applyEquipFilter();
+    buildEquipFilter();
+    console.log(`[layer:${key}] loaded:`, st.meshes.length, 'draw calls /', Object.keys(meta).length, 'elements /', st.meshes.reduce((a, m) => a + (m.count || 1), 0), 'instances');
+  }).catch(e => {
+    st.loading = false;
+    btn.disabled = false; btn.removeAttribute('aria-busy');
+    btn.innerHTML = st.labelHtml;
+    console.error(`[layer:${key}] load failed —`, e);
+  }).finally(updateAllElementsButton);
+  return st.pending;
+};
+// Bulk visibility is independent of the floor selection. Last user intent wins.
+let allElementsEpoch=0,allElementsLoading=false,allElementsRequested=false;
+function updateAllElementsButton(){
+ const keys=Object.keys(LAYERS),visible=keys.filter(k=>layerState[k]?.group?.visible).length;
+ const active=allElementsLoading?allElementsRequested:visible===keys.length;
+ const label=allElementsLoading?`Hide all · ${visible}/${keys.length}`:active?'Hide all elements':'Show all elements';
+ for(const id of ['allElementsBtn','showAllLayersQuick','loadAllScanLayers']){
+  const b=document.getElementById(id);if(!b)continue;b.disabled=false;b.textContent=label;b.setAttribute('aria-pressed',active?'true':visible?'mixed':'false');
+ }
+ const status=document.getElementById('allElementsStatus');if(status)status.textContent=`${visible}/${keys.length} element layers visible${allElementsLoading?' · Loading in sequence':''} · Floor filter unchanged`;
+}
+window.setAllElements=async show=>{
+ const epoch=++allElementsEpoch;allElementsRequested=!!show;allElementsLoading=!!show;
+ for(const key of Object.keys(LAYERS)){const st=layerState[key]||(layerState[key]={});st.desiredVisible=!!show;if(st.group)st.group.visible=!!show;document.getElementById('layerBtn-'+key)?.classList.toggle('active',!!st.group&&!!show);}
+ if(mepModel)mepModel.visible=false;document.getElementById('layerBtn-mep')?.classList.remove('active');
+ if(typeof scanOnly!=='undefined')scanOnly=false;
+ if(typeof window.setAllElementContext==='function')window.setAllElementContext(!!show);
+ equipTypeFilter=null;clearPick();applyEquipFilter();buildEquipFilter();updateAllElementsButton();
+ if(!show)return;
+ try{
+  for(const key of Object.keys(LAYERS)){
+   if(epoch!==allElementsEpoch)return;
+   const st=layerState[key];
+   if(st.loading)await st.pending;else if(!st.group)await toggleLayer(key,{bulk:true});
+   if(epoch!==allElementsEpoch)return;
+   if(st.group){st.group.visible=true;st.desiredVisible=true;document.getElementById('layerBtn-'+key)?.classList.add('active');}
+   applyEquipFilter();updateAllElementsButton();
+  }
+ }finally{if(epoch===allElementsEpoch){allElementsLoading=false;buildEquipFilter();updateAllElementsButton();}}
+};
+window.toggleAllElements=()=>setAllElements(!(allElementsLoading?allElementsRequested:Object.keys(LAYERS).every(k=>layerState[k]?.group?.visible)));
+
+window.toggleEquipment = () => toggleLayer('equipment');   // legacy hook
+window.toggleMepModel = () => {
+  if (!mepModel) return;
+  mepModel.visible = !mepModel.visible;
+  document.getElementById('layerBtn-mep').classList.toggle('active', mepModel.visible);
+  document.getElementById('legend').style.display = mepModel.visible ? '' : 'none';
+  if (!mepModel.visible) clearPick();   // a picked discipline mesh is gone from view
+};
+/* The layer list is a fixed panel on the LEFT (the dashboard owns the right),
+   so the two can never overlap. It stays open while toggling layers; close
+   with the ✕, the Layers button, or Esc. */
+window.toggleLayersMenu = () => {
+  const m = document.getElementById('layersMenu');
+  m.hidden = !m.hidden;
+  document.getElementById('layersBtn').classList.toggle('active', !m.hidden);
+};
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('layersMenu').hidden) toggleLayersMenu();
+});
+
+/* Type filter — chips = the type taxonomy of every VISIBLE layer, ordered by
+   count. A chip hides everything else across layers. */
+let equipLevelFilter = null;
+window.setElementFloor = value => { equipLevelFilter = value || null; applyEquipFilter(); buildEquipFilter(); };
+let equipTypeFilter = null;   // null = all
+const layerOn = m => { const st = layerState[m.userData.layer]; return st && st.group && st.group.visible; };
+raycaster.params.Line = { threshold: 0.15 };   // 2D-symbol elements are pickable within 15 cm
+// Raycaster ignores .visible — hidden layers and filtered-out meshes must be excluded explicitly.
+const visibleEquip = () => equipMeshes.filter(m => m.visible && layerOn(m));   // zero-scaled instances cannot be hit
+/* Type chips live INSIDE the left layers panel, one group under each visible
+   layer's button (they used to be one merged bar over the model). One filter
+   is active at a time; clicking the active chip — or a layer's "All" — clears it. */
+function buildEquipFilter() {
+  const perLayer = {};   // layer -> {type: count}
+  for (const e of Object.values(equipMeta)) {
+    const st = layerState[e.layer];
+    if (st && st.group && st.group.visible && e.type && (!equipLevelFilter || (elementLevel(e) || 'UNKNOWN') === equipLevelFilter))
+      (perLayer[e.layer] = perLayer[e.layer] || {})[e.type] = (perLayer[e.layer][e.type] || 0) + 1;
+  }
+  const allCounts = {};
+  for (const c of Object.values(perLayer)) for (const [t, n] of Object.entries(c)) allCounts[t] = (allCounts[t] || 0) + n;
+  if (equipTypeFilter && !allCounts[equipTypeFilter]) { equipTypeFilter = null; applyEquipFilter(); }
+  for (const key of Object.keys(LAYERS)) {
+    const box = document.getElementById('chips-' + key);
+    if (!box) continue;
+    box.innerHTML = '';
+    let coverage = document.getElementById('coverage-' + key);
+    if (!coverage) { coverage = document.createElement('div'); coverage.id = 'coverage-' + key; coverage.className = 'layer-coverage'; box.before(coverage); }
+    const st = layerState[key];
+    coverage.hidden = !st?.group?.visible;
+    if (st?.survival) {
+      const totals = Object.values(st.survival).reduce((a,c) => ({shown:a.shown+c.with_geometry, total:a.total+(c.eligible ?? c.total), excluded:a.excluded+(c.excluded || 0)}),{shown:0,total:0,excluded:0});
+      const detail = Object.entries(st.survival).map(([name,c]) => {
+      const denominator = c.eligible ?? c.total;
+      return `${name}: ${c.with_geometry.toLocaleString()} / ${denominator.toLocaleString()} ${c.eligible != null ? 'eligible' : 'source'} elements with geometry` + (c.excluded ? ` · ${c.excluded.toLocaleString()} intentionally excluded` : '') + (c.eligible == null ? ' (exclusions not separated)' : '');
+      }).join('; ');
+      coverage.innerHTML = `<details><summary>Geometry ${totals.shown.toLocaleString()} / ${totals.total.toLocaleString()}${totals.excluded ? ' · '+totals.excluded.toLocaleString()+' excluded' : ''}</summary>${esc(detail)}</details>`;
+    }
+    const counts = perLayer[key];
+    box.hidden = !counts;
+    if (!counts) continue;
+    const mk = (label, val, n) => {
+      const b = document.createElement('button');
+      b.className = 'ef' + (val !== null && val === equipTypeFilter ? ' on' : '');
+      b.innerHTML = esc(label) + (n != null ? `<small>${n}</small>` : '');
+      b.onclick = () => { equipTypeFilter = (val === null || val === equipTypeFilter) ? null : val; applyEquipFilter(); buildEquipFilter(); };
+      box.appendChild(b);
+    };
+    mk('All', null, Object.values(counts).reduce((a, b) => a + b, 0));
+    for (const [t, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) mk(t, t, n);
+  }
+}
+const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
+function applyEquipFilter() {
+  for (const mesh of equipMeshes) setElementRenderVisible(mesh, equipLevelFilter, equipTypeFilter, equipMeta);
+  if (equipPicked) {
+    const info = equipMeta[equipPicked.id];
+    if ((equipTypeFilter && info?.type !== equipTypeFilter) || (equipLevelFilter && (elementLevel(info) || 'UNKNOWN') !== equipLevelFilter)) clearPick();
+  }
+  const visible = visibleEquip();
+  const ids = new Set();
+  for (const mesh of visible) for (const id of mesh.userData.ids) if (id) ids.add(id);
+  document.getElementById('layerStats').textContent = ids.size.toLocaleString() + ' elements · current floor / type selection';
+}
+
+function findEquipId(obj) {
+  for (let o = obj; o; o = o.parent) {
+    if (o.name && equipMeta && equipMeta[o.name]) return o.name;
+  }
+  return null;
+}
+const _white = new THREE.Color(0xffffff), _amber = new THREE.Color(0xfbbf24);
+function unhighlightEquip() {
+  if (equipPicked) for (const mesh of equipMeshes) highlightElementRender(mesh, equipPicked.id, false);
+  equipPicked = null;
+}
+
+const EQUIP_LABELS = {  // family name → human label
+  'eE_EQ_Panelboard_v2': 'Panelboard', 'RT_EQ_Transformer': 'Transformer',
+  'eE_EQ_Disconnect_v2': 'Disconnect switch', 'RT_EQ_Panel_TopHat': 'Panel (top hat)',
+  'RT_EQ_Ground_Bar': 'Ground bar', 'RT_EQ_Access_Panel': 'Access panel', 'RT_EQ_Pad': 'Equipment pad',
+};
+// Revit parameters carried by scripts/extract_layer.py from the full property dump
+const REVIT_FIELDS = [['mark', 'mark'], ['location', 'room / location'], ['electrical_data', 'electrical data'],
+  ['design_va', 'design load (VA)'], ['watts', 'watts'], ['flow', 'design airflow'], ['system_classification', 'system'],
+  ['pressure_drop', 'pressure drop'], ['size', 'size'], ['mains', 'mains'], ['mcb_rating', 'MCB rating'],
+  ['volume', 'volume'], ['length', 'length'], ['area', 'area'], ['structural_material', 'material'],
+  ['structural_usage', 'structural usage'], ['revit_type', 'type'], ['workset', 'workset'], ['phase', 'phase'], ['comments', 'comments']];
+function revitRows(info) {
+  const rows = REVIT_FIELDS.filter(([k]) => info[k] != null && info[k] !== '').map(([k, l]) => {
+    let v = String(info[k]).replace(/^Material "|", #\d+$/g, '');
+    return drow(l, esc(v));
+  });
+  return rows.length ? dsec('Revit (design)') + rows.join('') : '';
+}
+/* Element dashboard — neighbours (same room, else same level + type) and the
+   modelled apportionment. Selecting a neighbour re-picks it through the same
+   instanced path, so the panel is navigable without touching the 3D view. */
+window.selectElementById = (id) => {
+  for (const mesh of equipMeshes) {
+    const hit = findElementSelection(mesh, id);
+    if (!hit) continue;
+    const st = layerState[mesh.userData.layer];
+    if (st?.group && !st.group.visible) toggleLayer(mesh.userData.layer);
+    const info = equipMeta[id];
+    if (equipTypeFilter && info.type !== equipTypeFilter) equipTypeFilter = null;
+    if (equipLevelFilter && elementLevel(info) !== equipLevelFilter) { equipLevelFilter = null; document.getElementById('elementFloor').value = ''; }
+    applyEquipFilter(); buildEquipFilter();
+    pickEquipment(mesh, hit.instanceId, id); return;
+  }
+  console.warn('[twin] element not in any loaded layer:', id);
+};
+
+function neighbourRows(id, info) {
+  const same = [];
+  const byRoom = !!info.location;
+  const level = elementLevel(info);
+  if (!byRoom && (!level || !info.type)) return "";
+  for (const [oid, o] of Object.entries(equipMeta)) {
+    if (oid === id) continue;
+    if (byRoom ? o.location === info.location && (!level || !elementLevel(o) || elementLevel(o) === level) : (elementLevel(o) === level && o.type === info.type)) same.push([oid, o]);
+    if (same.length >= 60) break;
+  }
+  if (!same.length) return '';
+  const shown = same.slice(0, 8);
+  const head = byRoom ? `Same room · ${esc(info.location)} · ${same.length}${same.length >= 60 ? '+' : ''}`
+                      : `Same level · ${esc(info.type || '')} · ${same.length}${same.length >= 60 ? '+' : ''}`;
+  return dsec(head) + shown.map(([oid, o]) =>
+    `<div class="eqrow" onclick="selectElementById('${esc(oid)}')"><span class="eqtag">${esc(o.type || o.category || '')}</span>`
+    + `<span class="eqcat">${esc(o.mark ? 'mark ' + o.mark : (o.name || ''))}</span>`
+    + `<span class="eqspec">${o.design_va ? o.design_va + ' VA' : o.flow ? esc(o.flow) : (o.levelKey || '')}</span></div>`).join('')
+    + (same.length > 8 ? `<div class="pt mut"><span>… ${same.length - 8} more (use the type chips to isolate)</span></div>` : '');
+}
+function apportionRow(info, meters) {
+  const ap = info.apportion;
+  if (!ap) return '';
+  const m = meters[ap.meter];
+  const kw = m && m.latest && typeof m.latest.kw === 'number' ? m.latest.kw : null;
+  const est = kw != null ? kw * ap.share : null;
+  const fmt = w => w < 1 ? (w * 1000).toFixed(0) + ' W' : w.toFixed(2) + ' kW';
+  return `<div class="pt"><span>MODELLED share · meter ${esc(ap.meter)} × ${(ap.share * 100).toFixed(3)} %</span>`
+       + `<span class="v">${est != null ? '≈ ' + fmt(est) : 'offline'}</span></div>`
+       + `<div class="pt mut"><span>${esc(ap.basis)} ${esc(String(ap.weight))} of ${esc(String(ap.pool))} elements on this feeder — an apportionment of the meter, not a measurement of this element.</span></div>`;
+}
+async function pickEquipment(mesh, instanceId, explicitId = null) {
+  const id = explicitId || (mesh.userData.ids ? mesh.userData.ids[mesh.userData.isLine ? 0 : instanceId] : null);
+  const info = id && equipMeta && equipMeta[id];
+  if (!info) return;
+  const epoch = ++elementPickEpoch;
+  document.getElementById('clickHint').classList.remove('show');
+  highlight(null);
+  unhighlightEquip();
+  equipPicked = { im: mesh, id }; picked = mesh;
+  for (const mesh of equipMeshes) highlightElementRender(mesh, id, true, _amber);
+  document.body.classList.add('twin-open');
+  document.getElementById('twinPanel').classList.add('show');
+  const label = info.type || EQUIP_LABELS[info.name] || info.name || 'Equipment';
+  document.getElementById('twinDot').style.background = '#fbbf24';
+  document.getElementById('twinTitle').textContent = label + (info.level ? ' · ' + info.level : '');
+  const ptsEl = document.getElementById('twinPoints');
+  const detInfo = document.getElementById('twinDetInfo');
+  document.getElementById('twinDetEquip').innerHTML = neighbourRows(id, info);
+  document.getElementById('twinDetZ').innerHTML = '';
+  document.getElementById('twinRange').classList.remove('on');
+  document.getElementById('twinEvent').innerHTML = '';
+  drawSpark(document.getElementById('twinSpark'), []);
+  detInfo.innerHTML =
+    dsec('Identity')
+    + drow('element', esc(label))
+    + drow('family', esc(info.name || '—'))
+    + (info.element_tag ? drow('element tag', esc(info.element_tag)) : '')
+    + (info.source_guid ? drow('source GUID', esc(info.source_guid)) : '')
+    + (info.cad_handle ? drow('CAD handle', esc(info.cad_handle)) : '')
+    + (info.category ? drow('revit category', esc(info.category)) : '')
+    + (info.system ? drow('system', esc(info.system)) : '')
+    + (elementLevel(info) ? drow('level', esc(info.level || elementLevel(info))
+        + (info.levelSource === 'geometry' ? ' <span class="mut">(inferred from position; pooled validation, not element certainty)</span>' : info.levelSource === 'source-file' ? ' <span class="mut">(from source filename)</span>' : '')) : '')
+    + (info.elevation_m != null ? drow('elevation', info.elevation_m.toFixed(2) + ' m') : '')
+    + (info.source_file ? drow('source model', esc(info.source_file)) : '')
+    + revitRows(info)
+    + carbonRows(info)
+    + (info.fabrication ? dsec('Fabrication attributes · source design') + Object.entries(info.fabrication).map(([k,v])=>drow(esc(k),esc(String(v)))).join('') : '')
+    + drow('dbId', esc(id) + (info.layer ? ' <span class="mut">· layer ' + esc(info.layer) + '</span>' : ''))
+    + dsec('Source')
+    + drow('geometry', 'APS SVF → element GLB (dbId-named nodes)')
+    + drow('identity file', esc(LAYERS[info.layer]?.json || 'unavailable'));
+  const bigEl = document.getElementById('twinBigKw'), badgeEl = document.getElementById('twinBadge');
+  const srcEl = document.getElementById('twinSrc');
+  bigEl.style.color = '';
+  document.getElementById('chartKey').innerHTML = '';
+  const baseCanvas = document.getElementById('twinBaseSpark');
+  baseCanvas._chart = null; baseCanvas.style.display = 'none';
+  drawSpark(baseCanvas, []);
+  const feeds = info.isFedBy || [];
+  bigEl.innerHTML = '— <small>kW</small>';
+  badgeEl.textContent = 'LOADING'; badgeEl.className = 'badge na';
+  ptsEl.innerHTML = '';
+  if (!feeds.length && !info.apportion) {
+    badgeEl.textContent = 'NO FEED';
+    srcEl.textContent = 'No measured feed bound to this element.';
+    ptsEl.innerHTML = '<div class="pt mut"><span>' + (info.system === 'Structural'
+      ? 'Design geometry and material only; no element sensor installed.'
+      : 'Identity and design information only; no element telemetry.') + '</span></div>';
+    return;
+  }
+  srcEl.textContent = !feeds.length ? 'Roof AHU electricity allocated by design CFM; no airflow sensor on this terminal.'
+    : info.feedSource === 'level-inferred' ? 'Feeder association inferred from floor; no verified circuit topology.'
+    : info.feedSource === 'revit-voltage' ? `Feeder associated by Revit voltage (${info.design_volts} V); not a verified circuit connection.`
+    : info.feedSource === 'voltage-class' ? 'Lighting feeder associated by voltage class; no per-circuit measurement.'
+    : info.feedSource === 'panel-schedule' ? 'Feeder association from the documented panel schedule; meter totals are not element measurements.'
+    : 'Legacy feeder association, unverified; meter totals are not element measurements.';
+  try {
+    const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+    if (epoch !== elementPickEpoch) return;
+    const meters = bd.meters || {};
+    const ids = [...new Set(feeds.length ? feeds.map(ref => String(ref).split(':')[2]) : [info.apportion.meter])];
+    const readings = ids.map(id => meterReading(meters[id]));
+    const available = readings.filter(r => r.value != null);
+    const complete = available.length === ids.length;
+    const state = !available.length ? 'OFFLINE' : !complete ? 'PARTIAL'
+      : readings.some(r => r.state === 'STALE') ? 'STALE'
+      : readings.some(r => r.state === 'TIME UNKNOWN') ? 'TIME UNKNOWN' : 'LIVE';
+    const total = available.reduce((sum,r)=>sum+r.value,0);
+    bigEl.innerHTML = (complete ? total.toFixed(1) : '—') + ' <small>kW ' + (feeds.length ? 'feeders' : 'roof meter') + '</small>';
+    badgeEl.textContent = state; badgeEl.className = state === 'LIVE' ? 'badge' : 'badge na';
+    const labels = {'3':'Roof Electric','76':'480/277 V (HVAC / lighting)','77':'208/120 V (plug / IT)'};
+    ptsEl.innerHTML = ids.map((id,i) => {
+      const r = readings[i];
+      return `<div class="pt"><span>Measured feeder · ${esc(labels[id] || id)}</span><span class="v">${r.value == null ? 'unavailable' : r.value.toFixed(1)+' kW'}</span></div>`
+        + `<div class="pt mut"><span>${esc(r.state)} · ${Number.isFinite(r.at) ? esc(new Date(r.at).toISOString()) : 'timestamp unavailable'}</span></div>`;
+    }).join('') + apportionRow(info,meters)
+      + (ids.includes('76') ? '<div class="pt mut"><span>Meter 76 is not apportioned: mixed lighting / plant loads, without defensible element weights.</span></div>' : '');
+    drawSpark(document.getElementById('twinSpark'), alignedMeterSeries(ids.map(id=>meters[id])));
+  } catch (e) {
+    if (epoch !== elementPickEpoch) return;
+    badgeEl.textContent = 'OFFLINE'; badgeEl.className = 'badge na';
+    bigEl.innerHTML = '— <small>kW</small>';
+    ptsEl.innerHTML = '<div class="pt mut"><span>Live feed unreachable — ' + esc(e.message) + '</span></div>';
+  }
+}
+
+function sumSeries(vals, points) {
+  const list = points.map(p => (vals[p.ref] && vals[p.ref].series) || []).filter(s => s.length);
+  if (!list.length) return [];
+  const n = Math.min(...list.map(s => s.length));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    let v = 0;
+    for (const s of list) v += s[s.length - n + i].v || 0;
+    out.push({ t: list[0][list[0].length - n + i].t, v });
+  }
+  return out;
+}
+function drawSpark(cv, series) {
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (series.length < 2) return;
+  const vs = series.map(s => s.v), min = Math.min(...vs), max = Math.max(...vs), rng = (max - min) || 1;
+  ctx.beginPath();
+  series.forEach((s, i) => {
+    const x = i / (series.length - 1) * (cv.width - 8) + 4;
+    const y = cv.height - 6 - (s.v - min) / rng * (cv.height - 12);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5; ctx.stroke();
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dsec = t => `<div class="dsec">${t}</div>`;
+const drow = (k, v) => `<div class="drow"><span class="dk">${k}</span><span class="dv">${v}</span></div>`;
+
+window.toggleTwinInfo = () => {
+  const det = document.getElementById('twinDetails');
+  det.classList.toggle('open');
+  document.getElementById('twinInfoBtn').textContent = det.classList.contains('open') ? '▾ Less' : '▸ More details';
+};
+window.toggleTwinMore = id => {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+};
+
+/* Expected telemetry per system category — answers "it's Piping, why only
+   kW?": each discipline lists the channels it SHOULD have; only the ones a
+   real meter backs show live values, the rest read "not connected". */
+const CHANNELS = {
+  duct:   [['Airflow', 'CFM'], ['Static pressure', 'in. w.c.'], ['Supply air temp', '°F']],
+  equip:  [['Power', 'kW', 'power'], ['Speed', '%'], ['Status', '']],
+  piping: [['Water flow', 'GPM', 'water'], ['Steam condensate', 'GPM', 'steam'], ['Irrigation', 'GPM', 'irr'],
+           ['Supply temp', '°F'], ['Return temp', '°F'], ['Pressure', 'psi']],
+  fire:   [['Line pressure', 'psi'], ['Valve status', ''], ['Flow switch', '']],
+  elec:   [['Power', 'kW', 'power'], ['Voltage', 'V'], ['Current', 'A']],
+};
+// Flow telemetry is real: meter #250 'Condensate & Water' on the Bechtel
+// logger (steam condensate GPM, irrigation GPM, two domestic water CFm) is
+// already fetched into data/building_data.json every 15 min by bmo_fetch.py.
+async function liveChannels(sysName, powerKw) {
+  const live = { power: powerKw };
+  if (SYS_CHANNELS[sysName] === 'piping') {
+    try {
+      const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+      const w = bd && bd.water && bd.water.latest;
+      if (w) {
+        const cf = (w.water1_rate_cfm || 0) + (w.water2_rate_cfm || 0);
+        live.water = cf * 7.481;               // ft³/min → gal/min
+        live.steam = w.steam_rate_gpm;
+        live.irr = w.irrigation_rate_gpm;
+      }
+    } catch {}
+  }
+  return live;
+}
+const SYS_CHANNELS = {
+  'HVAC Duct': 'duct', 'Diffusers': 'duct',
+  'HVAC Equipment': 'equip', 'Pumps/Valves': 'equip',
+  'Piping': 'piping', 'Sprinkler': 'fire',
+  'Conduit': 'elec', 'Electrical': 'elec',
+};
+function channelRows(sysName, live) {
+  const set = CHANNELS[SYS_CHANNELS[sysName]] || [];
+  if (!set.length) return '';
+  return '<div class="sec">Sensor channels</div>' + set.map(([label, unit, kind]) => {
+    const v = kind && live ? live[kind] : null;
+    if (v != null && isFinite(v)) {
+      return `<div class="pt"><span><i class="livedot"></i>${label}</span><span class="v" style="color:#34d399">${(+v).toFixed(1)} ${unit}</span></div>`;
+    }
+    return `<div class="pt ch-off"><span>${label}${unit ? ' (' + unit + ')' : ''}</span><span>— not connected</span></div>`;
+  }).join('');
+}
+
+// Building-level panel: load + baseline + system directory.
+const BUILDING_PICK = {};
+window.selectSysByIndex = i => { const m = sysMesh[i]; if (m) pickSystem(m); };
+function pickBuilding() {
+  elementPickEpoch++;
+  unhighlightEquip();
+  picked = BUILDING_PICK;
+  highlight(null);
+  document.getElementById('clickHint').classList.remove('show');
+  document.body.classList.add('twin-open');
+  document.getElementById('twinPanel').classList.add('show');
+  document.getElementById('twinDot').style.background = '#FDB515';
+  document.getElementById('twinTitle').textContent = 'Bechtel Engineering Center · Building structure';
+  document.getElementById('twinDetEquip').innerHTML = '';
+  drawSpark(document.getElementById('twinSpark'), []);
+  renderBaseline(); // same headline: load, status, band chart, latest event
+  document.getElementById('twinPoints').innerHTML =
+    '<div id="dvaWidget"></div>'
+    + '<div class="pt mut"><span>Systems in this building — click one:</span></div>'
+    + SYSTEMS.map((s, i) =>
+      `<div class="pt sysrow" onclick="selectSysByIndex(${i})"><span><span class="sw" style="background:#${s.hex.toString(16).padStart(6, '0')}"></span>${esc(s.label)}</span><span class="v">▸</span></div>`).join('');
+  const bEnt = twinPkg && twinPkg.brick.entities['grimes:Grimes'];
+  document.getElementById('twinDetInfo').innerHTML =
+    dsec('Identity')
+    + drow('brick class', bEnt ? esc(String(bEnt.type).replace('brick:', '')) : 'Building')
+    + drow('campus', 'UC Berkeley')
+    + dsec('About')
+    + '<div class="dnote">Meter values are building or feeder context; element allocations remain modelled.</div>'
+    + '<div class="duri">grimes:Grimes</div>';
+  renderDesignVsActual();
+}
+
+/* ── DESIGN vs ACTUAL (data/design_model.json) — building-panel widget ──
+   LEED design-model annual electricity vs the measured annualized range.
+   Values load from the design-model file; only the layout lives here. */
+async function renderDesignVsActual() {
+  let dm;
+  try { dm = await cachedJson('data/design_model.json'); } catch { return; }
+  const el = document.getElementById('dvaWidget');
+  if (!el || !dm || !dm.annual) return;
+  const design = dm.annual.proposed_kwh;
+  const mc = dm.measured_comparison || {};
+  const g = String(mc.gap_vs_design_pct || '').match(/\+?(\d+)\s*to\s*\+?(\d+)/);
+  const loPct = g ? +g[1] : 9, hiPct = g ? +g[2] : 16;
+  const mLo = mc.naive_annualized_kwh || Math.round(design * (1 + loPct / 100));
+  const mHi = Math.round(design * (1 + hiPct / 100));
+  const max = Math.max(design, mHi) || 1;
+  const mwh = v => (v / 1000).toFixed(1);
+  const pw = v => (v / max * 100).toFixed(1);
+  const peak = dm.peak || {};
+  el.innerHTML =
+    '<div class="sec">Design vs actual · annual electricity</div>'
+    + `<div class="dvarow"><span class="dvak">design</span><div class="dvabar"><i style="width:${pw(design)}%;background:rgba(253,181,21,.55)"></i></div><span class="dvav">${mwh(design)} MWh</span></div>`
+    + `<div class="dvarow"><span class="dvak">actual</span><div class="dvabar"><i style="width:${pw(mLo)}%;background:#34d399"></i><i class="rng" style="left:${pw(mLo)}%;width:${pw(mHi - mLo)}%"></i></div><span class="dvav">${mwh(mLo)}–${mwh(mHi)} MWh</span></div>`
+    + `<div class="pt"><span>Gap vs design</span><span class="v" style="color:#fbbf24">+${loPct}–${hiPct}%</span></div>`
+    + (peak.coincident_kw ? `<div class="pt"><span>Design coincident peak</span><span class="v">${esc(peak.coincident_kw)} kW</span></div>` : '')
+    + '<div class="mut" style="font:italic 9px/1.6 var(--mono)">July-only sample — winter data needed</div>';
+}
+
+async function pickSystem(mesh) {
+  const epoch = ++elementPickEpoch;
+  unhighlightEquip();
+  picked = mesh;
+  highlight(mesh);
+  document.getElementById('clickHint').classList.remove('show'); // hint served its purpose
+  document.body.classList.add('twin-open');
+  document.getElementById('twinPanel').classList.add('show');
+  const name = mesh.name || (mesh.parent && mesh.parent.name) || '';
+  const si = NAME_TO_SYS[name] ?? NAME_TO_SYS_N[NORM(name)];
+  document.getElementById('twinDot').style.background =
+    si != null ? '#' + SYSTEMS[si].hex.toString(16).padStart(6, '0') : '#64748b';
+  document.getElementById('twinTitle').textContent = si != null ? SYSTEMS[si].label : name;
+  const ptsEl = document.getElementById('twinPoints'), detInfo = document.getElementById('twinDetInfo');
+  ptsEl.innerHTML = ''; detInfo.innerHTML = '';
+  document.getElementById('twinDetEquip').innerHTML = '';
+  drawSpark(document.getElementById('twinSpark'), []);
+  const sysName = si != null ? SYSTEMS[si].name : null;
+  const isPiping = SYS_CHANNELS[sysName] === 'piping';
+  // Plumbing is flow-first: GPM headline + 24 h flow chart. Everything else
+  // keeps the electricity-vs-baseline headline.
+  if (isPiping) renderFlowHeadline(); else renderBaseline();
+  renderEquip(sysName || name); // design-basis equipment for this system (independent of live binding)
+  if (!twinPkg) { detInfo.textContent = 'twin package not loaded (serve over http)'; return; }
+  const res = TwinResolver.resolveNode(twinPkg, name);
+  if (!res.bound) {
+    ptsEl.innerHTML = '<div class="pt mut"><span>Not bound to live data — see More details</span></div>';
+    detInfo.innerHTML = dsec('Why no data')
+      + `<div class="dnote">${esc(res.reason)}</div>`
+      + `<div class="dnote">Add "${esc(name)}" to buildings/grimes/binding.json to link it.</div>`;
+    return;
+  }
+  // structured details: grouped label–value rows, URI demoted to the footer
+  const rawEnt = twinPkg.brick.entities[res.uri] || {};
+  const parentEnt = rawEnt.isPartOf && twinPkg.brick.entities[rawEnt.isPartOf];
+  detInfo.innerHTML =
+    dsec('Identity')
+    + drow('brick class', esc(String(res.type).replace('brick:', '').replace(/_/g, ' ')))
+    + (si != null ? drow('category', esc(SYSTEMS[si].label)) : '')
+    + ((parentEnt || res.feeders.length)
+      ? dsec('Relationships')
+        + (parentEnt ? drow('part of', esc(parentEnt.label || rawEnt.isPartOf)) : '')
+        + (res.feeders.length ? drow('fed by', esc(res.feeders.join(' + '))) : '')
+      : '')
+    + dsec('Data source')
+    + drow('adapter', 'BMO · 15-min CSV export')
+    + (res.points.length ? drow('points', esc(res.points.map(p => p.ref).join(', '))) : drow('points', 'none'))
+    + dsec('Next steps')
+    + '<div class="dnote">BAS/IoT sensor integration will populate the remaining channels.</div>'
+    + `<div class="duri">${esc(res.uri)}</div>`;
+  if (!res.points.length) {
+    const channels = await liveChannels(sysName, null);
+    if (epoch !== elementPickEpoch) return;
+    ptsEl.innerHTML = channelRows(sysName, channels)
+      + '<div class="pt mut"><span>No meter on this system'
+      + (res.type === 'brick:Fire_Safety_System' ? ' (fire protection is unmetered)' : '') + '</span></div>';
+    return;
+  }
+  try {
+    const vals = await TwinResolver.fetchValues(twinPkg, res.points, cachedJson);
+    if (epoch !== elementPickEpoch) return;
+    let total = 0;
+    const rows = res.points.map(p => {
+      const v = vals[p.ref] || {};
+      if (typeof v.value === 'number') total += v.value;
+      const nm = String(v.name || p.ref).replace(/\s*\(.*\)$/, ''); // short name
+      return `<div class="pt"><span>· ${esc(nm)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'}</span></div>`;
+    });
+    let elec = '<div class="sec">Connected now · building electricity (proxy)</div>'
+      + `<div class="pt"><span>Total power</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
+      + rows.slice(0, 3).join('');
+    if (rows.length > 3) {
+      elec += `<div id="twinPtsMore" style="display:none">${rows.slice(3).join('')}</div>`
+        + `<div class="morebtn" onclick="toggleTwinMore('twinPtsMore')">… ${rows.length - 3} more</div>`;
+    }
+    const chans = channelRows(sysName, await liveChannels(sysName, total));
+    if (epoch !== elementPickEpoch) return;
+    if (isPiping) {
+      // flow-first: electricity proxy is secondary → lives in More details
+      ptsEl.innerHTML = chans;
+      detInfo.innerHTML += '<div style="margin-top:5px">' + elec + '</div>';
+    } else {
+      ptsEl.innerHTML = chans + elec;
+    }
+    drawSpark(document.getElementById('twinSpark'), sumSeries(vals, res.points)); // 24h feed, in details
+  } catch (e) {
+    if (epoch === elementPickEpoch) ptsEl.innerHTML = '<div class="pt mut"><span>⚠ live data unavailable</span></div>';
+  }
+}
+
+/* ── DESIGN EQUIPMENT (buildings/grimes/equipment.json) ──
+   Design-basis equipment registry (LEED/DD documents). Rows filtered by the
+   picked system's `system` field: tag · category · 1–2 headline specs; click
+   a row to unfold the remaining specs. Falls back to the old "no registry"
+   note when the file is missing or nothing matches this system. */
+const _specFmt = {
+  heating_cop: v => 'COP ' + v,
+  cooling_eer: v => 'EER ' + v,
+  seer: v => 'SEER ' + v,
+  supply_cfm: v => (+v).toLocaleString() + ' CFM',
+  input_kw: v => v + ' kW',
+  kw_each: v => v + ' kW each',
+  zones: v => v + ' zones',
+  gpm: v => v + ' GPM',
+  count: v => '×' + v,
+  hp: v => (Array.isArray(v) ? v.join('/') : v) + ' hp',
+  chw_supply_f: v => 'CHW ' + v + '°F',
+  hw_supply_f: v => 'HW ' + v + '°F',
+  storage_gal: v => v + ' gal',
+};
+const _specPriority = ['heating_cop', 'cooling_eer', 'supply_cfm', 'input_kw', 'kw_each', 'seer', 'zones', 'count', 'hp', 'gpm', 'chw_supply_f', 'hw_supply_f', 'storage_gal'];
+function headlineSpecKeys(specs) {
+  const keys = _specPriority.filter(k => k in specs).slice(0, 2);
+  if (!keys.length && Object.keys(specs).length) keys.push(Object.keys(specs)[0]);
+  return keys;
+}
+const fmtSpec = (k, v) => _specFmt[k] ? _specFmt[k](v)
+  : String(k).replace(/_/g, ' ') + ' ' + (Array.isArray(v) ? v.join('/') : v);
+let _eqUid = 0;
+async function renderEquip(sysName) {
+  const epoch = elementPickEpoch;
+  const el = document.getElementById('twinDetEquip'); // lives inside ⓘ details
+  try {
+    const reg = await cachedJson('buildings/grimes/equipment.json');
+    if (epoch !== elementPickEpoch) return;
+    const items = (reg.equipment || []).filter(it => NORM(it.system || '') === NORM(sysName || ''));
+    if (!items.length) throw new Error('no entry');
+    el.innerHTML = dsec('Design equipment · ' + items.length)
+      + items.map(it => {
+        const specs = it.specs || {};
+        const head = headlineSpecKeys(specs);
+        const rest = Object.keys(specs).filter(k => !head.includes(k));
+        const id = 'eqd' + (_eqUid++);
+        const det =
+          (it.description ? `<div class="dnote">${esc(it.description)}</div>` : '')
+          + rest.map(k => drow(esc(String(k).replace(/_/g, ' ')),
+              esc(Array.isArray(specs[k]) ? specs[k].join(' / ') : specs[k]))).join('')
+          + (it.serves ? drow('serves', esc(it.serves)) : '')
+          + (it.location ? drow('location', esc(it.location)) : '')
+          + (it.meter ? drow('meter', 'M' + esc(it.meter)) : '')
+          + (it.source ? `<div class="dnote">${esc(it.source)}</div>` : '');
+        return `<div class="eqrow" onclick="toggleTwinMore('${id}')" title="click for full specs">`
+          + `<span class="eqtag">${esc(it.tag)}</span><span class="eqcat">${esc(it.category)}</span>`
+          + `<span class="eqspec">${esc(head.map(k => fmtSpec(k, specs[k])).join(' · '))}</span></div>`
+          + `<div id="${id}" class="eqdet" style="display:none">${det}</div>`;
+      }).join('');
+  } catch {
+    if (epoch !== elementPickEpoch) return;
+    el.innerHTML = 'no element registry — GLB is system-tier geometry; NWD re-export needed for per-element data';
+  }
+}
+
+/* ══════════ BASELINE / ANOMALY (data/energy_baseline.json) ══════════
+   Hour-of-week median baseline + MAD z-scores built by scripts/build_baseline.py
+   from the repo's own archived snapshots. Building-level, shown in the twin
+   panel: current vs typical-for-this-hour, ±3σ band chart, ⚠ badge on |z|>3. */
+const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function fmtEvTime(s) { // '2026-07-24 02:00' → 'Jul 24, 2:00 AM'
+  const d = new Date(String(s).replace(' ', 'T'));
+  if (isNaN(d)) return esc(s);
+  let h = d.getHours();
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${MONS[d.getMonth()]} ${d.getDate()}, ${h}:${String(d.getMinutes()).padStart(2, '0')} ${ap}`;
+}
+
+const CHARTKEY_POWER = '<span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span>';
+const CHARTKEY_FLOW = '<span class="k"><i class="ln" style="background:#60a5fa"></i>water flow (24 h)</span>';
+
+/* Flow-first headline for Plumbing: GPM big number, 24 h flow chart (blue),
+   steam/irrigation companion rows. Electricity proxy moves to details. */
+async function renderFlowHeadline() {
+  const epoch = elementPickEpoch;
+  const big = document.getElementById('twinBigKw'), badge = document.getElementById('twinBadge'),
+        srcEl = document.getElementById('twinSrc'), evEl = document.getElementById('twinEvent'),
+        cv = document.getElementById('twinBaseSpark');
+  cv.style.display = '';
+  big.innerHTML = '— <small>GPM</small>'; big.style.color = '#93c5fd';
+  badge.textContent = '…'; badge.className = 'badge na';
+  srcEl.textContent = ''; evEl.innerHTML = '';
+  document.getElementById('twinRange').className = 'rangeline';
+  document.getElementById('chartKey').innerHTML = CHARTKEY_FLOW;
+  cv._chart = null; // flow chart has its own scale — disable power hover
+  cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+  try {
+    const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+    if (epoch !== elementPickEpoch) return;
+    const w = bd && bd.water, L = w && w.latest;
+    if (!L) { srcEl.textContent = 'no flow data available'; return; }
+    const gpm = ((L.water1_rate_cfm || 0) + (L.water2_rate_cfm || 0)) * 7.481;
+    big.innerHTML = gpm.toFixed(1) + ' <small>GPM</small>';
+    badge.textContent = 'LIVE FLOW'; badge.className = 'badge lo';
+    const st = w.stats_today && w.stats_today.water_rate;
+    srcEl.textContent = 'domestic water · meter #250'
+      + (L.timestamp ? ' · ' + L.timestamp.slice(11, 16) : '');
+    const rngEl = document.getElementById('twinRange');
+    if (st && st.max != null) {
+      rngEl.innerHTML = `Today's range: <b>${(st.min * 7.481).toFixed(1)}–${(st.max * 7.481).toFixed(1)} GPM</b> · avg ${((st.avg || 0) * 7.481).toFixed(1)}`;
+      rngEl.className = 'rangeline on';
+    } else {
+      rngEl.className = 'rangeline'; rngEl.innerHTML = '';
+    }
+    drawFlowChart(cv, (w.timeseries_water || []).map(p => ({ t: p.t, v: (p.v || 0) * 7.481 })));
+    const steam = +L.steam_rate_gpm, irr = +L.irrigation_rate_gpm;
+    evEl.innerHTML =
+      `<div class="pt"><span><i class="livedot" style="background:#fb923c"></i>Steam condensate</span><span class="v" style="color:#fb923c">${isFinite(steam) ? steam.toFixed(1) : '—'} GPM</span></div>`
+      + `<div class="pt"><span><i class="livedot" style="background:#60a5fa"></i>Irrigation</span><span class="v" style="color:#93c5fd">${isFinite(irr) ? irr.toFixed(1) : '—'} GPM</span></div>`;
+  } catch (e) { console.warn('[flow]', e.message); }
+}
+function drawFlowChart(cv, series) {
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (series.length < 2) return;
+  const vs = series.map(p => p.v), lo = 0, hi = Math.max(1, Math.max(...vs));
+  const W = cv.width, H = cv.height, PT = 8, PB = 26, rng = hi - lo || 1;
+  const X = i => i / (series.length - 1) * (W - 8) + 4;
+  const Y = v => H - PB - (v - lo) / rng * (H - PB - PT);
+  ctx.beginPath();
+  series.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.v)) : ctx.moveTo(X(0), Y(p.v)); });
+  ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.lineTo(X(series.length - 1), Y(0)); ctx.lineTo(X(0), Y(0)); ctx.closePath();
+  ctx.fillStyle = 'rgba(96,165,250,.12)'; ctx.fill();
+  ctx.fillStyle = 'rgba(148,163,184,.55)';
+  ctx.font = '600 17px JetBrains Mono, monospace';
+  ctx.fillText(hi.toFixed(1) + ' GPM', 6, 20);
+  ctx.fillText('0', 6, H - PB - 5);
+  ctx.fillStyle = 'rgba(148,163,184,.45)';
+  series.forEach((p, i) => {
+    const hh = +String(p.t).slice(11, 13), mm = String(p.t).slice(14, 16);
+    if (hh % 6 === 0 && mm === '00') {
+      const lbl = hh === 0 ? '12 AM' : hh < 12 ? hh + ' AM' : hh === 12 ? '12 PM' : (hh - 12) + ' PM';
+      ctx.fillText(lbl, Math.max(2, Math.min(X(i) - 22, W - 62)), H - 7);
+    }
+  });
+}
+
+async function renderBaseline() {
+  const epoch = elementPickEpoch;
+  const big = document.getElementById('twinBigKw'), badge = document.getElementById('twinBadge'),
+        srcEl = document.getElementById('twinSrc'), evEl = document.getElementById('twinEvent'),
+        cv = document.getElementById('twinBaseSpark');
+  cv.style.display = '';
+  big.innerHTML = '— <small>kW</small>'; big.style.color = '';
+  badge.textContent = '…'; badge.className = 'badge na';
+  srcEl.textContent = ''; evEl.innerHTML = '';
+  document.getElementById('twinRange').className = 'rangeline';
+  document.getElementById('chartKey').innerHTML = CHARTKEY_POWER;
+  cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+  try {
+    const eb = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/energy_baseline.json');
+    if (epoch !== elementPickEpoch) return;
+    const med = eb && eb.buildings && eb.buildings.grimes;
+    // TOWT (weather-normalized) preferred when its quality flag passes; both
+    // files share the current/recent24 shape so the source is just swapped.
+    let src = med, srcName = 'median';
+    try {
+      const tw = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/towt_baseline.json');
+    if (epoch !== elementPickEpoch) return;
+      const tg = tw && tw.buildings && tw.buildings.grimes;
+      if (tg && tg.use_towt && tg.recent24 && tg.recent24.length) { src = tg; srcName = 'weather-normalized'; }
+    } catch {} // towt file is optional
+    if (epoch !== elementPickEpoch) return;
+    if (!src || !src.recent24 || !src.recent24.length) return;
+    const c = src.current || {}, z = typeof c.z === 'number' ? c.z : null;
+    const zt = (eb && eb.z_threshold) || 3;
+    big.innerHTML = (c.kw != null ? c.kw : '—') + ' <small>kW</small>';
+    // plain-language status; the z-score itself lives in ⓘ details
+    const pct = (c.base && c.kw != null) ? Math.round((c.kw - c.base) / c.base * 100) : null;
+    if (z === null) { badge.textContent = 'No live reading'; badge.className = 'badge na'; }
+    else if (c.anomaly && z > 0) { badge.textContent = 'Using more than usual' + (pct != null ? ` (+${pct}%)` : ''); badge.className = 'badge hi'; }
+    else if (c.anomaly) { badge.textContent = 'Using less than usual' + (pct != null ? ` (${pct}%)` : ''); badge.className = 'badge lo'; }
+    else { badge.textContent = 'Normal for this hour'; badge.className = 'badge'; }
+    document.getElementById('twinDetZ').textContent =
+      z === null ? '' : `z-score ${z} (|z|>${zt} flags anomaly) · σ ${src.sigma} kW · ${srcName} baseline`;
+    srcEl.textContent = 'bldg load vs ' + srcName + ' baseline';
+    // expected range, visible without hovering: baseline ± zt·σ for this hour
+    const rngEl = document.getElementById('twinRange');
+    if (c.base != null) {
+      const bandLo = Math.max(0, Math.round(c.base - zt * src.sigma)),
+            bandHi = Math.round(c.base + zt * src.sigma);
+      if (c.anomaly && c.kw != null) {
+        rngEl.innerHTML = `Now <b>${c.kw} kW</b> — ${z > 0 ? 'above' : 'below'} typical range (${bandLo}–${bandHi} kW)`;
+        rngEl.className = 'rangeline on anom';
+      } else {
+        rngEl.innerHTML = `Typical for this hour: <b>${bandLo}–${bandHi} kW</b>`;
+        rngEl.className = 'rangeline on';
+      }
+    } else {
+      rngEl.className = 'rangeline'; rngEl.innerHTML = '';
+    }
+    drawBaseChart(cv, src.recent24, src.sigma, zt);
+    cv._chart.events = (med && med.events) || []; // for hover tooltips
+    // latest anomaly event (one line) + staggered-start sim callout; rest folds
+    let sim = null;
+    try { sim = await cachedJson('data/startup_sim.json'); } catch {}
+    if (epoch !== elementPickEpoch) return;
+    const evs = ((med && med.events) || []).slice().reverse();
+    if (evs.length) {
+      const ev = evs[0];
+      let h = `<div class="evline"><span>${ev.dir === 'high' ? '⚠' : 'ℹ'} ${fmtEvTime(ev.start)} — unusually ${esc(ev.dir)} for ${ev.hours}h</span>`
+        + (evs.length > 1 ? `<span class="morebtn" onclick="toggleTwinMore('twinEvMore')">+${evs.length - 1} more</span>` : '')
+        + '</div>';
+      if (sim && ev.dir === 'high' && +ev.start.slice(11, 13) <= 6) {
+        const [lo, hi] = sim.est_peak_reduction_kw || [10, 20];
+        h += `<div class="simline">→ simulated fix: staggered start, est. −${lo}~${hi} kW peak</div>`;
+      }
+      h += `<div id="twinEvMore" style="display:none">` + evs.slice(1, 6).map(e2 =>
+        `<div class="pt"><span>· ${fmtEvTime(e2.start)}</span><span class="v">${esc(e2.dir)} · ${e2.hours}h</span></div>`).join('') + '</div>';
+      evEl.innerHTML = h;
+    }
+  } catch (e) { console.warn('[baseline]', e.message); }
+}
+function drawBaseChart(cv, recent, sigma, zt, hoverI) {
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const lo = Math.min(...recent.map(p => Math.min(p.kw, p.base - zt * sigma))),
+        hi = Math.max(...recent.map(p => Math.max(p.kw, p.base + zt * sigma)));
+  const rng = (hi - lo) || 1, W = cv.width, H = cv.height;
+  const PT = 8, PB = 26; // bottom padding reserves room for the time axis
+  const X = i => i / (recent.length - 1) * (W - 8) + 4;
+  const Y = v => H - PB - (v - lo) / rng * (H - PB - PT);
+  // normal band: baseline ± z_threshold·σ
+  ctx.beginPath();
+  recent.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.base + zt * sigma)) : ctx.moveTo(X(0), Y(p.base + zt * sigma)); });
+  for (let i = recent.length - 1; i >= 0; i--) ctx.lineTo(X(i), Y(recent[i].base - zt * sigma));
+  ctx.closePath(); ctx.fillStyle = 'rgba(253,181,21,.10)'; ctx.fill();
+  // baseline (typical) — dashed gold
+  ctx.beginPath();
+  recent.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.base)) : ctx.moveTo(X(0), Y(p.base)); });
+  ctx.strokeStyle = 'rgba(253,181,21,.7)'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+  // actual load — green
+  ctx.beginPath();
+  recent.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.kw)) : ctx.moveTo(X(0), Y(p.kw)); });
+  ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5; ctx.stroke();
+  // anomalous hours — red dots
+  recent.forEach((p, i) => {
+    if (Math.abs(p.z) > zt) { ctx.fillStyle = '#f87171'; ctx.beginPath(); ctx.arc(X(i), Y(p.kw), 3.5, 0, 7); ctx.fill(); }
+  });
+  // axes: kW range on the left, a few time ticks along the bottom
+  ctx.fillStyle = 'rgba(148,163,184,.55)';
+  ctx.font = '600 17px JetBrains Mono, monospace';
+  ctx.fillText(Math.round(hi) + ' kW', 6, 20);
+  ctx.fillText(Math.round(lo) + '', 6, H - PB - 5);
+  ctx.fillStyle = 'rgba(148,163,184,.45)';
+  recent.forEach((p, i) => {
+    const hh = +String(p.ts).slice(11, 13), mm = String(p.ts).slice(14, 16);
+    if (hh % 6 === 0 && mm === '00') {
+      const lbl = hh === 0 ? '12 AM' : hh < 12 ? hh + ' AM' : hh === 12 ? '12 PM' : (hh - 12) + ' PM';
+      ctx.fillText(lbl, Math.max(2, Math.min(X(i) - 22, W - 62)), H - 7);
+    }
+  });
+  // hover crosshair + marker
+  if (hoverI != null && recent[hoverI]) {
+    const hx = X(hoverI), p = recent[hoverI];
+    ctx.strokeStyle = 'rgba(226,232,240,.35)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(hx, PT); ctx.lineTo(hx, H - PB); ctx.stroke();
+    ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.arc(hx, Y(p.kw), 4.5, 0, 7); ctx.fill();
+  }
+  cv._chart = Object.assign(cv._chart || {}, { recent, sigma, zt });
+}
+
+/* ── chart hover/scrub: crosshair + tooltip (mouse + touch drag) ── */
+const _baseCv = document.getElementById('twinBaseSpark');
+_baseCv.style.touchAction = 'none';
+function chartHover(e) {
+  const st = _baseCv._chart;
+  if (!st || !st.recent || st.recent.length < 2) return;
+  const rect = _baseCv.getBoundingClientRect();
+  const fx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const i = Math.round(fx * (st.recent.length - 1));
+  drawBaseChart(_baseCv, st.recent, st.sigma, st.zt, i);
+  const p = st.recent[i];
+  const unusual = Math.abs(p.z) > st.zt;
+  const status = unusual ? (p.z > 0 ? 'unusually high' : 'unusually low') : 'normal';
+  const evd = unusual && (st.events || []).find(ev => p.ts >= ev.start && p.ts <= ev.end);
+  const tip = document.getElementById('chartTip');
+  tip.innerHTML = `<b>${fmtEvTime(p.ts)}</b><br>${p.kw} kW actual · ${p.base} expected`
+    + `<br><span style="color:${unusual ? '#f87171' : '#34d399'}">${status}</span>`
+    + (evd ? ` <span style="color:#94a3b8">(${evd.hours}h event)</span>` : '');
+  tip.style.display = 'block';
+  // keep the tooltip inside the panel
+  const panel = document.getElementById('twinPanel');
+  let left = _baseCv.offsetLeft + fx * rect.width - tip.offsetWidth / 2;
+  left = Math.max(4, Math.min(left, panel.clientWidth - tip.offsetWidth - 4));
+  let top = _baseCv.offsetTop - tip.offsetHeight - 6;
+  if (top < 2) top = _baseCv.offsetTop + rect.height + 6;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+function chartLeave() {
+  const st = _baseCv._chart;
+  document.getElementById('chartTip').style.display = 'none';
+  if (st && st.recent && st.recent.length > 1) drawBaseChart(_baseCv, st.recent, st.sigma, st.zt);
+}
+_baseCv.addEventListener('pointermove', chartHover);
+_baseCv.addEventListener('pointerdown', chartHover);
+_baseCv.addEventListener('pointerleave', chartLeave);
+_baseCv.addEventListener('pointerup', chartLeave);
+
+/* ══════════ AS-BUILT DISCREPANCY NOTES (Compare mode) ══════════
+   Flag a spot where the 360° photo and the BIM disagree; each note stores the
+   BIM camera + raw Cupix position + calibration snapshot, so it can be
+   re-visited and exported as evidence for as-built model updates. */
+const NOTES_KEY = 'asbuiltNotes.grimes.v1';
+let notes = [];
+try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '[]'); } catch {}
+function renderNotes() {
+  document.getElementById('noteCount').textContent = notes.length;
+  document.getElementById('notesList').innerHTML = notes.map((n, i) =>
+    `<div class="note" onclick="gotoNote(${i})" title="${esc(n.at)}"><span>⚑</span><span class="txt">${esc(n.note)}</span><span class="del" onclick="event.stopPropagation();delNote(${i})">✕</span></div>`).join('');
+}
+function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch {} renderNotes(); }
+window.flagNote = () => {
+  const note = prompt('As-built discrepancy — what differs between the 360° photo and the BIM here?');
+  if (!note) return;
+  notes.push({
+    id: Date.now(), at: new Date().toISOString(), note,
+    system: picked ? (picked.name || null) : null,
+    cam: camera.position.toArray().map(v => +v.toFixed(3)),
+    quat: camera.quaternion.toArray().map(v => +v.toFixed(4)),
+    target: controls.target.toArray().map(v => +v.toFixed(3)),
+    cupixRaw: lastTm ? [lastTm[3], lastTm[7], lastTm[11]].map(v => +v.toFixed(3)) : null,
+    calib: { yaw: calib.yRotation, scale: calib.scale, offset: { ...calib.offset } },
+  });
+  saveNotes();
+};
+window.gotoNote = i => {
+  const n = notes[i];
+  if (!n) return;
+  userUntil = Date.now() + 4000; // pause Cupix sync while inspecting
+  camera.position.fromArray(n.cam);
+  camera.quaternion.fromArray(n.quat);
+  controls.target.fromArray(n.target);
+};
+window.delNote = i => { notes.splice(i, 1); saveNotes(); };
+window.exportNotes = () => {
+  const blob = new Blob([JSON.stringify({ _schema: 'asbuilt-notes/1', building: 'grimes', exported_at: new Date().toISOString(), notes }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'asbuilt_notes_grimes.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+renderNotes();
+
+
+// Local scan integration. Source GLB and element identities remain untouched.
+const scanRoot=new THREE.Group();scene.add(scanRoot);let scanReady=false,scanOnly=false;
+const scanConfig={x:16.9,y:1.524,z:10.8,yaw:-135};
+// Export includes Level 1 elevation (4.572); previous camera transform uses level-local Z.
+// Thus the inherited display offset is 6.096 - 4.572, pending geometric registration.
+function updateScanTransform(){scanRoot.position.set(scanConfig.x,scanConfig.y,scanConfig.z);scanRoot.rotation.set(0,scanConfig.yaw*Math.PI/180,0);scanRoot.updateMatrixWorld(true)}
+function fitScan(){if(!scanReady)return;const b=new THREE.Box3().setFromObject(scanRoot),c=b.getCenter(new THREE.Vector3()),d=b.getSize(new THREE.Vector3()).length();controls.target.copy(c);camera.position.copy(c).add(new THREE.Vector3(d*.45,d*.55,d*.6));controls.update()}
+for(const [id,key] of [['scanX','x'],['scanY','y'],['scanZ','z'],['scanYaw','yaw']])document.getElementById(id).addEventListener('input',e=>{const v=Number(e.target.value);if(Number.isFinite(v)){scanConfig[key]=v;updateScanTransform()}});
+document.getElementById('scanReset').onclick=()=>{Object.assign(scanConfig,{x:16.9,y:1.524,z:10.8,yaw:-135});for(const [id,k]of[['scanX','x'],['scanY','y'],['scanZ','z'],['scanYaw','yaw']])document.getElementById(id).value=scanConfig[k];updateScanTransform()};
+document.getElementById('scanSave').onclick=()=>{const a=document.createElement('a'),u=URL.createObjectURL(new Blob([JSON.stringify({status:'provisional',source:'May 6 Level 1 GLB',landmarkPairs:scanPairs,...scanConfig},null,2)],{type:'application/json'}));a.href=u;a.download='scan-alignment.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
+function setScanVisible(value){scanRoot.visible=!!value;document.getElementById('scanVisibleToggle').checked=scanRoot.visible;document.getElementById('scanShow').textContent=scanRoot.visible?'Hide scan':'Show scan'}
+document.getElementById('scanShow').onclick=()=>setScanVisible(!scanRoot.visible);
+document.getElementById('scanVisibleToggle').onchange=e=>setScanVisible(e.target.checked);
+document.getElementById('showAllLayersQuick').onclick=()=>toggleAllElements();
+document.getElementById('scanFit').onclick=()=>{claimCamera();fitScan()};
+document.getElementById('scanAlpha').oninput=e=>scanRoot.traverse(o=>{if(o.isMesh)o.material.opacity=Number(e.target.value)});
+document.getElementById('scanOnly').onclick=e=>{scanOnly=!scanOnly;for(const st of Object.values(layerState))if(st.group){if(scanOnly){st.scanPriorVisible=st.group.visible;st.group.visible=false}else st.group.visible=st.scanPriorVisible??st.group.visible}if(mepModel)mepModel.visible=false;e.target.textContent=scanOnly?'Restore BIM':'Scan only'};
+async function loadScanDataset(unused,onLoad,onProgress,onError){try{const combined=new THREE.Group();const paths=['scan-assets/level1-scan-2026-05-06.glb','scan-assets/level1-scan-2026-05-06-part2.glb'];for(let i=0;i<paths.length;i++){document.getElementById('scanStatus').textContent=`Loading scan part ${i+1}/${paths.length}…`;const g=await loader.loadAsync(paths[i]);combined.add(g.scene);}onLoad({scene:combined});document.body.dataset.scanParts='2';}catch(e){onError(e);}}
+if(splitPane!=='bim')loadScanDataset('scan-assets/level1-scan-2026-05-06.glb',g=>{const axes=new THREE.Group();axes.rotation.x=-Math.PI/2;axes.add(g.scene);scanRoot.add(axes);g.scene.traverse(o=>{if(o.isMesh){const old=o.material;o.material=new THREE.MeshBasicMaterial({map:old.map,toneMapped:false,transparent:true,opacity:.65,depthWrite:false,side:THREE.DoubleSide});old.dispose()}});scanReady=true;if(splitPane==='scan'){Object.assign(scanConfig,{x:0,y:0,z:0,yaw:0});document.getElementById('scanAlpha').value=1;scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}})}updateScanTransform();fitScan();document.getElementById('scanStatus').textContent='Not registered · Do not use overlay for device location';if(splitPane==='scan')document.getElementById('scanStatus').textContent=camerasLinked?'Captured geometry · Views aligned':'Captured geometry · Independent camera';document.body.dataset.scanReady='true';},undefined,e=>{document.getElementById('scanStatus').textContent='Scan load failed: '+e.message});
+
+function solveScanPairs(pairs){
+ if(pairs.length<3)throw new Error('Select at least 3 matching landmark pairs.');
+ const mean=k=>pairs.reduce((a,p)=>a.map((v,i)=>v+p[k][i]/pairs.length),[0,0,0]);const a=mean('source'),b=mean('target');let dot=0,cross=0,spread=0;
+ for(const p of pairs){const x=p.source[0]-a[0],z=p.source[2]-a[2],X=p.target[0]-b[0],Z=p.target[2]-b[2];dot+=x*X+z*Z;cross+=z*X-x*Z;spread+=x*x+z*z}
+ if(spread<1||Math.hypot(dot,cross)<1e-6)throw new Error('Landmarks are too close or inconsistent.');
+ const yaw=Math.atan2(cross,dot),c=Math.cos(yaw),n=Math.sin(yaw),x=b[0]-c*a[0]-n*a[2],y=b[1]-a[1],z=b[2]+n*a[0]-c*a[2];
+ const errors=pairs.map(p=>Math.hypot(c*p.source[0]+n*p.source[2]+x-p.target[0],p.source[1]+y-p.target[1],-n*p.source[0]+c*p.source[2]+z-p.target[2]));
+ return {x,y,z,yaw:yaw*180/Math.PI,rms:Math.sqrt(errors.reduce((a,v)=>a+v*v,0)/errors.length),max:Math.max(...errors)};
+}
+const scanPairs=[];let pickScanMode=null,pendingScanPoint=null;
+const pairStatus=document.getElementById('pairStatus');
+document.getElementById('scanPoint').onclick=()=>{pickScanMode='source';pairStatus.textContent='Click a fixed point on the scan.'};
+document.getElementById('bimPoint').onclick=()=>{if(!pendingScanPoint){pairStatus.textContent='Pick the scan point first.';return}pickScanMode='target';pairStatus.textContent='Click the same landmark on BIM geometry.'};
+document.getElementById('clearScanPairs').onclick=()=>{scanPairs.length=0;pendingScanPoint=null;pickScanMode=null;pairStatus.textContent='0 pairs'};
+renderer.domElement.addEventListener('click',e=>{if(!pickScanMode)return;e.stopImmediatePropagation();const rect=renderer.domElement.getBoundingClientRect(),rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1),camera);const hits=rc.intersectObjects(pickScanMode==='source'?[scanRoot]:visibleEquip(),true);if(!hits.length){pairStatus.textContent='No surface hit. Try a visible surface.';return}if(pickScanMode==='source'){pendingScanPoint=scanRoot.worldToLocal(hits[0].point.clone()).toArray();pairStatus.textContent='Scan point selected. Now pick the matching BIM point.'}else{scanPairs.push({source:pendingScanPoint,target:hits[0].point.toArray()});pendingScanPoint=null;pairStatus.textContent=scanPairs.length+' pairs'}pickScanMode=null},true);
+document.getElementById('solveScan').onclick=()=>{try{const fit=solveScanPairs(scanPairs);Object.assign(scanConfig,fit);updateScanTransform();for(const[id,k]of[['scanX','x'],['scanY','y'],['scanZ','z'],['scanYaw','yaw']])document.getElementById(id).value=scanConfig[k].toFixed(3);document.getElementById('scanStatus').textContent=`Landmark fit RMS ${fit.rms.toFixed(3)} m · Max ${fit.max.toFixed(3)} m · Independent check pending`;pairStatus.textContent=scanPairs.length+' fitted pairs'}catch(e){pairStatus.textContent=e.message}};
+
+
+const scanFloorRay=new THREE.Raycaster(),scanDown=new THREE.Vector3(0,-1,0),scanNormal=new THREE.Vector3();
+function scanFloorAt(x,z,top,depth){
+ scanFloorRay.set(new THREE.Vector3(x,top,z),scanDown);scanFloorRay.near=0;scanFloorRay.far=depth;
+ const hits=scanFloorRay.intersectObject(scanRoot,true);
+ for(const hit of hits){if(!hit.face)continue;scanNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);if(Math.abs(scanNormal.y)>.65)return hit.point.y;}
+ return null;
+}
+function scanWallBetween(start,move){
+ const length=move.length();if(!length)return false;const direction=move.clone().normalize();
+ for(const h of [.45,1.25]){scanFloorRay.set(new THREE.Vector3(start.x,start.y+h,start.z),direction);scanFloorRay.near=0;scanFloorRay.far=length+.2;if(scanFloorRay.intersectObject(scanRoot,true).length)return true;}
+ return false;
+}
+let scanEntryYaw=0;
+function scanOpenDirection(v){let best=null;for(let i=0;i<24;i++){const a=i*Math.PI/12,dir=new THREE.Vector3(Math.sin(a),0,Math.cos(a));scanFloorRay.set(new THREE.Vector3(v.x,v.y+EYE,v.z),dir);scanFloorRay.near=0;scanFloorRay.far=25;const hit=scanFloorRay.intersectObject(scanRoot,true)[0];if(hit&&hit.distance>1.5&&(!best||hit.distance>best.distance))best={distance:hit.distance,yaw:a+Math.PI};}return best;}
+function findScanSpawn(){
+ const b=new THREE.Box3().setFromObject(scanRoot),center=b.getCenter(new THREE.Vector3());
+ // Use actual recorded camera positions, then verify supporting geometry below each.
+ const candidates=scanPanos.map(p=>scanRoot.localToWorld(new THREE.Vector3(p.position[0],p.position[2]+4.572,-p.position[1]))).sort((a,c)=>a.distanceToSquared(center)-c.distanceToSquared(center));
+ for(const v of candidates){const floor=scanFloorAt(v.x,v.z,v.y,.0+2.3);if(floor!==null&&v.y-floor>.8&&v.y-floor<2.3){const p=new THREE.Vector3(v.x,floor,v.z),open=scanOpenDirection(p);if(open){scanEntryYaw=open.yaw;return p;}}}
+ return null;
+}
+let scanPanos=[];if(splitPane!=='bim')fetch('scan-assets/camera-positions.json').then(r=>r.json()).then(j=>{scanPanos=j.positions.map(position=>({position}))}).catch(()=>{});
+document.getElementById('scanWalkStart').onclick=()=>toggleWalk();
+document.getElementById('scanWalkExit').onclick=()=>toggleWalk();
+for(const btn of document.querySelectorAll('[data-move]')){btn.onpointerdown=e=>{e.preventDefault();btn.setPointerCapture(e.pointerId);keys[btn.dataset.move]=true};for(const event of ['pointerup','pointercancel','lostpointercapture'])btn.addEventListener(event,()=>keys[btn.dataset.move]=false)}
+window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+let stopScanLayerLoad=false;
+function refreshScanLayerStatus(){const entries=Object.entries(LAYERS),loaded=entries.filter(([k])=>!!layerState[k]?.group).length;if(bulkScanLayers)document.getElementById('showAllLayersQuick').textContent=`Loading layers · ${loaded}/10`;document.getElementById('layerLoadStatus').textContent=`${loaded}/10 layers loaded · Filter: ${equipLevelFilter||'All floors'}. Click a layer to load / show / hide.`;for(const[k]of entries){const b=document.getElementById('layerBtn-'+k),st=layerState[k];b.dataset.loadState=st?.loading?'loading':st?.group?(st.group.visible?'shown':'hidden'):'not-loaded';b.title=LAYERS[k].label+' · '+b.dataset.loadState;}}
+document.getElementById('loadAllScanLayers').onclick=()=>toggleAllElements();
+// Begin the existing sequential loader after initialization. No user click required.
+// Interior design context uses the same established BIM frame, never the scan transform.
+// Original dbIds and Draco payloads are retained in the Level 1 subsets.
+const interiorState={ready:false,loading:false,mode:'room',groups:{},stats:{drawCalls:0,sourceTriangles:0,renderTriangles:0},error:null};
+const interiorVisible={furniture:true,enclosure:true,floors:true,ceilings:true};
+window.interiorInspection=()=>({ready:interiorState.ready,loading:interiorState.loading,mode:interiorState.mode,error:interiorState.error,stats:{...interiorState.stats},groups:Object.fromEntries(Object.entries(interiorState.groups).map(([key,v])=>[key,{elements:v.elements,visible:v.group.visible,drawCalls:v.stats.drawCalls}]))});
+function applyInteriorVisibility(){
+ for(const [key,st]of Object.entries(interiorState.groups))st.group.visible=interiorVisible[key];
+ for(const input of document.querySelectorAll('[data-interior]'))input.checked=interiorVisible[input.dataset.interior];
+ document.getElementById('interiorRoom').setAttribute('aria-pressed',String(interiorState.mode==='room'));
+ document.getElementById('interiorServices').setAttribute('aria-pressed',String(interiorState.mode==='services'));
+}
+window.setInteriorMode=mode=>{
+ if(!['room','services'].includes(mode))return;
+ interiorState.mode=mode;
+ Object.assign(interiorVisible,{furniture:true,floors:true,enclosure:mode==='room',ceilings:mode==='room'});
+ applyInteriorVisibility();
+};
+document.getElementById('interiorRoom').onclick=()=>setInteriorMode('room');
+document.getElementById('interiorServices').onclick=()=>setInteriorMode('services');
+for(const input of document.querySelectorAll('[data-interior]'))input.onchange=()=>{interiorVisible[input.dataset.interior]=input.checked;interiorState.mode='custom';applyInteriorVisibility()};
+async function loadInterior(){
+ if(interiorState.ready||interiorState.loading)return;
+ interiorState.loading=true;const status=document.getElementById('interiorStatus');
+ try{
+  const manifest=await cachedJson('interior/manifest.json');
+  renderer.localClippingEnabled=true;
+  const clip=[new THREE.Plane(new THREE.Vector3(0,1,0),-manifest.sliceY[0]),new THREE.Plane(new THREE.Vector3(0,-1,0),manifest.sliceY[1])];
+  for(const [key,entry]of Object.entries(manifest.groups)){
+   if(interiorState.groups[key])continue;
+   status.textContent=`Loading Level 1 ${key}…`;
+   const meta=(await cachedJson(entry.json)).elements;
+   let gltf;
+   try{
+    gltf=await loader.loadAsync(entry.glb);
+    gltf.scene.rotation.y=Math.PI;gltf.scene.position.set(EQUIP_OFFSET.x,EQUIP_OFFSET.y,EQUIP_OFFSET.z);gltf.scene.updateMatrixWorld(true);
+    bindElementSourceIds(gltf);
+    const built=await buildElementRenderTier(THREE,gltf.scene,meta,'interior-'+key);
+    const group=new THREE.Group();group.name='interior:'+key;
+    for(const mesh of built.meshes){
+     mesh.material.clippingPlanes=clip;mesh.material.clipShadows=false;mesh.material.side=THREE.DoubleSide;
+     // Navisworks coordination overrides make real slabs/ceilings translucent.
+     // Room view restores opaque surfaces; explicitly invisible host geometry stays invisible.
+     if((key==='floors'||key==='ceilings')&&mesh.material.opacity>0){mesh.material.opacity=1;mesh.material.transparent=false;mesh.material.depthWrite=true;}
+     // Exported design colours are preserved; rough surfaces should not look metallic.
+     if('metalness'in mesh.material){mesh.material.metalness=0;mesh.material.roughness=Math.max(.65,mesh.material.roughness);}
+     group.add(mesh);
+    }
+    scene.add(group);interiorState.groups[key]={group,stats:built.stats,elements:entry.elements,meta};
+    for(const stat of Object.keys(interiorState.stats))interiorState.stats[stat]+=built.stats[stat]||0;
+    applyInteriorVisibility();
+   }finally{releaseElementSource(gltf)}
+  }
+  interiorState.ready=true;
+  status.textContent=`Level 1 · ${manifest.groups.furniture.elements.toLocaleString()} furniture / casework elements · Design context`;
+ }catch(e){interiorState.error=String(e.message||e);status.textContent='Interior load failed · click Room view to retry';document.getElementById('interiorRoom').onclick=()=>{setInteriorMode('room');loadInterior()};console.error('Interior load failed',e)}
+ finally{interiorState.loading=false}
+}
+window.setAllElementContext=show=>{for(const key of Object.keys(interiorVisible))interiorVisible[key]=show;interiorState.mode='custom';applyInteriorVisibility();};
+if(splitPane==='bim')queueMicrotask(async()=>{await loadInterior();if(!mobileMq.matches)await setAllElements(true);});
+
+document.getElementById('pauseScanLayers').onclick=()=>{stopScanLayerLoad=true;document.getElementById('pauseScanLayers').textContent='Stopping after current layer…'};
+setInterval(()=>{refreshScanLayerStatus();updateAllElementsButton();},1000);refreshScanLayerStatus();updateAllElementsButton();
+
+window.scanInspection=()=>({config:{...scanConfig},scanVisible:scanRoot.visible,scanParts:Number(document.body.dataset.scanParts||0),camera:{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov,linked:camerasLinked,driver:cameraDriver,zoom:camera.zoom},walk:{active:walkMode,position:playerPos.toArray(),floor:floorY,eye:camera.position.y,panos:scanPanos.length},scanBounds:new THREE.Box3().setFromObject(scanRoot),bimBounds:bimBbox(),layerStats:Object.fromEntries(Object.entries(layerState).map(([k,v])=>[k,{loaded:!!v.group,visible:v.group?.visible,stats:v.renderStats}]))});
+setElementFloor('L1');document.getElementById('elementFloor').value='L1';if(splitPane!=='scan')toggleLayer('equipment');document.getElementById('legend').style.display='none';
+if(splitPane==='scan'){document.getElementById('layersMenu').hidden=true;document.getElementById('scanTools').querySelector('b').textContent='Level 1 · Actual scan';}
+if(splitPane) dismissWelcome();
+function fitBimPane(){if(walkMode)exitWalk();claimCamera();const b=bimBbox();if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),radius=b.getSize(new THREE.Vector3()).length()/2,angle=Math.min(camera.fov*Math.PI/180,2*Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect)),distance=radius/Math.sin(angle/2)*1.05;const direction=camera.position.clone().sub(controls.target).normalize();controls.target.copy(c);camera.position.copy(c).addScaledVector(direction,distance);controls.update();}
+if(splitPane==='bim'){const btn=document.getElementById('fitBimQuick');btn.hidden=false;btn.onclick=fitBimPane;const timer=setInterval(()=>{if(mepModel){clearInterval(timer)}},200);setTimeout(()=>clearInterval(timer),30000);}
+
+const hideOverview=setInterval(()=>{if(mepModel){mepModel.visible=false;document.getElementById('legend').style.display='none';document.getElementById('layerBtn-mep')?.classList.remove('active');fitScan();clearInterval(hideOverview)}},100);setTimeout(()=>clearInterval(hideOverview),30000);
+
+
+// Pose transport is local to the comparison parent; no Cupix session is required.
+let linkedPose=null,poseSendTime=0,lastPoseSignature='',cameraEpoch=0,cameraDriver='scan',camerasLinked=true,claimPending=false;
+function cameraPose(){return{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov,zoom:camera.zoom};}
+function claimCamera(){
+ if(!splitPane)return;
+ linkedPose=null;claimPending=true;controls.enabled=!walkMode;lastPoseSignature='';
+ window.parent.postMessage({type:'grimes-claim-camera',pose:cameraPose()},location.origin);
+}
+function releaseBimCamera(){claimCamera();}
+renderer.domElement.addEventListener('pointerdown',claimCamera,true);
+renderer.domElement.addEventListener('wheel',claimCamera,{capture:true,passive:true});
+document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Finish moving':'Walk BIM';if(walkMode)document.getElementById('walkHint').textContent='BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
+document.getElementById('bimFollow').textContent='Align views';
+document.getElementById('bimFollow').onclick=()=>window.parent.postMessage({type:'grimes-request-link'},location.origin);
+function publishScanPose(t){
+ if(!splitPane||(splitPane==='scan'&&!scanReady)||claimPending||(camerasLinked&&cameraDriver!==splitPane)||t-poseSendTime<33)return;
+ const pose=cameraPose(),signature=JSON.stringify(pose);if(signature===lastPoseSignature)return;
+ lastPoseSignature=signature;poseSendTime=t;window.parent.postMessage({type:'grimes-camera-pose',epoch:cameraEpoch,pose},location.origin);
+}
+function applyLinkedPose(p){
+ linkedPose=p;camera.position.fromArray(p.position);camera.quaternion.fromArray(p.quaternion).normalize();camera.fov=p.fov;camera.zoom=p.zoom;camera.updateProjectionMatrix();
+ controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),8);controls.enabled=false;
+}
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin||e.source!==window.parent)return;const d=e.data;
+ if(d?.type==='grimes-camera-role'){
+  cameraEpoch=d.epoch;cameraDriver=d.driver;camerasLinked=d.linked;claimPending=false;lastPoseSignature='';
+  if(camerasLinked&&cameraDriver!==splitPane){if(walkMode)exitWalk();controls.enabled=false;}
+  else{linkedPose=null;controls.enabled=!walkMode;}
+  document.body.dataset.cameraLinked=String(camerasLinked);if(splitPane==='scan')document.getElementById('scanStatus').textContent=camerasLinked?'Captured geometry · Views aligned':'Captured geometry · Independent camera';return;
+ }
+ if(d?.type!=='grimes-linked-pose'||d.epoch!==cameraEpoch||claimPending||!camerasLinked||cameraDriver===splitPane)return;
+ const p=d.pose;if(!p||!Array.isArray(p.position)||p.position.length!==3||!Array.isArray(p.quaternion)||p.quaternion.length!==4||![...p.position,...p.quaternion,p.fov,p.zoom].every(Number.isFinite)||p.fov<=0||p.fov>=180||p.zoom<=0)return;
+ applyLinkedPose(p);
+});
+window.parent.postMessage({type:'grimes-camera-ready'},location.origin);
+
+let _lastT = 0;
+renderer.setAnimationLoop((t) => {
+  const dt = Math.min(0.1, (t - _lastT) / 1000) || 0.016;
+  _lastT = t;
+  if (walkMode) {
+    updateWalk(dt);
+  } else if (!linkedPose && Date.now() - lastSyncAt > 800) {
+    // Don't let OrbitControls re-aim the camera while Cupix is driving it
+    // (same fix as grimes-xr commit d913737).
+    controls.update();
+  }
+  if(linkedPose){camera.position.fromArray(linkedPose.position);camera.quaternion.fromArray(linkedPose.quaternion).normalize();}
+  publishScanPose(t);
+  // Keep the last frame while decoding/batching a layer. Hundreds of async
+  // batching yields must not submit the existing multi-million-triangle scene.
+  if (!interiorState.loading && !Object.values(layerState).some(st => st.loading)) renderer.render(scene, camera);
+});
+</script>
+
+</body>
+</html>

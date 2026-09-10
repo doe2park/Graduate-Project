@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Grimes · Scan and BIM comparison</title><style>*{box-sizing:border-box}body{margin:0;font:14px Arial;background:#0b1522;color:#eaf2fa}header{height:64px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #38506a}h1{margin:0;font-size:17px}header p{margin:5px 0 0;color:#becad7;font-size:12px}main{height:calc(100dvh - 64px);display:grid;grid-template-columns:1fr 1fr;gap:3px;background:#49617d}section{display:flex;flex-direction:column;min-width:0;min-height:0;background:#101d2c}h2{margin:0;padding:10px 14px;font-size:14px;height:38px;background:#132b40}h2 span{font-weight:normal;color:#b4cbdc;margin-left:10px;font-size:11px}iframe{border:0;width:100%;flex:1;min-height:0;background:#0a111c}@media(max-width:600px){header{height:78px}main{height:calc(100dvh - 78px);grid-template-columns:1fr;grid-template-rows:1fr 1fr}header p{max-width:330px}h2{height:32px;padding:8px}}</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p></div><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label></header><main><section aria-label="Actual scan"><h2>Actual scan <span>Level 1 · May 6, 2026</span></h2><iframe title="Actual 3D scan" src="scan-bim.html?pane=scan&amp;revision=public1" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="scan-bim.html?pane=bim&amp;revision=public1" allow="fullscreen; pointer-lock"></iframe></section></main><script>
+const frames=document.querySelectorAll('iframe'),link=document.getElementById('linkCameras'),status=document.getElementById('linkStatus');
+let registration=null,driver='scan',epoch=0;const poses={};
+const index=p=>p==='scan'?0:1,other=p=>p==='scan'?'bim':'scan';
+const send=(pane,data)=>frames[index(pane)].contentWindow.postMessage(data,location.origin);
+function valid(p){return p&&Array.isArray(p.position)&&p.position.length===3&&Array.isArray(p.quaternion)&&p.quaternion.length===4&&[...p.position,...p.quaternion,p.fov,p.zoom].every(Number.isFinite)&&p.fov>0&&p.fov<180&&p.zoom>0;}
+function convert(p,from){
+ const a=registration.rotationYDegrees*Math.PI/180,c=Math.cos(a),s=Math.sin(a),t=registration.translation;
+ let [x,y,z]=p.position;let position;
+ if(from==='scan')position=[c*x+s*z+t[0],y+t[1],-s*x+c*z+t[2]];
+ else{x-=t[0];y-=t[1];z-=t[2];position=[c*x-s*z,y,s*x+c*z];}
+ const h=Math.sin((from==='scan'?a:-a)/2),w=Math.cos(a/2),[qx,qy,qz,qw]=p.quaternion;
+ return{position,quaternion:[w*qx+h*qz,w*qy+h*qw,w*qz-h*qx,w*qw-h*qy],fov:p.fov,zoom:p.zoom};
+}
+function sync(){if(!link.checked||!registration||!poses[driver])return;const target=other(driver),pose=convert(poses[driver],driver);poses[target]=pose;send(target,{type:'grimes-linked-pose',epoch,pose});}
+function roles(){for(const pane of ['scan','bim'])send(pane,{type:'grimes-camera-role',epoch,driver,linked:link.checked});status.textContent=link.checked?'Aligned views · Move either pane · '+(driver==='scan'?'Scan':'BIM')+' controls both':'Independent cameras';sync();}
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin)return;const pane=e.source===frames[0].contentWindow?'scan':e.source===frames[1].contentWindow?'bim':null;if(!pane)return;const d=e.data;
+ if(d?.type==='grimes-camera-ready'){roles();return;}
+ if(d?.type==='grimes-claim-camera'){driver=pane;epoch++;if(valid(d.pose))poses[pane]=d.pose;roles();return;}
+ if(d?.type==='grimes-request-link'){link.checked=true;epoch++;roles();return;}
+ if(d?.type!=='grimes-camera-pose'||d.epoch!==epoch||!valid(d.pose))return;
+ if(link.checked&&pane!==driver)return;poses[pane]=d.pose;if(pane===driver)sync();
+});
+link.onchange=()=>{epoch++;roles()};
+fetch('alignment-analysis/accepted-registration.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(c=>{if(c.status!=='geometry-registered'||!Number.isFinite(c.rotationYDegrees)||!Array.isArray(c.translation)||c.translation.length!==3||!c.translation.every(Number.isFinite))throw Error();registration=c;link.disabled=false;link.checked=true;epoch++;roles()}).catch(()=>status.textContent='Independent cameras · Registration unavailable');
+</script></body></html>

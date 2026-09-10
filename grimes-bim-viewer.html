@@ -237,9 +237,10 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   <span class="tb-spacer"></span>
   <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
   <div class="tb-dd" id="layersDd">
+  <button class="tb-btn" id="allElementsBtn" onclick="toggleAllElements()" aria-pressed="false" title="Show or hide every element layer; floor selection stays separate">Show all elements</button>
     <button class="tb-btn" id="layersBtn" onclick="toggleLayersMenu()" title="Element-tier layers cut from the 741k-element APS master — each element is clickable">⬡ Layers ▾</button>
     <div class="tb-menu" id="layersMenu" hidden>
-      <div class="lm-hdr">ELEMENT LAYERS <button onclick="toggleLayersMenu()" title="Close">✕</button></div>
+      <div id="allElementsStatus" role="status" style="padding:6px;font-size:11px">All elements controls layers; All floors controls levels.</div><div class="lm-hdr">ELEMENT LAYERS <button onclick="toggleLayersMenu()" title="Close">✕</button></div>
       <label class="layer-coverage" style="display:block">Element floor <select id="elementFloor" onchange="setElementFloor(this.value)"><option value="">All floors</option><option value="LOWER">Lower</option><option value="MEZZ">Mezzanine</option><option value="L1">Level 1</option><option value="L2">Level 2</option><option value="L3">Level 3</option><option value="L4">Level 4</option><option value="ROOF">Roof</option><option value="UNKNOWN">Unknown</option></select></label>
       <div id="layerStats" class="layer-coverage" role="status"></div>
       <button class="tb-btn" id="layerBtn-mep" onclick="toggleMepModel()" title="Legacy 8-mesh MEP overview (one mesh per discipline) — the colourful backdrop. Superseded by the per-element layers below but handy for a quick systems read.">🎨 MEP overview <small>1.7 MB · 8 systems</small></button>
@@ -265,7 +266,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
       <div class="lm-chips" id="chips-fire" hidden></div>
     </div>
   </div>
-  <button class="tb-btn" id="compareBtn" onclick="toggleCompare()" title="Split view: walk the real 360° site photos next to the model">🪞 Cupix Compare</button>
+  <a class="tb-btn" id="compareBtn" href="scan-compare.html" title="Registered 3D scan and BIM; either pane controls the aligned cameras">Scan ↔ BIM</a>
   <a class="tb-btn" href="grimes-performance.html" title="Live design-vs-actual energy: LEED model vs measured meter counters">📉 Design vs Actual</a>
 </div>
 
@@ -295,7 +296,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
     <h2>🏛️ Bechtel Engineering Center — Live Digital Twin</h2>
     This is a live digital twin of an operating campus building.<br><br>
     <span class="em">Colored pipes &amp; ducts</span> are the building's real systems — <b>click one</b> to see its live energy data.<br><br>
-    <span class="em">🚶 Walk</span> explores the building like a game · <span class="em">🪞 Compare</span> walks the real 360° site photos side-by-side.
+    <span class="em">🚶 Walk</span> explores the building like a game · <span class="em">Scan ↔ BIM</span> opens the registered 3D scan and model side by side.
     <button onclick="dismissWelcome()">Got it — let me explore</button>
   </div>
 </div>
@@ -1420,25 +1421,25 @@ const layerState = {};           // key -> { group, meshes, loading }
 let equipMeshes = [], equipMeta = {}, equipPicked = null;   // union across loaded layers
 const anyLayerVisible = () => Object.values(layerState).some(l => l.group && l.group.visible);
 
-window.toggleLayer = (key) => {
+window.toggleLayer = (key, {bulk=false}={}) => {
   const L = LAYERS[key], st = layerState[key] || (layerState[key] = {});
   const btn = document.getElementById('layerBtn-' + key);
-  if (st.loading) return;
+  if (st.loading) return st.pending;
   if (st.group) {
-    st.group.visible = !st.group.visible;
+    st.group.visible = !st.group.visible; st.desiredVisible=st.group.visible;
     btn.classList.toggle('active', st.group.visible);
     applyEquipFilter();
     if (!st.group.visible && equipPicked && equipPicked.im.userData.layer === key) clearPick();
-    buildEquipFilter();
-    return;
+    buildEquipFilter(); updateAllElementsButton();
+    return Promise.resolve(true);
   }
-  if (st.loading) return;
-  if (L.mb >= 5 && mobileMq.matches && !confirm(`${L.label.slice(2)} is ${L.mb} MB — load on mobile data?`)) return;
-  st.loading = true;
+  if (st.loading) return st.pending;
+  if (!bulk && L.mb >= 5 && mobileMq.matches && !confirm(`${L.label.slice(2)} is ${L.mb} MB — load on mobile data?`)) return;
+  st.loading = true;st.desiredVisible=true;
   btn.disabled = true; btn.setAttribute('aria-busy','true');
   if (!st.labelHtml) st.labelHtml = btn.innerHTML;
   btn.textContent = `⏳ ${L.mb} MB…`;
-  cachedJson(L.json).then(async metaJson => {
+  st.pending = cachedJson(L.json).then(async metaJson => {
     const meta = metaJson.elements || {};
     for (const info of Object.values(meta)) info.levelKey = elementLevel(info) || 'UNKNOWN';
     for (const [id, info] of Object.entries(meta)) { info.layer = key; equipMeta[id] = info; }
@@ -1460,11 +1461,12 @@ window.toggleLayer = (key) => {
     equipMeshes.push(...tier.meshes);
     st.group = new THREE.Group(); st.group.name = 'layer:' + key;   // world-space container (matrices already baked)
     for (const im of st.meshes) st.group.add(im);
+    st.group.visible=st.desiredVisible!==false;
     scene.add(st.group);
     st.loading = false;
     btn.disabled = false; btn.removeAttribute('aria-busy');
     btn.innerHTML = st.labelHtml;
-    btn.classList.add('active');
+    btn.classList.toggle('active',st.group.visible);
     document.getElementById('layersBtn').classList.add('active');
     applyEquipFilter();
     buildEquipFilter();
@@ -1474,8 +1476,41 @@ window.toggleLayer = (key) => {
     btn.disabled = false; btn.removeAttribute('aria-busy');
     btn.innerHTML = st.labelHtml;
     console.error(`[layer:${key}] load failed —`, e);
-  });
+  }).finally(updateAllElementsButton);
+  return st.pending;
 };
+// Bulk visibility is independent of the floor selection. Last user intent wins.
+let allElementsEpoch=0,allElementsLoading=false,allElementsRequested=false;
+function updateAllElementsButton(){
+ const keys=Object.keys(LAYERS),visible=keys.filter(k=>layerState[k]?.group?.visible).length;
+ const active=allElementsLoading?allElementsRequested:visible===keys.length;
+ const label=allElementsLoading?`Hide all · ${visible}/${keys.length}`:active?'Hide all elements':'Show all elements';
+ for(const id of ['allElementsBtn','showAllLayersQuick','loadAllScanLayers']){
+  const b=document.getElementById(id);if(!b)continue;b.disabled=false;b.textContent=label;b.setAttribute('aria-pressed',active?'true':visible?'mixed':'false');
+ }
+ const status=document.getElementById('allElementsStatus');if(status)status.textContent=`${visible}/${keys.length} element layers visible${allElementsLoading?' · Loading in sequence':''} · Floor filter unchanged`;
+}
+window.setAllElements=async show=>{
+ const epoch=++allElementsEpoch;allElementsRequested=!!show;allElementsLoading=!!show;
+ for(const key of Object.keys(LAYERS)){const st=layerState[key]||(layerState[key]={});st.desiredVisible=!!show;if(st.group)st.group.visible=!!show;document.getElementById('layerBtn-'+key)?.classList.toggle('active',!!st.group&&!!show);}
+ if(mepModel)mepModel.visible=false;document.getElementById('layerBtn-mep')?.classList.remove('active');
+ if(typeof scanOnly!=='undefined')scanOnly=false;
+ if(typeof window.setAllElementContext==='function')window.setAllElementContext(!!show);
+ equipTypeFilter=null;clearPick();applyEquipFilter();buildEquipFilter();updateAllElementsButton();
+ if(!show)return;
+ try{
+  for(const key of Object.keys(LAYERS)){
+   if(epoch!==allElementsEpoch)return;
+   const st=layerState[key];
+   if(st.loading)await st.pending;else if(!st.group)await toggleLayer(key,{bulk:true});
+   if(epoch!==allElementsEpoch)return;
+   if(st.group){st.group.visible=true;st.desiredVisible=true;document.getElementById('layerBtn-'+key)?.classList.add('active');}
+   applyEquipFilter();updateAllElementsButton();
+  }
+ }finally{if(epoch===allElementsEpoch){allElementsLoading=false;buildEquipFilter();updateAllElementsButton();}}
+};
+window.toggleAllElements=()=>setAllElements(!(allElementsLoading?allElementsRequested:Object.keys(LAYERS).every(k=>layerState[k]?.group?.visible)));
+
 window.toggleEquipment = () => toggleLayer('equipment');   // legacy hook
 window.toggleMepModel = () => {
   if (!mepModel) return;
