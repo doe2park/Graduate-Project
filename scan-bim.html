@@ -358,6 +358,7 @@ body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;
 <script type="module">
 import * as THREE from 'three';
 const splitPane=new URLSearchParams(location.search).get('pane');
+let photoNavigationMode=false,photoStepAt=0;
 document.body.dataset.pane=splitPane||'overlay';
 // Scan quality policy uses the device window, never the half-width comparison pane.
 let qualityWindow=window;
@@ -667,7 +668,7 @@ function exitWalk() {
   avatar.visible = false;
   for (const k in keys) keys[k] = false;
   controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),8);
-  if(splitPane==='bim')document.getElementById('bimNavigate').textContent='Walk BIM';
+  if(splitPane==='bim')document.getElementById('bimNavigate').textContent=photoNavigationMode?'Look around BIM':'Walk BIM';
   controls.enabled = true;
   renderer.setPixelRatio(Math.min(devicePixelRatio, mobileQuality ? 1 : 2));
   document.getElementById('walkBtn').classList.remove('active');
@@ -719,6 +720,12 @@ document.addEventListener('keyup', e => { keys[e.code] = false; });
 
 const _fwd = new THREE.Vector3(), _rightV = new THREE.Vector3(), _upV = new THREE.Vector3(0, 1, 0), _move = new THREE.Vector3(), _look = new THREE.Vector3();
 function updateWalk(dt) {
+  if(photoNavigationMode&&splitPane==='bim'){
+    applyLook();_aimAcc+=dt;if(_aimAcc>.12){_aimAcc=0;updateAim();}
+    const next=keys.KeyW||keys.ArrowUp||keys.KeyD||keys.ArrowRight,previous=keys.KeyS||keys.ArrowDown||keys.KeyA||keys.ArrowLeft;
+    if((next||previous)&&performance.now()-photoStepAt>600){photoStepAt=performance.now();window.parent.postMessage({type:'grimes-photo-step',delta:next?1:-1},location.origin);}
+    return;
+  }
   camera.getWorldDirection(_look);               // full look dir (yaw+pitch)
   _fwd.copy(_look); _fwd.y = 0;
   if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1); else _fwd.normalize();
@@ -2528,9 +2535,9 @@ function claimCamera(){
  window.parent.postMessage({type:'grimes-claim-camera',pose:cameraPose()},location.origin);
 }
 function releaseBimCamera(){claimCamera();}
-renderer.domElement.addEventListener('pointerdown',claimCamera,true);
+renderer.domElement.addEventListener('pointerdown',()=>{claimCamera();if(photoNavigationMode&&splitPane==='bim'&&!walkMode)enterWalk();},true);
 renderer.domElement.addEventListener('wheel',claimCamera,{capture:true,passive:true});
-document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Finish moving':'Walk BIM';if(walkMode)document.getElementById('walkHint').textContent='BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
+document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Finish looking':photoNavigationMode?'Look around BIM':'Walk BIM';if(walkMode)document.getElementById('walkHint').textContent=photoNavigationMode?'Captured station · Drag to look · W/S next/previous photo · aim + click to inspect':'BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
 document.getElementById('bimFollow').textContent='Align views';
 document.getElementById('bimFollow').onclick=()=>window.parent.postMessage({type:'grimes-request-link'},location.origin);
 function publishScanPose(t){
@@ -2544,6 +2551,12 @@ function applyLinkedPose(p){
 }
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin||e.source!==window.parent)return;const d=e.data;
+ if(d?.type==='grimes-photo-mode'&&splitPane==='bim'){
+  photoNavigationMode=!!d.enabled;controls.enableRotate=!photoNavigationMode;controls.enablePan=!photoNavigationMode;controls.enableZoom=!photoNavigationMode;
+  document.getElementById('fitBimQuick').disabled=photoNavigationMode;
+  if(!walkMode)document.getElementById('bimNavigate').textContent=photoNavigationMode?'Look around BIM':'Walk BIM';
+  return;
+ }
  if(d?.type==='grimes-camera-role'){
   cameraEpoch=d.epoch;cameraDriver=d.driver;camerasLinked=d.linked;claimPending=false;lastPoseSignature='';
   if(camerasLinked&&cameraDriver!==splitPane){if(walkMode)exitWalk();controls.enabled=false;}

@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Grimes · Captured 360° photos</title><style>
+*{box-sizing:border-box}body{margin:0;background:#101923;color:white;font:13px Arial;overflow:hidden}canvas{display:block;touch-action:none;width:100%;height:100%}#tools{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;background:#101e30e8;padding:9px;border-radius:8px}button,select{font:inherit;padding:8px;color:white;background:#244562;border:1px solid #8aa5bb;border-radius:4px}button{cursor:pointer}#status{position:absolute;bottom:10px;left:10px;right:10px;background:#101e30df;padding:8px;border-radius:5px;pointer-events:none;font-size:12px}#loading{color:#ffe495}#station{max-width:125px}@media(max-height:420px){#tools{padding:5px;top:4px;left:4px;right:4px}button,select{padding:6px}#status{font-size:10px;bottom:4px;padding:5px}}
+</style><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script></head><body><div id="tools"><button id="previous" aria-label="Previous captured position">←</button><select id="station" aria-label="Captured position"></select><button id="next" aria-label="Next captured position">→</button><span id="loading" role="status">Loading photos…</span></div><div id="status">Drag to look · Arrows / W,S: next or previous capture · Actual photos at recorded positions</div><script type="module">
+import * as THREE from 'three';
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.01,2000);
+let deviceWindow=window;try{if(top.location.origin===location.origin)deviceWindow=top}catch{}
+const mobile=deviceWindow.matchMedia('(max-width:768px), (pointer:coarse)').matches;
+const renderer=new THREE.WebGLRenderer({antialias:false});renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1:2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.appendChild(renderer.domElement);
+const geometry=new THREE.SphereGeometry(100,64,40);geometry.scale(-1,1,1);
+const material=new THREE.MeshBasicMaterial({toneMapped:false}),sphere=new THREE.Mesh(geometry,material);sphere.visible=false;scene.add(sphere);
+const axis=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2),centerCorrection=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI);
+const loader=new THREE.TextureLoader(),label=document.getElementById('loading'),select=document.getElementById('station');
+let stations=[],active=-1,requested=-1,targetStation=-1,loading=false,epoch=0,driver='scan',linked=true,pendingClaim=false,yaw=0,pitch=0,drag=null,lastStep=0;
+const pose=()=>({position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov,zoom:camera.zoom});
+const send=data=>parent.postMessage(data,location.origin);
+function angles(){const e=new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ');yaw=e.y;pitch=e.x;}
+function claim(){pendingClaim=true;send({type:'grimes-claim-camera',pose:pose()});}
+function publish(){if(active<0||pendingClaim||(linked&&driver!=='scan'))return;send({type:'grimes-camera-pose',epoch,pose:pose()});}
+async function openStation(index){
+ const target=Math.max(0,Math.min(stations.length-1,index));if(loading&&target===targetStation)return;targetStation=target;requested=target;if(loading)return;loading=true;
+ try{while(requested!==-1){const i=requested;requested=-1;const s=stations[i];label.textContent='Loading capture…';
+  const texture=await loader.loadAsync('scan-assets/panoramas/'+(mobile?'mobile/':'')+s.file);
+  if(requested!==-1){texture.dispose();continue;}
+  texture.colorSpace=THREE.SRGBColorSpace;const old=material.map;material.map=texture;material.needsUpdate=true;old?.dispose();
+  sphere.position.fromArray(s.position);sphere.quaternion.copy(axis).multiply(new THREE.Quaternion().fromArray(s.e57Quaternion)).multiply(axis.clone().invert()).multiply(centerCorrection);
+  camera.position.fromArray(s.position);
+  if(active<0){const forward=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().fromArray(s.e57Quaternion)).applyQuaternion(axis);camera.lookAt(camera.position.clone().add(forward));angles();}
+  active=i;sphere.visible=true;select.value=String(i);label.textContent=`${i+1}/${stations.length} · Captured photo`;
+  document.getElementById('previous').disabled=i===0;document.getElementById('next').disabled=i===stations.length-1;document.body.dataset.ready='true';claim();
+ }}catch(e){label.textContent='Photo unavailable · choose another capture';console.error(e)}finally{loading=false;if(requested>=0){const queued=requested;requested=-1;queueMicrotask(()=>openStation(queued));}}
+}
+function step(delta){if(!stations.length)return;openStation((targetStation>=0?targetStation:Math.max(0,active))+delta);}
+document.getElementById('previous').onclick=()=>step(-1);document.getElementById('next').onclick=()=>step(1);select.onchange=()=>openStation(Number(select.value));
+renderer.domElement.onpointerdown=e=>{if(active<0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);claim();};
+renderer.domElement.onpointermove=e=>{if(!drag||drag.id!==e.pointerId)return;yaw-=(e.clientX-drag.x)*.004;pitch=Math.max(-1.45,Math.min(1.45,pitch-(e.clientY-drag.y)*.004));drag.x=e.clientX;drag.y=e.clientY;camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));publish();};
+for(const type of ['pointerup','pointercancel','lostpointercapture'])renderer.domElement.addEventListener(type,()=>drag=null);
+renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();camera.fov=Math.max(40,Math.min(95,camera.fov+e.deltaY*.025));camera.updateProjectionMatrix();claim();},{passive:false});
+window.addEventListener('keydown',e=>{if(e.target.tagName==='SELECT')return;if(['ArrowRight','ArrowUp','w','W','ArrowLeft','ArrowDown','s','S'].includes(e.key)){e.preventDefault();if(performance.now()-lastStep<500)return;lastStep=performance.now();step(['ArrowRight','ArrowUp','w','W'].includes(e.key)?1:-1);}});
+window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==parent)return;const d=e.data;
+ if(d?.type==='grimes-camera-role'){epoch=d.epoch;driver=d.driver;linked=d.linked;pendingClaim=false;if(driver==='scan')publish();}
+ if(d?.type==='grimes-photo-step')step(d.delta<0?-1:1);
+ if(d?.type==='grimes-linked-pose'&&d.epoch===epoch&&active>=0){const p=d.pose;if(!p||!Array.isArray(p.quaternion)||p.quaternion.length!==4||!p.quaternion.every(Number.isFinite))return;camera.quaternion.fromArray(p.quaternion);camera.fov=p.fov;camera.zoom=p.zoom;camera.updateProjectionMatrix();angles();}
+});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();label.textContent='Graphics paused · reload this page';});
+renderer.setAnimationLoop(()=>renderer.render(scene,camera));
+window.photoInspection=()=>({active,station:stations[active],count:stations.length,loading,mobile,camera:pose(),texture:material.map?{width:material.map.image.width,height:material.map.image.height}:null});
+fetch('scan-assets/panoramas/manifest.json').then(r=>{if(!r.ok)throw Error('Photo manifest unavailable');return r.json()}).then(m=>{stations=m.stations;for(const [i,s]of stations.entries()){const option=document.createElement('option');option.value=i;option.textContent=`Capture ${i+1}`;select.appendChild(option);}send({type:'grimes-camera-ready'});return openStation(Math.max(0,stations.findIndex(s=>s.id===m.defaultStation)))}).catch(e=>label.textContent=e.message);
+</script></body></html>

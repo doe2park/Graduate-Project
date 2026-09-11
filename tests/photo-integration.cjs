@@ -1,0 +1,17 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');const assert=require('node:assert/strict'),fs=require('node:fs');
+(async()=>{const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});try{
+ const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:8893/scan-compare.html');
+ let photo=page.frames().find(f=>f.url().includes('scan-photo')),bim=page.frames().find(f=>f.url().includes('pane=bim'));
+ await photo.waitForFunction(()=>window.photoInspection?.().active>=0,null,{timeout:90000});await bim.waitForFunction(()=>window.interiorInspection?.().ready&&scanInspection().camera.linked,null,{timeout:180000});
+ const T=await import(process.env.THREE_MODULE||require('node:path').join(__dirname,'../node_modules/three/build/three.module.js'));const r=JSON.parse(fs.readFileSync(require('node:path').join(__dirname,'../alignment-analysis/accepted-registration.json')));const q=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),r.rotationYDegrees*Math.PI/180),offset=new T.Vector3().fromArray(r.translation);
+ async function aligned(){await page.waitForTimeout(250);const p=await photo.evaluate(()=>photoInspection()),b=await bim.evaluate(()=>scanInspection().camera);assert.ok(new T.Vector3().fromArray(p.camera.position).applyQuaternion(q).add(offset).distanceTo(new T.Vector3().fromArray(b.position))<1e-5,'matching station');assert.ok(new T.Quaternion().fromArray(p.camera.quaternion).premultiply(q).angleTo(new T.Quaternion().fromArray(b.quaternion))<1e-5,'matching orientation');return p;}
+ let p=await aligned();assert.equal(p.count,100);assert.equal(p.texture.width,2048);const start=p.active;
+ await photo.locator('#next').click();await photo.waitForFunction(i=>photoInspection().active===i,start+1,{timeout:30000});await aligned();
+ const rect=await photo.locator('canvas').boundingBox();await page.mouse.move(rect.x+rect.width*.6,rect.y+rect.height*.55);await page.mouse.down();await page.mouse.move(rect.x+rect.width*.4,rect.y+rect.height*.6,{steps:8});await page.mouse.up();await aligned();
+ const brect=await bim.locator('canvas').first().boundingBox();await page.mouse.move(brect.x+brect.width*.6,brect.y+brect.height*.6);await page.mouse.down();await page.mouse.move(brect.x+brect.width*.4,brect.y+brect.height*.55,{steps:8});await page.mouse.up();await aligned();
+ await page.screenshot({path:process.env.PHOTO_SCREENSHOT||require('node:path').join(require('node:os').tmpdir(),'photo-bim-mobile.png')});
+ await bim.locator('#electricalFocus').click();await bim.waitForFunction(()=>['conduit','fixtures','lighting','equipment'].every(k=>scanInspection().layerStats[k]?.visible),null,{timeout:180000});await aligned();
+ await page.locator('#scanMode').selectOption('mesh');await page.waitForTimeout(500);const mesh=page.frames().find(f=>f.url().includes('pane=scan'));await mesh.waitForFunction(()=>window.scanInspection?.().scanParts===2,null,{timeout:120000});assert.equal(await bim.locator('#fitBimQuick').isDisabled(),false);
+ assert.deepEqual(errors,[]);console.log('PASS: 100 captured photos, mobile texture, station step, photo drag, BIM drag, electrical focus, identical registered poses');
+}finally{await browser.close()}})().catch(e=>{console.error(e);process.exit(1)});

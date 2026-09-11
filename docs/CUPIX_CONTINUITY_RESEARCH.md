@@ -39,9 +39,9 @@ Historical local records identify an Insta360 X4 panorama (4096×2048 sample) an
 | Two Level 1 textured scan GLBs | Local and public repository; source hashes recorded | Existing scan remains renderable without Cupix at runtime |
 | Accepted scan/BIM transform | Public JSON, method record, archived fitter/results | Existing geometry and camera alignment remain usable |
 | Panorama metadata inventory | Local private file, 217 entries | Captured names, dates and positions; not all full-resolution images or full poses |
-| Example panorama | One locally documented 4096×2048 sample | Example only, not full panorama backup |
+| Recovered panoramas (2026-09-11) | 100 × 4096×2048 spherical images with E57 poses | Independent photo tour; 100 of 217 inventory positions, not a complete image backup |
 | Original Insta360 videos | Not verified in inspected project files or current UI | Highest priority for independent reconstruction |
-| E57/PLY point-cloud exports | Export controls available; downloaded files not verified | Needed for independent geometric analysis and interoperability |
+| E57 exports (2026-09-11) | Three complete files archived; one includes 100 panoramas and poses | Independent geometric analysis and image/pose recovery; PLY not verified |
 | Source plans, scale references, control points | Full export package not verified | Needed to establish scale and validate alignment |
 
 Original source GLBs total approximately 97 MB. The current mobile derivatives only reduce texture resolution, preserve all geometry and coordinates, and total approximately 20 MB. Their current mesh appearance does not reveal whether any proprietary neural model participated upstream.
@@ -77,3 +77,7 @@ No request was sent as part of this investigation.
 ## Professor explanation
 
 “Insta360 provided the capture imagery. Cupix processed the imagery into spatially positioned panoramas and 3D geometry, using its proprietary mapping technology, publicly described as SLAM-based. We then performed a separate constrained ICP registration to align the exported mesh with BIM. The exact proprietary reconstruction configuration for this capture is not yet verified. For future independence, we are preserving the source imagery and evaluating an alternative reconstruction workflow.”
+
+## Verified export follow-up, 2026-09-11
+
+E57 **With Pano** was successfully exported and parsed. The independent comparison now defaults to those photos. This supersedes the earlier unverified-export status above. See [recovery, coordinate binding and validation](CAPTURED_PANORAMA_VIEWER.md). Original INSV/video recovery remains unverified.

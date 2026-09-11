@@ -27,3 +27,7 @@ The conduit sidecar contains 11,063 geometry-bearing elements: 2,907 conduits, 8
 Another scan rendering defect set `depthWrite=false` whenever Walk ended, including the opaque scan pane. That allowed rear surfaces to paint over front surfaces. The scan pane now preserves opaque depth occlusion; translucent overlay retains its previous policy. Regression tests reproduce both defects before fixing them.
 
 Cupix Export > Point Cloud > E57 exposes **With Pano** after selecting E57. A panorama-inclusive export was started on 2026-09-11. Image and pose recovery must be verified from the completed file before making tour completeness claims.
+
+## Resolution: recovered photographic view
+
+The panorama-inclusive E57 export completed. 100 full-resolution spherical images and poses were recovered and bound to the existing registration; these are now the default comparison view. See [implementation and verification](CAPTURED_PANORAMA_VIEWER.md). The archived single sample is no longer the only available image. Mesh mode remains separate.
