@@ -723,7 +723,7 @@ function updateWalk(dt) {
   if(photoNavigationMode&&splitPane==='bim'){
     applyLook();_aimAcc+=dt;if(_aimAcc>.12){_aimAcc=0;updateAim();}
     const next=keys.KeyW||keys.ArrowUp||keys.KeyD||keys.ArrowRight,previous=keys.KeyS||keys.ArrowDown||keys.KeyA||keys.ArrowLeft;
-    if((next||previous)&&performance.now()-photoStepAt>600){photoStepAt=performance.now();window.parent.postMessage({type:'grimes-photo-step',delta:next?1:-1},location.origin);}
+    if((next||previous)&&performance.now()-photoStepAt>600){photoStepAt=performance.now();window.parent.postMessage({type:'grimes-photo-step',delta:next?1:-1,direction:keys.KeyA||keys.ArrowLeft?'left':keys.KeyD||keys.ArrowRight?'right':keys.KeyS||keys.ArrowDown?'back':'forward'},location.origin);}
     return;
   }
   camera.getWorldDirection(_look);               // full look dir (yaw+pitch)
@@ -2537,7 +2537,7 @@ function claimCamera(){
 function releaseBimCamera(){claimCamera();}
 renderer.domElement.addEventListener('pointerdown',()=>{claimCamera();if(photoNavigationMode&&splitPane==='bim'&&!walkMode)enterWalk();},true);
 renderer.domElement.addEventListener('wheel',claimCamera,{capture:true,passive:true});
-document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Finish looking':photoNavigationMode?'Look around BIM':'Walk BIM';if(walkMode)document.getElementById('walkHint').textContent=photoNavigationMode?'Captured station · Drag to look · W/S next/previous photo · aim + click to inspect':'BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
+document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Finish looking':photoNavigationMode?'Look around BIM':'Walk BIM';if(walkMode)document.getElementById('walkHint').textContent=photoNavigationMode?'Captured station · Drag to look · WASD follow capture route · aim + click to inspect':'BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
 document.getElementById('bimFollow').textContent='Align views';
 document.getElementById('bimFollow').onclick=()=>window.parent.postMessage({type:'grimes-request-link'},location.origin);
 function publishScanPose(t){
@@ -2546,7 +2546,7 @@ function publishScanPose(t){
  lastPoseSignature=signature;poseSendTime=t;window.parent.postMessage({type:'grimes-camera-pose',epoch:cameraEpoch,pose},location.origin);
 }
 function applyLinkedPose(p){
- linkedPose=p;camera.position.fromArray(p.position);camera.quaternion.fromArray(p.quaternion).normalize();camera.fov=p.fov;camera.zoom=p.zoom;camera.updateProjectionMatrix();
+ linkedPose=p;camera.position.fromArray(p.position);camera.quaternion.fromArray(p.quaternion).normalize();if(photoNavigationMode){const e=new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ');yaw=e.y;pitch=e.x;}camera.fov=p.fov;camera.zoom=p.zoom;camera.updateProjectionMatrix();
  controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),8);controls.enabled=false;
 }
 window.addEventListener('message',e=>{
@@ -2559,7 +2559,7 @@ window.addEventListener('message',e=>{
  }
  if(d?.type==='grimes-camera-role'){
   cameraEpoch=d.epoch;cameraDriver=d.driver;camerasLinked=d.linked;claimPending=false;lastPoseSignature='';
-  if(camerasLinked&&cameraDriver!==splitPane){if(walkMode)exitWalk();controls.enabled=false;}
+  if(camerasLinked&&cameraDriver!==splitPane){if(walkMode&&!photoNavigationMode)exitWalk();controls.enabled=false;}
   else{linkedPose=null;controls.enabled=!walkMode;}
   document.body.dataset.cameraLinked=String(camerasLinked);if(splitPane==='scan')document.getElementById('scanStatus').textContent=camerasLinked?'Captured geometry · Views aligned':'Captured geometry · Independent camera';return;
  }

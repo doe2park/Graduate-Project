@@ -4,7 +4,7 @@
 
 The comparison now opens **360° photos** by default. These are actual captured images recovered from Cupix's **Aerial → 3D Display Settings → Export → Point Cloud → E57 → With Pano** export, not textures stretched over the imperfect reconstructed mesh. The previous **3D mesh** remains available in the scan selector for free movement. Neither mode requires Cupix at runtime.
 
-The finished export produced three E57 files. One contains 100 spherical images with full image poses; the other two contain point-cloud data without images. All 100 JPEGs are 4096 × 2048. Raw E57 files, XML and extraction metadata are archived locally under the Grimes_360_Pilot/source-recovery directory. Original camera videos have **not** been recovered.
+The finished export produced three E57 files. One contains 100 spherical images with full image poses; the other two contain point-cloud data without images. All 100 JPEGs are 4096 × 2048. Raw E57 files, XML and extraction metadata are archived locally under the Grimes_360_Pilot/source-recovery directory. Original camera videos have **not** been recovered. Archived source filenames include `VID_20260506_145040_00_472.insv(12).jpg`, consistent with images extracted from an Insta360 video; this filename alone does not recover the video or establish its processing pipeline.
 
 The inventory contains 217 positions, but this export contains 100 panoramas. Do not describe this as a complete 217-image backup. Every inventory position is within 1.884 m of an exported photo station (median 0.732 m); this checks proximity along the recorded route, not complete room/surface coverage or surveyed accuracy.
 
@@ -20,13 +20,13 @@ References: [libE57Format Image2D pose](https://asmaloney.github.io/libE57Format
 
 ## Honest navigation
 
-A photograph has one optical center. Photo mode moves between recorded stations, rather than pretending that a single image supplies arbitrary walking parallax. Drag either pane to look around; use capture arrows/select or W/S while looking around BIM to change station. BIM's center crosshair and element inspection remain available. Free translation and Fit BIM are available in **3D mesh** mode. Floor selection does not move the scan to another floor.
+A photograph has one optical center. Photo mode moves between recorded stations, rather than pretending that a single image supplies arbitrary walking parallax. Drag either pane to look around; hold WASD / arrow keys in either pane, or use the on-screen movement pad. Movement chooses a nearby route neighbor in the viewing direction. Capture arrows/select remain available for explicit jumps. BIM's center crosshair and element inspection remain available. Free translation and Fit BIM are available in **3D mesh** mode. Floor selection does not move the scan to another floor.
 
-The parent validates message origin, source, epoch and pose values. Photo mode keeps the BIM camera at the transformed active station; either pane may supply orientation. Changing a photo updates the image and registered camera together, after the image loads. Stale texture loads are disposed. No live sensor value, GLB identity or geometry is synthesized or changed.
+The parent validates message origin, source, epoch and pose values. Photo mode keeps the BIM camera at the transformed active station; either pane may supply orientation. After the next image loads, a 420–850 ms eased crossfade moves both cameras together. The intermediate image is a blend of recorded photos, not measured parallax or a newly reconstructed video frame. Long explicit jumps crossfade without flying across the building. Reduced-motion preference removes the animation. Stale texture loads are disposed. No live sensor value, GLB identity or geometry is synthesized or changed.
 
 ## Loading and verification
 
-Only the current photo and one pending load are held. Original 4K images are served on desktop; 2048 × 1024 JPEG derivatives are served on mobile. Approximate active texture allocations with mipmaps are 45 MB and 11 MB respectively; these exclude BIM, browser overhead and the transient replacement texture. The large scan GLBs are not loaded in photo mode.
+Only the current photo and one replacement texture are held, including during crossfade. Two neighboring JPEGs are prefetched into the browser cache without GPU texture allocation. Original 4K images are served on desktop; 2048 × 1024 JPEG derivatives are served on mobile. Approximate active texture allocations with mipmaps are 45 MB and 11 MB respectively; these exclude BIM, browser overhead and the transient replacement texture. The large scan GLBs are not loaded in photo mode.
 
 - Original JPEG SHA-256 values match all 100 extracted payloads; poses are finite unit quaternions.
 - Source-image dimensions and mobile derivatives verified.
@@ -37,3 +37,10 @@ Only the current photo and one pending load are held. Original 4K images are ser
 Run `python3 tests/panorama-assets.py`. For the browser integration, serve the repository on 127.0.0.1:8893 and run `node tests/photo-integration.cjs` with Playwright and Three.js installed (or set PLAYWRIGHT_MODULE and THREE_MODULE).
 
 Slow-network regression: repeated Next moves to the cumulative target; a failed in-flight image does not drop a newer queued selection (`tests/photo-queue.cjs`). Rebuild runtime assets using `scripts/build_panorama_assets.py <extracted-directory>` with Pillow; originals are copied byte-for-byte.
+
+
+## Directional walk route
+
+The 217 archived capture-list positions map to their nearest exported photo stations. Adjacent entries contribute an edge only if the raw step is at most 4 m, the exported-station step is at most 5.5 m, and the elevation difference is under 1.5 m. All 100 exported stations are connected. This is an inferred route from list adjacency, not a verified chronological video track or a collision-certified floor plan. Walking chooses only graph neighbors within the requested forward/back/side direction; turn at route ends. It does not fabricate missing captures.
+
+After rebuilding images, run `python3 scripts/build_photo_route.py <private-scan-inventory.json>` to regenerate neighbor indices. Do not publish the raw inventory. Validate with `node tests/photo-walk.cjs`, the asset tests, and `tests/photo-integration.cjs` (mobile tap, held forward motion, interpolated camera and registered endpoints).
