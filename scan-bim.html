@@ -359,7 +359,10 @@ body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;
 import * as THREE from 'three';
 const splitPane=new URLSearchParams(location.search).get('pane');
 document.body.dataset.pane=splitPane||'overlay';
-const mobileQuality=matchMedia('(max-width:768px), (pointer:coarse)').matches;
+// Scan quality policy uses the device window, never the half-width comparison pane.
+let qualityWindow=window;
+try{if(window.top.location.origin===location.origin)qualityWindow=window.top;}catch{}
+const mobileQuality=qualityWindow.matchMedia('(max-width:768px), (pointer:coarse)').matches;
 document.body.dataset.quality=mobileQuality?'mobile':'full';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
