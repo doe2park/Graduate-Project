@@ -347,7 +347,7 @@ body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;
   <div class="hint">Calibration auto-loads from <b>data/cupix_calib.json</b> (same registration grimes-xr uses: yaw −135°, swap+flip, camMat). Local tweaks persist in this browser.</div>
 </div>
 
-<div id="scanQuickActions"><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate">Walk BIM</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><section id="interiorTools" aria-label="Interior appearance"><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></section><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script>
+<div id="scanQuickActions"><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate">Walk BIM</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><section id="interiorTools" aria-label="Interior appearance"><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></section><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -425,7 +425,7 @@ fitLayout();
 // browser must not claim the gestures for scroll/zoom first.
 renderer.domElement.style.touchAction = 'none';
 
-const mobileMq = window.matchMedia('(max-width:768px), (pointer:coarse)');
+const mobileMq = qualityWindow.matchMedia('(max-width:768px), (pointer:coarse)');
 
 /* ══════════ MODELS ══════════ */
 // Same assets + same placement math as grimes-xr.html, so the calibration in
@@ -662,7 +662,7 @@ function exitWalk() {
   if (!walkMode) return;
   walkMode = false; thirdPerson = false; dragLook = false;
   document.body.classList.remove('scan-walking');
-  scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=Number(document.getElementById('scanAlpha').value);o.material.depthWrite=false}});
+  scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=splitPane==='scan'?1:Number(document.getElementById('scanAlpha').value);o.material.depthWrite=splitPane==='scan'}});
   renderer.toneMappingExposure = EXPOSURE_ORBIT;
   avatar.visible = false;
   for (const k in keys) keys[k] = false;
@@ -2449,6 +2449,22 @@ window.setInteriorMode=mode=>{
 };
 document.getElementById('interiorRoom').onclick=()=>setInteriorMode('room');
 document.getElementById('interiorServices').onclick=()=>setInteriorMode('services');
+// Reveal the physical electrical layers without changing floor or camera alignment.
+document.getElementById('electricalFocus').onclick=async()=>{
+ const button=document.getElementById('electricalFocus');button.disabled=true;
+ await setAllElements(false);const epoch=allElementsEpoch;
+ try{
+  for(const key of ['conduit','fixtures','lighting','equipment']){
+   if(epoch!==allElementsEpoch)return;
+   button.textContent='Loading '+LAYERS[key].label.replace(/^[^A-Za-z]+/,'')+'…';
+   const st=layerState[key]||(layerState[key]={});st.desiredVisible=true;
+   if(st.loading)await st.pending;else if(!st.group)await toggleLayer(key,{bulk:true});
+   if(epoch!==allElementsEpoch)return;
+   if(st.group){st.group.visible=true;document.getElementById('layerBtn-'+key).classList.add('active');}
+   applyEquipFilter();buildEquipFilter();updateAllElementsButton();
+  }
+ }finally{button.disabled=false;button.textContent='Show electrical';}
+};
 for(const input of document.querySelectorAll('[data-interior]'))input.onchange=()=>{interiorVisible[input.dataset.interior]=input.checked;interiorState.mode='custom';applyInteriorVisibility()};
 async function loadInterior(){
  if(interiorState.ready||interiorState.loading)return;
