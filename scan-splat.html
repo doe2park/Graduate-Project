@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Grimes · Experimental Gaussian reconstruction</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101923;color:#edf4fa;font:13px Arial,sans-serif}canvas{display:block;touch-action:none}#tools{position:absolute;inset:10px 10px auto;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:9px;background:#101e30ed;padding:10px;border:1px solid #52667a;border-radius:8px}#experiment{color:#ffe29b;font-weight:bold}#loading{color:#cee0eb}button{font:inherit;padding:9px;color:white;background:#244562;border:1px solid #8aa5bb;border-radius:5px;cursor:pointer;touch-action:none}button:focus-visible{outline:2px solid #ffe29b}#status{position:absolute;bottom:10px;left:10px;right:10px;z-index:2;background:#101e30ed;padding:9px;border-radius:5px;pointer-events:none;font-size:12px;line-height:1.5}#movePad{position:absolute;bottom:85px;left:50%;transform:translateX(-50%);display:flex;gap:5px;z-index:2}#movePad button{min-width:40px}#retry{display:none}body[data-state=error] #retry{display:inline-block}body[data-state=error] #movePad{display:none}@media(max-width:520px){#tools{font-size:12px;padding:8px;gap:6px}#movePad{bottom:112px}#status{font-size:11px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
+</head><body data-state="loading">
+<div id="tools"><span id="experiment">EXPERIMENT · 3D Gaussian splats</span><span id="loading" role="status">Loading reconstruction…</span><button id="reset" disabled>Reset view</button><button id="retry" onclick="location.reload()">Retry</button></div>
+<div id="movePad" aria-label="Move camera"><button data-move="left" aria-label="Move left">←</button><button data-move="forward" aria-label="Move forward">↑</button><button data-move="back" aria-label="Move backward">↓</button><button data-move="right" aria-label="Move right">→</button><button data-move="up" aria-label="Move up">+Y</button><button data-move="down" aria-label="Move down">−Y</button></div>
+<div id="status">Drag to look · WASD / arrows: move · Q/E: down/up · Shift: faster<br>Trained appearance reconstruction · May contain holes and floaters · No collision or physical accuracy guarantee</div>
+<script type="module">
+const label=document.getElementById('loading'),held=new Set();
+let state='loading',error=null,viewer=null,renderer=null,camera=null,manifest=null,count=0,epoch=0,driver='scan',linked=true,pendingClaim=false,mobile=false,drag=null,yaw=0,pitch=0,initialPose=null,selectedFile=null;
+const send=data=>{if(parent!==window)parent.postMessage(data,location.origin);};
+const pose=()=>camera?{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov,zoom:camera.zoom,identity:'scan'}:null;
+window.splatInspection=()=>({state,error,count,selectedFile,frame:manifest?.frame||null,mobile,status:manifest?.status||null,camera:pose(),epoch,driver,linked,pendingClaim,sharedMemory:false,renderedFrames:renderer?.info.render.frame||0,pointCloudMode:viewer?.splatMesh?.pointCloudModeEnabled||false,renderer:'GaussianSplats3D 0.4.7',provenance:manifest?.provenance||null});
+const finiteArray=(a,n)=>Array.isArray(a)&&a.length===n&&a.every(Number.isFinite);
+const validPose=p=>p&&finiteArray(p.position,3)&&finiteArray(p.quaternion,4)&&Math.abs(Math.hypot(...p.quaternion)-1)<.01&&Number.isFinite(p.fov)&&p.fov>=20&&p.fov<=110&&(p.zoom===undefined||(Number.isFinite(p.zoom)&&p.zoom>0&&p.zoom<=10));
+function fail(e){error=e.message||String(e);state='error';document.body.dataset.state=state;label.textContent=error;held.clear();document.getElementById('reset').disabled=true;if(renderer)renderer.setAnimationLoop(null);if(viewer)viewer.dispose().catch(()=>{});}
+try{
+ const manifestURL=new URL(new URLSearchParams(location.search).get('manifest')||'capture-local/gaussian/pilot/viewer.json',location.href);
+ if(manifestURL.origin!==location.origin)throw Error('Use a same-origin reconstruction manifest');
+ const response=await fetch(manifestURL);if(!response.ok)throw Error('Reconstruction unavailable · train the local pilot first');manifest=await response.json();
+ if(manifest.frame!=='scan-y-up-metres')throw Error('Unsupported coordinate frame · expected scan-y-up-metres');
+ if(manifest.status!=='experimental-trained')throw Error('This viewer requires an experimental-trained reconstruction');
+ if(!validPose(manifest.camera))throw Error('Reconstruction needs a valid initial camera pose');
+ if(typeof manifest.file!=='string')throw Error('Reconstruction PLY file is missing');
+ let deviceWindow=window;try{if(top.location.origin===location.origin)deviceWindow=top;}catch{}
+ mobile=deviceWindow.matchMedia('(max-width:768px), (pointer:coarse)').matches;
+ selectedFile=mobile&&manifest.mobileFile?manifest.mobileFile:manifest.file;
+ if(typeof selectedFile!=='string')throw Error('Reconstruction PLY file is missing');
+ const assetURL=new URL(selectedFile,manifestURL);if(assetURL.origin!==location.origin||!assetURL.pathname.toLowerCase().endsWith('.ply'))throw Error('Use a same-origin Gaussian PLY asset');
+ const selectedCount=mobile&&manifest.mobileFile?manifest.mobileSplatCount:manifest.splatCount;
+ if(Number(selectedCount)>(mobile?1000000:3000000))throw Error('Reconstruction exceeds this device’s splat budget · use a smaller export');
+ const [THREE,GS]=await Promise.all([import('three'),import('@mkkellogg/gaussian-splats-3d')]);
+ camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.03,Math.max(30,Math.min(2000,Number(manifest.maxDistance)||500)));
+ renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:mobile?'default':'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.setClearColor(0x101923,1);document.body.appendChild(renderer.domElement);
+ function angles(){const e=new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ');yaw=e.y;pitch=e.x;}
+ function applyPose(p){camera.position.fromArray(p.position);camera.quaternion.fromArray(p.quaternion).normalize();camera.fov=p.fov;camera.zoom=p.zoom||1;camera.updateProjectionMatrix();camera.updateMatrixWorld();angles();viewer?.forceRenderNextFrame();}
+ initialPose=manifest.camera;applyPose(initialPose);
+ // External camera stays in the original scan Y-up metre frame. No scene transforms or BIM geometry.
+ // No SharedArrayBuffer/COOP dependency, so the same file works on static GitHub Pages.
+ // 0.4.7 Instant reveal still advances a hidden 0.003/frame fade; finish it in one update to allow idle rendering to stop.
+ viewer=new GS.Viewer({camera,renderer,selfDrivenMode:false,useBuiltInControls:false,sharedMemoryForWorkers:false,gpuAcceleratedSort:false,integerBasedSort:false,halfPrecisionCovariancesOnGPU:true,sphericalHarmonicsDegree:mobile?0:2,inMemoryCompressionLevel:1,freeIntermediateSplatData:true,dynamicScene:false,sceneRevealMode:GS.SceneRevealMode.Instant,sceneFadeInRateMultiplier:1/.003,renderMode:GS.RenderMode.OnChange});
+ function claim(){if(state!=='ready')return;if(parent===window){pendingClaim=false;driver='scan';return;}if(!pendingClaim){pendingClaim=true;send({type:'grimes-claim-camera',pose:pose()});}}
+ function publish(){if(state==='ready'&&!pendingClaim&&(!linked||driver==='scan'))send({type:'grimes-camera-pose',epoch,pose:pose()});}
+ renderer.domElement.onpointerdown=e=>{if(state!=='ready'||e.button!==0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);claim();};
+ renderer.domElement.onpointermove=e=>{if(!drag||drag.id!==e.pointerId)return;yaw-=(e.clientX-drag.x)*.004;pitch=Math.max(-1.5,Math.min(1.5,pitch-(e.clientY-drag.y)*.004));drag.x=e.clientX;drag.y=e.clientY;camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));publish();};
+ for(const name of ['pointerup','pointercancel','lostpointercapture'])renderer.domElement.addEventListener(name,()=>drag=null);
+ renderer.domElement.addEventListener('wheel',e=>{if(state!=='ready')return;e.preventDefault();claim();camera.fov=Math.max(35,Math.min(95,camera.fov+e.deltaY*.025));camera.updateProjectionMatrix();viewer.forceRenderNextFrame();publish();},{passive:false});
+ const keys={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',KeyQ:'down',KeyE:'up',ShiftLeft:'fast',ShiftRight:'fast'};
+ window.addEventListener('keydown',e=>{if(state!=='ready'||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)||!keys[e.code])return;e.preventDefault();if(!held.size)claim();held.add(keys[e.code]);});
+ window.addEventListener('keyup',e=>held.delete(keys[e.code]));window.addEventListener('blur',()=>{held.clear();drag=null;});document.addEventListener('visibilitychange',()=>{if(document.hidden)held.clear();});
+ for(const button of document.querySelectorAll('[data-move]')){button.onpointerdown=e=>{if(state!=='ready')return;e.preventDefault();button.setPointerCapture(e.pointerId);claim();held.add(button.dataset.move);};for(const name of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(name,()=>held.delete(button.dataset.move));}
+ document.getElementById('reset').onclick=()=>{held.clear();claim();applyPose(initialPose);publish();};
+ window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==parent)return;const d=e.data;
+  if(d?.type==='grimes-camera-role'&&Number.isInteger(d.epoch)&&d.epoch>=epoch&&['scan','bim'].includes(d.driver)&&typeof d.linked==='boolean'){epoch=d.epoch;driver=d.driver;linked=d.linked;pendingClaim=false;if(linked&&driver!=='scan'){held.clear();drag=null;}if(driver==='scan')publish();}
+  if(d?.type==='grimes-linked-pose'&&d.epoch===epoch&&linked&&driver!=='scan'&&!pendingClaim&&validPose(d.pose)){applyPose(d.pose);}
+ });
+ window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);viewer.forceRenderNextFrame();});
+ renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();fail(Error('Graphics context lost · reload or use a smaller export'));});
+ await viewer.addSplatScene(assetURL.href,{showLoadingUI:false,progressiveLoad:false,splatAlphaRemovalThreshold:1});
+ count=viewer.splatMesh.getSplatCount();if(!count)throw Error('Gaussian PLY contains no visible splats');
+ state='ready';document.body.dataset.state=state;document.body.dataset.ready='true';label.textContent=`${count.toLocaleString()} trained splats${mobile&&manifest.mobileFile?' · Reduced mobile export':''}`;document.getElementById('reset').disabled=false;
+ // Loading can outlast a parent role handshake: announce only once the asset is usable.
+ send({type:'grimes-camera-ready'});claim();
+ const forward=new THREE.Vector3(),right=new THREE.Vector3(),move=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);let previous=performance.now();
+ renderer.setAnimationLoop(t=>{const dt=Math.min(.05,Math.max(0,(t-previous)/1000));previous=t;if(document.hidden)return;
+  if(held.size&&(!linked||driver==='scan')&&!pendingClaim){forward.set(-Math.sin(yaw),0,-Math.cos(yaw));right.crossVectors(forward,up);move.set(0,0,0);if(held.has('forward'))move.add(forward);if(held.has('back'))move.sub(forward);if(held.has('right'))move.add(right);if(held.has('left'))move.sub(right);if(held.has('up'))move.y++;if(held.has('down'))move.y--;if(move.lengthSq()){camera.position.addScaledVector(move.normalize(),dt*(held.has('fast')?4:1.4));publish();}}
+  camera.updateMatrixWorld();viewer.selfDrivenUpdate();
+ });
+ window.addEventListener('pagehide',()=>{renderer.setAnimationLoop(null);viewer.dispose().catch(()=>{});renderer.dispose();},{once:true});
+}catch(e){fail(e);}
+</script></body></html>
