@@ -163,3 +163,7 @@ Registration methodology and archived computation: `docs/SCAN_BIM_REGISTRATION.m
 ## Captured panorama comparison (2026-09-11)
 
 The scan comparison now defaults to `scan-photo.html`: 100 actual 4096×2048 E57 panoramas, with original image poses and 2K mobile derivatives under `scan-assets/panoramas`. Source inventory has 217 positions; do not claim all 217 images were recovered. The E57 includes Level 1 elevation, so do not add 4.572 twice. Photo mode walks between recorded stations over an inferred capture-adjacency graph, crossfading photos and synchronizing BIM; endpoints retain recorded positions and intermediate blends are not measured parallax; select 3D mesh for free translation. The accepted GLB-to-BIM registration is unchanged. Details and tests: `docs/CAPTURED_PANORAMA_VIEWER.md`. `Show electrical` reveals conduit, receptacles, lighting and equipment without interior occlusion, retaining the floor. Device policy uses the top-level window, not an iframe width.
+
+## New capture intake (2026-09-12)
+
+Use `scripts/capture_import.py prepare` for a new building/floor/capture; `capture-review.html?project=...` reviews its isolated package. `capture-local/` is ignored. Original E57 poses are converted once without a Grimes elevation offset; no registration or sensor feeds are inherited. The optional landmark fit remains provisional with independent checks. INSV requires reconstruction and NWD/IFC requires conversion before intake; do not claim direct upload-to-twin support. See `docs/CAPTURE_ONBOARDING.md`.
