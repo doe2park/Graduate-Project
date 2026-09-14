@@ -29,9 +29,10 @@ try{
  mobile=deviceWindow.matchMedia('(max-width:768px), (pointer:coarse)').matches;
  selectedFile=mobile&&manifest.mobileFile?manifest.mobileFile:manifest.file;
  if(typeof selectedFile!=='string')throw Error('Reconstruction PLY file is missing');
- const assetURL=new URL(selectedFile,manifestURL);if(assetURL.origin!==location.origin||!assetURL.pathname.toLowerCase().endsWith('.ply'))throw Error('Use a same-origin Gaussian PLY asset');
+ const assetURL=new URL(selectedFile,manifestURL);if(assetURL.origin!==location.origin||!(/\.(ply|ksplat)$/i).test(assetURL.pathname))throw Error('Use a same-origin Gaussian PLY or KSplat asset');
  const selectedCount=mobile&&manifest.mobileFile?manifest.mobileSplatCount:manifest.splatCount;
- if(Number(selectedCount)>(mobile?1000000:3000000))throw Error('Reconstruction exceeds this device’s splat budget · use a smaller export');
+ if(!Number.isSafeInteger(selectedCount)||selectedCount<1)throw Error('Reconstruction needs a positive Gaussian count');
+ if(selectedCount>(mobile?1000000:3000000))throw Error('Reconstruction exceeds this device’s splat budget · use a smaller export');
  const [THREE,GS]=await Promise.all([import('three'),import('@mkkellogg/gaussian-splats-3d')]);
  camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.03,Math.max(30,Math.min(2000,Number(manifest.maxDistance)||500)));
  renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:mobile?'default':'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.setClearColor(0x101923,1);document.body.appendChild(renderer.domElement);
