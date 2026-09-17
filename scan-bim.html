@@ -666,7 +666,7 @@ window.toggleWalk = () => {
   if(!walkMode)return;
   if(mobileMq.matches)return;
   // Synchronously inside the click gesture — no awaits/timeouts before this.
-  try { renderer.domElement.requestPointerLock(); } catch { plockFailed = true; showWalkHint(); }
+  try { const lock = renderer.domElement.requestPointerLock(); lock?.catch(()=>{plockFailed=true;if(walkMode)showWalkHint();}); } catch { plockFailed = true; showWalkHint(); }
 };
 function enterWalk() {
   walkMode = true; thirdPerson = false;
@@ -2698,7 +2698,7 @@ document.getElementById('scanObjects').onclick=async()=>{
 let mobileSearchTimer;document.getElementById('mobileElementSearch').oninput=()=>{clearTimeout(mobileSearchTimer);mobileSearchTimer=setTimeout(renderMobileElements,100);};
 document.getElementById('mobileElementClose').onclick=()=>{document.getElementById('mobileElementBrowser').hidden=true;};
 
-let _lastT = 0;
+let _lastT = 0, _lastWalkRender = -Infinity;
 renderer.setAnimationLoop((t) => {
   const dt = Math.min(0.1, (t - _lastT) / 1000) || 0.016;
   _lastT = t;
@@ -2711,9 +2711,13 @@ renderer.setAnimationLoop((t) => {
   }
   if(linkedPose){camera.position.fromArray(linkedPose.position);camera.quaternion.fromArray(linkedPose.quaternion).normalize();}
   publishScanPose(t);
-  // Keep the last frame while decoding/batching a layer. Hundreds of async
-  // batching yields must not submit the existing multi-million-triangle scene.
-  if (!interiorState.loading && !Object.values(layerState).some(st => st.loading)) renderer.render(scene, camera);
+  // Normal loading still avoids per-yield render churn. Walk must remain
+  // visible: show bounded preview frames while the next layer is prepared.
+  const layerBusy = interiorState.loading || Object.values(layerState).some(st => st.loading);
+  if (!layerBusy || (walkMode && t - _lastWalkRender >= (mobileMq.matches ? 400 : 250))) {
+    renderer.render(scene, camera);
+    _lastWalkRender = t;
+  }
 });
 </script>
 

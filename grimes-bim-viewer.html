@@ -626,7 +626,7 @@ window.toggleWalk = () => {
   enterWalk();
   if (mobileMq.matches) { ensureMobileEquipment().catch(()=>{}); return; }
   // Synchronously inside the click gesture — no awaits/timeouts before this.
-  try { renderer.domElement.requestPointerLock(); } catch { plockFailed = true; showWalkHint(); }
+  try { const lock = renderer.domElement.requestPointerLock(); lock?.catch(()=>{plockFailed=true;if(walkMode)showWalkHint();}); } catch { plockFailed = true; showWalkHint(); }
 };
 function enterWalk() {
   walkMode = true; thirdPerson = false;
@@ -2455,7 +2455,7 @@ document.getElementById('mobileBrowse').onclick=async()=>{
 let mobileSearchTimer;document.getElementById('mobileElementSearch').oninput=()=>{clearTimeout(mobileSearchTimer);mobileSearchTimer=setTimeout(renderMobileElements,100);};
 document.getElementById('mobileElementClose').onclick=()=>{document.getElementById('mobileElementBrowser').hidden=true;};
 document.getElementById('mobileFit').onclick=()=>{if(walkMode)exitWalk();clearPick();const bb=bimBbox();if(bb.isEmpty())return;const c=bb.getCenter(new THREE.Vector3()),r=bb.getSize(new THREE.Vector3()).length()/2;const angle=Math.min(camera.fov*Math.PI/180,2*Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect));controls.target.copy(c);camera.position.copy(c).addScaledVector(new THREE.Vector3(1,.7,1).normalize(),r/Math.sin(angle/2)*1.05);controls.update();};
-let _lastT = 0;
+let _lastT = 0, _lastWalkRender = -Infinity;
 renderer.setAnimationLoop((t) => {
   const dt = Math.min(0.1, (t - _lastT) / 1000) || 0.016;
   _lastT = t;
@@ -2466,9 +2466,13 @@ renderer.setAnimationLoop((t) => {
     // (same fix as grimes-xr commit d913737).
     controls.update();
   }
-  // Keep the last frame while decoding/batching a layer. Hundreds of async
-  // batching yields must not submit the existing multi-million-triangle scene.
-  if (!Object.values(layerState).some(st => st.loading)) renderer.render(scene, camera);
+  // Normal loading still avoids per-yield render churn. Walk must remain
+  // visible: show bounded preview frames while the next layer is prepared.
+  const layerBusy = Object.values(layerState).some(st => st.loading);
+  if (!layerBusy || (walkMode && t - _lastWalkRender >= (mobileMq.matches ? 400 : 250))) {
+    renderer.render(scene, camera);
+    _lastWalkRender = t;
+  }
 });
 </script>
 
