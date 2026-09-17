@@ -1001,6 +1001,11 @@ window.toggleCompare = () => {
   setTimeout(fitLayout, 100);
 };
 
+// Preserve the legacy Cupix comparison as an explicit presentation entry.
+if (new URLSearchParams(location.search).get('compare') === 'cupix') {
+  toggleCompare();
+}
+
 function syncPanelInputs() {
   document.getElementById('yawDeg').value = calib.yRotation;
   document.getElementById('scaleIn').value = calib.scale;
