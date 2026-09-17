@@ -4,7 +4,7 @@
 <script>if(!["scan","bim"].includes(new URLSearchParams(location.search).get("pane")))location.replace("scan-compare.html");</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scan + UC Berkeley · Bechtel Full BIM (Three.js)</title>
+<title>Scan + UC Berkeley · Grimes BIM (Three.js)</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -203,6 +203,9 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   body.twin-open #legend{display:none}
 }
 .carbon-form{display:grid;gap:8px;margin:10px 0}.carbon-form label{display:grid;gap:4px;font-size:11px}.carbon-form input,.carbon-form select,#elementFloor{background:#152131;color:#e2e8f0;border:1px solid #41516a;border-radius:4px;padding:6px;max-width:100%}.layer-coverage{font-size:10px;color:#a8b6c9;padding:4px 12px;line-height:1.5}
+
+#twinPanel{background:rgba(8,14,25,.98)}
+#twinInfoBtn{display:block;background:none;border:0;text-align:left;min-height:40px;padding:6px 0}
 </style>
 <style>#layersMenu[hidden],#pauseScanLayers[hidden],#fitBimQuick[hidden]{display:none!important}#scanQuickActions{position:absolute;top:55px;left:300px;z-index:90;display:flex;align-items:center;gap:12px;padding:8px 12px;background:#12283ef2;border:1px solid #607d98;border-radius:8px;color:white;font:13px Arial}#scanQuickActions button{background:#1b6f96;color:white;border:1px solid #8bc;padding:8px 12px;border-radius:5px;cursor:pointer}#scanQuickActions button:disabled{opacity:.6}#scanQuickActions label{display:flex;gap:7px;align-items:center;white-space:nowrap}#scanQuickActions input{width:18px;height:18px}#scanTools{top:112px!important}@media(max-width:768px), (pointer:coarse){#scanQuickActions{left:8px;right:8px;top:52px;justify-content:space-between;font-size:12px}#scanQuickActions button{padding:8px}#scanTools{top:110px!important}}#compareBtn{display:none}#walkPad{display:none;position:absolute;bottom:50px;right:18px;z-index:80;grid-template-columns:repeat(3,44px);gap:5px}#walkPad button{height:42px;background:#18364c;color:white;border:1px solid #8bc;border-radius:6px;touch-action:none}body.scan-walking #walkPad{display:grid}body.scan-walking #scanTools{display:none}#walkBtn{display:inline-flex!important}#layerLoadStatus{padding:8px;font-size:11px;color:#bcd;line-height:1.6}body.twin-open #scanTools{display:none}#scanTools{position:absolute;top:60px;right:12px;z-index:65;background:#112236ed;border:1px solid #567;padding:12px;border-radius:8px;color:#fff;font:12px Arial;max-width:340px}#scanTools button{padding:6px;margin:3px;color:white;background:#294664;border:1px solid #789;border-radius:4px}#scanTools label{display:inline-block;margin:4px}#scanTools input[type=number]{width:62px}#scanTools details{margin-top:8px}#scanStatus{max-width:310px;margin:6px 0;color:#fcd77d}@media(max-width:768px), (pointer:coarse){#scanTools{top:56px;max-width:230px;font-size:11px}}</style><style>
 body[data-pane] #scanQuickActions{left:12px;right:auto}
@@ -213,12 +216,32 @@ body[data-pane="bim"] #layersMenu{top:108px;max-height:calc(100dvh - 180px)}
 </style><style>
 #interiorTools{display:none;position:absolute;left:12px;top:109px;z-index:85;padding:8px 10px;border:1px solid #607d98;border-radius:8px;background:#12283ef2;color:#eef6fc;font:12px Arial;max-width:calc(100% - 24px)}
 body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;gap:6px;align-items:center}#interiorTools button{border:1px solid #7895aa;color:#dfebf4;background:#1b3448;border-radius:5px;padding:7px 10px;cursor:pointer}#interiorTools button[aria-pressed="true"]{background:#dbeaf0;color:#183144}#interiorTools summary{cursor:pointer;padding:7px}.interior-options{display:grid;gap:9px;padding:12px;position:absolute;left:0;top:45px;width:260px;max-width:80vw;background:#12283efa;border:1px solid #607d98;border-radius:6px}.interior-options label{display:flex;gap:8px;align-items:center}.interior-options small{color:#a9bfd0;line-height:1.4}#interiorStatus{font-size:10px;color:#b5cddd;margin-top:6px}body.twin-open #interiorTools{display:none}
-</style><style>.lm-chips[hidden]{display:none!important}#scanQuickActions{flex-wrap:wrap;gap:6px}#scanQuickActions button{min-height:36px}#pauseScanLayers{display:none!important}body.scan-walking #interiorTools{display:none}body[data-pane="scan"] #scanInspect{display:none}@media(max-width:768px), (pointer:coarse){#scanQuickActions{justify-content:flex-start}body[data-pane="bim"] #interiorTools{top:155px}#walkHint{display:none!important}body.scan-walking #twinPanel{bottom:105px;max-height:35vh}#walkPad{bottom:10px}#scanQuickActions button{font-size:11px;padding:6px}}</style></head>
+</style><style>.lm-chips[hidden]{display:none!important}#scanQuickActions{flex-wrap:wrap;gap:6px}#scanQuickActions button{min-height:36px}#pauseScanLayers{display:none!important}body.scan-walking #interiorTools{display:none}body[data-pane="scan"] #scanInspect{display:none}@media(max-width:768px), (pointer:coarse){#scanQuickActions{justify-content:flex-start}body[data-pane="bim"] #interiorTools{top:155px}#walkHint{display:none!important}body.scan-walking #twinPanel{bottom:105px;max-height:35vh}#walkPad{bottom:10px}#scanQuickActions button{font-size:11px;padding:6px}}</style><style>
+/* Readable observation history and reachable controls on small screens. */
+#twinPanel{max-height:calc(100dvh - 82px);overflow-y:auto;overscroll-behavior:contain}
+#twinPanel .thdr{position:sticky;top:-10px;background:#0b1423;z-index:2;padding:10px 0}#twinPanel .thdr button{min-width:36px;min-height:36px;color:#dbeafe}
+#twinPanel .srcnote,#twinPanel .mut,#twinPanel .morebtn{color:#9cafc5}#twinPanel .morebtn{padding:10px 0;font-size:12px}
+#meterHistory{margin:12px 0;border-top:1px solid #334155;padding-top:12px}.history-heading{font:600 13px system-ui;color:#e2e8f0}.history-note{font:11px/1.5 system-ui;color:#a9bdd1;margin:6px 0}.meter-tabs{display:flex;gap:5px;margin:9px 0}.meter-tabs button{flex:1;min-height:36px;background:#142c40;color:#bcd0df;border:1px solid #466075;border-radius:5px;font:11px system-ui}.meter-tabs button[aria-pressed=true]{background:#1b584e;color:#fff;border-color:#34d399}.history-values{display:flex;justify-content:space-between;align-items:center}.history-values strong{font:600 23px system-ui;color:#ecfdf5}.history-values small,.history-values span{font:11px system-ui;color:#9fb8cd}#meterPlot svg{display:block;width:100%;height:auto}#meterPlot svg text{fill:#9fb8cd;font:10px system-ui}.history-axis{display:flex;justify-content:space-between;font:9px system-ui;color:#9fb8cd}.history-table{max-height:220px;overflow:auto}.history-table table{border-collapse:collapse;width:100%;font:11px system-ui}.history-table td,.history-table th{text-align:right;padding:7px;border-bottom:1px solid #25374a}.history-table td:first-child,.history-table th:first-child{text-align:left}.history-table th{position:sticky;top:0;background:#152537}
+@media(max-width:768px),(pointer:coarse){#twinPanel{left:8px;right:8px;bottom:8px;max-height:calc(100dvh - 68px)}body.twin-open #mobileTools,body.twin-open #mobileWalkPad{display:none}body.mobile-walking #twinPanel{bottom:8px;max-height:calc(100dvh - 68px)}.meter-tabs button{min-height:44px}#twinPanel .thdr button{min-width:44px;min-height:44px}#twinPanel .drow{overflow-wrap:anywhere}}
+</style><style>
+body[data-pane="bim"] #topbar{display:none}body[data-pane="bim"] #main{top:0;height:100%}body[data-pane="bim"] #scanQuickActions{top:8px;left:8px;right:8px;padding:5px;gap:5px;z-index:65}body[data-pane="bim"] #scanQuickActions button{min-height:36px;padding:6px 8px;font-size:11px}body[data-pane="bim"] #bimFollow{display:none}body[data-pane="bim"] #fitBimQuick:disabled{display:none}
+body[data-pane="bim"] #interiorTools{top:58px;left:8px;right:8px;width:auto;padding:0;z-index:64}#interiorTools>summary{min-height:36px;padding:10px;cursor:pointer}#interiorTools[open]{max-height:calc(100dvh - 76px);overflow:auto}#interiorTools .interior-modes{padding:8px;flex-wrap:wrap}#interiorTools .interior-options{position:static;width:auto;max-width:100%}#interiorStatus{padding:0 10px 8px}body.twin-open #scanQuickActions,body.twin-open #interiorTools,body.twin-open #clickHint,body.twin-open #walkPad{display:none!important}
+body[data-pane="bim"] #twinPanel{top:8px;bottom:auto;left:8px;right:8px;width:auto;max-height:calc(100dvh - 16px)}
+@media(hover:hover) and (pointer:fine){body.scan-walking #bimNavigate{display:none}}
+@media(max-width:768px),(pointer:coarse){body[data-pane="bim"] #scanQuickActions button{min-height:40px}body[data-pane="bim"] #interiorTools{top:62px}body.scan-walking #bimNavigate{display:none}body.scan-walking #twinPanel{bottom:auto;max-height:calc(100dvh - 16px)}}
+</style><style>#mobileElementBrowser{position:fixed;inset:64px 14px 16px;z-index:120;background:#101b2b;border:1px solid #64748b;border-radius:10px;padding:14px;max-width:460px;color:#e2e8f0;overflow:auto}
+#mobileElementBrowser header{display:flex;align-items:center;justify-content:space-between;font-size:17px;margin-bottom:12px}
+#mobileElementBrowser button{min-height:44px;border:1px solid #526d87;border-radius:7px;background:#17344b;color:#e2e8f0;font:600 13px var(--font);padding:8px;touch-action:none}
+#mobileElementSearch{width:100%;font:16px var(--font);padding:12px;color:white;background:#091423;border:1px solid #526d87;border-radius:6px;margin:6px 0}
+#mobileElementStatus{font-size:12px;color:#a8b6c9;padding:8px 0}
+#mobileElementResults{display:grid;gap:7px}#mobileElementResults button{text-align:left;white-space:normal}#mobileElementResults small{display:block;color:#a8b6c9;font-size:11px;margin-top:4px}
+
+#mobileElementBrowser{inset:8px;max-width:none}#mobileElementBrowser[hidden]{display:none}body[data-pane="bim"] #layersMenu{top:58px;left:8px;max-height:calc(100dvh - 70px);z-index:100}body[data-pane="bim"] #scanQuickActions{flex-wrap:nowrap;overflow-x:auto}body[data-pane="bim"] #scanQuickActions button{flex-shrink:0}</style></head>
 <body>
 
 <div id="topbar">
   <a href="https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html" class="back">◂ Campus</a>
-  <span class="tb-title">Bechtel · Full BIM</span>
+  <span class="tb-title">Grimes · BIM</span>
   <span class="tb-sub">Three.js · GLB · no external BIM service</span>
   <span class="tb-spacer"></span>
   <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
@@ -269,7 +292,7 @@ body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;
     <div id="crosshair">+</div>
     <div id="loading">
       <div class="spinner"></div>
-      <div class="msg">Loading Bechtel MEP model…</div>
+      <div class="msg">Loading Grimes MEP model…</div>
       <div class="sub" id="loadSub">grimes-mep-only.glb · 1.7 MB</div>
     </div>
   </div>
@@ -279,18 +302,19 @@ body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;
 
 <div id="welcome">
   <div class="card">
-    <h2>🏛️ Bechtel Engineering Center — Live Digital Twin</h2>
+    <h2>🏛️ Grimes Engineering Center — Live Digital Twin</h2>
     This is a live digital twin of an operating campus building.<br><br>
-    <span class="em">Colored pipes &amp; ducts</span> are the building's real systems — <b>click one</b> to see its live energy data.<br><br>
+    <span class="em">Colored pipes &amp; ducts</span> show modelled building systems — <b>click one</b> for design information and building meter context.<br><br>
     <span class="em">🚶 Walk</span> explores the building like a game · <span class="em">🪞 Compare</span> walks the real 360° site photos side-by-side.
     <button onclick="dismissWelcome()">Got it — let me explore</button>
   </div>
 </div>
-<div id="clickHint">💡 Click any colored system to see live data</div>
+<div id="clickHint">Select an object to inspect its information</div>
 
 <div id="levelBadge"></div>
 <div id="walkPad"><button id="scanInspect">Inspect</button><button data-move="KeyW">↑</button><button id="scanWalkExit">Exit</button><button data-move="KeyA">←</button><button data-move="KeyS">↓</button><button data-move="KeyD">→</button></div><div id="walkHint"><b>WASD</b> move · <b>mouse</b> look · <b>Shift</b> run · Scan floor follow · <b>Esc</b> exit</div>
 
+<section id="mobileElementBrowser" hidden role="dialog" aria-modal="true" aria-label="Find BIM element"><header><b>Find a BIM element</b><button id="mobileElementClose" aria-label="Close object search">Close</button></header><label for="mobileElementSearch">Name, tag or element ID</label><input id="mobileElementSearch" type="search" placeholder="Search equipment…" autocomplete="off"><div id="mobileElementStatus" role="status"></div><div id="mobileElementResults"></div></section>
 <div id="twinPanel">
   <div class="thdr">
     <span class="sysdot" id="twinDot"></span>
@@ -303,10 +327,9 @@ body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;
   <canvas id="twinBaseSpark" width="640" height="180"></canvas>
   <div id="chartTip"></div>
   <div class="chartkey" id="chartKey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
-  <div id="twinPoints"></div>
-  <div id="twinEvent"></div>
-  <div class="morebtn" id="twinInfoBtn" onclick="toggleTwinInfo()">▸ More details</div>
-  <div id="twinDetails">
+  <div id="twinEvent"></div><section id="meterHistory" aria-label="Building meter observations"></section>
+  <button type="button" class="morebtn" id="twinInfoBtn" aria-controls="twinDetails" aria-expanded="false" onclick="toggleTwinInfo()">▸ More details</button>
+  <div id="twinDetails"><div id="meterHistoryDetails"></div><div id="twinPoints"></div>
     <div id="twinDetZ" class="dnote"></div>
     <div id="twinDetInfo"></div>
     <div id="twinDetEquip" class="dnote"></div>
@@ -347,7 +370,7 @@ body[data-pane="bim"] #interiorTools{display:block}.interior-modes{display:flex;
   <div class="hint">Calibration auto-loads from <b>data/cupix_calib.json</b> (same registration grimes-xr uses: yaw −135°, swap+flip, camMat). Local tweaks persist in this browser.</div>
 </div>
 
-<div id="scanQuickActions"><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate">Walk BIM</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><section id="interiorTools" aria-label="Interior appearance"><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></section><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script>
+<div id="scanQuickActions"><button id="scanObjects" type="button">Objects</button><button type="button" onclick="document.getElementById('layersBtn').click()">Layers</button><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate">Walk BIM</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><details id="interiorTools" aria-label="View settings"><summary>View settings</summary><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></details><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -645,6 +668,7 @@ function enterWalk() {
   if(!spawn){walkMode=false;renderer.toneMappingExposure=EXPOSURE_ORBIT;document.getElementById('scanStatus').textContent='No supported scan floor found. Choose another area.';return;}
   floorTargetY=spawn.y;floorY=spawn.y;playerPos.copy(spawn);
   if(splitPane!=='bim'){pitch=0;yaw=scanEntryYaw;}applyLook();document.body.classList.add('scan-walking');
+  if(splitPane==='bim')document.getElementById('bimNavigate').textContent='Exit look';
   scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}});
   camera.position.set(playerPos.x, floorY + EYE, playerPos.z);
   controls.enabled = false;                      // Orbit fully off while walking
@@ -1729,6 +1753,7 @@ async function pickEquipment(mesh, instanceId, explicitId = null) {
   baseCanvas._chart = null; baseCanvas.style.display = 'none';
   drawSpark(baseCanvas, []);
   const feeds = info.isFedBy || [];
+  loadMeterHistory(epoch, feeds[0]?.split(':')[2] || info.apportion?.meter || '3');
   bigEl.innerHTML = '— <small>kW</small>';
   badgeEl.textContent = 'LOADING'; badgeEl.className = 'badge na';
   ptsEl.innerHTML = '';
@@ -1776,6 +1801,45 @@ async function pickEquipment(mesh, instanceId, explicitId = null) {
   }
 }
 
+// Meter observations are building context; selecting an asset never creates telemetry.
+function normaliseMeterHistory(series) {
+  const points = new Map();
+  for (const p of series || []) {
+    const at = bmoTimestamp(p.t);
+    if (Number.isFinite(at) && Number.isFinite(p.v)) points.set(at,{at,t:p.t,v:p.v});
+  }
+  return [...points.values()].sort((a,b)=>a.at-b.at);
+}
+let historyMeters = null, historyEpoch = -1;
+const historyTime = at => new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(at);
+async function loadMeterHistory(epoch, preferred='3') {
+  historyMeters=null;historyEpoch=epoch;
+  const host=document.getElementById('meterHistory'),details=document.getElementById('meterHistoryDetails');
+  host.innerHTML='<div class="history-note">Loading building meter history…</div>';details.innerHTML='';
+  try {
+    const data=await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+    if(epoch!==elementPickEpoch)return;
+    historyMeters=data.meters||{};historyEpoch=epoch;
+    host.innerHTML='<div class="history-heading">Building meter history</div><p class="history-note">Measured at the building meter, not this object.</p><div class="meter-tabs" role="group" aria-label="Choose building meter">'+[['3','Roof #3'],['76','480 V #76'],['77','208 V #77']].map(([id,label])=>`<button type="button" data-history-meter="${id}" onclick="showMeterHistory('${id}')">${label}</button>`).join('')+'</div><div id="meterPlot"></div>';
+    showMeterHistory(['3','76','77'].includes(String(preferred))?String(preferred):'3');
+  } catch {if(epoch===elementPickEpoch)host.innerHTML='<div class="history-note">Meter history unavailable.</div>';}
+}
+window.showMeterHistory = id => {
+  if(!historyMeters||historyEpoch!==elementPickEpoch)return;
+  const meter=historyMeters[id],points=normaliseMeterHistory(meter?.timeseries_kw),reading=meterReading(meter);
+  document.querySelectorAll('[data-history-meter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.historyMeter===id)));
+  const host=document.getElementById('meterPlot'),details=document.getElementById('meterHistoryDetails');
+  if(!points.length){host.innerHTML='<p class="history-note">No timestamped kW observations available.</p>';details.innerHTML='';return;}
+  const lo=Math.min(0,...points.map(p=>p.v)),hi=Math.max(1,...points.map(p=>p.v)),range=hi-lo;
+  const first=points[0].at,last=points.at(-1).at,span=last-first||1;
+  const x=p=>36+(p.at-first)/span*284,y=p=>104-(p.v-lo)/range*86;
+  let path='';points.forEach((p,i)=>{path+=(i&&p.at-points[i-1].at<=30*60000?'L':'M')+x(p).toFixed(2)+','+y(p).toFixed(2)+' ';});
+  const avg=points.reduce((s,p)=>s+p.v,0)/points.length;
+  host.innerHTML=`<div class="history-values"><strong>${reading.value==null?'—':reading.value.toFixed(1)} <small>kW</small></strong><span>${esc(reading.state)}</span></div><svg viewBox="0 0 336 132" role="img" aria-label="Meter ${id} measured power history in kilowatts"><path d="M36 18H320 M36 61H320 M36 104H320" stroke="#334155" fill="none"/><text x="2" y="22">${hi.toFixed(0)}</text><text x="2" y="108">${lo.toFixed(0)}</text><path d="${path}" stroke="#34d399" stroke-width="2.5" fill="none"/>${points.map(p=>`<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="1.5" fill="#34d399"><title>${esc(historyTime(p.at))}: ${p.v.toFixed(2)} kW</title></circle>`).join('')}</svg><div class="history-axis"><span>${esc(historyTime(first))}</span><span>${esc(historyTime(last))}</span></div><div class="history-note">Pacific time · ${points.length} samples · Mean ${avg.toFixed(1)} kW · Peak ${Math.max(...points.map(p=>p.v)).toFixed(1)} kW</div>`;
+  const latest=meter?.latest||{};
+  details.innerHTML=`<div class="history-heading">Meter #${esc(id)} · received observations</div><p class="history-note">Pacific time · newest first · kW history. Voltage/current are latest-only when provided.</p><div class="history-table"><table><thead><tr><th>Observed time</th><th>kW</th></tr></thead><tbody>${[...points].reverse().map(p=>`<tr><td>${esc(historyTime(p.at))}</td><td>${p.v.toFixed(2)}</td></tr>`).join('')}</tbody></table></div><div class="dsec">Latest meter channels</div>`+[['voltage_ll','Line voltage','V'],['voltage_ln','Line–neutral','V'],['current_avg','Current','A'],['power_factor','Power factor',''],['frequency','Frequency','Hz'],['kwh_delivered','Cumulative energy','kWh']].filter(([k])=>Number.isFinite(latest[k])).map(([k,label,unit])=>drow(label,latest[k]+' '+unit)).join('')+'<p class="history-note">BMO CSV export → scheduled collection → data branch JSON. No direct device BAS feed.</p>';
+};
+
 function sumSeries(vals, points) {
   const list = points.map(p => (vals[p.ref] && vals[p.ref].series) || []).filter(s => s.length);
   if (!list.length) return [];
@@ -1809,6 +1873,7 @@ const drow = (k, v) => `<div class="drow"><span class="dk">${k}</span><span clas
 window.toggleTwinInfo = () => {
   const det = document.getElementById('twinDetails');
   det.classList.toggle('open');
+  document.getElementById('twinInfoBtn').setAttribute('aria-expanded',String(det.classList.contains('open')));
   document.getElementById('twinInfoBtn').textContent = det.classList.contains('open') ? '▾ Less' : '▸ More details';
 };
 window.toggleTwinMore = id => {
@@ -1876,9 +1941,10 @@ function pickBuilding() {
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
   document.getElementById('twinDot').style.background = '#FDB515';
-  document.getElementById('twinTitle').textContent = 'Bechtel Engineering Center · Building structure';
+  document.getElementById('twinTitle').textContent = 'Grimes Engineering Center · Building structure';
   document.getElementById('twinDetEquip').innerHTML = '';
   drawSpark(document.getElementById('twinSpark'), []);
+  loadMeterHistory(elementPickEpoch);
   renderBaseline(); // same headline: load, status, band chart, latest event
   document.getElementById('twinPoints').innerHTML =
     '<div id="dvaWidget"></div>'
@@ -1925,6 +1991,7 @@ async function renderDesignVsActual() {
 
 async function pickSystem(mesh) {
   const epoch = ++elementPickEpoch;
+  loadMeterHistory(epoch);
   unhighlightEquip();
   picked = mesh;
   highlight(mesh);
@@ -2520,6 +2587,8 @@ window.scanInspection=()=>({config:{...scanConfig},scanVisible:scanRoot.visible,
 setElementFloor('L1');document.getElementById('elementFloor').value='L1';if(splitPane!=='scan')toggleLayer('equipment');document.getElementById('legend').style.display='none';
 if(splitPane==='scan'){document.getElementById('layersMenu').hidden=true;document.getElementById('scanTools').querySelector('b').textContent='Level 1 · Actual scan';}
 if(splitPane) dismissWelcome();
+if(splitPane==='bim')document.body.appendChild(document.getElementById('layersMenu'));
+
 function fitBimPane(){if(walkMode)exitWalk();claimCamera();const b=bimBbox();if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),radius=b.getSize(new THREE.Vector3()).length()/2,angle=Math.min(camera.fov*Math.PI/180,2*Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect)),distance=radius/Math.sin(angle/2)*1.05;const direction=camera.position.clone().sub(controls.target).normalize();controls.target.copy(c);camera.position.copy(c).addScaledVector(direction,distance);controls.update();}
 if(splitPane==='bim'){const btn=document.getElementById('fitBimQuick');btn.hidden=false;btn.onclick=fitBimPane;const timer=setInterval(()=>{if(mepModel){clearInterval(timer)}},200);setTimeout(()=>clearInterval(timer),30000);}
 
@@ -2537,7 +2606,7 @@ function claimCamera(){
 function releaseBimCamera(){claimCamera();}
 renderer.domElement.addEventListener('pointerdown',()=>{claimCamera();if(photoNavigationMode&&splitPane==='bim'&&!walkMode)enterWalk();},true);
 renderer.domElement.addEventListener('wheel',claimCamera,{capture:true,passive:true});
-document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Finish looking':photoNavigationMode?'Look around BIM':'Walk BIM';if(walkMode)document.getElementById('walkHint').textContent=photoNavigationMode?'Captured station · Drag to look · WASD follow capture route · aim + click to inspect':'BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
+document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Exit look':photoNavigationMode?'Look around BIM':'Walk BIM';if(walkMode)document.getElementById('walkHint').textContent=photoNavigationMode?'Captured station · Drag to look · WASD follow capture route · aim + click to inspect':'BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
 document.getElementById('bimFollow').textContent='Align views';
 document.getElementById('bimFollow').onclick=()=>window.parent.postMessage({type:'grimes-request-link'},location.origin);
 function publishScanPose(t){
@@ -2568,6 +2637,40 @@ window.addEventListener('message',e=>{
  applyLinkedPose(p);
 });
 window.parent.postMessage({type:'grimes-camera-ready'},location.origin);
+
+// Lightweight, source-ID-based alternative to selecting small targets on a phone.
+async function ensureMobileEquipment(){
+ const st=layerState.equipment;
+ if(!st?.group&&!st?.loading)toggleLayer('equipment');
+ for(let i=0;i<240;i++){
+  if(layerState.equipment?.group){if(!layerState.equipment.group.visible)toggleLayer('equipment');return;}
+  if(!layerState.equipment?.loading)throw Error('Equipment could not load. Check the connection and try Objects again.');
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ throw Error('Equipment is still loading. Try Objects again shortly.');
+}
+function renderMobileElements(){
+ const q=document.getElementById('mobileElementSearch').value.trim().toLowerCase(),list=document.getElementById('mobileElementResults');list.replaceChildren();
+ let total=0;const entries=equipMeta[q]?[[q,equipMeta[q]]]:Object.entries(equipMeta);
+ for(const [id,info] of entries){
+  if(!layerState[info.layer]?.group?.visible)continue;
+  if(equipLevelFilter&&elementLevel(info)!==equipLevelFilter)continue;
+  const label=info.element_tag||info.mark||info.name||info.family||info.type||'Element';
+  const searchable=[id,label,info.name,info.family,info.type,info.mark,info.location,info.level].join(' ').toLowerCase();
+  if(q&&!searchable.includes(q))continue;
+  total++;if(total>80)continue;
+  const btn=document.createElement('button');btn.dataset.elementId=id;btn.append(document.createTextNode(String(label)));
+  const detail=document.createElement('small');detail.textContent=[info.type||info.category,elementLevel(info)||info.level,'ID '+id].filter(Boolean).join(' · ');btn.append(detail);
+  btn.onclick=()=>{selectElementById(id);document.getElementById('mobileElementBrowser').hidden=true;};list.append(btn);
+ }
+ document.getElementById('mobileElementStatus').textContent=total?`${total.toLocaleString()} matches · showing ${Math.min(total,80)}. Search to narrow the list.`:'No matching loaded elements. Try a name, tag or source ID.';
+}
+document.getElementById('scanObjects').onclick=async()=>{
+ if(walkMode)exitWalk();document.getElementById('mobileElementBrowser').hidden=false;document.getElementById('mobileElementStatus').textContent='Loading equipment (1.5 MB)…';
+ try{await ensureMobileEquipment();renderMobileElements();}catch(e){document.getElementById('mobileElementStatus').textContent=e.message;}
+};
+let mobileSearchTimer;document.getElementById('mobileElementSearch').oninput=()=>{clearTimeout(mobileSearchTimer);mobileSearchTimer=setTimeout(renderMobileElements,100);};
+document.getElementById('mobileElementClose').onclick=()=>{document.getElementById('mobileElementBrowser').hidden=true;};
 
 let _lastT = 0;
 renderer.setAnimationLoop((t) => {

@@ -8,6 +8,7 @@ function fixture(){
  vm.runInContext(block('/* ELEMENT DATA HELPERS */','/* END ELEMENT DATA HELPERS */'),ctx);
  vm.runInContext(block('function neighbourRows(', '\nfunction apportionRow('),ctx);
  vm.runInContext(block('async function pickEquipment(', '\nfunction sumSeries('),ctx);
+ ctx.loadMeterHistory=()=>{}; // History widget is tested separately; isolate element feed races.
  return {ctx,get};
 }
 test('missing meter must not become LIVE zero',async()=>{const {ctx,get}=fixture();await ctx.pickEquipment({userData:{ids:['123']}},0);assert.notEqual(get('twinBadge').textContent,'LIVE');assert.doesNotMatch(get('twinBigKw').innerHTML,/0\.0/)});

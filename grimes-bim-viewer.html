@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UC Berkeley · Bechtel Full BIM (Three.js)</title>
+<title>UC Berkeley · Grimes BIM (Three.js)</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -226,13 +226,23 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
  #mobileElementBrowser{inset:58px 8px 8px;max-width:none}
 }
 @media(max-height:480px) and (max-width:900px){#walkHint{display:none!important}#mobileElementBrowser{inset:54px 8px 8px}#twinPanel{max-height:66vh}}
+
+#twinPanel{background:rgba(8,14,25,.98)}
+#twinInfoBtn{display:block;background:none;border:0;text-align:left;min-height:40px;padding:6px 0}
 </style>
-</head>
+<style>
+/* Readable observation history and reachable controls on small screens. */
+#twinPanel{max-height:calc(100dvh - 82px);overflow-y:auto;overscroll-behavior:contain}
+#twinPanel .thdr{position:sticky;top:-10px;background:#0b1423;z-index:2;padding:10px 0}#twinPanel .thdr button{min-width:36px;min-height:36px;color:#dbeafe}
+#twinPanel .srcnote,#twinPanel .mut,#twinPanel .morebtn{color:#9cafc5}#twinPanel .morebtn{padding:10px 0;font-size:12px}
+#meterHistory{margin:12px 0;border-top:1px solid #334155;padding-top:12px}.history-heading{font:600 13px system-ui;color:#e2e8f0}.history-note{font:11px/1.5 system-ui;color:#a9bdd1;margin:6px 0}.meter-tabs{display:flex;gap:5px;margin:9px 0}.meter-tabs button{flex:1;min-height:36px;background:#142c40;color:#bcd0df;border:1px solid #466075;border-radius:5px;font:11px system-ui}.meter-tabs button[aria-pressed=true]{background:#1b584e;color:#fff;border-color:#34d399}.history-values{display:flex;justify-content:space-between;align-items:center}.history-values strong{font:600 23px system-ui;color:#ecfdf5}.history-values small,.history-values span{font:11px system-ui;color:#9fb8cd}#meterPlot svg{display:block;width:100%;height:auto}#meterPlot svg text{fill:#9fb8cd;font:10px system-ui}.history-axis{display:flex;justify-content:space-between;font:9px system-ui;color:#9fb8cd}.history-table{max-height:220px;overflow:auto}.history-table table{border-collapse:collapse;width:100%;font:11px system-ui}.history-table td,.history-table th{text-align:right;padding:7px;border-bottom:1px solid #25374a}.history-table td:first-child,.history-table th:first-child{text-align:left}.history-table th{position:sticky;top:0;background:#152537}
+@media(max-width:768px),(pointer:coarse){#twinPanel{left:8px;right:8px;bottom:8px;max-height:calc(100dvh - 68px)}body.twin-open #mobileTools,body.twin-open #mobileWalkPad{display:none}body.mobile-walking #twinPanel{bottom:8px;max-height:calc(100dvh - 68px)}.meter-tabs button{min-height:44px}#twinPanel .thdr button{min-width:44px;min-height:44px}#twinPanel .drow{overflow-wrap:anywhere}}
+</style></head>
 <body>
 
 <div id="topbar">
   <a href="grimes-campus-map-arcgis.html" class="back">◂ Campus</a>
-  <span class="tb-title">Bechtel · Full BIM</span>
+  <span class="tb-title">Grimes · BIM</span>
   <span class="tb-sub">Three.js · GLB · no external BIM service</span>
   <span class="tb-spacer"></span>
   <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
@@ -283,7 +293,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
     <div id="crosshair">+</div>
     <div id="loading">
       <div class="spinner"></div>
-      <div class="msg">Loading Bechtel MEP model…</div>
+      <div class="msg">Loading Grimes MEP model…</div>
       <div class="sub" id="loadSub">grimes-mep-only.glb · 1.7 MB</div>
     </div>
   </div>
@@ -293,14 +303,14 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
 
 <div id="welcome">
   <div class="card">
-    <h2>🏛️ Bechtel Engineering Center — Live Digital Twin</h2>
+    <h2>🏛️ Grimes Engineering Center — Live Digital Twin</h2>
     This is a live digital twin of an operating campus building.<br><br>
-    <span class="em">Colored pipes &amp; ducts</span> are the building's real systems — <b>click one</b> to see its live energy data.<br><br>
+    <span class="em">Colored pipes &amp; ducts</span> show modelled building systems — <b>click one</b> for design information and building meter context.<br><br>
     <span class="em">🚶 Walk</span> explores the building like a game · <span class="em">Scan ↔ BIM</span> opens the registered 3D scan and model side by side.
     <button onclick="dismissWelcome()">Got it — let me explore</button>
   </div>
 </div>
-<div id="clickHint">💡 Click any colored system to see live data</div>
+<div id="clickHint">Select an object to inspect its information</div>
 
 <div id="mobileTools"><button id="mobileBrowse">Objects</button><button id="mobileFit">Fit model</button></div>
 <div id="mobileWalkPad" aria-label="Touch Walk controls"><div class="walk-move"><span></span><button data-walk-key="KeyW" aria-label="Move forward">↑</button><span></span><button data-walk-key="KeyA" aria-label="Move left">←</button><button data-walk-key="KeyS" aria-label="Move backward">↓</button><button data-walk-key="KeyD" aria-label="Move right">→</button></div><div class="walk-actions"><button id="mobileHeightUp" aria-label="Raise eye height">Height +</button><button id="mobileHeightDown" aria-label="Lower eye height">Height −</button><button id="mobileInspect">Inspect</button><button id="mobileWalkExit">Exit Walk</button></div></div>
@@ -320,10 +330,9 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   <canvas id="twinBaseSpark" width="640" height="180"></canvas>
   <div id="chartTip"></div>
   <div class="chartkey" id="chartKey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
-  <div id="twinPoints"></div>
-  <div id="twinEvent"></div>
-  <div class="morebtn" id="twinInfoBtn" onclick="toggleTwinInfo()">▸ More details</div>
-  <div id="twinDetails">
+  <div id="twinEvent"></div><section id="meterHistory" aria-label="Building meter observations"></section>
+  <button type="button" class="morebtn" id="twinInfoBtn" aria-controls="twinDetails" aria-expanded="false" onclick="toggleTwinInfo()">▸ More details</button>
+  <div id="twinDetails"><div id="meterHistoryDetails"></div><div id="twinPoints"></div>
     <div id="twinDetZ" class="dnote"></div>
     <div id="twinDetInfo"></div>
     <div id="twinDetEquip" class="dnote"></div>
@@ -1725,6 +1734,7 @@ async function pickEquipment(mesh, instanceId, explicitId = null) {
   baseCanvas._chart = null; baseCanvas.style.display = 'none';
   drawSpark(baseCanvas, []);
   const feeds = info.isFedBy || [];
+  loadMeterHistory(epoch, feeds[0]?.split(':')[2] || info.apportion?.meter || '3');
   bigEl.innerHTML = '— <small>kW</small>';
   badgeEl.textContent = 'LOADING'; badgeEl.className = 'badge na';
   ptsEl.innerHTML = '';
@@ -1772,6 +1782,45 @@ async function pickEquipment(mesh, instanceId, explicitId = null) {
   }
 }
 
+// Meter observations are building context; selecting an asset never creates telemetry.
+function normaliseMeterHistory(series) {
+  const points = new Map();
+  for (const p of series || []) {
+    const at = bmoTimestamp(p.t);
+    if (Number.isFinite(at) && Number.isFinite(p.v)) points.set(at,{at,t:p.t,v:p.v});
+  }
+  return [...points.values()].sort((a,b)=>a.at-b.at);
+}
+let historyMeters = null, historyEpoch = -1;
+const historyTime = at => new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(at);
+async function loadMeterHistory(epoch, preferred='3') {
+  historyMeters=null;historyEpoch=epoch;
+  const host=document.getElementById('meterHistory'),details=document.getElementById('meterHistoryDetails');
+  host.innerHTML='<div class="history-note">Loading building meter history…</div>';details.innerHTML='';
+  try {
+    const data=await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
+    if(epoch!==elementPickEpoch)return;
+    historyMeters=data.meters||{};historyEpoch=epoch;
+    host.innerHTML='<div class="history-heading">Building meter history</div><p class="history-note">Measured at the building meter, not this object.</p><div class="meter-tabs" role="group" aria-label="Choose building meter">'+[['3','Roof #3'],['76','480 V #76'],['77','208 V #77']].map(([id,label])=>`<button type="button" data-history-meter="${id}" onclick="showMeterHistory('${id}')">${label}</button>`).join('')+'</div><div id="meterPlot"></div>';
+    showMeterHistory(['3','76','77'].includes(String(preferred))?String(preferred):'3');
+  } catch {if(epoch===elementPickEpoch)host.innerHTML='<div class="history-note">Meter history unavailable.</div>';}
+}
+window.showMeterHistory = id => {
+  if(!historyMeters||historyEpoch!==elementPickEpoch)return;
+  const meter=historyMeters[id],points=normaliseMeterHistory(meter?.timeseries_kw),reading=meterReading(meter);
+  document.querySelectorAll('[data-history-meter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.historyMeter===id)));
+  const host=document.getElementById('meterPlot'),details=document.getElementById('meterHistoryDetails');
+  if(!points.length){host.innerHTML='<p class="history-note">No timestamped kW observations available.</p>';details.innerHTML='';return;}
+  const lo=Math.min(0,...points.map(p=>p.v)),hi=Math.max(1,...points.map(p=>p.v)),range=hi-lo;
+  const first=points[0].at,last=points.at(-1).at,span=last-first||1;
+  const x=p=>36+(p.at-first)/span*284,y=p=>104-(p.v-lo)/range*86;
+  let path='';points.forEach((p,i)=>{path+=(i&&p.at-points[i-1].at<=30*60000?'L':'M')+x(p).toFixed(2)+','+y(p).toFixed(2)+' ';});
+  const avg=points.reduce((s,p)=>s+p.v,0)/points.length;
+  host.innerHTML=`<div class="history-values"><strong>${reading.value==null?'—':reading.value.toFixed(1)} <small>kW</small></strong><span>${esc(reading.state)}</span></div><svg viewBox="0 0 336 132" role="img" aria-label="Meter ${id} measured power history in kilowatts"><path d="M36 18H320 M36 61H320 M36 104H320" stroke="#334155" fill="none"/><text x="2" y="22">${hi.toFixed(0)}</text><text x="2" y="108">${lo.toFixed(0)}</text><path d="${path}" stroke="#34d399" stroke-width="2.5" fill="none"/>${points.map(p=>`<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="1.5" fill="#34d399"><title>${esc(historyTime(p.at))}: ${p.v.toFixed(2)} kW</title></circle>`).join('')}</svg><div class="history-axis"><span>${esc(historyTime(first))}</span><span>${esc(historyTime(last))}</span></div><div class="history-note">Pacific time · ${points.length} samples · Mean ${avg.toFixed(1)} kW · Peak ${Math.max(...points.map(p=>p.v)).toFixed(1)} kW</div>`;
+  const latest=meter?.latest||{};
+  details.innerHTML=`<div class="history-heading">Meter #${esc(id)} · received observations</div><p class="history-note">Pacific time · newest first · kW history. Voltage/current are latest-only when provided.</p><div class="history-table"><table><thead><tr><th>Observed time</th><th>kW</th></tr></thead><tbody>${[...points].reverse().map(p=>`<tr><td>${esc(historyTime(p.at))}</td><td>${p.v.toFixed(2)}</td></tr>`).join('')}</tbody></table></div><div class="dsec">Latest meter channels</div>`+[['voltage_ll','Line voltage','V'],['voltage_ln','Line–neutral','V'],['current_avg','Current','A'],['power_factor','Power factor',''],['frequency','Frequency','Hz'],['kwh_delivered','Cumulative energy','kWh']].filter(([k])=>Number.isFinite(latest[k])).map(([k,label,unit])=>drow(label,latest[k]+' '+unit)).join('')+'<p class="history-note">BMO CSV export → scheduled collection → data branch JSON. No direct device BAS feed.</p>';
+};
+
 function sumSeries(vals, points) {
   const list = points.map(p => (vals[p.ref] && vals[p.ref].series) || []).filter(s => s.length);
   if (!list.length) return [];
@@ -1805,6 +1854,7 @@ const drow = (k, v) => `<div class="drow"><span class="dk">${k}</span><span clas
 window.toggleTwinInfo = () => {
   const det = document.getElementById('twinDetails');
   det.classList.toggle('open');
+  document.getElementById('twinInfoBtn').setAttribute('aria-expanded',String(det.classList.contains('open')));
   document.getElementById('twinInfoBtn').textContent = det.classList.contains('open') ? '▾ Less' : '▸ More details';
 };
 window.toggleTwinMore = id => {
@@ -1872,9 +1922,10 @@ function pickBuilding() {
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
   document.getElementById('twinDot').style.background = '#FDB515';
-  document.getElementById('twinTitle').textContent = 'Bechtel Engineering Center · Building structure';
+  document.getElementById('twinTitle').textContent = 'Grimes Engineering Center · Building structure';
   document.getElementById('twinDetEquip').innerHTML = '';
   drawSpark(document.getElementById('twinSpark'), []);
+  loadMeterHistory(elementPickEpoch);
   renderBaseline(); // same headline: load, status, band chart, latest event
   document.getElementById('twinPoints').innerHTML =
     '<div id="dvaWidget"></div>'
@@ -1921,6 +1972,7 @@ async function renderDesignVsActual() {
 
 async function pickSystem(mesh) {
   const epoch = ++elementPickEpoch;
+  loadMeterHistory(epoch);
   unhighlightEquip();
   picked = mesh;
   highlight(mesh);
@@ -2387,7 +2439,7 @@ function renderMobileElements(){
   total++;if(total>80)continue;
   const btn=document.createElement('button');btn.dataset.elementId=id;btn.append(document.createTextNode(String(label)));
   const detail=document.createElement('small');detail.textContent=[info.type||info.category,elementLevel(info)||info.level,'ID '+id].filter(Boolean).join(' · ');btn.append(detail);
-  btn.onclick=()=>{selectElementById(id);document.getElementById('mobileElementBrowser').hidden=true;document.getElementById('twinDetails').classList.add('open');document.getElementById('twinInfoBtn').textContent='▾ Less';};list.append(btn);
+  btn.onclick=()=>{selectElementById(id);document.getElementById('mobileElementBrowser').hidden=true;};list.append(btn);
  }
  document.getElementById('mobileElementStatus').textContent=total?`${total.toLocaleString()} matches · showing ${Math.min(total,80)}. Search to narrow the list.`:'No matching loaded elements. Try a name, tag or source ID.';
 }

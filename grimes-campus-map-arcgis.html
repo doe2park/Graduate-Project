@@ -520,6 +520,16 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 #modeToggle button{padding:6px 12px;font-size:10px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--dim)}
 #modeToggle button.active{background:var(--gold);color:#000}
 @media(max-width:768px){#pubPanel{width:calc(100vw - 24px);right:12px;top:auto;bottom:60px;max-height:60vh;overflow-y:auto}#modeToggle{left:56px;top:auto;bottom:60px}}
+
+/* Keep map controls clear of the mobile timeline. */
+@media(max-width:768px){
+ #mobileExplore,#firstHint{display:none!important}
+ #tlBar{left:8px!important;right:8px;bottom:8px!important;transform:none!important;max-width:calc(100% - 16px);box-sizing:border-box;gap:6px!important;padding:8px!important}
+ #tlSlider{width:0!important;min-width:20px;flex:1}
+ #tlLabel{min-width:88px!important;font-size:10px}
+ #tlPlay,#tlLive{min-height:36px;flex-shrink:0}
+ #modeToggle{bottom:76px!important}
+}
 </style>
 </head>
 <body>
@@ -544,7 +554,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 </div>
 <div id="ma">
   <button id="tb">☰</button>
-  <a href="grimes-bim-viewer.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(253,181,21,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--gold);font-size:10px;font-weight:600;text-decoration:none">🏗 Bechtel BIM</a>
+  <a href="grimes-bim-viewer.html" style="position:absolute;top:12px;right:60px;z-index:10;padding:6px 12px;border-radius:8px;border:1px solid rgba(253,181,21,.3);background:rgba(10,16,32,.8);backdrop-filter:blur(8px);color:var(--gold);font-size:10px;font-weight:600;text-decoration:none">🏗 Grimes BIM</a>
 
   <!-- Campus Mood: one-line plain-language summary -->
   <div id="campusMood" title="How the campus compares to typical load at this hour">
@@ -644,7 +654,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 <script src="https://js.arcgis.com/4.29/"></script>
 <script>
 const D=[
-  {id:'grimes',n:'Grimes Engineering Center',a:'Bechtel Center',lat:37.87410,lng:-122.25815,c:'Engineering',bim:1,nrg:1,kw:37.3,
+  {id:'grimes',n:'Grimes Engineering Center',a:'Grimes Center',lat:37.87410,lng:-122.25815,c:'Engineering',bim:1,nrg:1,kw:37.3,
    floors:4,sqft:'83,460',yr:1980,yrn:'1980 / 2025 renovation',mep:8,sensors:30,
    xr:'https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html'},
   {id:'cory',n:'Cory Hall',a:'Electrical Engineering (EECS)',lat:37.87530,lng:-122.25725,c:'Engineering',nrg:1,yr:1950,floors:5},

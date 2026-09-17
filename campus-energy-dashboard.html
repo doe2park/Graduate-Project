@@ -48,6 +48,8 @@ a{color:var(--cyan);text-decoration:none}
 #loading{display:flex;align-items:center;justify-content:center;height:60vh;color:var(--dim);font-size:14px;gap:10px}
 .spin{width:20px;height:20px;border:2px solid var(--faint);border-top-color:var(--cyan);border-radius:50%;animation:sp .6s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+
+.table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.grid2>*{min-width:0}.card{min-width:0}.stats>*{min-width:0}@media(max-width:768px){.hdr{flex-wrap:wrap;padding:10px;gap:8px}.hdr-ts{flex-basis:100%;padding-left:4px}.card-title{flex-wrap:wrap}.card-title span{margin-left:0}.stat-val{font-size:clamp(18px,5.8vw,26px)}.wrap{padding:10px}}
 </style>
 </head>
 <body>
@@ -227,7 +229,7 @@ async function init(){
 
     <div class="sec-title">🏢 All Buildings <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:8px">${online.length} live · ${offline.length} offline</span></div>
     <div class="card" style="overflow-x:auto;padding:8px">
-    <table class="tbl">
+    <div class="table-scroll" role="region" aria-label="Building readings, scroll horizontally" tabindex="0"><table class="tbl">
       <tr><th>#</th><th>Building</th><th>Status</th><th>kW</th><th>Trend</th><th>$/day</th><th>CO₂</th><th>Predicted</th></tr>
       ${blds.map(([id,b],i)=>{const sp=b.sparkline||[];const mx=Math.max(...sp,1);return '<tr>'+
         '<td style="color:var(--dim)">'+(i+1)+'</td>'+
@@ -239,7 +241,7 @@ async function init(){
         '<td style="font-family:var(--mono);color:var(--green);font-size:10px">'+(b.est_daily_co2_kg?b.est_daily_co2_kg+'kg':'')+'</td>'+
         '<td style="font-family:var(--mono);color:var(--dim);font-size:10px">'+(b.predicted_kw?'~'+b.predicted_kw:'')+'</td>'+
         '</tr>'}).join('')}
-    </table>
+    </table></div>
     </div>
 
     <div style="text-align:center;padding:20px;font-size:9px;color:var(--faint)">
