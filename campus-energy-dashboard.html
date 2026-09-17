@@ -50,6 +50,7 @@ a{color:var(--cyan);text-decoration:none}
 @keyframes sp{to{transform:rotate(360deg)}}
 
 .table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.grid2>*{min-width:0}.card{min-width:0}.stats>*{min-width:0}@media(max-width:768px){.hdr{flex-wrap:wrap;padding:10px;gap:8px}.hdr-ts{flex-basis:100%;padding-left:4px}.card-title{flex-wrap:wrap}.card-title span{margin-left:0}.stat-val{font-size:clamp(18px,5.8vw,26px)}.wrap{padding:10px}}
+@media(max-width:600px){.chart-box{height:280px}.hdr-back{min-height:36px;display:inline-flex;align-items:center}.card-title span{line-height:1.5}}
 </style>
 </head>
 <body>
@@ -187,7 +188,7 @@ async function init(){
     <div class="stats">
       <div class="stat"><div class="stat-lbl">Campus Load</div><div class="stat-val" style="color:var(--gold)">${totalKw.toLocaleString()}<span style="font-size:14px"> kW</span></div><div class="stat-sub">${data.buildings_online}/${data.buildings_total} buildings online</div></div>
       <div class="stat"><div class="stat-lbl">Est. Daily Cost</div><div class="stat-val" style="color:var(--text)">$${(data.total_daily_cost||0).toLocaleString()}</div><div class="stat-sub">@ $0.15/kWh · Pacific Gas & Electric</div></div>
-      <div class="stat"><div class="stat-lbl">Avg kW/Floor</div><div class="stat-val" style="color:var(--green)">${avgEff}<span style="font-size:14px"> kW</span></div><div class="stat-sub">Energy efficiency index</div></div>
+      <div class="stat"><div class="stat-lbl">Avg kW/Floor</div><div class="stat-val" style="color:var(--green)">${avgEff}<span style="font-size:14px"> kW</span></div><div class="stat-sub">Demand divided by floor count</div></div>
       <div class="stat"><div class="stat-lbl">Daily Energy</div><div class="stat-val" style="color:var(--cyan)">${((data.total_daily_kwh||0)/1000).toFixed(1)}<span style="font-size:14px"> MWh</span></div><div class="stat-sub">≈ ${Math.round((data.total_daily_kwh||0)/30)} avg US homes</div></div>
     </div>
 
@@ -210,18 +211,19 @@ async function init(){
 
     <div class="grid2">
       <div class="card">
-        <div class="card-title">📐 Energy Efficiency <span>kW per floor · lower = more efficient</span></div>
+        <div class="card-title">📐 Demand per Floor <span>kW / floor · colors match categories</span></div>
         <div class="chart-box"><canvas id="effBar"></canvas></div>
+        <p style="font-size:11px;color:var(--dim);line-height:1.5;margin:12px 0 0">A rough size-normalized comparison, not an efficiency rating. Floor area, occupancy and building use are not controlled.</p>
       </div>
     </div>
 
     <div class="grid2">
       <div class="card">
-        <div class="card-title">🏛 Building Age vs Energy <span>year built vs kW · hover for details</span></div>
+        <div class="card-title">🏛 Building Age vs Energy <span>Year built vs kW · category colors · tap for details</span></div>
         <div class="chart-box"><canvas id="ageScatter"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title">💰 Cost per Building <span>est. $/day · hover for details</span></div>
+        <div class="card-title">💰 Cost per Building <span>Est. $/day · category colors · tap for details</span></div>
         <div class="chart-box"><canvas id="costBar"></canvas></div>
       </div>
     </div>
@@ -254,13 +256,13 @@ async function init(){
   // ── CHARTS ──
   Object.values(charts).forEach(function(c){c.destroy()});charts={};
 
-  var tooltipOpts={enabled:true,backgroundColor:'rgba(10,16,32,.95)',borderColor:'rgba(253,181,21,.3)',borderWidth:1,titleFont:{size:11,weight:'bold'},bodyFont:{size:12,family:"'JetBrains Mono',monospace"},padding:10,cornerRadius:8,displayColors:true};
+  var tooltipOpts={enabled:true,backgroundColor:'rgba(10,16,32,.95)',borderColor:'rgba(253,181,21,.3)',borderWidth:1,titleFont:{size:11,weight:'bold'},bodyFont:{size:window.innerWidth<600?10:12,family:"'JetBrains Mono',monospace"},padding:10,cornerRadius:8,displayColors:true};
 
   // 1. Donut
   var catLabels=Object.keys(cats).filter(function(c){return cats[c]>0});
   var catData=catLabels.map(function(c){return Math.round(cats[c])});
   var catClrs=catLabels.map(function(c){return catColors[c]||'#94a3b8'});
-  charts.donut=new Chart(document.getElementById('catDonut'),{type:'doughnut',data:{labels:catLabels,datasets:[{data:catData,backgroundColor:catClrs,borderWidth:0,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:10,padding:8,font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return ctx.label+': '+ctx.raw+' kW ('+Math.round(ctx.raw/totalKw*100)+'%)'}}}}}});
+  charts.donut=new Chart(document.getElementById('catDonut'),{type:'doughnut',data:{labels:catLabels,datasets:[{data:catData,backgroundColor:catClrs,borderWidth:0,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:window.innerWidth<600?'bottom':'right',labels:{boxWidth:10,padding:8,font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return ctx.label+': '+ctx.raw+' kW ('+Math.round(ctx.raw/totalKw*100)+'%)'}}}}}});
 
   // 2. Top 10 Bar
   var top10=online.slice(0,10);
@@ -287,7 +289,7 @@ async function init(){
 
   // 4. Cost Bar
   var costTop=online.slice(0,10);
-  charts.cost=new Chart(document.getElementById('costBar'),{type:'bar',data:{labels:costTop.map(function(e){return shortName(e[1].name)}),datasets:[{label:'$/day',data:costTop.map(function(e){return e[1].est_daily_cost}),backgroundColor:'rgba(253,181,21,.6)',borderRadius:4,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var b=costTop[ctx.dataIndex][1];return b.name+': $'+b.est_daily_cost+'/day ('+b.kw+' kW)'}}})},scales:{x:{grid:{display:false},ticks:{font:{size:8}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return '$'+v}}}}}});
+  charts.cost=new Chart(document.getElementById('costBar'),{type:'bar',data:{labels:costTop.map(function(e){return shortName(e[1].name)}),datasets:[{label:'$/day',data:costTop.map(function(e){return e[1].est_daily_cost}),backgroundColor:costTop.map(function(e){return catColors[catMap[e[0]]||'Other']}),borderRadius:4,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var entry=costTop[ctx.dataIndex],b=entry[1];return [b.name,(catMap[entry[0]]||'Other')+' · est. $'+b.est_daily_cost+'/day',b.kw+' kW × 24 h × $0.15/kWh']}}})},scales:{x:{grid:{display:false},ticks:{font:{size:8}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return '$'+v}}}}}});
 
   // 5. Efficiency Bar (kW per floor)
   var effTop=effData.slice(0,10);
@@ -295,16 +297,16 @@ async function init(){
     labels:effTop.map(function(e){return shortName(e.name)}),
     datasets:[{
       data:effTop.map(function(e){return e.kwPerFloor}),
-      backgroundColor:effTop.map(function(e){return e.kwPerFloor>50?'#f87171':e.kwPerFloor>20?'#FDB515':'#34d399'}),
+      backgroundColor:effTop.map(function(e){return catColors[catMap[e.id]||'Other']}),
       borderRadius:4,barThickness:16
     }]
-  },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var e=effTop[ctx.dataIndex];return e.name+': '+e.kwPerFloor+' kW/floor ('+e.kw+'kW ÷ '+e.fl+' floors)'}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+' kW/fl'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+  },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var e=effTop[ctx.dataIndex];return [e.name,(catMap[e.id]||'Other')+' · '+e.kwPerFloor+' kW/floor',e.kw+' kW ÷ '+e.fl+' floors']}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+' kW/fl'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
 
   // 6. Age vs Energy Scatter
   var scatterData=effData.filter(function(e){return e.yr}).map(function(e){
-    return {x:e.yr,y:e.kw,name:e.name,fl:e.fl,eff:e.kwPerFloor};
+    return {id:e.id,x:e.yr,y:e.kw,name:e.name,fl:e.fl,eff:e.kwPerFloor};
   });
-  var scatterColors=scatterData.map(function(e){return e.y>200?'rgba(248,113,113,.8)':e.y>100?'rgba(253,181,21,.8)':'rgba(52,211,153,.8)'});
+  var scatterColors=scatterData.map(function(e){return catColors[catMap[e.id]||'Other']});
   var scMaxKw=Math.max.apply(null,scatterData.map(function(e){return e.y}))||500;
   var scatterSizes=scatterData.map(function(e){return Math.max(4,Math.min(14,4+(e.y/scMaxKw)*10))});
   charts.age=new Chart(document.getElementById('ageScatter'),{type:'scatter',data:{
@@ -312,9 +314,10 @@ async function init(){
       data:scatterData,
       backgroundColor:scatterColors,
       pointRadius:scatterSizes,
+      pointHitRadius:10,
       pointHoverRadius:scatterSizes.map(function(s){return s+3}),
     }]
-  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var d=scatterData[ctx.dataIndex];return d.name+' ('+d.x+') — '+d.y+' kW · '+d.fl+'fl · '+d.eff+' kW/fl'}}})},scales:{x:{title:{display:true,text:'Year Built',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:8}}},y:{title:{display:true,text:'Current kW',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v+'kW'}}}}}});
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var d=scatterData[ctx.dataIndex];return [d.name,(catMap[d.id]||'Other')+' · '+d.y+' kW','Built '+d.x+' · '+d.fl+' floors']}}})},scales:{x:{title:{display:true,text:'Year Built',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:8}}},y:{title:{display:true,text:'Current kW',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v+'kW'}}}}}});
 }
 
 init().catch(function(e){document.getElementById('app').innerHTML='<div style="text-align:center;padding:40px;color:var(--red)">Error: '+e.message+'</div>'});

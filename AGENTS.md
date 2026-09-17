@@ -176,3 +176,5 @@ Reusable scripts: `prepare_gaussian_dataset.py`, `train_gaussian.py`, `encode_ga
 
 ## Weekly history restored (2026-09-17)
 At the owner’s explicit request, weekly-report.html is again maintained as a companion to Campus Energy Dashboard. It reads the automated data branch daily/index.json and up to seven daily snapshots per window, with cached back/forward navigation, zero-preserving sample statistics, missing-day gaps and CSV export. These are collector observations, not verified continuous meter histories. Archive date labels are UTC collector dates; extrapolated energy is sum(daily sample mean × 24 hours), not measured counter deltas. No manually written data branch reports.
+
+UI updates must include mobile-width overflow, touch interaction and chart/legend checks, per owner request (2026-09-17). Dashboard building charts share category colors. Demand per floor is a rough comparison, not an energy-efficiency rating.
