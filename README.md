@@ -1,313 +1,96 @@
 # Operational Campus Digital Twin from BIM
 
-**UC Berkeley · Civil & Environmental Engineering · M.S. Construction Systems**
+UC Berkeley · Civil & Environmental Engineering · Yoonsung Chung · Advisor: Prof. Kenichi Soga
 
-A web-based operational digital twin for UC Berkeley's campus buildings, centered on the Grimes Engineering Center. The system integrates BIM model analysis, real-time energy metering (BMO), and interactive web visualization — demonstrating a complete "BIM-to-Operations" pipeline at zero infrastructure cost.
+A campus-scale research prototype connecting site appearance, BIM objects and available operating data. Grimes / Bechtel Engineering Center is the detailed pilot. The research asks whether these connections, with explicit evidence labels, help users understand existing buildings with incomplete drawings and sensor coverage.
 
-**Live Demo:** [doe2park.github.io/Graduate-Project](https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html)
+## Open the live sites
 
----
+Updated for the September 17, 2026 presentation. These are the canonical public links used by the presentation QR codes.
 
-## System Overview
-
-```
-BMO Obvius Meters (154 devices, 26 online)
-  → GitHub Actions (Python, every 15 min)
-    → JSON Data Store (live + 24hr history + daily archive + weekly report)
-      → GitHub Pages (free HTTPS hosting)
-        → 8 Web Interfaces
-           ├── Campus Map (ArcGIS 2D)
-           ├── 3D Viewer (CesiumJS + Google Photorealistic 3D Tiles)
-           ├── Energy Dashboard (Chart.js)
-           ├── Weekly Report
-           └── Grimes MEP Viewer (Three.js + WebXR)
-  → Cloudflare Workers AI (Llama 3.1 chatbot)
-```
-
----
-
-## Live Interfaces
-
-| Interface | URL | Technology |
-|---|---|---|
-| **Campus Map** (hub) | [grimes-campus-map-arcgis.html](https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html) | ArcGIS JS SDK 4.29 |
-| **Grimes BIM Viewer** | [grimes-bim-viewer.html](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | Three.js + GLB element tier (per-element dashboards, live feeds) + Cupix 360° compare |
-| **Energy Dashboard** | [campus-energy-dashboard.html](https://doe2park.github.io/Graduate-Project/campus-energy-dashboard.html) | Chart.js 4.4 |
-| **Design vs Actual (LEED M&V)** | [grimes-performance.html](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | Measured meter counters vs the LEED v4 energy model — live, auto-updating |
-| **AI Chatbot** | [campus-chatbot.ucb-dt.workers.dev](https://campus-chatbot.ucb-dt.workers.dev) | Cloudflare Workers AI |
-
-*Consolidated 2026-09: `campus-3d`, `grimes-xr`, `weekly-report`, `comfort-dashboard`, `vote`, `leed-lca-preview`, `twin-viewer`, and `grimes-bim-iot/protoys` are now redirect stubs into the four interfaces above (old bookmarks keep working; the pages live in git history).*
-
----
-
-## Campus Map
-
-Interactive 2D satellite map displaying live energy data for 61 UC Berkeley buildings.
-
-- **61 buildings** with coordinates verified from [berkeley.edu/map](https://www.berkeley.edu/map/)
-- **~25 buildings** with live kW readings from BMO metering, auto-refreshed every 60 seconds (37 metered buildings tracked; reporting count varies with meter uptime)
-- Category-colored markers with energy-intensity outline (green → gold → red)
-- Click any building for popup with department, year built, floors, energy data
-- **24-hour time slider** with play button — replay campus energy patterns
-- **AI chatbot** powered by Cloudflare Workers AI (Llama 3.1 8B) with local NLP fallback
-  - 20+ intents, fuzzy string matching, handles typos and varied phrasing
-  - Korean keyword support
-  - Time-slider aware — answers reflect currently selected time
-- Links to berkeley.edu building pages, energy dashboard, and 3D viewer
-- Grimes beacon marker guides users to the full BIM-to-WebXR digital twin
-
-## 3D Campus Viewer
-
-Photorealistic 3D visualization of UC Berkeley campus with live energy overlay.
-
-- **Google Photorealistic 3D Tiles** via CesiumJS — real building textures, trees, terrain
-- OSM Buildings fallback when Google Tiles unavailable
-- Energy-coded ground circles: size proportional to kW, color by intensity
-- Floating labels on building rooftops (visible on zoom-in, fade on zoom-out)
-- **24-hour time slider** with stats panel synchronization
-  - Total kW, buildings online, daily cost, CO₂ all update with slider position
-- Click any building for info popup (name, department, kW, year, floors, cost, CO₂)
-- Enhanced rendering: `maximumScreenSpaceError: 4`, FXAA, device pixel ratio scaling
-
-## Energy Dashboard
-
-Real-time analytics with 6 interactive charts.
-
-- **Stats cards:** Campus load (kW), daily cost ($), avg kW/floor, daily energy (MWh)
-- **Energy by Category:** Donut chart — Engineering, Science, Humanities, Professional, Student Life, Libraries
-- **Top 10 Buildings:** Horizontal bar chart ranked by current kW
-- **Campus Load History:** 24-hour line chart with hover crosshair and tooltip
-- **Cost per Building:** Top consumers by estimated $/day
-- **Energy Efficiency (kW/floor):** Normalized by floor count — identifies truly inefficient buildings
-- **Building Age vs Energy:** Scatter plot — year built vs current kW with building metadata on hover
-- Auto-refresh every 60 seconds
-- `shortName()` mapping with 30+ entries and fuzzy matching
-
-## Weekly Report
-
-Auto-generated 7-day energy summary.
-
-- Weekly stats: average kW, total MWh, cost, CO₂
-- Daily breakdown cards with peak times
-- Peak vs average comparison charts
-- Building weekly rankings table
-- Generated from daily JSON snapshot archive
-
-## Grimes MEP Viewer
-
-3D MEP (Mechanical, Electrical, Plumbing) walkthrough of Grimes Engineering Center with live energy data.
-
-- **Three.js** renderer with **WebXR** support (desktop, mobile, VR headset)
-- 8 MEP system layers: HVAC Ductwork, HVAC Equipment, Plumbing/Piping, Fire Protection, Electrical, Diffusers/Grilles, Pumps/Valves, Spiral Ductwork
-- Toggle individual systems on/off via legend
-- View modes: System (color by type), Temperature, Flow, Energy (heatmap)
-- **Live BMO data** for electrical components (3 meters: Roof Electric, 480/277V, 208/120V)
-- WASD + QE movement, mouse orbit, click any component for sensor panel
-- First-person walkthrough mode
-
-### Live Data (BMO Metering — ~70% of UI)
-
-| Meter | Voltage | Data Points |
-|---|---|---|
-| Meter #3 (Roof Electric) | 480V | kW, current, voltage, power factor, frequency, kWh delivered, peak demand |
-| Meter #76 (HVAC/Lighting) | 480/277V | kW, current, voltage |
-| Meter #77 (Outlets/IT) | 208/120V | kW, current, voltage |
-| Water meter | — | flow rate (cf/m), total consumption (cf) |
-| Steam meter | — | total consumption (gal) |
-
-### BIM-Validated Floor Energy Breakdown (~15% of UI)
-
-Derived from analysis of **741,796 BIM elements** in the Revit/Navisworks model. **93 electrical panelboards** were identified and mapped to BMO meters by floor:
-
-| Floor | Meter Sources | Panelboards | Description |
+| Website | Open | Source | What it does |
 |---|---|---|---|
-| **SRV (Roof)** | Meter #3 × 100% | 0 (direct AHU feed) | Rooftop air handling units, exhaust fans |
-| **L3** | Meter #77 × 18% | 11 × 208V | Upper floor outlets, IT equipment |
-| **L2** | Meter #77 × 35% | 22 × 208V | Mid floor outlets, lab equipment |
-| **L1** | Meter #76 × 45% + Meter #77 × 31% | 14 × 480V + 19 × 208V | HVAC, lighting, outlets |
-| **B1** | Meter #76 × 55% + Meter #77 × 16% | 17 × 480V + 10 × 208V | MSB, mechanical room, workshop |
+| Campus map | [Live map](https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html) | [HTML](grimes-campus-map-arcgis.html) | Geographic context for 61 campus buildings and available utility readings |
+| Campus energy dashboard | [Live dashboard](https://doe2park.github.io/Graduate-Project/campus-energy-dashboard.html) | [HTML](campus-energy-dashboard.html) | Demand trends, building comparisons and reporting availability |
+| Element BIM viewer | [Live BIM viewer](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | [HTML](grimes-bim-viewer.html) | Select floors/layers and inspect individual model objects and their data evidence |
+| Scan ↔ BIM comparison | [Live comparison](https://doe2park.github.io/Graduate-Project/scan-compare.html) | [HTML](scan-compare.html) | Captured 360° photos and registered BIM with linked views; optional mesh mode |
+| Design vs actual | [Live performance page](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | [HTML](grimes-performance.html) | LEED design context and observed energy, with coverage and modelling limits |
 
-**Key finding:** 480/277V panelboards (Meter #76) exist only on B1 and L1. L2 and L3 have exclusively 208/120V distribution. Main switchboards (MSB-1, MSB-2) are located on B1.
+The comparison supplements the four main interfaces. It does not require a Cupix login. The old Cupix iframe comparison is not the current demonstration. Former interfaces such as `campus-3d`, `grimes-xr`, `weekly-report` and `twin-viewer` redirect to the maintained pages; they are not separate active products.
 
-### Simulated Data (~5% of UI)
+### Suggested demonstration
 
-HVAC, plumbing, and fire protection sensor readings shown on component click are simulated placeholders. These are ready for future BAS (Building Automation System) integration. All simulated values are labeled "SIM" in the UI.
+1. Start with the campus map to locate Grimes.
+2. Open the energy dashboard to explain the available building-level measurements.
+3. Use the BIM viewer to select an object and distinguish its identity/design properties from its operating-data context.
+4. Open Scan ↔ BIM to compare the same registered location. Photo walking moves along recorded capture stations with transitions; mesh mode allows free movement.
+5. Use Design vs Actual to discuss energy performance and the limits of available evidence.
 
----
+On narrow screens the comparison stacks its panes vertically and uses smaller panorama derivatives. Device memory and WebGL support affect large-model loading. Browser viewport tests do not establish compatibility with every physical phone.
 
-## Data Architecture
+## Data and evidence
 
-### Automated Pipeline
-
-> **Branch layout (since 2026-07-30):** `main` is code-only. All pipeline outputs
-> are committed to the orphan **`data` branch** and fetched by the pages from
-> `https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/…`.
-> Static configs (LEED extracts, cupix_calib, building_ids, manifests) stay on `main`.
-> Weather-normalized **TOWT baselines** (`scripts/towt_baseline.py`) and hour-of-week
-> baselines (`scripts/build_baseline.py`) run in the same 15-min workflow.
-
-| File | Description | Update Frequency |
-|---|---|---|
-| `data/campus_energy.json` | Live snapshot — kW, cost, CO₂, anomaly flags, prediction (on `data` branch) | Every 15 min |
-| `data/campus_energy_history.json` | 24-hour rolling history — up to 96 data points per building | Every 15 min |
-| `data/daily/YYYY-MM-DD.json` | Permanent daily archive — all readings preserved for trend analysis | Append each cycle |
-| `data/weekly_report.json` | 7-day summary — avg/peak/min kW, cost, CO₂ per building | Every 15 min |
-
-### BMO Connection
-
-- **System:** BMO Obvius (BuildingManager Online)
-- **Auth:** HTTP Basic Authentication
-- **Database:** `dbU216ucberkelF682`
-- **Devices discovered:** 154 AcquiSuite devices
-- **Buildings tracked:** 37 (see `BUILDINGS` in `bmo_fetch_campus.py`)
-- **Currently reporting:** ~25 buildings (varies with meter uptime)
-- **Building kW = sum of all responding meters** for that building (e.g. Grimes = meter #3 + #76 + #77)
-- **Offline:** 12 buildings (hardware disconnected — requires Facilities Services)
-- **kW columns parsed:** "kW total (kW)", "Active Power Total (kW)", "kW total", "kW", "kW del-rec (kW)", "Power Total (kW)", "kW del (kW)"
-
-### Features
-
-- **Anomaly detection:** Flags buildings consuming >150% of their 2-hour rolling average
-- **Prediction:** Weighted moving average for short-term kW prediction
-- **CO₂ estimation:** kW × 24h × 0.21 kg/kWh (California grid average, CARB)
-- **Cost estimation:** kW × 24h × $0.15/kWh (PG&E commercial rate)
-- **Daily snapshots:** Permanent JSON files for long-term historical analysis
-
----
-
-## AI Chatbot
-
-Deployed as a Cloudflare Worker using **Workers AI** (free tier, no API key required).
-
-- **Model:** Meta Llama 3.1 8B Instruct (`@cf/meta/llama-3.1-8b-instruct`)
-- **Endpoint:** `https://campus-chatbot.ucb-dt.workers.dev`
-- **Context:** Sends current energy data + building metadata with each query
-- **Time-aware:** Reflects current time slider position
-- **Fallback:** Local fuzzy NLP engine with 20+ intents when AI proxy is unavailable
-- **Languages:** English and Korean
-
----
-
-## BIM Model Analysis
-
-The Grimes Engineering Center BIM model (Revit → Navisworks NWD) contains **741,796 elements** across **48 NWC files** from multiple design and construction teams:
-
-| File Code | Firm / Role | Discipline |
-|---|---|---|
-| `RT` | Rutherford & Chekene | Electrical design |
-| `FMB` | Mechanical designer | HVAC / plumbing design |
-| `CDC` | Mechanical contractor | HVAC / plumbing construction BIM |
-| `PRIBUSS PRAGMATIC` | Pribuss Engineering + Pragmatic PE | Fire protection design + construction |
-| `SOM` | Skidmore, Owings & Merrill | Architecture |
-| `XL` | — | 3D Grids / coordination |
-
-### MEP Files (35 NWC)
-
-```
-Electrical:     00/01/02/03-UCBBE-RT-ELEC.nwc (power distribution)
-                00/01/02/03-UCBBE-RT-ELEC-IW.nwc (internal wiring)
-                00/01/02/03-UCBBE-RT-ELEC-LTG.nwc (lighting)
-                RF-UCBBE-RT-ELEC.nwc (roof electrical)
-Fire Protection: 00/01/02/03-UCBBE-PRIBUSS PRAGMATIC-FP.nwc
-Mechanical:     00/01/02/03/04-UCBBE-FMB-MECH DUCT.nwc
-                00/01/02/03-UCBBE-FMB-MP.nwc (mechanical piping)
-                00/01/02/03-UCBBE-FMB-PL.nwc (plumbing)
-                B1/L1/L2/L3-UCBB-CDC-MF.nwc (mechanical fabrication)
+```text
+UC Berkeley BMO utility meters
+  -> scheduled GitHub Actions (every 15 minutes)
+  -> JSON on the machine-written data branch
+  -> public static HTML interfaces on GitHub Pages
 ```
 
----
+The current pipeline retrieves actual BMO utility observations. Direct BAS/BACnet device-point integration is not implemented. Scheduled collection does not guarantee every meter is online or every observation is fresh.
 
-## Technology Stack
+- **Measured:** three Grimes building electricity meters. Showing a meter total in an object card provides building/feeder context, not a direct measurement of that object.
+- **Modelled:** provisional design-weighted allocations. Meter 77 uses design VA and meter 3 uses design CFM. These are uncalibrated scenarios, not verified device consumption or circuit membership.
+- **Meter 76 is not apportioned:** no defensible allocation evidence is available.
+- **Inferred:** derived relationships such as some floor assignments. Preserve their provenance and uncertainty.
+- Panel schedules, reviewed equipment relationships and BAS point mappings are still needed for verified asset-to-feed connections. Missing/stale values must not become live zero readings.
 
-| Component | Technology | Cost |
-|---|---|---|
-| 2D Campus Map | ArcGIS JS SDK 4.29 | Free (developer tier) |
-| 3D Campus View | CesiumJS 1.119 + Google Photorealistic 3D Tiles | Free (Cesium ion) |
-| MEP 3D Viewer | Three.js r160 + WebXR | Free (open source) |
-| Energy Dashboard | Chart.js 4.4.1 | Free (open source) |
-| AI Chatbot | Cloudflare Workers AI (Llama 3.1 8B) | Free (Workers free tier) |
-| Data Pipeline | Python 3.12 + GitHub Actions | Free (GitHub free tier) |
-| Hosting | GitHub Pages | Free |
-| Metering | BMO Obvius | UC Berkeley infrastructure |
-| **Total monthly cost** | | **$0** |
+## BIM identity and rendering
 
----
+Ten element layers contain 66,620 identities with geometry. Original GLB node identifiers bind to JSON sidecars. Revit-derived dbIds and fabrication CAD entity identities have different source hierarchies. Identity is scoped to the source model and revision.
 
-## Repository Structure
+The viewer batches geometry at runtime while preserving picking through primitive ranges. It offers floor/type/layer filters and Show all / Hide all element controls. The architectural Building Shell feature was removed. Interior geometry in the scan comparison provides separate spatial context.
 
-```
-Graduate-Project/
-├── grimes-campus-map-arcgis.html    # Campus 2D map with chatbot (main entry)
-├── campus-energy-dashboard.html     # Chart.js dashboard
-├── grimes-bim-viewer.html           # Grimes element-tier BIM viewer — Three.js + GLB + Cupix sync
-├── grimes-performance.html          # Design vs Actual (LEED M&V) dashboard
-├── *.html (campus-3d, grimes-xr, …) # redirect stubs from the 2026-09 consolidation
-├── grimes-mep-only.glb              # MEP 3D model (1.7 MB)
-├── grimes-mep-compressed.glb        # Full building model (21 MB Draco+WebP, lazy-loaded overlay)
-├── bmo_fetch.py                     # BMO fetcher — Grimes detail (building_data.json)
-├── bmo_fetch_campus.py              # BMO fetcher — campus-wide (campus_energy.json)
-├── generate_weekly_report.py        # Weekly report generator
-├── convert_nwd_local.py             # (reference only) retired NWD → APS pipeline
-├── extract_leed.py / extract_lca.py # LEED submittal → JSON extractors
-├── worker/
-│   ├── chatbot-worker.js            # Cloudflare Worker: campus chatbot (Workers AI)
-│   └── wrangler.toml
-├── buildings/grimes/                # Twin package: manifest, Brick model, binding, sources
-├── twin/twin-resolver.js            # Building-agnostic glb-node → live-data resolver
-├── data/
-│   ├── campus_energy.json           # Live energy snapshot (~15 min)
-│   ├── campus_energy_history.json   # 24 hr rolling history
-│   ├── building_data.json           # Grimes per-meter detail (~15 min)
-│   ├── building_ids.json            # Chatbot-actionable ids (single source for worker)
-│   ├── baselines.json               # Hour-of-week baselines
-│   ├── bechtel_leed.json / bechtel_lca.json  # LEED submittal extracts
-│   ├── cupix_calib.json             # Cupix↔BIM registration (yaw/offset/scale)
-│   ├── weekly_report.json           # 7-day summary
-│   ├── daily/                       # Permanent daily archives + index.json
-│   └── archive/                     # Daily snapshots of live JSONs
-└── .github/workflows/
-    ├── bmo-campus-energy.yml        # */15 cron — campus fetch
-    └── bmo-fetch.yml                # 7,22,37,52 cron — Grimes fetch (offset to avoid push races)
-```
+Never rename identity nodes, flatten away identity, or re-encode existing Draco geometry when subsetting. See [AGENTS.md](AGENTS.md) for the full invariants and development workflow.
 
----
+## Scan, photos and alignment
 
-## Security Notes
+- Public photo mode contains 100 recovered 4096×2048 panoramas and 2K mobile derivatives. The source inventory has 217 positions; it is not 217 recovered images.
+- Photo transitions follow an inferred adjacency graph. Intermediate blends are not measured parallax or a new continuous reconstruction.
+- The accepted registration uses axis conversion, pose search and trimmed point-to-point ICP constrained to yaw and XYZ translation, with metric scale fixed.
+- The internal nearest-point median residual is about 0.13 m. This is not independently surveyed accuracy and does not validate every object association.
+- Linked camera poses use the forward/inverse registration so either view can drive the comparison.
 
-The following must NOT be committed to the public repository:
+[Registration methodology](docs/SCAN_BIM_REGISTRATION.md) · [Captured panorama viewer](docs/CAPTURED_PANORAMA_VIEWER.md) · [Public comparison](docs/PUBLIC_SCAN_COMPARISON.md)
 
-- `.env` — BMO credentials
-- `raw_csv/` — raw BMO meter exports
-- API credentials of any kind (APS Client ID/Secret live ONLY in env vars and Cloudflare worker secrets)
+## Local Gaussian experiment
 
-`data/building_data.json` and `data/campus_energy.json` are auto-generated by the pipeline and published intentionally (they power the live pages). They contain meter readings and AcquiSuite MAC addresses but no credentials. If MAC exposure becomes a concern, strip the `mac`/`device_mac` fields in the fetch scripts before writing JSON.
+The repository includes a Gaussian viewer and reconstruction tools, but the trained assets remain local under ignored `capture-local/`. Public QR codes intentionally open the photo/mesh comparison. A local `?mode=splat` URL is not a public Gaussian deployment.
 
----
+The experiment uses Brush 0.3.0 and exported image poses. Blur and floaters remain; it is not a claim of photograph-quality rendering, surveyed geometry or a complete camera-only reconstruction pipeline.
 
-## Future Work
+[Methods, papers and metrics](docs/GAUSSIAN_RECONSTRUCTION_METHODS.md)
 
-- Restore 12 offline BMO meters (Facilities Services coordination)
-- Energy efficiency index: kW/sqft normalization with actual floor area data
-- Weather correlation: temperature vs. energy consumption using NOAA data
-- Grimes MEP time-linked visualization: pipe colors change by real-time load
-- Sub-metering integration: individual panelboard monitoring (93 panels identified)
-- BAS integration: real HVAC/plumbing sensor data to replace simulated values
-- Monthly automated PDF reports for Facilities Services
-- User testing with campus facility managers
+## New floors and buildings
 
----
+Each capture gets an isolated package with its own poses, scale, registration and reviewed data links. The tooling does not inherit the Grimes transform or meter associations. Raw INSV needs reconstruction; NWD/IFC needs conversion before browser intake.
 
-## Author
+[Capture onboarding](docs/CAPTURE_ONBOARDING.md) · [MEP recovery](docs/MEP_RECOVERY.md)
 
-**Yoonsung Chung**
-M.S. Construction Systems · UC Berkeley CEE
-yoonsung_chung@berkeley.edu
+## Repository map
 
----
+| Path | Purpose |
+|---|---|
+| Root HTML pages | Self-contained public interfaces |
+| `buildings/grimes/` | Element GLBs and identity/design sidecars |
+| `scan-assets/` | Public scan/interior assets and captured panorama derivatives |
+| `alignment-analysis/accepted-registration.json` | Accepted scan-to-BIM transform |
+| `scripts/` | Collection, extraction, provenance, capture and reconstruction tools |
+| `tests/` | Rendering/identity, data, registration and capture checks |
+| `docs/` | Methods, decisions, limitations and onboarding documentation |
+| `.github/workflows/` | Automated data collection |
+| `worker/` | Optional Cloudflare chatbot |
 
-## Acknowledgments
+`main` holds code and static configuration. The orphan `data` branch holds automated outputs and must not be edited by hand. Raw captures, local Gaussian assets and credentials are not deployment inputs.
 
-- UC Berkeley Facilities Services — BMO metering system access
-- Prof. Kenichi Soga — Thesis advisor
-- Tianyu — BMO data coordination
-- BIM model contributors: SOM (Architecture), Rutherford & Chekene (Electrical), Pribuss Engineering + Pragmatic PE (Fire Protection)
+This is a research prototype for monitoring and investigation. Automated building control and a completed user study are not implemented.
