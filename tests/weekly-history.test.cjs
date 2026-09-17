@@ -1,0 +1,6 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{test}=require('node:test');
+const source=fs.readFileSync(process.env.WEEKLY_HTML||'weekly-report.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+const c={};vm.createContext(c);vm.runInContext(source.slice(source.indexOf('function finite'),source.indexOf('function fmt')),c);
+test('recorded zero survives; missing and invalid readings are excluded',()=>{const r=c.summarizeDays([['2026-09-01',{readings:[{total_kw:0,buildings:{a:0}},{total_kw:10,buildings:{a:10}},{total_kw:null},{total_kw:'12'},{total_kw:NaN}]}],['2026-09-02',{readings:[]}]]);assert.equal(r.count,2);assert.equal(r.avg,5);assert.equal(r.daily.length,1);assert.equal(r.rank.a.avg_kw,5);assert.equal(r.daily[0].est_kwh,120)});
+test('building coverage is per building; daily energy weights days separately',()=>{const r=c.summarizeDays([['2026-09-01',{readings:[{total_kw:10,buildings:{a:10}},{total_kw:10,buildings:{a:10}}]}],['2026-09-02',{readings:[{total_kw:40,buildings:{b:40}}]}]]);assert.equal(r.rank.a.days,1);assert.equal(r.rank.b.readings,1);assert.equal(r.avg,20);assert.equal(r.daily.reduce((a,d)=>a+d.est_kwh,0),1200)});
+test('no observations remain unavailable rather than zero',()=>{const r=c.summarizeDays([]);assert.equal(r.avg,null);assert.equal(r.peak,null);assert.equal(r.count,0)});

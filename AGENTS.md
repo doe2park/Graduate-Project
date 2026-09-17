@@ -29,7 +29,7 @@ every page is a self-contained HTML file.
 | `campus-energy-dashboard.html` | Campus charts (Chart.js) |
 | `grimes-performance.html` | LEED design-vs-actual M&V, live; Platinum scorecard section |
 
-`campus-3d`, `grimes-xr`, `weekly-report`, `comfort-dashboard`, `vote`,
+`campus-3d`, `grimes-xr`, `comfort-dashboard`, `vote`,
 `leed-lca-preview`, `twin-viewer`, `grimes-bim-iot/protoys` are redirect
 stubs (2026-09 consolidation) — do not resurrect them; old code is in git
 history. A separate Cloudflare Worker chatbot lives in `worker/`.
@@ -173,3 +173,6 @@ Use `scripts/capture_import.py prepare` for a new building/floor/capture; `captu
 `scan-splat.html` renders actual optimized 3D Gaussians with pinned GaussianSplats3D 0.4.7 / three 0.169.0, continuous camera movement and the existing bidirectional scan/BIM transform. `scan-compare.html?mode=splat` selects the locally available experimental manifest under ignored `capture-local/gaussian/pilot/`; the ordinary entry keeps photo mode. A 1M-splat Brush 0.3.0 result is the local default after a 2M capacity experiment showed little final quality improvement. Desktop KSplat is 48.1 MB; mobile uses a reduced 350k SH0 model. Substantial blur remains; do not claim photograph-quality or surveyed geometry. No source GLB or data-branch changes, and no public Gaussian asset deployment.
 
 Reusable scripts: `prepare_gaussian_dataset.py`, `train_gaussian.py`, `encode_gaussian.mjs`, `package_gaussian.py`. Preserve original posed image/scan coordinates; never apply Grimes registration to another building by changing the manifest path. Raw INSV still needs pose/scale reconstruction. Actual methods, references, metrics and evidence: `docs/GAUSSIAN_RECONSTRUCTION_METHODS.md`. Future PPT additions are recorded in the owner's local `Grimes_360_Pilot/Presentation_Update_Backlog.md`; no PPT or deleted presenter notes were changed. Browser tests: `tests/splat-viewer.cjs`, `tests/splat-integration.cjs` (local optimized asset required), `tests/gaussian-codec.cjs`; Python camera/package tests use the isolated NumPy/SciPy/Pillow environment.
+
+## Weekly history restored (2026-09-17)
+At the owner’s explicit request, weekly-report.html is again maintained as a companion to Campus Energy Dashboard. It reads the automated data branch daily/index.json and up to seven daily snapshots per window, with cached back/forward navigation, zero-preserving sample statistics, missing-day gaps and CSV export. These are collector observations, not verified continuous meter histories. Archive date labels are UTC collector dates; extrapolated energy is sum(daily sample mean × 24 hours), not measured counter deltas. No manually written data branch reports.

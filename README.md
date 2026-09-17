@@ -16,7 +16,7 @@ Updated for the September 17, 2026 presentation. These are the canonical public 
 | Scan ↔ BIM comparison | [Live comparison](https://doe2park.github.io/Graduate-Project/scan-compare.html) | [HTML](scan-compare.html) | Captured 360° photos and registered BIM with linked views; optional mesh mode |
 | Design vs actual | [Live performance page](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | [HTML](grimes-performance.html) | LEED design context and observed energy, with coverage and modelling limits |
 
-The comparison supplements the four main interfaces. It does not require a Cupix login. The old Cupix iframe comparison is not the current demonstration. Former interfaces such as `campus-3d`, `grimes-xr`, `weekly-report` and `twin-viewer` redirect to the maintained pages; they are not separate active products.
+The comparison supplements the four main interfaces. It does not require a Cupix login. The old Cupix iframe comparison is not the current demonstration. Former interfaces such as `campus-3d`, `grimes-xr` and `twin-viewer` redirect to the maintained pages; they are not separate active products.
 
 ### Suggested demonstration
 
@@ -94,3 +94,6 @@ Each capture gets an isolated package with its own poses, scale, registration an
 `main` holds code and static configuration. The orphan `data` branch holds automated outputs and must not be edited by hand. Raw captures, local Gaussian assets and credentials are not deployment inputs.
 
 This is a research prototype for monitoring and investigation. Automated building control and a completed user study are not implemented.
+
+### Weekly operating history
+[Weekly Energy Report](https://doe2park.github.io/Graduate-Project/weekly-report.html) complements the Campus Energy Dashboard with archived seven-day windows, daily demand charts, building rankings, sample counts and CSV export. Demand statistics summarize irregular collector snapshots; estimated energy is explicitly labelled and is not counter-based measurement.
