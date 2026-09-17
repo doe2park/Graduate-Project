@@ -27,3 +27,7 @@ The collector's `status: online` means a nonempty CSV parsed successfully, not a
 
 ## Validation
 `node --test tests/viewer.test.cjs tests/meter-history.test.cjs` and `VIEWER=scan-bim.html node --test tests/viewer.test.cjs`; HTML inline JavaScript syntax checks and `git diff --check`. No GLB, identity sidecar or data-branch edits.
+
+## Compact card revision
+
+Owner requested that Scan/BIM inspection preserve the visible model. Replaced the full-pane card with a 320 px desktop card and a 276 px phone card, capped at 340 px / 248 px respectively. Desktop collapsed card measured 320 × 287 px; phone details retain the capped area and scroll internally. Kept a single measured-meter chart, compact selector, sample timestamp and freshness status. Moved duplicate headlines, long context and legacy plots to More details. The chart uses a thin unsmoothed line, subtle area shading, a last-sample marker and a pointer readout; retained timestamp gaps and missing-value semantics. Phone summary statistics are omitted from the compact face to keep the detail control visible.

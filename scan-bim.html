@@ -237,7 +237,24 @@ body[data-pane="bim"] #twinPanel{top:8px;bottom:auto;left:8px;right:8px;width:au
 #mobileElementStatus{font-size:12px;color:#a8b6c9;padding:8px 0}
 #mobileElementResults{display:grid;gap:7px}#mobileElementResults button{text-align:left;white-space:normal}#mobileElementResults small{display:block;color:#a8b6c9;font-size:11px;margin-top:4px}
 
-#mobileElementBrowser{inset:8px;max-width:none}#mobileElementBrowser[hidden]{display:none}body[data-pane="bim"] #layersMenu{top:58px;left:8px;max-height:calc(100dvh - 70px);z-index:100}body[data-pane="bim"] #scanQuickActions{flex-wrap:nowrap;overflow-x:auto}body[data-pane="bim"] #scanQuickActions button{flex-shrink:0}</style></head>
+#mobileElementBrowser{inset:8px;max-width:none}#mobileElementBrowser[hidden]{display:none}body[data-pane="bim"] #layersMenu{top:58px;left:8px;max-height:calc(100dvh - 70px);z-index:100}body[data-pane="bim"] #scanQuickActions{flex-wrap:nowrap;overflow-x:auto}body[data-pane="bim"] #scanQuickActions button{flex-shrink:0}</style><style>
+/* Compact inspection card: keep the registered model visible. */
+body[data-pane="bim"] #twinPanel{box-sizing:border-box;left:auto;right:12px;top:58px;bottom:auto;width:320px;max-width:calc(100vw - 24px);max-height:min(340px,calc(100dvh - 72px));padding:8px 12px;border:1px solid #344459;border-radius:10px;background:#101b2b;box-shadow:0 8px 28px #0005}
+#twinPanel .thdr{top:-8px;background:#101b2b;padding:0 0 5px;margin-bottom:0;border-color:#29394d;font-size:12px}
+#twinPanel .thdr button{min-width:28px;min-height:28px}
+#twinPanel #meterHistory{margin:5px 0 0;padding:0;border:0}
+.meter-toolbar{display:flex;justify-content:space-between;align-items:center;font:10px var(--font);color:#a5b4c8}
+.meter-toolbar select{background:#1b2b40;border:1px solid #344a63;border-radius:5px;color:#deebfa;padding:4px 5px;font:11px var(--font);max-width:125px}
+#meterPlot .history-values{margin-top:6px}#meterPlot .history-values strong{font:600 22px var(--font);font-variant-numeric:tabular-nums;letter-spacing:-.6px;color:#f2f6fc}#meterPlot .history-values small{font:11px var(--font);letter-spacing:0;color:#9eafc6}
+#meterPlot .reading-status{font:9px var(--font);letter-spacing:.7px;color:#dfb571}#meterPlot .reading-status[data-state="LIVE"]{color:#85c8bd}
+#meterPlot svg{height:94px;width:100%;margin-top:3px}#meterPlot svg text{font:9px var(--font);fill:#8093ad}
+#historyReadout{font:10px var(--font);color:#b5c6dc;text-align:right;font-variant-numeric:tabular-nums;min-height:15px}
+.history-summary{display:flex;justify-content:space-between;font:10px var(--font);color:#859ab5;margin-top:3px}.history-summary b{font-weight:500;color:#c3d4e9}
+.history-scope{font:9px var(--font);color:#9bacbf;margin-top:6px}
+#twinPanel #twinInfoBtn{font:11px var(--font);min-height:28px;padding:7px 0 1px;width:100%;color:#91b9e7}
+#twinDetails{border-top:1px solid #344459;padding-top:10px}.detail-context{margin-top:12px}
+@media(max-width:420px),(pointer:coarse){body[data-pane="bim"] #twinPanel,body[data-pane="bim"].scan-walking #twinPanel{left:auto;right:8px;top:auto;bottom:8px;width:276px;max-width:calc(100vw - 72px);max-height:min(248px,calc(100dvh - 66px));padding:6px 10px}#twinPanel .thdr{top:-6px}#twinPanel .thdr button{min-width:28px;min-height:28px}#meterPlot svg{height:72px}.history-summary{display:none}#twinPanel #twinInfoBtn{min-height:30px}.meter-toolbar select{min-height:28px}}
+</style></head>
 <body>
 
 <div id="topbar">
@@ -322,15 +339,15 @@ body[data-pane="bim"] #twinPanel{top:8px;bottom:auto;left:8px;right:8px;width:au
     <span id="twinTitle">System</span>
     <button onclick="clearPick()" title="close">✕</button>
   </div>
-  <div class="bigrow"><span class="bigkw" id="twinBigKw">— <small>kW</small></span><span class="badge na" id="twinBadge">…</span></div>
+<section id="meterHistory" aria-label="Building meter observations"></section>
+  <button type="button" class="morebtn" id="twinInfoBtn" aria-controls="twinDetails" aria-expanded="false" onclick="toggleTwinInfo()">▸ More details</button>
+  <div id="twinDetails"><div id="meterHistoryDetails"></div><div class="detail-context">  <div class="bigrow"><span class="bigkw" id="twinBigKw">— <small>kW</small></span><span class="badge na" id="twinBadge">…</span></div>
   <div class="srcnote" id="twinSrc"></div>
   <div class="rangeline" id="twinRange"></div>
   <canvas id="twinBaseSpark" width="640" height="180"></canvas>
   <div id="chartTip"></div>
   <div class="chartkey" id="chartKey"><span class="k"><i class="ln"></i>actual</span><span class="k"><i class="bd"></i>expected range</span><span class="k"><i class="dt"></i>unusual</span></div>
-  <div id="twinEvent"></div><section id="meterHistory" aria-label="Building meter observations"></section>
-  <button type="button" class="morebtn" id="twinInfoBtn" aria-controls="twinDetails" aria-expanded="false" onclick="toggleTwinInfo()">▸ More details</button>
-  <div id="twinDetails"><div id="meterHistoryDetails"></div><div id="twinPoints"></div>
+  <div id="twinEvent"></div></div><div id="twinPoints"></div>
     <div id="twinDetZ" class="dnote"></div>
     <div id="twinDetInfo"></div>
     <div id="twinDetEquip" class="dnote"></div>
@@ -1821,22 +1838,30 @@ async function loadMeterHistory(epoch, preferred='3') {
     const data=await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
     if(epoch!==elementPickEpoch)return;
     historyMeters=data.meters||{};historyEpoch=epoch;
-    host.innerHTML='<div class="history-heading">Building meter history</div><p class="history-note">Measured at the building meter, not this object.</p><div class="meter-tabs" role="group" aria-label="Choose building meter">'+[['3','Roof #3'],['76','480 V #76'],['77','208 V #77']].map(([id,label])=>`<button type="button" data-history-meter="${id}" onclick="showMeterHistory('${id}')">${label}</button>`).join('')+'</div><div id="meterPlot"></div>';
+    host.innerHTML='<div class="meter-toolbar"><span>Building meter</span><select aria-label="Choose building meter" id="historyMeterSelect" onchange="showMeterHistory(this.value)">'+[['3','Roof #3'],['76','480 V #76'],['77','208 V #77']].map(([id,label])=>`<option value="${id}">${label}</option>`).join('')+'</select></div><div id="meterPlot"></div>';
     showMeterHistory(['3','76','77'].includes(String(preferred))?String(preferred):'3');
   } catch {if(epoch===elementPickEpoch)host.innerHTML='<div class="history-note">Meter history unavailable.</div>';}
 }
 window.showMeterHistory = id => {
   if(!historyMeters||historyEpoch!==elementPickEpoch)return;
   const meter=historyMeters[id],points=normaliseMeterHistory(meter?.timeseries_kw),reading=meterReading(meter);
-  document.querySelectorAll('[data-history-meter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.historyMeter===id)));
+  document.getElementById('historyMeterSelect').value=id;
   const host=document.getElementById('meterPlot'),details=document.getElementById('meterHistoryDetails');
   if(!points.length){host.innerHTML='<p class="history-note">No timestamped kW observations available.</p>';details.innerHTML='';return;}
   const lo=Math.min(0,...points.map(p=>p.v)),hi=Math.max(1,...points.map(p=>p.v)),range=hi-lo;
   const first=points[0].at,last=points.at(-1).at,span=last-first||1;
-  const x=p=>36+(p.at-first)/span*284,y=p=>104-(p.v-lo)/range*86;
-  let path='';points.forEach((p,i)=>{path+=(i&&p.at-points[i-1].at<=30*60000?'L':'M')+x(p).toFixed(2)+','+y(p).toFixed(2)+' ';});
-  const avg=points.reduce((s,p)=>s+p.v,0)/points.length;
-  host.innerHTML=`<div class="history-values"><strong>${reading.value==null?'—':reading.value.toFixed(1)} <small>kW</small></strong><span>${esc(reading.state)}</span></div><svg viewBox="0 0 336 132" role="img" aria-label="Meter ${id} measured power history in kilowatts"><path d="M36 18H320 M36 61H320 M36 104H320" stroke="#334155" fill="none"/><text x="2" y="22">${hi.toFixed(0)}</text><text x="2" y="108">${lo.toFixed(0)}</text><path d="${path}" stroke="#34d399" stroke-width="2.5" fill="none"/>${points.map(p=>`<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="1.5" fill="#34d399"><title>${esc(historyTime(p.at))}: ${p.v.toFixed(2)} kW</title></circle>`).join('')}</svg><div class="history-axis"><span>${esc(historyTime(first))}</span><span>${esc(historyTime(last))}</span></div><div class="history-note">Pacific time · ${points.length} samples · Mean ${avg.toFixed(1)} kW · Peak ${Math.max(...points.map(p=>p.v)).toFixed(1)} kW</div>`;
+  const x=p=>30+(p.at-first)/span*258,y=p=>80-(p.v-lo)/range*68;
+  const segments=[];let segment=[];
+  points.forEach((p,i)=>{if(i&&p.at-points[i-1].at>30*60000){segments.push(segment);segment=[];}segment.push(p);});if(segment.length)segments.push(segment);
+  const path=segments.map(seg=>seg.map((p,i)=>(i?'L':'M')+x(p).toFixed(2)+','+y(p).toFixed(2)).join(' ')).join(' ');
+  const area=segments.map(seg=>'M'+x(seg[0]).toFixed(2)+',80 '+seg.map(p=>'L'+x(p).toFixed(2)+','+y(p).toFixed(2)).join(' ')+' L'+x(seg.at(-1)).toFixed(2)+',80 Z').join(' ');
+  const avg=points.reduce((s,p)=>s+p.v,0)/points.length,lastPoint=points.at(-1);
+  const clock=at=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(at);
+  const readout=historyTime(lastPoint.at)+' PT · '+lastPoint.v.toFixed(1)+' kW';
+  host.innerHTML=`<div class="history-values"><strong>${reading.value==null?'—':reading.value.toFixed(1)} <small>kW</small></strong><span class="reading-status" data-state="${esc(reading.state)}">${esc(reading.state)}</span></div><svg viewBox="0 0 300 102" role="img" aria-label="Meter ${id} measured power history in kilowatts"><defs><linearGradient id="meterWash" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#70b8ff" stop-opacity=".24"/><stop offset="1" stop-color="#70b8ff" stop-opacity=".01"/></linearGradient></defs><path d="M30 12H288 M30 46H288 M30 80H288" stroke="#2b3a4e" stroke-dasharray="2 4" fill="none"/><text x="1" y="15">${hi.toFixed(0)}</text><text x="1" y="83">${lo.toFixed(0)}</text><path d="${area}" fill="url(#meterWash)"/><path d="${path}" stroke="#82bdff" stroke-width="1.7" stroke-linejoin="round" fill="none"/><circle cx="${x(lastPoint)}" cy="${y(lastPoint)}" r="3" fill="#d5e9ff" stroke="#82bdff" stroke-width="1.5"/><text x="30" y="99">${clock(first)}</text><text x="288" y="99" text-anchor="end">${clock(last)}</text></svg><div id="historyReadout">${esc(readout)}</div><div class="history-summary"><span>Mean <b>${avg.toFixed(1)}</b></span><span>Peak <b>${Math.max(...points.map(p=>p.v)).toFixed(1)}</b> kW</span></div><div class="history-scope">Measured at meter · no device sensor</div>`;
+  const chart=host.querySelector('svg');
+  chart.onpointermove=e=>{const rect=chart.getBoundingClientRect(),at=first+Math.max(0,Math.min(1,((e.clientX-rect.left)/rect.width*300-30)/258))*span;const point=points.reduce((best,p)=>Math.abs(p.at-at)<Math.abs(best.at-at)?p:best);document.getElementById('historyReadout').textContent=historyTime(point.at)+' PT · '+point.v.toFixed(1)+' kW';};
+  chart.onpointerleave=()=>{document.getElementById('historyReadout').textContent=readout;};
   const latest=meter?.latest||{};
   details.innerHTML=`<div class="history-heading">Meter #${esc(id)} · received observations</div><p class="history-note">Pacific time · newest first · kW history. Voltage/current are latest-only when provided.</p><div class="history-table"><table><thead><tr><th>Observed time</th><th>kW</th></tr></thead><tbody>${[...points].reverse().map(p=>`<tr><td>${esc(historyTime(p.at))}</td><td>${p.v.toFixed(2)}</td></tr>`).join('')}</tbody></table></div><div class="dsec">Latest meter channels</div>`+[['voltage_ll','Line voltage','V'],['voltage_ln','Line–neutral','V'],['current_avg','Current','A'],['power_factor','Power factor',''],['frequency','Frequency','Hz'],['kwh_delivered','Cumulative energy','kWh']].filter(([k])=>Number.isFinite(latest[k])).map(([k,label,unit])=>drow(label,latest[k]+' '+unit)).join('')+'<p class="history-note">BMO CSV export → scheduled collection → data branch JSON. No direct device BAS feed.</p>';
 };
