@@ -164,7 +164,7 @@ async function init(){
   const anomKeys=Object.keys(anomalies);
 
   const cats={};
-  const catColors={'Engineering':'#FDB515','Science':'#34d399','Humanities':'#a78bfa','Professional':'#60a5fa','Student Life':'#f87171','Libraries':'#fbbf24','Other':'#94a3b8'};
+  const catColors={'Engineering':'#FDB515','Science':'#34d399','Humanities':'#a78bfa','Professional':'#60a5fa','Student Life':'#f87171','Libraries':'#38bdf8','Other':'#94a3b8'};
   const catMap={grimes:'Engineering',cory:'Engineering',soda:'Engineering',davis:'Engineering',etch:'Engineering',hmm:'Engineering',hesse:'Engineering',sutardja:'Engineering',mclaughlin:'Engineering',stanley:'Science',tan:'Science',latimer:'Science',birge:'Science',hilde:'Science',lksc:'Science',koshland:'Science',wheeler:'Humanities',dwinelle:'Humanities',barrows:'Humanities',moses:'Humanities',stephens:'Humanities',wurster:'Professional',giannini:'Professional',tolman:'Professional',morgan:'Professional',boalt:'Professional',mlk:'Student Life',rsf:'Student Life',chavez:'Student Life',anthony:'Student Life',sproul:'Other',doe:'Libraries',moffitt:'Libraries',uhall:'Other',northgate:'Other',donner:'Other',bww:'Other',mulford:'Other'};
   for(const [id,b] of blds){const cat=catMap[id]||'Other';if(!cats[cat])cats[cat]=0;if(b.kw)cats[cat]+=b.kw}
 
@@ -198,11 +198,12 @@ async function init(){
 
     <div class="grid2">
       <div class="card">
-        <div class="card-title">🏛 Energy by Category <span>kW distribution</span></div>
+        <div class="card-title">🏛 Demand by Category <span>Share of available kW readings</span></div>
         <div class="chart-box"><canvas id="catDonut"></canvas></div>
+        <p style="font-size:11px;color:var(--dim);line-height:1.5;margin:12px 0 0">Project-assigned building groups by use / academic area; not an official BMO classification or departmental energy allocation. Mixed-use buildings have one group.</p>
       </div>
       <div class="card">
-        <div class="card-title">📊 Top 10 Buildings <span>by current kW · hover for details</span></div>
+        <div class="card-title">📊 Top 10 Buildings <span>Current kW · colors match categories · tap for details</span></div>
         <div class="chart-box"><canvas id="topBar"></canvas></div>
       </div>
     </div>
@@ -263,7 +264,7 @@ async function init(){
 
   // 2. Top 10 Bar
   var top10=online.slice(0,10);
-  charts.topBar=new Chart(document.getElementById('topBar'),{type:'bar',data:{labels:top10.map(function(e){return shortName(e[1].name)}),datasets:[{data:top10.map(function(e){return e[1].kw}),backgroundColor:top10.map(function(e){return e[1].kw>200?'#f87171':e[1].kw>100?'#FDB515':'#2dd4bf'}),borderRadius:4,barThickness:16}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var b=top10[ctx.dataIndex][1];return b.name+': '+b.kw+' kW (~$'+(b.est_daily_cost||0)+'/day)'}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+'kW'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+  charts.topBar=new Chart(document.getElementById('topBar'),{type:'bar',data:{labels:top10.map(function(e){return shortName(e[1].name)}),datasets:[{data:top10.map(function(e){return e[1].kw}),backgroundColor:top10.map(function(e){return catColors[catMap[e[0]]||'Other']}),borderRadius:4,barThickness:16}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var entry=top10[ctx.dataIndex],b=entry[1];return [b.name,(catMap[entry[0]]||'Other')+' · '+b.kw+' kW']}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+'kW'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
 
   // 3. History Line — normalize to even 3hr intervals
   var allPts=[];
