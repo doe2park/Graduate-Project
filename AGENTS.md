@@ -180,3 +180,6 @@ At the owner’s explicit request, weekly-report.html is again maintained as a c
 UI updates must include mobile-width overflow, touch interaction and chart/legend checks, per owner request (2026-09-17). Dashboard building charts share category colors. Demand per floor is a rough comparison, not an energy-efficiency rating.
 
 Walk loading exception (2026-09-17): while a layer loads, active Walk may render bounded preview frames (250 ms desktop / 400 ms narrow or touch) so camera motion remains visible. Ordinary orbit loading still pauses renders. This avoids the previous total visual freeze; large synchronous geometry work can still cause stalls.
+
+## September capture update (2026-09-21)
+The comparison now defaults to the September 17 Level 1 capture; a date picker preserves the May 6 baseline. `scan-assets/captures/2026-09-17/` contains 100 E57 posed photos, a byte-identical exported mesh and mobile derivatives. September uses a separately labeled **provisional project-frame alignment**, not the verified status of the May registration. Its 95 temporal route edges leave four sparse gaps. Gaussian remains the May-only local experiment. See `docs/CAPTURE_UPDATE_20260917.md` for provenance, coordinate checks and limits.

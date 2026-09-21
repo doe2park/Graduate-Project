@@ -2479,7 +2479,7 @@ document.getElementById('showAllLayersQuick').onclick=()=>toggleAllElements();
 document.getElementById('scanFit').onclick=()=>{claimCamera();fitScan()};
 document.getElementById('scanAlpha').oninput=e=>scanRoot.traverse(o=>{if(o.isMesh)o.material.opacity=Number(e.target.value)});
 document.getElementById('scanOnly').onclick=e=>{scanOnly=!scanOnly;for(const st of Object.values(layerState))if(st.group){if(scanOnly){st.scanPriorVisible=st.group.visible;st.group.visible=false}else st.group.visible=st.scanPriorVisible??st.group.visible}if(mepModel)mepModel.visible=false;e.target.textContent=scanOnly?'Restore BIM':'Scan only'};
-async function loadScanDataset(unused,onLoad,onProgress,onError){try{const combined=new THREE.Group();const prefix=mobileQuality?'scan-assets/mobile/':'scan-assets/';const paths=['level1-scan-2026-05-06.glb','level1-scan-2026-05-06-part2.glb'].map(name=>prefix+name);for(let i=0;i<paths.length;i++){document.getElementById('scanStatus').textContent=`Loading scan part ${i+1}/${paths.length}…`;const g=await loader.loadAsync(paths[i]);combined.add(g.scene);g.parser.cache.removeAll();}onLoad({scene:combined});document.body.dataset.scanParts='2';}catch(e){onError(e);}}
+async function loadScanDataset(unused,onLoad,onProgress,onError){try{const combined=new THREE.Group();const prefix=mobileQuality?'scan-assets/mobile/':'scan-assets/';const recent=new URLSearchParams(location.search).get('capture')==='2026-09-17';const paths=recent?['scan-assets/captures/2026-09-17/'+(mobileQuality?'mobile/':'')+'scan.glb']:['level1-scan-2026-05-06.glb','level1-scan-2026-05-06-part2.glb'].map(name=>prefix+name);for(let i=0;i<paths.length;i++){document.getElementById('scanStatus').textContent=`Loading scan part ${i+1}/${paths.length}…`;const g=await loader.loadAsync(paths[i]);combined.add(g.scene);g.parser.cache.removeAll();}onLoad({scene:combined});document.body.dataset.scanParts=String(paths.length);}catch(e){onError(e);}}
 if(splitPane!=='bim')loadScanDataset('scan-assets/level1-scan-2026-05-06.glb',g=>{const axes=new THREE.Group();axes.rotation.x=-Math.PI/2;axes.add(g.scene);scanRoot.add(axes);g.scene.traverse(o=>{if(o.isMesh){const old=o.material;o.material=new THREE.MeshBasicMaterial({map:old.map,toneMapped:false,transparent:splitPane!=='scan',opacity:splitPane==='scan'?1:.65,depthWrite:splitPane==='scan',side:THREE.DoubleSide});old.dispose()}});scanReady=true;if(splitPane==='scan'){Object.assign(scanConfig,{x:0,y:0,z:0,yaw:0});document.getElementById('scanAlpha').value=1;scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}})}updateScanTransform();fitScan();document.getElementById('scanStatus').textContent='Not registered · Do not use overlay for device location';if(splitPane==='scan')document.getElementById('scanStatus').textContent=camerasLinked?'Captured geometry · Views aligned':'Captured geometry · Independent camera';document.body.dataset.scanReady='true';},undefined,e=>{document.getElementById('scanStatus').textContent='Scan load failed: '+e.message});
 
 function solveScanPairs(pairs){
@@ -2517,11 +2517,26 @@ function scanOpenDirection(v){let best=null;for(let i=0;i<24;i++){const a=i*Math
 function findScanSpawn(){
  const b=new THREE.Box3().setFromObject(scanRoot),center=b.getCenter(new THREE.Vector3());
  // Use actual recorded camera positions, then verify supporting geometry below each.
- const candidates=scanPanos.map(p=>scanRoot.localToWorld(new THREE.Vector3(p.position[0],p.position[2]+4.572,-p.position[1]))).sort((a,c)=>a.distanceToSquared(center)-c.distanceToSquared(center));
+ const candidates=scanPanos.map(p=>scanRoot.localToWorld(new THREE.Vector3().fromArray(p.position))).sort((a,c)=>a.distanceToSquared(center)-c.distanceToSquared(center));
  for(const v of candidates){const floor=scanFloorAt(v.x,v.z,v.y,.0+2.3);if(floor!==null&&v.y-floor>.8&&v.y-floor<2.3){const p=new THREE.Vector3(v.x,floor,v.z),open=scanOpenDirection(p);if(open){scanEntryYaw=open.yaw;return p;}}}
  return null;
 }
-let scanPanos=[];if(splitPane!=='bim')fetch('scan-assets/camera-positions.json').then(r=>r.json()).then(j=>{scanPanos=j.positions.map(position=>({position}))}).catch(()=>{});
+/* SCAN WALK CAMERAS */
+async function loadScanWalkCameras(date){
+ const recent=date==='2026-09-17';
+ const response=await fetch(recent?'scan-assets/captures/2026-09-17/panoramas/manifest.json':'scan-assets/camera-positions.json');
+ if(!response.ok)throw Error('Capture positions unavailable');
+ const data=await response.json();
+ const positions=recent?data.stations.map(s=>s.position):data.positions.map(p=>[p[0],p[2]+4.572,-p[1]]);
+ if(!positions.length||positions.some(p=>!Array.isArray(p)||p.length!==3||!p.every(Number.isFinite)))throw Error('Invalid capture positions');
+ return positions.map(position=>({position}));
+}
+/* END SCAN WALK CAMERAS */
+let scanPanos=[];
+if(splitPane!=='bim'){
+ const button=document.getElementById('scanWalkStart');button.disabled=true;
+ loadScanWalkCameras(new URLSearchParams(location.search).get('capture')).then(p=>{scanPanos=p;button.disabled=false;}).catch(()=>{document.getElementById('scanStatus').textContent='Walk positions unavailable. Reload to retry.';});
+}
 document.getElementById('scanWalkStart').onclick=()=>toggleWalk();
 document.getElementById('scanWalkExit').onclick=()=>toggleWalk();
 for(const btn of document.querySelectorAll('[data-move]')){btn.onpointerdown=e=>{e.preventDefault();btn.setPointerCapture(e.pointerId);keys[btn.dataset.move]=true};for(const event of ['pointerup','pointercancel','lostpointercapture'])btn.addEventListener(event,()=>keys[btn.dataset.move]=false)}

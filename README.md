@@ -97,3 +97,7 @@ This is a research prototype for monitoring and investigation. Automated buildin
 
 ### Weekly operating history
 [Weekly Energy Report](https://doe2park.github.io/Graduate-Project/weekly-report.html) complements the Campus Energy Dashboard with archived seven-day windows, daily demand charts, building rankings, sample counts and CSV export. Demand statistics summarize irregular collector snapshots; estimated energy is explicitly labelled and is not counter-based measurement.
+
+## Copyright and reuse
+
+© 2026 Yoonsung Chung. All rights reserved for author-owned contributions. Public viewing and sharing links are welcome; reuse requires permission unless an applicable exception or existing license permits it. Third-party BIM, capture exports, data and dependencies retain their respective rights. See [Copyright and permitted use](LICENSE.md). Public GitHub viewing/forking rights remain unaffected.
