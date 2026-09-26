@@ -1,103 +1,95 @@
-# Operational Campus Digital Twin from BIM
+# Campus Digital Twin · Grimes Engineering Center
 
-UC Berkeley · Civil & Environmental Engineering · Yoonsung Chung · Advisor: Prof. Kenichi Soga
+**Yoonsung Chung · UC Berkeley Civil & Environmental Engineering**
 
-A campus-scale research prototype connecting site appearance, BIM objects and available operating data. Grimes / Bechtel Engineering Center is the detailed pilot. The research asks whether these connections, with explicit evidence labels, help users understand existing buildings with incomplete drawings and sensor coverage.
+Advisor: Prof. Kenichi Soga · Research status updated September 25, 2026
 
-## Open the live sites
+A research prototype linking **captured site appearance, BIM objects and operational data**, with explicit labels for measured, modelled and inferred information.
 
-Updated for the September 17, 2026 presentation. These are the canonical public links used by the presentation QR codes.
+> In existing buildings with incomplete drawings and sensor coverage, does connecting these sources and showing their evidence help people understand building conditions faster and more accurately?
 
-| Website | Open | Source | What it does |
+**For research collaborators:** [Start here](docs/RESEARCH_COLLABORATION.md) · [Data and JSON guide](docs/DATA_SHARING.md) · [Reconstruction experiments](docs/RAW_VIDEO_RECONSTRUCTION.md)
+
+## Explore the public demonstrations
+
+No installation is required. Open a live page, rather than its HTML source on GitHub. Desktop is recommended for the full BIM demonstration; mobile layouts and reduced scan assets are provided, but large-model loading depends on device memory and WebGL support.
+
+| Interface | Live demonstration | Source | Purpose |
 |---|---|---|---|
-| Campus map | [Live map](https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html) | [HTML](grimes-campus-map-arcgis.html) | Geographic context for 61 campus buildings and available utility readings |
-| Campus energy dashboard | [Live dashboard](https://doe2park.github.io/Graduate-Project/campus-energy-dashboard.html) | [HTML](campus-energy-dashboard.html) | Demand trends, building comparisons and reporting availability |
-| Element BIM viewer | [Live BIM viewer](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | [HTML](grimes-bim-viewer.html) | Select floors/layers and inspect individual model objects and their data evidence |
-| Scan ↔ BIM comparison | [Live comparison](https://doe2park.github.io/Graduate-Project/scan-compare.html) | [HTML](scan-compare.html) | Captured 360° photos and registered BIM with linked views; optional mesh mode |
-| Design vs actual | [Live performance page](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | [HTML](grimes-performance.html) | LEED design context and observed energy, with coverage and modelling limits |
+| Campus map | [Open map](https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html) | [HTML](grimes-campus-map-arcgis.html) | Geographic context and available utility observations for 61 buildings |
+| Energy dashboard | [Open dashboard](https://doe2park.github.io/Graduate-Project/campus-energy-dashboard.html) | [HTML](campus-energy-dashboard.html) | Compare demand, building categories and reporting availability |
+| Weekly history | [Open weekly report](https://doe2park.github.io/Graduate-Project/weekly-report.html) | [HTML](weekly-report.html) | Review archived observations, sample counts and seven-day windows |
+| Element BIM viewer | [Open BIM](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | [HTML](grimes-bim-viewer.html) | Select floors, layers and individual elements; inspect properties and data provenance |
+| Scan ↔ BIM | [Open comparison](https://doe2park.github.io/Graduate-Project/scan-compare.html) | [HTML](scan-compare.html) | Compare captured panoramas or scan mesh with linked BIM views |
+| Design vs actual | [Open performance](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | [HTML](grimes-performance.html) | Examine LEED design context against available operating evidence |
 
-The comparison supplements the four main interfaces. It does not require a Cupix login. The old Cupix iframe comparison is not the current demonstration. Former interfaces such as `campus-3d`, `grimes-xr` and `twin-viewer` redirect to the maintained pages; they are not separate active products.
+**Suggested tour:** campus map → energy dashboard / weekly history → BIM object selection → Scan ↔ BIM → performance. The scan comparison does not require a Cupix login.
 
-### Suggested demonstration
+## What is implemented—and what remains experimental
 
-1. Start with the campus map to locate Grimes.
-2. Open the energy dashboard to explain the available building-level measurements.
-3. Use the BIM viewer to select an object and distinguish its identity/design properties from its operating-data context.
-4. Open Scan ↔ BIM to compare the same registered location. Photo walking moves along recorded capture stations with transitions; mesh mode allows free movement.
-5. Use Design vs Actual to discuss energy performance and the limits of available evidence.
+| Area | Current status | Evidence boundary |
+|---|---|---|
+| Element BIM | Ten layers, 66,620 identities with geometry; filtering, picking and runtime batching | Design properties do not prove installed condition or sensor coverage |
+| Operating data | Scheduled BMO collection and archived observations | Not a direct BAS/BACnet connection or continuous verified meter history |
+| Public scan comparison | September 17 capture is the default; May 6 baseline remains selectable | September alignment is provisional; photo transitions are not measured parallax |
+| Gaussian reconstruction | Two distinct local research tracks: exported poses and independent raw-video SfM | Trained scenes remain local; public links open photo/mesh modes |
+| Research evaluation | Task-based comparison proposed | No completed user study or demonstrated improvement in decision accuracy yet |
 
-On narrow screens the comparison stacks its panes vertically and uses smaller panorama derivatives. Device memory and WebGL support affect large-model loading. Browser viewport tests do not establish compatibility with every physical phone.
-
-## Data and evidence
+## Architecture and data honesty
 
 ```text
-UC Berkeley BMO utility meters
-  -> scheduled GitHub Actions (every 15 minutes)
-  -> JSON on the machine-written data branch
-  -> public static HTML interfaces on GitHub Pages
+BMO utility observations → scheduled GitHub Actions → JSON on data branch
+                                                        ↓
+BIM GLBs + element-property JSON → static web interfaces ← scan photos / mesh
 ```
 
-The current pipeline retrieves actual BMO utility observations. Direct BAS/BACnet device-point integration is not implemented. Scheduled collection does not guarantee every meter is online or every observation is fresh.
+The collection workflow is scheduled every 15 minutes. This does not guarantee that a meter is online or its reading is fresh. GitHub Pages serves the HTML and public assets; geometry and JSON are separate files, not embedded entirely in the HTML.
 
-- **Measured:** three Grimes building electricity meters. Showing a meter total in an object card provides building/feeder context, not a direct measurement of that object.
-- **Modelled:** provisional design-weighted allocations. Meter 77 uses design VA and meter 3 uses design CFM. These are uncalibrated scenarios, not verified device consumption or circuit membership.
-- **Meter 76 is not apportioned:** no defensible allocation evidence is available.
-- **Inferred:** derived relationships such as some floor assignments. Preserve their provenance and uncertainty.
-- Panel schedules, reviewed equipment relationships and BAS point mappings are still needed for verified asset-to-feed connections. Missing/stale values must not become live zero readings.
+- **Measured:** three Grimes building electricity meters. A total shown beside a BIM element is meter context, not a measurement of that element.
+- **Modelled:** uncalibrated design-weighted allocations—meter 77 by design VA; meter 3 by design CFM. These do not establish circuit membership or device consumption.
+- **Meter 76 is not apportioned:** defensible allocation evidence is missing.
+- **Inferred:** relationships such as some floor assignments; preserve the source and uncertainty.
+- Missing/stale values must not become live zero readings. Panel schedules, reviewed equipment relationships and BAS point mappings are needed for verified asset-to-feed connections.
 
-## BIM identity and rendering
+## Scan registration and reconstruction
 
-Ten element layers contain 66,620 identities with geometry. Original GLB node identifiers bind to JSON sidecars. Revit-derived dbIds and fabrication CAD entity identities have different source hierarchies. Identity is scoped to the source model and revision.
+The public comparison contains separate May 6 and September 17 packages, each with 100 recovered panoramas. The May source inventory lists 217 positions; that is not 217 recovered images. The September package is not claimed to cover the entire building or all server imagery.
 
-The viewer batches geometry at runtime while preserving picking through primitive ranges. It offers floor/type/layer filters and Show all / Hide all element controls. The architectural Building Shell feature was removed. Interior geometry in the scan comparison provides separate spatial context.
+The May registration uses axis conversion, pose search and trimmed point-to-point ICP constrained to yaw and translation, with metric scale fixed. Its approximately 0.13 m internal median nearest-point residual is **not surveyed accuracy**. September uses a separately labelled provisional project-frame alignment; May's validation status must not be transferred to it.
 
-Never rename identity nodes, flatten away identity, or re-encode existing Draco geometry when subsetting. See [AGENTS.md](AGENTS.md) for the full invariants and development workflow.
+Photo mode moves between recorded stations with blends. Mesh mode supports free translation within usable geometry. Linked cameras do not themselves prove registration accuracy.
 
-## Scan, photos and alignment
+The separate **Cupix-independent September raw-video pilot** uses Insta360 Studio → FFmpeg perspective images → COLMAP SfM → Brush Gaussian optimization. It registered 142 of 144 views and produced 7,565 sparse points and an 8,000-step Gaussian result. Metric scale and BIM alignment remain unvalidated; no dense mesh was generated in that pilot.
 
-- Public photo mode contains 100 recovered 4096×2048 panoramas and 2K mobile derivatives. The source inventory has 217 positions; it is not 217 recovered images.
-- Photo transitions follow an inferred adjacency graph. Intermediate blends are not measured parallax or a new continuous reconstruction.
-- The accepted registration uses axis conversion, pose search and trimmed point-to-point ICP constrained to yaw and XYZ translation, with metric scale fixed.
-- The internal nearest-point median residual is about 0.13 m. This is not independently surveyed accuracy and does not validate every object association.
-- Linked camera poses use the forward/inverse registration so either view can drive the comparison.
+[Scan/BIM registration](docs/SCAN_BIM_REGISTRATION.md) · [September public capture](docs/CAPTURE_UPDATE_20260917.md) · [Raw-video pilot](docs/RAW_VIDEO_RECONSTRUCTION.md) · [Earlier posed-image Gaussian experiment](docs/GAUSSIAN_RECONSTRUCTION_METHODS.md)
 
-[Registration methodology](docs/SCAN_BIM_REGISTRATION.md) · [Captured panorama viewer](docs/CAPTURED_PANORAMA_VIEWER.md) · [Public comparison](docs/PUBLIC_SCAN_COMPARISON.md)
+## Repository guide
 
-## Local Gaussian experiment
-
-The repository includes a Gaussian viewer and reconstruction tools, but the trained assets remain local under ignored `capture-local/`. Public QR codes intentionally open the photo/mesh comparison. A local `?mode=splat` URL is not a public Gaussian deployment.
-
-The experiment uses Brush 0.3.0 and exported image poses. Blur and floaters remain; it is not a claim of photograph-quality rendering, surveyed geometry or a complete camera-only reconstruction pipeline.
-
-[Methods, papers and metrics](docs/GAUSSIAN_RECONSTRUCTION_METHODS.md)
-
-## New floors and buildings
-
-Each capture gets an isolated package with its own poses, scale, registration and reviewed data links. The tooling does not inherit the Grimes transform or meter associations. Raw INSV needs reconstruction; NWD/IFC needs conversion before browser intake.
-
-[Capture onboarding](docs/CAPTURE_ONBOARDING.md) · [MEP recovery](docs/MEP_RECOVERY.md)
-
-## Repository map
-
-| Path | Purpose |
+| Location | Contents |
 |---|---|
-| Root HTML pages | Self-contained public interfaces |
-| `buildings/grimes/` | Element GLBs and identity/design sidecars |
-| `scan-assets/` | Public scan/interior assets and captured panorama derivatives |
-| `alignment-analysis/accepted-registration.json` | Accepted scan-to-BIM transform |
-| `scripts/` | Collection, extraction, provenance, capture and reconstruction tools |
-| `tests/` | Rendering/identity, data, registration and capture checks |
-| `docs/` | Methods, decisions, limitations and onboarding documentation |
-| `.github/workflows/` | Automated data collection |
+| Root HTML files | Public interfaces; legacy pages may redirect |
+| `buildings/grimes/` | BIM geometry and element-property sidecars |
+| `scan-assets/` | Published scan meshes, photos and capture manifests |
+| `alignment-analysis/accepted-registration.json` | May registration record |
+| `scripts/` and `tests/` | Processing, provenance and validation tools |
+| `docs/` | Methods, evidence, limitations and collaboration guidance |
+| `.github/workflows/` | Automated collection |
 | `worker/` | Optional Cloudflare chatbot |
 
-`main` holds code and static configuration. The orphan `data` branch holds automated outputs and must not be edited by hand. Raw captures, local Gaussian assets and credentials are not deployment inputs.
+`main` contains the website and static assets. The orphan **`data` branch is machine-written** and must not be edited manually. Raw INSV/E57 files, full private property exports, local training outputs and credentials are not included by this documentation update.
 
-This is a research prototype for monitoring and investigation. Automated building control and a completed user study are not implemented.
+### Run locally
 
-### Weekly operating history
-[Weekly Energy Report](https://doe2park.github.io/Graduate-Project/weekly-report.html) complements the Campus Energy Dashboard with archived seven-day windows, daily demand charts, building rankings, sample counts and CSV export. Demand statistics summarize irregular collector snapshots; estimated energy is explicitly labelled and is not counter-based measurement.
+```bash
+git clone https://github.com/doe2park/Graduate-Project.git
+cd Graduate-Project
+python3 -m http.server 8000
+```
+
+Open `http://localhost:8000/grimes-campus-map-arcgis.html`. Internet access is needed for CDN libraries and online data. Cloning the repository also downloads its tracked public assets; local Gaussian training outputs are not included.
+
+For implementation changes, read [AGENTS.md](AGENTS.md). Preserve GLB identity nodes and existing Draco bytes; sidecars bind to source-scoped element identifiers. See [MEP recovery](docs/MEP_RECOVERY.md) and [new capture onboarding](docs/CAPTURE_ONBOARDING.md).
 
 ## Copyright and reuse
 
-© 2026 Yoonsung Chung. All rights reserved for author-owned contributions. Public viewing and sharing links are welcome; reuse requires permission unless an applicable exception or existing license permits it. Third-party BIM, capture exports, data and dependencies retain their respective rights. See [Copyright and permitted use](LICENSE.md). Public GitHub viewing/forking rights remain unaffected.
+© 2026 Yoonsung Chung. All rights reserved for author-owned contributions. Public viewing and sharing links are welcome; reuse requires permission unless an applicable exception or existing license permits it. Third-party models, captures, data and dependencies retain their respective rights. See [LICENSE.md](LICENSE.md). Public GitHub viewing/forking rights remain unaffected.

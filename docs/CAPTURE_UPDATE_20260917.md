@@ -11,7 +11,7 @@ Imported September 21, 2026. Cupix SiteView visibly selected Level 1 / September
 
 ## Navigation and dates
 
-The ordinary comparison defaults to September 17. The date picker retains May 6 without overwriting its assets. `?capture=2026-05-06` opens the baseline; `?capture=2026-09-17` opens the update. Photo and mesh modes follow the selected date. The local Gaussian option explicitly belongs to May; selecting it returns to that date. No September Gaussian training is claimed.
+The ordinary comparison defaults to September 17. The date picker retains May 6 without overwriting its assets. `?capture=2026-05-06` opens the baseline; `?capture=2026-09-17` opens the update. Photo and mesh modes follow the selected date. The local Gaussian option explicitly belongs to May; selecting it returns to that date. No September Gaussian training is claimed for this public exported-capture package. A separate local [raw-video SfM/Gaussian pilot](RAW_VIDEO_RECONSTRUCTION.md) was subsequently completed without inherited Cupix poses or validated BIM alignment.
 
 New photo stations are sorted by their original video frame number. Only consecutive exported frames with distance at most 5.5 m and elevation change at most 1.5 m are connected: 95 edges, four gaps. These are sparse temporally supported links, not verified collision-free paths. No arbitrary nearest spatial neighbors are connected through walls. The capture picker/previous-next controls can cross a route gap, but directional Walk cannot. Blended intermediate images are not measured parallax.
 

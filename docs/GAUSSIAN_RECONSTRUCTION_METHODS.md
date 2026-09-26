@@ -1,5 +1,7 @@
 # Gaussian reconstruction: methods, evidence, and reuse
 
+> Scope: this note documents the earlier experiment using exported Cupix poses. The separate September camera-only SfM → Brush pilot is documented in [Raw-video reconstruction](RAW_VIDEO_RECONSTRUCTION.md). Both trained asset sets remain local.
+
 Recorded 2026-09-13 for future research presentations and capture reuse. No PowerPoint was edited for this update. **Three local optimization runs completed; an actual trained Gaussian scene is available in the local linked viewer.** The selected one-million-Gaussian model supports continuous novel-view movement but still has substantial blur and floaters. This is an experimental appearance layer, not a photograph-quality replacement or a public deployment.
 
 ## Three representations, different jobs
