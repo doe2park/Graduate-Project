@@ -254,6 +254,16 @@ body[data-pane="bim"] #twinPanel{box-sizing:border-box;left:auto;right:12px;top:
 #twinPanel #twinInfoBtn{font:11px var(--font);min-height:28px;padding:7px 0 1px;width:100%;color:#91b9e7}
 #twinDetails{border-top:1px solid #344459;padding-top:10px}.detail-context{margin-top:12px}
 @media(max-width:420px),(pointer:coarse){body[data-pane="bim"] #twinPanel,body[data-pane="bim"].scan-walking #twinPanel{left:auto;right:8px;top:auto;bottom:8px;width:276px;max-width:calc(100vw - 72px);max-height:min(248px,calc(100dvh - 66px));padding:6px 10px}#twinPanel .thdr{top:-6px}#twinPanel .thdr button{min-width:28px;min-height:28px}#meterPlot svg{height:72px}.history-summary{display:none}#twinPanel #twinInfoBtn{min-height:30px}.meter-toolbar select{min-height:28px}}
+</style><style>
+/* Mobile compare: the scene stays visible when controls are folded. */
+#sceneControlsToggle{display:none;position:absolute;top:8px;right:8px;z-index:110;min-height:40px;padding:8px 12px;border:1px solid #7895aa;border-radius:8px;background:#132b40;color:#eef6fc;font:13px Arial;cursor:pointer}
+body[data-pane="bim"] #sceneControlsToggle{display:block}
+body[data-pane="bim"]:not(.controls-collapsed) #scanQuickActions{top:54px}
+body[data-pane="bim"]:not(.controls-collapsed) #interiorTools{top:108px}
+body[data-pane="bim"]:not(.controls-collapsed) #layersMenu{top:104px;max-height:calc(100dvh - 116px)}
+body.controls-collapsed #scanQuickActions,body.controls-collapsed #interiorTools,body.controls-collapsed #layersMenu,body.controls-collapsed #clickHint,body.controls-collapsed #walkPad{display:none!important}
+#bimLoadProgress{position:absolute;bottom:8px;left:8px;right:8px;z-index:60;pointer-events:none;font:11px/1.4 Arial;color:#d6e5ed;text-shadow:0 1px 3px #000}
+#bimLoadProgress:empty{display:none}body:not([data-pane="bim"]) #bimLoadProgress{display:none}
 </style></head>
 <body>
 
@@ -327,6 +337,7 @@ body[data-pane="bim"] #twinPanel{box-sizing:border-box;left:auto;right:12px;top:
     <button onclick="dismissWelcome()">Got it — let me explore</button>
   </div>
 </div>
+<button id="sceneControlsToggle" aria-expanded="true" aria-controls="scanQuickActions interiorTools">Hide controls</button><div id="bimLoadProgress" role="status" aria-live="polite">Loading room…</div>
 <div id="clickHint">Select an object to inspect its information</div>
 
 <div id="levelBadge"></div>
@@ -2588,13 +2599,15 @@ async function loadInterior(){
   const manifest=await cachedJson('interior/manifest.json');
   renderer.localClippingEnabled=true;
   const clip=[new THREE.Plane(new THREE.Vector3(0,1,0),-manifest.sliceY[0]),new THREE.Plane(new THREE.Vector3(0,-1,0),manifest.sliceY[1])];
-  for(const [key,entry]of Object.entries(manifest.groups)){
+  for(const key of ['enclosure','floors','ceilings','furniture']){
+   const entry=manifest.groups[key];
    if(interiorState.groups[key])continue;
    status.textContent=`Loading Level 1 ${key}…`;
-   const meta=(await cachedJson(entry.json)).elements;
+   document.getElementById('bimLoadProgress').textContent=key==='furniture'?'Room visible · loading furniture…':`Loading ${key}…`;
    let gltf;
    try{
-    gltf=await loader.loadAsync(entry.glb);
+    const [metadata,loaded]=await Promise.all([cachedJson(entry.json),loader.loadAsync(entry.glb)]);
+    gltf=loaded;const meta=metadata.elements;
     gltf.scene.rotation.y=Math.PI;gltf.scene.position.set(EQUIP_OFFSET.x,EQUIP_OFFSET.y,EQUIP_OFFSET.z);gltf.scene.updateMatrixWorld(true);
     bindElementSourceIds(gltf);
     const built=await buildElementRenderTier(THREE,gltf.scene,meta,'interior-'+key);
@@ -2614,12 +2627,14 @@ async function loadInterior(){
    }finally{releaseElementSource(gltf)}
   }
   interiorState.ready=true;
+  document.getElementById('bimLoadProgress').textContent='';
   status.textContent=`Level 1 · ${manifest.groups.furniture.elements.toLocaleString()} furniture / casework elements · Design context`;
- }catch(e){interiorState.error=String(e.message||e);status.textContent='Interior load failed · click Room view to retry';document.getElementById('interiorRoom').onclick=()=>{setInteriorMode('room');loadInterior()};console.error('Interior load failed',e)}
+ }catch(e){interiorState.error=String(e.message||e);document.getElementById('bimLoadProgress').textContent='Room incomplete · open Controls → Room view to retry';status.textContent='Interior load failed · click Room view to retry';document.getElementById('interiorRoom').onclick=()=>{setInteriorMode('room');loadInterior()};console.error('Interior load failed',e)}
  finally{interiorState.loading=false}
 }
 window.setAllElementContext=show=>{for(const key of Object.keys(interiorVisible))interiorVisible[key]=show;interiorState.mode='custom';applyInteriorVisibility();};
-if(splitPane==='bim')queueMicrotask(async()=>{await loadInterior();if(!mobileMq.matches)await setAllElements(true);});
+// Keep full-building element layers available through Layers / Show all, not automatic.
+if(splitPane==='bim')queueMicrotask(()=>loadInterior());
 
 document.getElementById('pauseScanLayers').onclick=()=>{stopScanLayerLoad=true;document.getElementById('pauseScanLayers').textContent='Stopping after current layer…'};
 setInterval(()=>{refreshScanLayerStatus();updateAllElementsButton();},1000);refreshScanLayerStatus();updateAllElementsButton();
@@ -2726,15 +2741,21 @@ renderer.setAnimationLoop((t) => {
   }
   if(linkedPose){camera.position.fromArray(linkedPose.position);camera.quaternion.fromArray(linkedPose.quaternion).normalize();}
   publishScanPose(t);
-  // Normal loading still avoids per-yield render churn. Walk must remain
-  // visible: show bounded preview frames while the next layer is prepared.
+  // Show already-loaded rooms while remaining groups decode; bound render cost.
+  // Standalone orbit keeps its existing loading policy.
   const layerBusy = interiorState.loading || Object.values(layerState).some(st => st.loading);
-  if (!layerBusy || (walkMode && t - _lastWalkRender >= (mobileMq.matches ? 400 : 250))) {
+  if (!layerBusy || ((walkMode || splitPane==='bim') && t - _lastWalkRender >= (mobileMq.matches ? 400 : 250))) {
     renderer.render(scene, camera);
     _lastWalkRender = t;
   }
 });
 </script>
 
+<script>
+(()=>{if(new URLSearchParams(location.search).get('pane')!=='bim')return;const button=document.getElementById('sceneControlsToggle');let device=window;try{if(top.location.origin===location.origin)device=top}catch{}
+function fold(collapsed){document.body.classList.toggle('controls-collapsed',collapsed);button.setAttribute('aria-expanded',String(!collapsed));button.textContent=collapsed?'Controls':'Hide controls';}
+fold(device.matchMedia('(max-width:768px), (pointer:coarse)').matches);button.onclick=()=>fold(!document.body.classList.contains('controls-collapsed'));
+})();
+</script>
 </body>
 </html>
