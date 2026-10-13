@@ -1,6 +1,6 @@
 # Research collaboration guide
 
-Updated September 25, 2026. [Project overview and demonstrations](../README.md)
+Updated October 13, 2026. [Project overview and demonstrations](../README.md)
 
 ## Research focus
 
@@ -15,6 +15,10 @@ A proposed evaluation compares photo-based navigation against reconstruction-ass
 3. Compare the same location in Scan ↔ BIM. Check the capture date and alignment status.
 4. Read the [raw-video reconstruction note](RAW_VIDEO_RECONSTRUCTION.md) for the separate local SfM/Gaussian experiment.
 5. Use the [JSON guide](DATA_SHARING.md) to identify the appropriate dataset for analysis.
+
+## Open the current BIM workspace
+
+[Open Grimes BIM Explorer](https://doe2park.github.io/Graduate-Project/grimes-bim-explorer.html?model=full) on any WebGL-capable desktop browser. The page is hosted on GitHub Pages, so the owner's computer does not need to be running. Use Search for names or object IDs; focus/isolate/hide a selected object, filter floors/systems, and inspect its source properties. Narrow screens use a smaller regional default when `model=full` is omitted. See the [usage and development guide](BIM_EXPLORER.md) for the editable source and rebuild command.
 
 ## Useful collaboration questions
 

@@ -2,7 +2,7 @@
 
 **Yoonsung Chung · UC Berkeley Civil & Environmental Engineering**
 
-Advisor: Prof. Kenichi Soga · Research status updated September 25, 2026
+Advisor: Prof. Kenichi Soga · Research status updated October 13, 2026
 
 A research prototype linking **captured site appearance, BIM objects and operational data**, with explicit labels for measured, modelled and inferred information.
 
@@ -19,9 +19,12 @@ No installation is required. Open a live page, rather than its HTML source on Gi
 | Campus map | [Open map](https://doe2park.github.io/Graduate-Project/grimes-campus-map-arcgis.html) | [HTML](grimes-campus-map-arcgis.html) | Geographic context and available utility observations for 61 buildings |
 | Energy dashboard | [Open dashboard](https://doe2park.github.io/Graduate-Project/campus-energy-dashboard.html) | [HTML](campus-energy-dashboard.html) | Compare demand, building categories and reporting availability |
 | Weekly history | [Open weekly report](https://doe2park.github.io/Graduate-Project/weekly-report.html) | [HTML](weekly-report.html) | Review archived observations, sample counts and seven-day windows |
+| BIM explorer (latest) | [Open full Grimes model](https://doe2park.github.io/Graduate-Project/grimes-bim-explorer.html?model=full) | [HTML](grimes-bim-explorer.html) · [Editable source](viewer-src/bim-explorer/) | Inspect original materials, search object IDs, isolate/hide objects, and section the whole building |
 | Element BIM viewer | [Open BIM](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) | [HTML](grimes-bim-viewer.html) | Select floors, layers and individual elements; inspect properties and data provenance |
 | Scan ↔ BIM | [Open comparison](https://doe2park.github.io/Graduate-Project/scan-compare.html) | [HTML](scan-compare.html) | Compare captured panoramas or scan mesh with linked BIM views |
 | Design vs actual | [Open performance](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | [HTML](grimes-performance.html) | Examine LEED design context against available operating evidence |
+
+**Latest BIM workspace:** [Grimes BIM Explorer](https://doe2park.github.io/Graduate-Project/grimes-bim-explorer.html) runs directly on GitHub Pages. No Python server or application installation is required. Desktop defaults to all ten source layers (66,620 identities); narrow screens start with a smaller regional package and can switch to the whole building. The explorer shows source BIM properties; use the existing element BIM viewer for labelled operating-data context. [Usage and development guide](docs/BIM_EXPLORER.md).
 
 **Suggested tour:** campus map → energy dashboard / weekly history → BIM object selection → Scan ↔ BIM → performance. The scan comparison does not require a Cupix login.
 
@@ -68,6 +71,8 @@ The separate **Cupix-independent September raw-video pilot** uses Insta360 Studi
 | Location | Contents |
 |---|---|
 | Root HTML files | Public interfaces; legacy pages may redirect |
+| `viewer-src/bim-explorer/` | Modular source for the public BIM explorer; rebuild the committed root HTML after edits |
+| `bim-explorer-assets/` | Source catalog, small examples and Draco decoders for the explorer |
 | `buildings/grimes/` | BIM geometry and element-property sidecars |
 | `scan-assets/` | Published scan meshes, photos and capture manifests |
 | `alignment-analysis/accepted-registration.json` | May registration record |

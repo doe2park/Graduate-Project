@@ -1,0 +1,1378 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:, "><title>Grimes | Interior Digital Twin</title><style>
+:root{font-family:Calibri,"Segoe UI",Arial,sans-serif;font-synthesis:none;color:#003262;background:#f3f6f8;--ink:#003262;--teal:#007c89;--line:#dce4e9;--muted:#5a6d7e}*{box-sizing:border-box}body{margin:0}a{color:var(--ink)}button,input,select{font:inherit;color:inherit}button,.button{min-height:44px;display:inline-flex;align-items:center;justify-content:center;padding:9px 13px;border:1px solid #c9d6df;border-radius:6px;background:white;text-decoration:none;font-size:14px;cursor:pointer}button:hover:not(:disabled),.button:hover{border-color:var(--teal);background:#eef8f8}button:disabled{opacity:.45;cursor:default}button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #fdb515;outline-offset:3px}.primary{background:var(--ink);color:white;border-color:var(--ink)}.primary:hover{color:var(--ink)}.app-header{height:76px;display:flex;align-items:center;gap:48px;padding:0 30px;background:white;border-bottom:1px solid var(--line)}.brand{font-size:23px;line-height:.98;text-decoration:none;font-weight:700;letter-spacing:-.7px;display:flex;flex-direction:column;border-left:4px solid #fdb515;padding-left:13px}.brand span{font-size:15px;letter-spacing:.1px;font-weight:400;margin-top:5px}nav{display:flex;gap:24px;height:100%;align-items:center}nav a{height:100%;display:flex;align-items:center;font-size:15px;text-decoration:none;border-bottom:3px solid transparent;padding-top:3px}nav a[aria-current]{border-color:var(--teal);font-weight:700}.local-badge{margin-left:auto;font-size:12px;color:var(--muted);border:1px solid var(--line);padding:6px 9px;border-radius:4px}.workspace{max-width:1800px;padding:25px 28px 15px;margin:auto}.project-bar{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-bottom:21px}h1{font-size:28px;letter-spacing:-.55px;margin:0 0 5px;line-height:1.15}p{font-size:14px;line-height:1.5;color:var(--muted);margin:7px 0}h2{font-size:23px;line-height:1.2;letter-spacing:-.3px;margin:15px 0 5px}.project-actions{display:flex;align-items:center;gap:8px}.project-actions select{width:auto;max-width:240px}.layout{display:grid;grid-template-columns:210px minmax(0,1fr) 270px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:white;align-items:stretch}.layout>*{min-width:0}.systems-panel{padding:22px 16px;border-right:1px solid var(--line)}summary{cursor:pointer;min-height:40px;align-content:center;font-weight:600;font-size:15px;line-height:1.4}summary span{font-size:12px;font-weight:400;color:var(--muted);margin-left:8px}.pair{display:flex;gap:6px;margin:9px 0 17px}.pair button{flex:1;padding:7px;font-size:13px}.layer-row{display:grid;grid-template-columns:16px 1fr auto;gap:9px;align-items:center;min-height:44px;font-size:14px;margin:0;cursor:pointer}.layer-row input{width:15px;height:15px;margin:0;accent-color:var(--teal)}.layer-name{border-left:3px solid var(--system-color);padding-left:7px}.layer-row em{font-size:12px;font-style:normal;color:var(--muted)}.legend-note{font-size:12px;line-height:1.4;color:var(--muted);margin:18px 0;display:flex;align-items:center;gap:7px}.legend-note i{width:8px;height:8px;background:#fdb515;flex-shrink:0;border-radius:50%}.import-panel{border-top:1px solid var(--line);padding-top:12px;margin-top:23px}.import-panel p{font-size:12px}.import-panel button{width:100%;margin:12px 0 4px}label{font-size:13px;display:block;margin:12px 0 6px}input[type=file]{width:100%;font-size:11px;margin-top:8px}input[type=file]::file-selector-button{border:1px solid var(--line);background:#f4f7f9;border-radius:4px;padding:8px;color:var(--ink)}input[type=search],select{width:100%;height:44px;border:1px solid #c9d6df;border-radius:6px;background:white;padding:0 10px;min-width:0;font-size:13px}input[type=search]{margin-bottom:8px}.text-link{display:block;font-size:13px;margin-top:24px;line-height:1.5}.model-panel{background:#eef3f6;display:flex;flex-direction:column}.canvas-tools{padding:13px 17px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}.canvas-tools>div{display:flex;gap:6px}.canvas-tools button{font-size:13px;padding:7px 11px}#viewport{position:relative;width:100%;height:clamp(420px,60vh,740px);min-width:0;touch-action:none;overflow:hidden}canvas{display:block;width:100%;height:100%}#loading{position:absolute;inset:16px auto auto 20px;background:var(--ink);color:white;padding:12px 15px;border-radius:5px;max-width:80%;font-size:13px;z-index:2}.model-caption{display:flex;justify-content:space-between;gap:8px;padding:10px 19px;color:var(--muted);font-size:12px}.metrics{display:grid;grid-template-columns:repeat(3,1fr);padding:20px;border-top:1px solid #d5e0e7;margin-top:auto;gap:8px}.metrics>div{display:flex;flex-direction:column;gap:5px}.metrics strong{font-size:25px;line-height:1;font-weight:600;font-variant-numeric:tabular-nums}.metrics span{font-size:12px;color:var(--muted)}.inspector{padding:22px 18px;border-left:1px solid var(--line)}.inspector-title{display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:600}.dot{width:7px;height:7px;background:var(--teal);border-radius:50%}#card{margin-top:21px}.system-chip{background:#edf4f7;padding:5px 8px;border-radius:4px;font-size:12px;color:#3e5e72}#key{font-size:12px;color:var(--muted);overflow-wrap:anywhere}dl{display:grid;grid-template-columns:64px 1fr;gap:12px 10px;font-size:13px;margin:22px 0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}#focus{width:100%}#feed{font-size:12px;margin:16px 0;padding:10px 0 10px 12px;border-left:2px solid #c9d6df}#card details summary{font-size:13px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;color:var(--muted);max-height:210px;overflow:auto;line-height:1.5}.activity{border-top:1px solid var(--line);margin-top:18px;padding-top:10px}.activity summary{font-size:13px}.activity ol{list-style:none;margin:7px 0 16px;padding:0;max-height:125px;overflow:auto}.activity li{font-size:12px;line-height:1.35;margin-bottom:12px;border-left:2px solid #c9d6df;padding-left:10px}.activity time{display:block;font-size:11px;color:var(--muted);margin-top:3px}#report{font-size:12px;width:100%}.status-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:8px 0}.status-bar p{font-size:12px}.status-bar>span{font-size:12px;color:var(--teal);white-space:nowrap}.error{color:#b02c36!important}footer{font-size:12px;color:var(--muted);padding-top:14px;line-height:1.5}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.home{max-width:1100px;margin:55px auto;padding:0 24px}.home h1{font-size:42px;max-width:630px}.home-lead{max-width:650px;font-size:18px;margin:20px 0 35px}.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.flow>article{padding:24px;background:white;border-top:3px solid var(--teal)}.flow h2{margin:6px 0 12px}.flow p{min-height:88px}.step-guide{max-width:820px;margin:40px auto;padding:0 22px}.step-guide li{margin-bottom:23px;line-height:1.65}.step-guide code{background:#e7edf2;padding:3px 6px;overflow-wrap:anywhere}.step-guide a{color:var(--teal)}
+@media(max-width:1150px){.layout{grid-template-columns:180px minmax(0,1fr) 235px}.workspace{padding:20px 16px}.project-bar{align-items:flex-start}.project-actions{flex-wrap:wrap;justify-content:flex-end}.project-actions #demo{display:none}.model-caption{flex-wrap:wrap}.app-header{padding:0 20px;gap:30px}}
+@media(max-width:850px){.app-header{height:auto;min-height:70px;padding:17px 16px;gap:14px;flex-wrap:wrap}.brand{font-size:21px}.local-badge{display:none}nav{gap:16px;margin-left:auto}nav a{font-size:13px;padding:10px 0}.workspace{padding:20px 12px}.project-bar{display:block}.project-actions{justify-content:flex-start;margin-top:16px;gap:7px}.project-actions select{max-width:210px;flex:1}h1{font-size:25px}.layout{grid-template-columns:1fr}.model-panel{grid-row:1}.systems-panel{grid-row:2;border-right:0;border-top:1px solid var(--line);padding:14px 18px}.inspector{grid-row:3;border-left:0;border-top:1px solid var(--line);padding:20px 18px}#viewport{height:49vh;min-height:330px}.canvas-tools{padding:10px 12px}.canvas-tools>span{font-size:12px}.metrics{padding:17px}.metrics strong{font-size:24px}.model-caption{padding:10px 14px;font-size:11px}.status-bar>span{display:none}#layers{display:grid;grid-template-columns:1fr 1fr;column-gap:16px}.layer-row{font-size:13px}.import-panel{margin-top:12px}.text-link{margin-top:14px}.flow{grid-template-columns:1fr}.flow p{min-height:0}.home{margin:30px auto}.home h1{font-size:34px}.home-lead{font-size:17px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+.search-count{font-size:11px;margin:0 0 8px}.systems-panel>details>label{margin-top:10px}#loading{pointer-events:none}.canvas-tools{flex-wrap:wrap}
+
+/* Inspection tools share the existing layout and touch targets. */
+.object-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:14px}
+.object-actions button{padding:9px 4px;min-height:40px;width:100%}
+#object-filter-state:empty{display:none}
+#object-filter-state{font-size:12px;color:#007c89;margin:8px 0}
+.section-tools{border-top:1px solid #dce4e9;margin-top:15px;padding-top:12px}
+.section-tools summary{font-size:13px;font-weight:600;cursor:pointer}
+.section-tools .section-toggle{display:flex;align-items:center;gap:8px}
+.section-tools input[type=checkbox]{width:16px;height:16px;margin:0}
+.section-tools input[type=range]{width:100%;padding:0;accent-color:#007c89}
+.section-tools p{font-size:11px;color:#637686;margin:3px 0}
+#section-value{float:right;font-variant-numeric:tabular-nums}
+.canvas-tools>div{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:600px){.canvas-tools{align-items:flex-start;gap:8px}.canvas-tools>div{gap:4px}.canvas-tools button{padding:8px 9px;min-height:44px}.object-actions button{min-height:44px}}
+
+</style><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script></head><body>
+<header class="app-header"><a class="brand" href="grimes-campus-map-arcgis.html">Interior<span>Digital Twin</span></a><nav aria-label="Workspace"><a href="grimes-bim-explorer.html" aria-current="page">BIM explorer</a><a href="scan-compare.html">Scan ↔ BIM</a><a href="campus-energy-dashboard.html">Energy dashboard</a></nav><span class="local-badge">Web workspace</span></header>
+<main class="workspace"><div class="project-bar"><div><h1>Grimes Engineering Center</h1><p id="scope">Complete BIM · Existing source geometry</p></div><div class="project-actions"><label class="sr-only" for="dataset">Example package</label><select id="dataset"><option value="full">Grimes · Complete BIM</option><option value="regional">Small region · 492 objects</option><option value="conduit">Conduit · identity exercise</option></select><button id="demo">Reload example</button></div></div>
+<div class="layout"><aside class="systems-panel"><details open id="systems-panel"><summary>Building systems <span id="layer-count">—</span></summary><label for="floor">Floor</label><select id="floor"><option value="">All floors</option></select><label for="colours">Appearance</label><select id="colours"><option value="source">Original materials</option><option value="systems">System colours</option></select><div class="pair"><button id="all">Show all</button><button id="none">Hide all</button></div><div id="layers" aria-label="System visibility"></div><details class="section-tools"><summary>Section view</summary><label class="section-toggle"><input type="checkbox" id="section-enabled"> Horizontal cut</label><label for="section-height">Cut height <output id="section-value">—</output></label><input id="section-height" type="range" min="0" max="30" step="0.05" disabled><p>Height in model coordinates.</p></details><div class="legend-note"><i></i>Gold highlights your selection.</div></details><details class="import-panel"><summary>Open your own package</summary><p>Choose prepared files from your computer. Files stay in this browser.</p><label>Geometry (.glb)<input id="glb" type="file" accept=".glb"></label><label>Object properties (.json)<input id="json" type="file" accept=".json"></label><button id="load">Validate and open</button><p class="downloads">Teaching example: <a href="bim-explorer-assets/sample.glb" download>GLB</a> + <a href="bim-explorer-assets/sample.json" download>JSON</a></p></details><a class="text-link" href="scan-compare.html" target="_blank" rel="noopener">Open Scan ↔ BIM ↗</a></aside>
+<section class="model-panel"><div class="canvas-tools"><span id="view-label">Model overview</span><div><button id="fit">Fit model</button><button id="top">Top view</button><button id="restore-view" title="Show all floors and objects; reset the section">Reset view</button></div></div><div id="viewport" aria-label="Interactive BIM model"><div id="loading" role="status">Preparing Grimes…</div></div><div class="model-caption"><span>Drag to orbit · Scroll or pinch to zoom · Select a component</span><span id="render-stats">—</span></div><div class="metrics"><div><strong id="metric-objects">—</strong><span>Objects loaded</span></div><div><strong id="metric-visible">—</strong><span>Enabled objects</span></div><div><strong id="metric-bytes">—</strong><span>Geometry size</span></div></div><div id="summary" class="sr-only"></div></section>
+<aside class="inspector"><div class="inspector-title">Object inspector <span class="dot"></span></div><label for="search">Search by ID, tag or type</label><input id="search" type="search" placeholder="e.g. junction box"><label class="sr-only" for="objects">Find a loaded object</label><p id="search-count" class="search-count"></p><select id="objects" disabled><option>Loading…</option></select><div id="card"><span id="system-name" class="system-chip">Source properties</span><h2 id="type">Select a component</h2><div id="key"></div><dl id="props"></dl><div class="object-actions"><button id="focus">Focus</button><button id="isolate">Isolate</button><button id="hide-object">Hide</button></div><p id="object-filter-state" role="status"></p><p id="feed">No verified element-level live feed.</p><details><summary>All source properties</summary><pre id="raw"></pre></details></div><details class="activity"><summary>Package activity</summary><ol id="activity"></ol></details><button id="report" disabled>Export validation record</button></aside></div>
+<div class="status-bar"><p id="status" role="status" aria-live="polite">Loading the bundled example…</p><span>Source IDs preserved</span></div><footer>Existing BIM geometry and object identities preserved. Floor labels retain their source or inferred provenance. Physical alignment is a separate step. <a href="LICENSE.md">Copyright and permitted use</a> · © 2026 Yoonsung Chung; third-party rights retained.</footer></main><script type="module">
+// viewer-src/bim-explorer/viewer.mjs
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+
+// viewer-src/bim-explorer/render-tier.mjs
+function bindElementSourceIds(gltf) {
+  let boundNodes = 0, associationNameConflicts = 0;
+  const associations = gltf.parser?.associations, nodes = gltf.parser?.json?.nodes;
+  if (!associations || !nodes) return { boundNodes, associationNameConflicts };
+  gltf.scene.traverse((object) => {
+    const nodeIndex = associations.get(object)?.nodes;
+    if (!Number.isInteger(nodeIndex)) return;
+    const associatedName = nodes[nodeIndex]?.name;
+    const sourceName = object.userData.name;
+    const name = typeof sourceName === "string" && sourceName ? sourceName : associatedName;
+    if (sourceName && associatedName && sourceName !== associatedName) associationNameConflicts++;
+    if (typeof name === "string" && name) {
+      object.userData.elementId = name;
+      boundNodes++;
+    }
+  });
+  return { boundNodes, associationNameConflicts };
+}
+async function buildElementRenderTier(THREE2, sceneGroup, meta, layerKey, options2 = {}) {
+  const MAX_VERTICES = 18e4, INSTANCE_REUSE = 8;
+  const fragments = [], repeated = /* @__PURE__ */ new Map(), mergeBuckets = /* @__PURE__ */ new Map(), meshes = [];
+  const stats = { sourceObjects: 0, unidentifiedObjects: 0, unidentifiedNames: [], sourceTriangles: 0, renderTriangles: 0, sourceSegments: 0, renderSegments: 0, mergedMeshes: 0, instancedMeshes: 0, instances: 0, drawCalls: 0 };
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const identity = (object) => {
+    for (let p = object; p; p = p.parent) {
+      const id = p.userData.elementId ?? p.name;
+      if (id && Object.prototype.hasOwnProperty.call(meta, id)) return id;
+    }
+    return null;
+  };
+  sceneGroup.traverse((object) => {
+    if (!(object.isMesh || object.isLine) || !object.geometry?.attributes.position) return;
+    stats.sourceObjects++;
+    const id = identity(object), info = meta[id] || {}, geometry = object.geometry;
+    if (id === null) {
+      stats.unidentifiedObjects++;
+      if (stats.unidentifiedNames.length < 8) stats.unidentifiedNames.push(object.userData.elementId || object.name || "(unnamed)");
+    }
+    const isLine = !!object.isLine, indexedCount = geometry.index?.count ?? geometry.attributes.position.count;
+    const drawStart = Math.max(0, geometry.drawRange.start), drawEnd = Math.min(indexedCount, drawStart + geometry.drawRange.count);
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const groups = Array.isArray(object.material) ? geometry.groups : [{ start: 0, count: indexedCount, materialIndex: 0 }];
+    for (const group of groups) {
+      const material = materials[group.materialIndex || 0];
+      if (!material) continue;
+      const start = Math.max(drawStart, group.start), end = Math.min(drawEnd, group.start + group.count);
+      if (end <= start) continue;
+      const part = { object, geometry, material, id, levelKey: info.levelKey || "", type: info.type || "", isLine, start, end, matrix: object.matrixWorld.clone() };
+      let cell = "";
+      if (options2.cellSize > 0) {
+        geometry.computeBoundingBox();
+        const c = geometry.boundingBox.getCenter(new THREE2.Vector3()).applyMatrix4(part.matrix);
+        cell = [c.x, c.z].map((v) => Math.floor(v / options2.cellSize)).join(":");
+      }
+      part.key = JSON.stringify([material.uuid, part.levelKey, options2.groupByType === false ? "" : part.type, cell, isLine, Object.entries(geometry.attributes).sort(([a], [b]) => a.localeCompare(b)).map(([name, a]) => [name, a.itemSize])]);
+      part.reuseKey = part.key + "|" + geometry.uuid;
+      part.canInstance = !isLine && part.matrix.determinant() > 0 && start === 0 && end === indexedCount && !Array.isArray(object.material);
+      if (part.canInstance) repeated.set(part.reuseKey, (repeated.get(part.reuseKey) || 0) + 1);
+      if (!isLine) stats.sourceTriangles += Math.floor((end - start) / 3);
+      else stats.sourceSegments += object.isLineSegments ? Math.floor((end - start) / 2) : Math.max(0, end - start - 1) + (object.isLineLoop && end - start > 1 ? 1 : 0);
+      fragments.push(part);
+    }
+  });
+  const prepareMaterial = (original) => {
+    const material = original.clone();
+    if (!options2.preserveMaterial && layerKey === "structural" && material.emissive) {
+      material.emissive.setHex(1976635);
+      material.emissiveIntensity = 0.25;
+    }
+    return material;
+  };
+  const decorate = (mesh, part, data) => {
+    mesh.name = "elements:" + layerKey;
+    mesh.userData = { layer: layerKey, levelKey: part.levelKey, type: part.type, isLine: part.isLine, ...data };
+    meshes.push(mesh);
+    return mesh;
+  };
+  const instanceBuckets = /* @__PURE__ */ new Map();
+  for (const part of fragments) {
+    const target = part.canInstance && repeated.get(part.reuseKey) >= INSTANCE_REUSE ? instanceBuckets : mergeBuckets;
+    const key = target === instanceBuckets ? part.reuseKey : part.key;
+    if (!target.has(key)) target.set(key, []);
+    target.get(key).push(part);
+  }
+  let work = 0;
+  for (const parts of instanceBuckets.values()) {
+    const p = parts[0], mesh = new THREE2.InstancedMesh(p.geometry, prepareMaterial(p.material), parts.length);
+    const white = new THREE2.Color(16777215);
+    parts.forEach((part, i) => {
+      mesh.setMatrixAt(i, part.matrix);
+      mesh.setColorAt(i, white);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingBox();
+    mesh.computeBoundingSphere();
+    decorate(mesh, p, { ids: parts.map((p2) => p2.id), renderTier: "instanced" });
+    stats.instancedMeshes++;
+    stats.instances += parts.length;
+    stats.renderTriangles += Math.floor((p.end - p.start) / 3) * parts.length;
+    if (++work % 100 === 0) await tick();
+  }
+  const normalMatrix = new THREE2.Matrix3(), vector = new THREE2.Vector3();
+  for (const parts of mergeBuckets.values()) {
+    let chunk = [], vertices = 0;
+    const flush = () => {
+      if (!chunk.length) return;
+      const p = chunk[0].part, sourceAttrs = p.geometry.attributes;
+      const geometry = new THREE2.BufferGeometry(), arrays = {}, sizes = {};
+      for (const [name, attribute] of Object.entries(sourceAttrs)) {
+        sizes[name] = attribute.itemSize;
+        arrays[name] = new Float32Array(vertices * attribute.itemSize);
+      }
+      if (!arrays.color) {
+        sizes.color = 3;
+        arrays.color = new Float32Array(vertices * 3);
+        arrays.color.fill(1);
+      }
+      const indexCount = chunk.reduce((n, c) => n + c.indices.length, 0), indices = new (vertices > 65535 ? Uint32Array : Uint16Array)(indexCount);
+      const ranges = [];
+      let vertexOffset = 0, indexOffset = 0;
+      for (const { part, indices: localIndices, sourceVertices } of chunk) {
+        normalMatrix.getNormalMatrix(part.matrix);
+        for (let i = 0; i < sourceVertices.length; i++) {
+          const sourceIndex = sourceVertices[i], dest = vertexOffset + i;
+          for (const [name, attribute] of Object.entries(part.geometry.attributes)) {
+            const size = attribute.itemSize, array = arrays[name], at = dest * size;
+            for (let k = 0; k < size; k++) array[at + k] = name === "color" && !part.material.vertexColors ? 1 : attribute.getComponent(sourceIndex, k);
+            if (name === "position") {
+              vector.fromArray(array, at).applyMatrix4(part.matrix);
+              vector.toArray(array, at);
+            } else if (name === "normal") {
+              vector.fromArray(array, at).applyMatrix3(normalMatrix).normalize();
+              vector.toArray(array, at);
+            } else if (name === "tangent") {
+              vector.fromArray(array, at).transformDirection(part.matrix);
+              vector.toArray(array, at);
+              if (size === 4 && part.matrix.determinant() < 0) array[at + 3] *= -1;
+            }
+          }
+        }
+        for (let i = 0; i < localIndices.length; i++) indices[indexOffset + i] = vertexOffset + localIndices[i];
+        if (!part.isLine && part.matrix.determinant() < 0) for (let i = 0; i < localIndices.length; i += 3) {
+          const at = indexOffset + i + 1, tmp = indices[at];
+          indices[at] = indices[at + 1];
+          indices[at + 1] = tmp;
+        }
+        ranges.push({ id: part.id, start: indexOffset, count: localIndices.length, vertexStart: vertexOffset, vertexCount: sourceVertices.length });
+        indexOffset += localIndices.length;
+        vertexOffset += sourceVertices.length;
+      }
+      for (const [name, array] of Object.entries(arrays)) geometry.setAttribute(name, new THREE2.BufferAttribute(array, sizes[name]));
+      geometry.setIndex(new THREE2.BufferAttribute(indices, 1));
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+      const material = prepareMaterial(p.material);
+      material.vertexColors = true;
+      const mesh = p.isLine ? new THREE2.LineSegments(geometry, material) : new THREE2.Mesh(geometry, material);
+      decorate(mesh, p, { ids: [...new Set(ranges.map((r) => r.id))], ranges, renderTier: "merged", highlighted: /* @__PURE__ */ new Map() });
+      stats.mergedMeshes++;
+      if (p.isLine) stats.renderSegments += indexCount / 2;
+      else stats.renderTriangles += indexCount / 3;
+      chunk = [];
+      vertices = 0;
+    };
+    for (const part of parts) {
+      const localIndices = [], sourceVertices = [], remap = /* @__PURE__ */ new Map();
+      const append = (offset) => {
+        const source = part.geometry.index ? part.geometry.index.getX(offset) : offset;
+        let local = remap.get(source);
+        if (local === void 0) {
+          local = sourceVertices.length;
+          remap.set(source, local);
+          sourceVertices.push(source);
+        }
+        localIndices.push(local);
+      };
+      if (part.isLine && !part.object.isLineSegments) {
+        for (let i = part.start; i + 1 < part.end; i++) {
+          append(i);
+          append(i + 1);
+        }
+        if (part.object.isLineLoop && part.end - part.start > 1) {
+          append(part.end - 1);
+          append(part.start);
+        }
+      } else {
+        const step = part.isLine ? 2 : 3, end = part.end - (part.end - part.start) % step;
+        for (let i = part.start; i < end; i++) append(i);
+      }
+      const appendChunk = (indices, sourceVertices2) => {
+        if (vertices + sourceVertices2.length > MAX_VERTICES) flush();
+        chunk.push({ part, indices, sourceVertices: sourceVertices2 });
+        vertices += sourceVertices2.length;
+      };
+      if (sourceVertices.length <= MAX_VERTICES) appendChunk(localIndices, sourceVertices);
+      else {
+        for (let start = 0; start < localIndices.length; start += MAX_VERTICES) {
+          const subIndices = [], subVertices = [], subMap = /* @__PURE__ */ new Map();
+          for (let i = start; i < Math.min(start + MAX_VERTICES, localIndices.length); i++) {
+            const source = sourceVertices[localIndices[i]];
+            let local = subMap.get(source);
+            if (local === void 0) {
+              local = subVertices.length;
+              subMap.set(source, local);
+              subVertices.push(source);
+            }
+            subIndices.push(local);
+          }
+          appendChunk(subIndices, subVertices);
+          await tick();
+        }
+      }
+      if (++work % 250 === 0) await tick();
+    }
+    flush();
+  }
+  stats.drawCalls = meshes.length;
+  return { meshes, stats };
+}
+function resolveElementHit(object, instanceId, faceIndex, index) {
+  if (!object?.userData?.ids) return null;
+  if (object.isInstancedMesh) return Number.isInteger(instanceId) ? object.userData.ids[instanceId] ?? null : null;
+  const ranges = object.userData.ranges;
+  if (!ranges) return object.userData.ids.length === 1 ? object.userData.ids[0] : null;
+  const offset = object.isLine ? index : Number.isInteger(faceIndex) ? faceIndex * 3 : null;
+  if (!Number.isInteger(offset) || offset < 0) return null;
+  let low = 0, high = ranges.length - 1;
+  while (low <= high) {
+    const mid = low + high >> 1, r = ranges[mid], start = object.isLine ? r.vertexStart : r.start, count = object.isLine ? r.vertexCount : r.count;
+    if (offset < start) high = mid - 1;
+    else if (offset >= start + count) low = mid + 1;
+    else return r.id;
+  }
+  return null;
+}
+function highlightElementRender(mesh, id, on, color) {
+  if (!id || !mesh.userData.ids?.includes(id)) return;
+  if (mesh.isInstancedMesh) {
+    const value = mesh.material.color.clone().set(on ? color ?? 16498468 : 16777215);
+    mesh.userData.ids.forEach((x, i) => {
+      if (x === id) mesh.setColorAt(i, value);
+    });
+    mesh.instanceColor.needsUpdate = true;
+    return;
+  }
+  const attribute = mesh.geometry.getAttribute("color"), saved = mesh.userData.highlighted;
+  if (!attribute || !saved) return;
+  if (on) {
+    if (saved.has(id)) return;
+    const value = mesh.material.color.clone().set(color ?? 16498468), snapshots = [];
+    for (const r of mesh.userData.ranges) {
+      if (r.id !== id) continue;
+      const start = r.vertexStart * attribute.itemSize, end = (r.vertexStart + r.vertexCount) * attribute.itemSize;
+      snapshots.push({ start, values: attribute.array.slice(start, end) });
+      for (let i = r.vertexStart; i < r.vertexStart + r.vertexCount; i++) attribute.setXYZ(i, value.r, value.g, value.b);
+    }
+    saved.set(id, snapshots);
+  } else {
+    for (const s of saved.get(id) || []) attribute.array.set(s.values, s.start);
+    saved.delete(id);
+  }
+  attribute.needsUpdate = true;
+}
+function releaseElementSource(gltf) {
+  if (!gltf) return;
+  gltf.parser?.cache?.removeAll();
+  gltf.parser?.associations?.clear();
+  for (const source of gltf.scenes || []) source.clear();
+  gltf.scene?.clear();
+  gltf.scenes = [];
+  gltf.scene = null;
+  gltf.parser = null;
+}
+
+// viewer-src/bim-explorer/contract.mjs
+function readGLB(buffer) {
+  if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 20) throw Error("Invalid GLB header");
+  const v = new DataView(buffer);
+  if (v.getUint32(0, true) !== 1179937895 || v.getUint32(4, true) !== 2) throw Error("A GLB version 2 file is required");
+  if (v.getUint32(8, true) !== buffer.byteLength) throw Error("GLB length is invalid");
+  let json = null, offset = 12;
+  while (offset < buffer.byteLength) {
+    if (offset + 8 > buffer.byteLength) throw Error("GLB chunk length is invalid");
+    const n = v.getUint32(offset, true), type = v.getUint32(offset + 4, true);
+    if (n % 4 || offset + 8 + n > buffer.byteLength) throw Error("GLB chunk length is invalid");
+    if (offset === 12 && type !== 1313821514) throw Error("GLB must start with JSON");
+    if (type === 1313821514) {
+      if (json) throw Error("Duplicate GLB JSON");
+      json = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, offset + 8, n)).trim());
+    }
+    offset += 8 + n;
+  }
+  if (!json) throw Error("Missing GLB JSON");
+  return json;
+}
+function validatePackage(g, m) {
+  if (m?.schemaVersion !== 1) throw Error("Metadata schemaVersion must be 1");
+  if (typeof m.buildingId !== "string" || !m.buildingId.trim()) throw Error("Declare a buildingId namespace");
+  if (typeof m.layer !== "string" || !m.layer.trim()) throw Error("Declare a layer");
+  if (m.units !== "m" || m.upAxis !== "Y") throw Error("This workshop requires declared units m and upAxis Y");
+  if (!m.elements || Array.isArray(m.elements) || typeof m.elements !== "object") throw Error("Missing element identity dictionary");
+  for (const [id, record] of Object.entries(m.elements)) if (!id || !record || Array.isArray(record) || typeof record !== "object") throw Error(`Invalid element record: ${id}`);
+  for (const r of [...g.images || [], ...g.buffers || []]) if (r.uri) throw Error("Use embedded GLB resources only; external resources are unsupported");
+  const nodes = g.nodes || [], parents = new Array(nodes.length).fill(-1);
+  nodes.forEach((n, i) => {
+    for (const c of n.children || []) {
+      if (!Number.isInteger(c) || c < 0 || c >= nodes.length || parents[c] !== -1) throw Error("Invalid node hierarchy");
+      parents[c] = i;
+    }
+  });
+  for (let i = 0; i < nodes.length; i++) {
+    const seen = /* @__PURE__ */ new Set();
+    let j = i;
+    while (j !== -1) {
+      if (seen.has(j)) throw Error("Cyclic node hierarchy");
+      seen.add(j);
+      j = parents[j];
+    }
+  }
+  const ids = /* @__PURE__ */ new Set(), missing = [];
+  let geometries = 0;
+  nodes.forEach((n, i) => {
+    if (n.mesh === void 0) return;
+    if (!g.meshes?.[n.mesh]) throw Error("Invalid mesh reference");
+    geometries++;
+    let j = i, id;
+    while (j !== -1) {
+      if (Object.hasOwn(m.elements, String(nodes[j].name))) {
+        id = String(nodes[j].name);
+        break;
+      }
+      j = parents[j];
+    }
+    if (id === void 0) missing.push(i);
+    else ids.add(id);
+  });
+  if (missing.length) throw Error(`Element identity missing for ${missing.length} geometry nodes; preserve source node names and use the matching JSON`);
+  if (!geometries) throw Error("No mesh geometry found");
+  return { buildingId: m.buildingId, layer: m.layer, matched: ids.size, geometries, metadataRecords: Object.keys(m.elements).length, unusedMetadata: Object.keys(m.elements).filter((id) => !ids.has(id)).length, units: m.units, upAxis: m.upAxis, ids: [...ids], spatiallyRegistered: false };
+}
+
+// viewer-src/bim-explorer/load-gate.mjs
+function createLoadGate() {
+  let busy = false;
+  return { get busy() {
+    return busy;
+  }, async run(task) {
+    if (busy) return false;
+    busy = true;
+    try {
+      return await task();
+    } finally {
+      busy = false;
+    }
+  } };
+}
+
+// viewer-src/bim-explorer/catalog.mjs
+var systems = { fixtures: { label: "Receptacles & data", color: "#a78150" }, plumbing: { label: "Plumbing", color: "#5d92b9" }, conduit: { label: "Electrical conduit", color: "#cf9b2b" }, duct: { label: "Ductwork", color: "#408da0" }, equipment: { label: "Equipment", color: "#b78342" }, fire: { label: "Fire protection", color: "#c56666" }, hydronic: { label: "Hydronic piping", color: "#6878b4" }, lifesafety: { label: "Life safety", color: "#77944c" }, lighting: { label: "Lighting", color: "#b3903d" }, structural: { label: "Structure", color: "#a1adb5" } };
+function layerMetadata(elements, layer) {
+  const records2 = Object.values(elements).filter((e) => e.layer === layer), out = {};
+  for (const e of records2) {
+    if (typeof e.sourceId !== "string" || e.sourceKey !== `${layer}:${e.sourceId}` || Object.hasOwn(out, e.sourceId)) throw Error(`Invalid or duplicate source identity in ${layer}`);
+    out[e.sourceId] = e;
+  }
+  return { schemaVersion: 1, buildingId: "grimes", layer, units: "m", upAxis: "Y", elements: out };
+}
+function identityKey(building, layer, id) {
+  return JSON.stringify([building, layer, String(id)]);
+}
+
+// viewer-src/bim-explorer/source-model.mjs
+function levelName(key) {
+  return { LOWER: "Lower level", MEZZ: "Mezzanine", L1: "Level 1", L2: "Level 2", L3: "Level 3", L4: "Level 4", ROOF: "Roof", UNKNOWN: "Unassigned level" }[key] || key;
+}
+function sourceMetadata(json, layer) {
+  if (!json.elements || typeof json.elements !== "object") throw Error("Source identity dictionary missing");
+  const elements = {};
+  for (const [id, e] of Object.entries(json.elements)) {
+    if (!e || typeof e !== "object") throw Error("Invalid source record");
+    let levelKey = e.levelKey;
+    const name = String(e.level || "").toUpperCase();
+    if (!levelKey || levelKey === "UNKNOWN") levelKey = /MEZZ/.test(name) ? "MEZZ" : /LOWER|B1/.test(name) ? "LOWER" : /ROOF/.test(name) ? "ROOF" : name.match(/^LEVEL 0?([1-4])$/)?.[1];
+    if (/^[1-4]$/.test(levelKey)) levelKey = "L" + levelKey;
+    elements[id] = { ...e, levelKey: levelKey || "UNKNOWN" };
+  }
+  return { schemaVersion: 1, buildingId: "grimes", layer, units: "m", upAxis: "Y", elements };
+}
+async function verifyBytes(buffer, expected) {
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", buffer)), (v) => v.toString(16).padStart(2, "0")).join("");
+  if (hash !== expected) throw Error("Source changed since the manifest was audited. Rebuild the source catalogue before loading.");
+  return hash;
+}
+function combineParts(parts, layer) {
+  const records2 = {}, stats = {};
+  let bytes = 0;
+  for (const p of parts) {
+    for (const [key, e] of Object.entries(p.records)) {
+      if (Object.hasOwn(records2, key)) throw Error("Source identity split between chunks");
+      records2[key] = e;
+    }
+    for (const [k, v] of Object.entries(p.stats)) if (typeof v === "number") stats[k] = (stats[k] || 0) + v;
+    bytes += p.bytes;
+  }
+  return { layer, records: records2, stats, bytes, validation: { matched: Object.keys(records2).length } };
+}
+
+// viewer-src/bim-explorer/object-view.mjs
+function createObjectView(THREE2, meshes, keyFor) {
+  const byKey = /* @__PURE__ */ new Map();
+  const states = [...new Set(meshes)].map((mesh) => {
+    const ids = mesh.userData.ids || [];
+    for (const id of new Set(ids)) {
+      const key = keyFor(mesh, id);
+      if (key == null) continue;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push({ mesh, id });
+    }
+    const state = {
+      mesh,
+      ids,
+      geometry: mesh.geometry,
+      ranges: mesh.userData.ranges,
+      hadFilterFlag: Object.hasOwn(mesh.userData, "objectFilterVisible"),
+      filterFlag: mesh.userData.objectFilterVisible,
+      box: mesh.boundingBox,
+      sphere: mesh.boundingSphere,
+      count: mesh.count,
+      filteredGeometry: null,
+      active: false
+    };
+    if (mesh.isInstancedMesh) {
+      state.matrices = mesh.instanceMatrix.array.slice();
+      state.colors = mesh.instanceColor?.array.slice();
+    }
+    return state;
+  });
+  function restoreState(s) {
+    const m = s.mesh;
+    if (s.active) {
+      if (m.isInstancedMesh) {
+        m.instanceMatrix.array.set(s.matrices);
+        m.instanceMatrix.needsUpdate = true;
+        if (s.colors && m.instanceColor) {
+          m.instanceColor.array.set(s.colors);
+          m.instanceColor.needsUpdate = true;
+        }
+        m.count = s.count;
+        m.boundingBox = s.box;
+        m.boundingSphere = s.sphere;
+      } else {
+        m.geometry = s.geometry;
+        m.userData.ranges = s.ranges;
+      }
+      m.userData.ids = s.ids;
+      s.active = false;
+    }
+    if (s.hadFilterFlag) m.userData.objectFilterVisible = s.filterFlag;
+    else delete m.userData.objectFilterVisible;
+  }
+  function setObjectFilter({ isolatedKey: isolatedKey2 = null, hiddenKeys: hiddenKeys2 = /* @__PURE__ */ new Set() } = {}) {
+    const visibleKeys = /* @__PURE__ */ new Set();
+    for (const s of states) {
+      const m = s.mesh;
+      const keep = (id) => {
+        const key = keyFor(m, id);
+        const show = (isolatedKey2 == null || key === isolatedKey2) && !hiddenKeys2.has(key);
+        if (show && key != null) visibleKeys.add(key);
+        return show;
+      };
+      const kept = s.ids.map(keep);
+      if (kept.every(Boolean)) {
+        restoreState(s);
+        continue;
+      }
+      if (!kept.some(Boolean)) {
+        restoreState(s);
+        m.userData.objectFilterVisible = false;
+        continue;
+      }
+      s.active = true;
+      if (m.isInstancedMesh) {
+        const ids = [], colorSize = m.instanceColor?.itemSize || 3;
+        for (let i = 0; i < s.count; i++) {
+          if (!kept[i]) continue;
+          const at = ids.length;
+          m.instanceMatrix.array.set(s.matrices.subarray(i * 16, (i + 1) * 16), at * 16);
+          if (s.colors && m.instanceColor) {
+            m.instanceColor.array.set(s.colors.subarray(i * colorSize, (i + 1) * colorSize), at * colorSize);
+          }
+          ids.push(s.ids[i]);
+        }
+        m.count = ids.length;
+        m.userData.ids = ids;
+        m.instanceMatrix.needsUpdate = true;
+        if (m.instanceColor) m.instanceColor.needsUpdate = true;
+        m.boundingBox = null;
+        m.boundingSphere = null;
+        m.computeBoundingBox();
+        m.computeBoundingSphere();
+        m.userData.objectFilterVisible = m.count > 0;
+      } else if (s.ranges && s.geometry.index) {
+        if (!s.filteredGeometry) {
+          const g2 = s.filteredGeometry = new THREE2.BufferGeometry();
+          for (const [name, attr] of Object.entries(s.geometry.attributes)) g2.setAttribute(name, attr);
+          g2.morphAttributes = s.geometry.morphAttributes;
+          g2.morphTargetsRelative = s.geometry.morphTargetsRelative;
+          g2.boundingBox = s.geometry.boundingBox?.clone() || null;
+          g2.boundingSphere = s.geometry.boundingSphere?.clone() || null;
+          g2.setIndex(new THREE2.BufferAttribute(new s.geometry.index.array.constructor(s.geometry.index.count), 1));
+        }
+        const start = s.geometry.drawRange.start;
+        const end = Math.min(s.geometry.index.count, start + s.geometry.drawRange.count);
+        const allowed = new Set(s.ids.filter((_, i) => kept[i]));
+        const pieces = s.ranges.filter((r) => allowed.has(r.id)).map((r) => ({
+          range: r,
+          from: Math.max(start, r.start),
+          to: Math.min(end, r.start + r.count)
+        })).filter((r) => r.to > r.from);
+        const ranges = [], g = s.filteredGeometry;
+        const indices = g.index.array;
+        let offset = 0;
+        g.clearGroups();
+        for (const p of pieces) {
+          const count = p.to - p.from;
+          indices.set(s.geometry.index.array.subarray(p.from, p.to), offset);
+          ranges.push({ ...p.range, start: offset, count });
+          for (const group of s.geometry.groups) {
+            const from = Math.max(p.from, group.start), to = Math.min(p.to, group.start + group.count);
+            if (to > from) g.addGroup(offset + from - p.from, to - from, group.materialIndex);
+          }
+          offset += count;
+        }
+        g.index.needsUpdate = true;
+        g.setDrawRange(0, offset);
+        m.geometry = g;
+        m.userData.ranges = ranges;
+        m.userData.objectFilterVisible = offset > 0;
+      } else {
+        if (s.ids.length > 1) throw new Error("Object filtering requires merged ranges or instance identities.");
+        if (!s.filteredGeometry) {
+          const g = s.filteredGeometry = new THREE2.BufferGeometry();
+          for (const [name, attr] of Object.entries(s.geometry.attributes)) g.setAttribute(name, attr);
+          g.setIndex(s.geometry.index);
+        }
+        s.filteredGeometry.setDrawRange(0, 0);
+        m.geometry = s.filteredGeometry;
+        m.userData.objectFilterVisible = false;
+      }
+    }
+    return { visibleKeys };
+  }
+  return {
+    byKey,
+    setObjectFilter,
+    restore() {
+      for (const s of states) restoreState(s);
+    },
+    dispose() {
+      for (const s of states) {
+        restoreState(s);
+        s.filteredGeometry?.dispose();
+      }
+      byKey.clear();
+    }
+  };
+}
+var boundsCache = /* @__PURE__ */ new WeakMap();
+function effectiveVisible(mesh) {
+  for (let p = mesh; p; p = p.parent) if (!p.visible) return false;
+  if (mesh.userData.objectFilterVisible === false) return false;
+  if (mesh.isInstancedMesh && mesh.count === 0) return false;
+  return mesh.geometry?.drawRange.count !== 0;
+}
+function pickVisible(raycaster, meshes, clippingPlanes = []) {
+  const candidates = [], hits = [];
+  for (const mesh of new Set(meshes)) {
+    if (!effectiveVisible(mesh) || !mesh.geometry || !raycaster.layers.test(mesh.layers)) continue;
+    mesh.updateWorldMatrix(true, false);
+    const old = boundsCache.get(mesh), version = mesh.instanceMatrix?.version;
+    let bounds = mesh.isInstancedMesh ? mesh.boundingBox : mesh.geometry.boundingBox;
+    if (!bounds || mesh.isInstancedMesh && old && (old.version !== version || old.count !== mesh.count)) {
+      if (mesh.isInstancedMesh) mesh.computeBoundingBox();
+      else mesh.geometry.computeBoundingBox();
+      bounds = mesh.isInstancedMesh ? mesh.boundingBox : mesh.geometry.boundingBox;
+    }
+    let cached = old;
+    if (!cached || cached.geometry !== mesh.geometry || cached.local !== bounds || cached.version !== version || cached.count !== mesh.count || !cached.matrix.equals(mesh.matrixWorld)) {
+      cached = {
+        geometry: mesh.geometry,
+        local: bounds,
+        version,
+        count: mesh.count,
+        matrix: mesh.matrixWorld.clone(),
+        box: bounds.clone().applyMatrix4(mesh.matrixWorld)
+      };
+      boundsCache.set(mesh, cached);
+    }
+    const box = mesh.isLine ? cached.box.clone().expandByScalar(raycaster.params.Line.threshold) : cached.box;
+    if (raycaster.ray.intersectsBox(box)) candidates.push(mesh);
+  }
+  raycaster.intersectObjects(candidates, false, hits);
+  return hits.filter((hit) => {
+    const material = Array.isArray(hit.object.material) ? hit.object.material[hit.face?.materialIndex || 0] : hit.object.material;
+    return material?.visible !== false && !clippingPlanes.some((plane) => plane.distanceToPoint(hit.point) < 0);
+  }).sort((a, b) => a.distance - b.distance);
+}
+
+// viewer-src/bim-explorer/record-index.mjs
+function createRecordIndex(records2) {
+  const entries = Object.entries(records2), byLayer = /* @__PURE__ */ new Map(), byFloor = /* @__PURE__ */ new Map();
+  const searchable = entries.map(([key, e]) => [key, e, [e.sourceId, e.type, e.category, e.element_tag, e.mark, e.layer, e.level].join(" ").toLowerCase()]);
+  for (const [key, e] of entries) {
+    if (!byLayer.has(e.layer)) byLayer.set(e.layer, []);
+    byLayer.get(e.layer).push(key);
+    const floor2 = e.levelKey || "UNKNOWN";
+    if (!byFloor.has(floor2)) byFloor.set(floor2, /* @__PURE__ */ new Map());
+    const counts = byFloor.get(floor2);
+    counts.set(e.layer, (counts.get(e.layer) || 0) + 1);
+  }
+  return {
+    entries,
+    byLayer,
+    byFloor,
+    search(query2, limit = 100, selected2 = null) {
+      const q = query2.trim().toLowerCase(), shown = [];
+      let count = 0, selectedMatch;
+      for (const [key, e, text] of searchable) if (text.includes(q)) {
+        count++;
+        if (shown.length < limit) shown.push([key, e]);
+        else if (key === selected2) selectedMatch = [key, e];
+      }
+      if (selectedMatch) shown.push(selectedMatch);
+      return { count, shown };
+    },
+    count({ layers: layers2, floor: floor2 = "", hiddenKeys: hiddenKeys2 = /* @__PURE__ */ new Set(), isolatedKey: isolatedKey2 = null }) {
+      const enabled = (e) => e && layers2.has(e.layer) && (!floor2 || (e.levelKey || "UNKNOWN") === floor2);
+      if (isolatedKey2) return enabled(records2[isolatedKey2]) && !hiddenKeys2.has(isolatedKey2) ? 1 : 0;
+      let n = 0;
+      for (const layer of layers2) n += floor2 ? byFloor.get(floor2)?.get(layer) || 0 : byLayer.get(layer)?.length || 0;
+      for (const key of hiddenKeys2) if (enabled(records2[key])) n--;
+      return n;
+    }
+  };
+}
+
+// viewer-src/bim-explorer/demand-renderer.mjs
+function createDemandRenderer({ renderer: renderer2, scene: scene2, camera: camera2, controls: controls2, blocked = () => false, onFrame = () => {
+}, pixelRatio = Math.min(globalThis.devicePixelRatio || 1, 1.5) }) {
+  let pending = false, moving = false, dragging = false, settleTimer, disposed = false, frames = 0;
+  const stats = { frames: 0, moving: false, pixelRatio, calls: 0, triangles: 0, cpuSubmitMs: 0 };
+  const setRatio = (ratio) => {
+    if (renderer2.getPixelRatio() !== ratio) renderer2.setPixelRatio(ratio);
+    stats.pixelRatio = ratio;
+  };
+  function settle() {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      if (dragging || disposed) return;
+      moving = false;
+      setRatio(pixelRatio);
+      invalidate2();
+    }, 180);
+  }
+  function invalidate2() {
+    if (pending || disposed || blocked() || document.hidden) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      if (disposed || blocked() || document.hidden) return;
+      controls2.update();
+      const start2 = performance.now();
+      renderer2.render(scene2, camera2);
+      Object.assign(stats, { frames: ++frames, moving, calls: renderer2.info.render.calls, triangles: renderer2.info.render.triangles, cpuSubmitMs: performance.now() - start2 });
+      onFrame({ ...stats });
+    });
+  }
+  const start = () => {
+    dragging = moving = true;
+    clearTimeout(settleTimer);
+    setRatio(Math.min(pixelRatio, 0.85));
+    invalidate2();
+  };
+  const change = () => {
+    if (moving) settle();
+    invalidate2();
+  };
+  const end = () => {
+    dragging = false;
+    settle();
+  };
+  const visibility = () => {
+    if (!document.hidden) {
+      dragging = moving = false;
+      setRatio(pixelRatio);
+      invalidate2();
+    }
+  };
+  controls2.addEventListener("start", start);
+  controls2.addEventListener("change", change);
+  controls2.addEventListener("end", end);
+  document.addEventListener("visibilitychange", visibility);
+  setRatio(pixelRatio);
+  return { invalidate: invalidate2, get stats() {
+    return { ...stats };
+  }, dispose() {
+    disposed = true;
+    clearTimeout(settleTimer);
+    controls2.removeEventListener("start", start);
+    controls2.removeEventListener("change", change);
+    controls2.removeEventListener("end", end);
+    document.removeEventListener("visibilitychange", visibility);
+  } };
+}
+
+// viewer-src/bim-explorer/asset-cache.mjs
+async function verifiedAsset(path, sha256, { fetchBuffer, verify, cacheStorage = globalThis.caches, origin = globalThis.location?.origin, onRead = () => {
+} }) {
+  let cache, key, cacheIssue;
+  if (cacheStorage && origin && /^[a-f0-9]{64}$/i.test(sha256)) {
+    key = `${origin}/__verified_bim_assets__/${sha256.toLowerCase()}`;
+    try {
+      cache = await cacheStorage.open("grimes-verified-geometry-v1");
+    } catch {
+    }
+  }
+  if (cache) {
+    try {
+      const response = await cache.match(key);
+      if (response) {
+        const buffer2 = await response.arrayBuffer();
+        await verify(buffer2, sha256);
+        onRead({ path, bytes: buffer2.byteLength, source: "verified-cache" });
+        return buffer2;
+      }
+    } catch (error) {
+      cacheIssue = error.message;
+      try {
+        await cache.delete(key);
+      } catch {
+      }
+    }
+  }
+  const buffer = await fetchBuffer(path);
+  await verify(buffer, sha256);
+  if (cache) {
+    try {
+      await cache.put(key, new Response(buffer, { headers: { "Content-Type": "application/octet-stream" } }));
+    } catch (error) {
+      cacheIssue = error.message;
+    }
+  }
+  onRead({ path, bytes: buffer.byteLength, source: "network", ...cacheIssue ? { cacheIssue } : {} });
+  return buffer;
+}
+
+// viewer-src/bim-explorer/deployment.mjs
+function deploymentPaths(documentURL) {
+  const project = new URL(".", documentURL);
+  const assets = new URL("bim-explorer-assets/", project);
+  const resolve = (base, value) => {
+    if (typeof value !== "string" || !value || /^[\\/]|^[a-z][a-z\d+.-]*:/i.test(value)) {
+      throw new Error("A project-relative resource path is required.");
+    }
+    const result = new URL(value, base);
+    if (result.origin !== base.origin || !result.pathname.startsWith(base.pathname)) {
+      throw new Error("Resource path is outside its configured directory.");
+    }
+    return result.href;
+  };
+  return {
+    asset: (value) => resolve(assets, value),
+    source: (value) => resolve(project, value)
+  };
+}
+
+// viewer-src/bim-explorer/viewer.mjs
+var deployment = deploymentPaths(document.baseURI);
+var $ = (id) => document.getElementById(id);
+var vp = $("viewport");
+var scene = new THREE.Scene();
+scene.background = new THREE.Color("#eef3f6");
+var camera = new THREE.PerspectiveCamera(42, 1, 1e-3, 1e5);
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+vp.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(16777215, 6320256, 1.8));
+var light = new THREE.DirectionalLight(16777215, 1.5);
+light.position.set(8, 15, 12);
+scene.add(light);
+var controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+var ray = new THREE.Raycaster();
+ray.params.Line.threshold = 0.025;
+var draco = new DRACOLoader().setDecoderPath(deployment.asset("draco/"));
+draco.setWorkerLimit(2);
+var loader = new GLTFLoader().setDRACOLoader(draco);
+var root = null;
+var records = {};
+var report = null;
+var selected = null;
+var mode = null;
+var layers = [];
+var events = [];
+var objectView = null;
+var recordIndex = createRecordIndex({});
+var hiddenKeys = /* @__PURE__ */ new Set();
+var isolatedKey = null;
+var cacheReads = [];
+var gate = createLoadGate();
+var floor = "";
+var buildingSource = false;
+var query = new URLSearchParams(location.search);
+if (!query.has("model") && matchMedia("(max-width: 600px)").matches) $("dataset").value = "regional";
+if (["regional", "conduit", "full"].includes(query.get("model"))) $("dataset").value = query.get("model");
+var draw = createDemandRenderer({ renderer, scene, camera, controls, blocked: () => buildingSource, onFrame: (stats) => {
+  $("render-stats").textContent = `${stats.calls.toLocaleString()} draw calls${stats.moving ? " · navigating" : ""}`;
+} });
+var invalidate = () => draw.invalidate();
+var sectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+function enabledLayers() {
+  return new Set(layers.filter((l) => l.visible).map((l) => l.key));
+}
+new ResizeObserver(() => {
+  camera.aspect = vp.clientWidth / vp.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(vp.clientWidth, vp.clientHeight);
+  invalidate();
+}).observe(vp);
+function visibleBox() {
+  const box = new THREE.Box3(), visible = enabledLayers();
+  for (const [key, e] of recordIndex.entries) if (e.viewBounds && visible.has(e.layer) && (!floor || (e.levelKey || "UNKNOWN") === floor) && !hiddenKeys.has(key) && (!isolatedKey || key === isolatedKey))
+    box.union(new THREE.Box3(new THREE.Vector3(...e.viewBounds.min), new THREE.Vector3(...e.viewBounds.max)));
+  return box;
+}
+function fit(top = false) {
+  if (!root) return;
+  const box = visibleBox();
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()), radius = s.length() / 2;
+  controls.target.copy(c);
+  const direction = (top ? new THREE.Vector3(0, 1, 1e-4) : new THREE.Vector3(0.9, 0.65, 1)).normalize(), right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), direction).normalize(), up = new THREE.Vector3().crossVectors(direction, right), tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  let distance = 0;
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    const v = new THREE.Vector3(x, y, z).sub(c);
+    distance = Math.max(distance, v.dot(direction) + Math.abs(v.dot(right)) / (tan * camera.aspect), v.dot(direction) + Math.abs(v.dot(up)) / tan);
+  }
+  camera.position.copy(c).addScaledVector(direction, distance * 1.09);
+  camera.near = Math.max(radius / 1e4, 1e-3);
+  camera.far = Math.max(radius * 50, 100);
+  camera.updateProjectionMatrix();
+  controls.update();
+  $("view-label").textContent = (top ? "Top view" : "Model overview") + (floor ? " · " + levelName(floor) : "");
+  invalidate();
+}
+$("fit").onclick = () => fit();
+$("top").onclick = () => fit(true);
+function event(message) {
+  events.push({ at: (/* @__PURE__ */ new Date()).toISOString(), message });
+  events = events.slice(-40);
+  $("activity").replaceChildren(...events.slice(-6).reverse().map((e) => {
+    const li = document.createElement("li"), time = document.createElement("time");
+    li.textContent = e.message;
+    time.dateTime = e.at;
+    time.textContent = new Date(e.at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    li.append(time);
+    return li;
+  }));
+}
+function status(message, error = false) {
+  $("status").textContent = message;
+  $("status").className = error ? "error" : "";
+}
+function dispose(object) {
+  const geometries = /* @__PURE__ */ new Set(), materials = /* @__PURE__ */ new Set(), textures = /* @__PURE__ */ new Set();
+  object?.traverse((o) => {
+    if (o.geometry) geometries.add(o.geometry);
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m) {
+      materials.add(m);
+      for (const v of Object.values(m)) if (v?.isTexture) textures.add(v);
+    }
+  });
+  for (const t of textures) t.dispose();
+  for (const m of materials) m.dispose();
+  for (const g of geometries) g.dispose();
+  object?.clear();
+}
+function applyVisibility() {
+  if (!root) return;
+  const visible = enabledLayers();
+  for (const m of root.children) m.visible = visible.has(m.userData.layer) && (!floor || (m.userData.levelKey || "UNKNOWN") === floor) && m.userData.objectFilterVisible !== false;
+  $("metric-visible").textContent = recordIndex.count({ layers: visible, floor, hiddenKeys, isolatedKey }).toLocaleString();
+  $("object-filter-state").textContent = isolatedKey ? "One object isolated" : hiddenKeys.size ? `${hiddenKeys.size} objects hidden` : "";
+  invalidate();
+}
+function highlight(key, enabled) {
+  for (const { mesh, id } of objectView?.byKey.get(key) || []) highlightElementRender(mesh, id, enabled, new THREE.Color("#FDB515"));
+}
+function applyObjectFilter() {
+  highlight(selected, false);
+  objectView?.setObjectFilter({ isolatedKey, hiddenKeys });
+  highlight(selected, true);
+  applyVisibility();
+}
+function setAllLayers(visible) {
+  for (const l of layers) l.visible = visible;
+  for (const input of $("layers").querySelectorAll("input")) input.checked = visible;
+  applyVisibility();
+}
+function resetSection() {
+  const box = visibleBox();
+  $("section-enabled").checked = false;
+  renderer.clippingPlanes = [];
+  if (!box.isEmpty()) {
+    $("section-height").min = box.min.y.toFixed(2);
+    $("section-height").max = box.max.y.toFixed(2);
+    $("section-height").value = ((box.min.y + box.max.y) / 2).toFixed(2);
+  }
+  updateSection();
+}
+function updateSection() {
+  const height = Number($("section-height").value);
+  sectionPlane.constant = height;
+  renderer.clippingPlanes = $("section-enabled").checked ? [sectionPlane] : [];
+  $("section-height").disabled = !$("section-enabled").checked;
+  $("section-value").textContent = `${height.toFixed(2)} m`;
+  invalidate();
+}
+$("section-enabled").onchange = updateSection;
+$("section-height").oninput = updateSection;
+$("isolate").onclick = () => {
+  if (!selected) return;
+  $("section-enabled").checked = false;
+  updateSection();
+  isolatedKey = selected;
+  hiddenKeys.delete(selected);
+  const e = records[selected];
+  floor = e.levelKey || "";
+  $("floor").value = floor;
+  setLayer(e.layer, true);
+  applyObjectFilter();
+  fit();
+};
+$("hide-object").onclick = () => {
+  if (selected) {
+    hiddenKeys.add(selected);
+    isolatedKey = null;
+    applyObjectFilter();
+  }
+};
+function restoreView() {
+  hiddenKeys.clear();
+  isolatedKey = null;
+  floor = "";
+  $("floor").value = "";
+  highlight(selected, false);
+  objectView?.restore();
+  highlight(selected, true);
+  setAllLayers(true);
+  resetSection();
+  fit();
+}
+$("restore-view").onclick = restoreView;
+function visibleCount() {
+  applyVisibility();
+}
+function setLayer(key, visible) {
+  const l = layers.find((l2) => l2.key === key);
+  if (!l) return;
+  l.visible = visible;
+  const cb = $("layers").querySelector(`input[data-layer="${CSS.escape(key)}"]`);
+  if (cb) cb.checked = visible;
+  applyVisibility();
+}
+function setupFloors() {
+  floor = "";
+  $("floor").replaceChildren();
+  for (const key of ["", ...new Set(Object.values(records).map((e) => e.levelKey || "UNKNOWN"))].sort((a, b) => ["", "LOWER", "MEZZ", "L1", "L2", "L3", "L4", "ROOF", "UNKNOWN"].indexOf(a) - ["", "LOWER", "MEZZ", "L1", "L2", "L3", "L4", "ROOF", "UNKNOWN"].indexOf(b))) {
+    const o = document.createElement("option");
+    o.value = key;
+    o.textContent = key ? levelName(key) : "All floors";
+    $("floor").append(o);
+  }
+}
+$("floor").onchange = () => {
+  floor = $("floor").value;
+  applyVisibility();
+  fit();
+};
+function applyColours() {
+  root?.traverse((m) => {
+    for (const mat of Array.isArray(m.material) ? m.material : [m.material]) if (mat?.userData.sourceColour !== void 0) {
+      mat.color.setHex(mat.userData.sourceColour);
+      if ($("colours").value === "systems") mat.color.set(systems[m.userData.layer]?.color || "#829bad");
+    }
+  });
+  invalidate();
+}
+$("colours").onchange = applyColours;
+$("all").onclick = () => {
+  hiddenKeys.clear();
+  isolatedKey = null;
+  applyObjectFilter();
+  setAllLayers(true);
+  event("All systems shown");
+};
+$("none").onclick = () => {
+  setAllLayers(false);
+  event("All systems hidden");
+};
+function renderLayers() {
+  $("layers").replaceChildren(...layers.map((l) => {
+    const row = document.createElement("label"), input = document.createElement("input"), name = document.createElement("span"), count = document.createElement("em");
+    row.className = "layer-row";
+    row.style.setProperty("--system-color", systems[l.key]?.color || "#607080");
+    input.type = "checkbox";
+    input.checked = true;
+    input.dataset.layer = l.key;
+    input.setAttribute("aria-label", systems[l.key]?.label || l.key);
+    input.onchange = () => setLayer(l.key, input.checked);
+    name.className = "layer-name";
+    name.textContent = systems[l.key]?.label || l.key;
+    count.textContent = l.count;
+    row.append(input, name, count);
+    return row;
+  }));
+  $("layer-count").textContent = layers.length;
+  visibleCount();
+}
+function options() {
+  const { count, shown } = recordIndex.search($("search").value, 100, selected);
+  $("objects").replaceChildren(...shown.map(([key, e]) => {
+    const o = document.createElement("option");
+    o.value = key;
+    o.textContent = `${e.type || e.layer} · ${e.sourceId}`;
+    return o;
+  }));
+  $("search-count").textContent = count > 100 ? `${count.toLocaleString()} matches · refine your search` : `${count.toLocaleString()} matching objects`;
+  $("objects").disabled = !count;
+  if (!count) {
+    const o = document.createElement("option");
+    o.textContent = "No matching objects";
+    $("objects").append(o);
+  } else if (shown.some(([k]) => k === selected)) $("objects").value = selected;
+}
+var searchTimer;
+$("search").oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(options, 100);
+};
+function select(key) {
+  const e = records[key];
+  if (!e) return;
+  highlight(selected, false);
+  selected = key;
+  highlight(selected, true);
+  if (!$("objects").querySelector(`option[value="${CSS.escape(key)}"]`)) options();
+  $("objects").value = key;
+  $("type").textContent = e.type || e.category || "BIM component";
+  $("system-name").textContent = systems[e.layer]?.label || e.layer;
+  $("key").textContent = `${e.buildingId} / ${e.layer} / ${e.sourceId}`;
+  $("props").replaceChildren();
+  for (const [label, value] of [["Tag", e.element_tag || e.mark || "Not supplied"], ["System", e.system || e.layer], ["Level", e.level || "Not supplied"], ["Source ID", e.sourceId], ["Location", e.location || "Not supplied"]]) {
+    const dt = document.createElement("dt"), dd = document.createElement("dd");
+    dt.textContent = label;
+    dd.textContent = String(value);
+    $("props").append(dt, dd);
+  }
+  $("raw").textContent = JSON.stringify(e, null, 2);
+  invalidate();
+}
+$("objects").onchange = (e) => select(e.target.value);
+$("focus").onclick = () => {
+  const e = records[selected];
+  if (!e) return;
+  $("section-enabled").checked = false;
+  updateSection();
+  hiddenKeys.delete(selected);
+  isolatedKey = null;
+  applyObjectFilter();
+  if (floor && e.levelKey !== floor) {
+    floor = e.levelKey || "";
+    $("floor").value = floor;
+  }
+  setLayer(e.layer, true);
+  const bounds = e.viewBounds;
+  if (!bounds) {
+    fit();
+    return;
+  }
+  const b = new THREE.Box3(new THREE.Vector3(...bounds.min), new THREE.Vector3(...bounds.max)), c = b.getCenter(new THREE.Vector3()), distance = Math.max(b.getSize(new THREE.Vector3()).length() * 1.8, 1.8);
+  controls.target.copy(c);
+  camera.position.copy(c).add(new THREE.Vector3(0.8, 0.5, 1).normalize().multiplyScalar(distance));
+  controls.update();
+  $("view-label").textContent = e.type || "Selected object";
+  invalidate();
+};
+async function checked(url, kind = "json") {
+  const r = await fetch(url);
+  if (!r.ok) throw Error(`File unavailable (${r.status}): ${url}`);
+  return kind === "buffer" ? r.arrayBuffer() : r.json();
+}
+async function decode(buffer, metadata, transform = null) {
+  const validated = validatePackage(readGLB(buffer), metadata);
+  const gltf = await loader.parseAsync(buffer, "");
+  let built;
+  try {
+    bindElementSourceIds(gltf);
+    const group = new THREE.Group();
+    if (transform) {
+      group.rotation.y = transform.yaw;
+      group.position.fromArray(transform.translation);
+    }
+    group.add(gltf.scene);
+    group.updateMatrixWorld(true);
+    const mapped = {};
+    for (const id of validated.ids) mapped[identityKey(metadata.buildingId, metadata.layer, id)] = { ...metadata.elements[id], buildingId: metadata.buildingId, layer: metadata.layer, sourceId: id };
+    group.traverse((o) => {
+      if (!o.geometry?.attributes.position) return;
+      let id;
+      for (let p = o; p; p = p.parent) if (Object.hasOwn(metadata.elements, p.userData.elementId)) {
+        id = String(p.userData.elementId);
+        break;
+      }
+      if (!id) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld), key = identityKey(metadata.buildingId, metadata.layer, id), old = mapped[key].viewBounds;
+      if (old) b.union(new THREE.Box3(new THREE.Vector3(...old.min), new THREE.Vector3(...old.max)));
+      mapped[key].viewBounds = { min: b.min.toArray(), max: b.max.toArray() };
+    });
+    built = await buildElementRenderTier(THREE, group, metadata.elements, metadata.layer, { groupByType: query.get("batching") === "legacy", preserveMaterial: true });
+    if (built.stats.unidentifiedObjects) throw Error("Geometry without a source identity");
+    for (const m of built.meshes) {
+      m.userData.buildingId = metadata.buildingId;
+      for (const mat of Array.isArray(m.material) ? m.material : [m.material]) if (mat.color) {
+        mat.userData.sourceColour = mat.color.getHex();
+      }
+    }
+    return { meshes: built.meshes, records: mapped, validation: validated, stats: built.stats, bytes: buffer.byteLength, layer: metadata.layer };
+  } catch (e) {
+    if (built) {
+      const g = new THREE.Group();
+      g.add(...built.meshes);
+      dispose(g);
+    } else dispose(gltf.scene);
+    throw e;
+  } finally {
+    releaseElementSource(gltf);
+  }
+}
+async function loadExample() {
+  const choice = $("dataset").value;
+  return requestLoad(async (next) => {
+    if (choice === "full") {
+      buildingSource = true;
+      try {
+        return await loadFull(next);
+      } finally {
+        buildingSource = false;
+      }
+    }
+    if (choice === "conduit") {
+      const [buffer, metadata] = await Promise.all([checked(deployment.asset("sample.glb"), "buffer"), checked(deployment.asset("sample.json"))]);
+      const l = await decode(buffer, metadata);
+      next.add(...l.meshes);
+      return { parts: [l], choice, scope: "Conduit identity exercise · 24 source objects" };
+    }
+    const manifest = await checked(deployment.asset("regional/manifest.json")), all = await checked(deployment.asset("regional/" + manifest.elements)), parts = [];
+    for (const l of manifest.layers) {
+      $("loading").textContent = `Loading ${systems[l.layer]?.label || l.layer}…`;
+      const part = await decode(await checked(deployment.asset("regional/" + l.file), "buffer"), layerMetadata(all, l.layer), manifest.sourceTransform);
+      next.add(...part.meshes);
+      parts.push(part);
+      if (part.validation.matched !== l.objects) throw Error(`Object count mismatch in ${l.layer}`);
+      event(`${systems[l.layer]?.label || l.layer}: ${part.validation.matched} identities verified`);
+    }
+    if (parts.reduce((s, p) => s + p.stats.renderTriangles, 0) !== manifest.triangleInstances) throw Error("Triangle count mismatch");
+    if (parts.reduce((s, p) => s + p.validation.matched, 0) !== manifest.objectCount) throw Error("Package identity count mismatch");
+    return { parts, choice, center: manifest.zone.centerBim, scope: "Level 1 regional package · Eight disciplines · Partial coverage" };
+  });
+}
+async function fetchSourceFile(path) {
+  return checked(deployment.source(path), "buffer");
+}
+async function sourceFile(path, hash) {
+  return verifiedAsset(path, hash, { fetchBuffer: fetchSourceFile, verify: verifyBytes, onRead: (r) => cacheReads.push(r) });
+}
+async function loadFull(next) {
+  const catalog = await checked(deployment.asset("source-catalog.json")), parts = [];
+  let completed = 0;
+  const total = catalog.layers.reduce((s, l) => s + l.parts.length, 0);
+  for (const layer of catalog.layers) {
+    $("loading").textContent = `Restoring ${systems[layer.key]?.label || layer.key} · ${completed}/${total} files`;
+    const raw = await sourceFile(layer.metadata, layer.metadataSHA256);
+    const metadata = sourceMetadata(JSON.parse(new TextDecoder().decode(raw)), layer.key), chunks = [];
+    for (const file of layer.parts) {
+      $("loading").textContent = `Loading ${systems[layer.key]?.label || layer.key} · ${completed + 1}/${total} files`;
+      await new Promise((r) => setTimeout(r, 0));
+      const buffer = await sourceFile(file.path, file.sha256);
+      const part = await decode(buffer, metadata, catalog.transform);
+      if (part.validation.matched !== file.objects || part.stats.renderTriangles !== file.triangles || part.stats.renderSegments !== file.segments) {
+        const g = new THREE.Group();
+        g.add(...part.meshes);
+        dispose(g);
+        throw Error(`Source fidelity mismatch: ${file.path}`);
+      }
+      next.add(...part.meshes);
+      chunks.push(part);
+      completed++;
+    }
+    parts.push(combineParts(chunks, layer.key));
+    event(`${systems[layer.key]?.label || layer.key}: ${layer.objects.toLocaleString()} original identities restored`);
+  }
+  if (parts.reduce((n, p) => n + p.validation.matched, 0) !== catalog.objects) throw Error("Incomplete building identities");
+  return { parts, choice: "full", scope: "Complete BIM · 10 disciplines · Existing source geometry" };
+}
+async function requestLoad(build) {
+  return gate.run(async () => {
+    const next = new THREE.Group(), started = performance.now();
+    cacheReads = [];
+    for (const id of ["demo", "load", "dataset"]) $(id).disabled = true;
+    $("loading").hidden = false;
+    status("Checking the package…");
+    event("Package load started");
+    try {
+      const result = await build(next), newRecords = Object.assign({}, ...result.parts.map((p) => p.records));
+      if (Object.keys(newRecords).length !== result.parts.reduce((s, p) => s + p.validation.matched, 0)) throw Error("Duplicate identity across packages");
+      const old = root;
+      objectView?.dispose();
+      root = next;
+      records = newRecords;
+      recordIndex = createRecordIndex(records);
+      selected = null;
+      hiddenKeys = /* @__PURE__ */ new Set();
+      isolatedKey = null;
+      objectView = createObjectView(THREE, root.children, (m, id) => identityKey(m.userData.buildingId, m.userData.layer, id));
+      mode = result.choice;
+      layers = result.parts.map((p) => ({ key: p.layer, count: p.validation.matched, visible: true }));
+      setupFloors();
+      scene.add(root);
+      if (old) {
+        scene.remove(old);
+        dispose(old);
+      }
+      report = { matched: Object.keys(records).length, ids: Object.keys(records), layers: result.parts.map((p) => ({ layer: p.layer, ...p.stats, matched: p.validation.matched, bytes: p.bytes })), fileBytes: result.parts.reduce((s, p) => s + p.bytes, 0), triangles: result.parts.reduce((s, p) => s + p.stats.renderTriangles, 0), segments: result.parts.reduce((s, p) => s + p.stats.renderSegments, 0), sourceGeometryPreserved: true, batching: query.get("batching") === "legacy" ? "by-type" : "compatible-material-floor-system", cache: { hits: cacheReads.filter((r) => r.source === "verified-cache").length, reads: cacheReads.length, assets: cacheReads }, mode: result.choice, scope: result.scope, units: "m", upAxis: "Y", spatiallyRegistered: false, hardwareValidated: false, validatedAt: (/* @__PURE__ */ new Date()).toISOString(), loadMs: Math.round(performance.now() - started) };
+      applyColours();
+      $("scope").textContent = result.scope;
+      $("search").value = "";
+      options();
+      renderLayers();
+      resetSection();
+      select(Object.keys(records).find((k) => records[k].sourceId === "160988" && records[k].layer === "equipment") || report.ids[0]);
+      fit();
+      if (result.choice === "full") {
+        camera.position.sub(controls.target).multiplyScalar(0.84).add(controls.target);
+        controls.update();
+      }
+      if (result.center) {
+        const c = new THREE.Vector3(...result.center);
+        controls.target.copy(c);
+        camera.position.copy(c).add(new THREE.Vector3(10, 7, 12).multiplyScalar(1.2 * Math.max(1, 1 / camera.aspect)));
+        controls.update();
+        $("view-label").textContent = "Regional overview";
+        invalidate();
+      }
+      $("metric-objects").textContent = report.matched.toLocaleString();
+      $("metric-bytes").textContent = report.fileBytes > 1e6 ? `${(report.fileBytes / 1e6).toFixed(2)} MB` : `${(report.fileBytes / 1e3).toFixed(1)} kB`;
+      $("summary").textContent = `${report.matched} objects · ${report.triangles} triangles · identity preserved`;
+      $("report").disabled = false;
+      status("Ready. Select a component to inspect its source properties.");
+      event(`Ready: ${report.matched} objects in ${layers.length} systems`);
+    } catch (e) {
+      dispose(next);
+      status(e.message, true);
+      event("Load failed; previous model retained");
+      if (mode && mode !== "upload") $("dataset").value = mode;
+    } finally {
+      $("loading").hidden = true;
+      for (const id of ["demo", "load", "dataset"]) $(id).disabled = false;
+      invalidate();
+    }
+  });
+}
+$("demo").onclick = loadExample;
+$("dataset").onchange = loadExample;
+$("load").onclick = () => requestLoad(async (next) => {
+  const g = $("glb").files[0], m = $("json").files[0];
+  if (!g || !m) throw Error("Choose both a GLB and its identity JSON.");
+  if (!g.name.toLowerCase().endsWith(".glb") || !m.name.toLowerCase().endsWith(".json")) throw Error("Choose .glb and .json files.");
+  if (g.size > 100 * 1024 * 1024 || m.size > 20 * 1024 * 1024) throw Error("File limit: GLB 100 MB, JSON 20 MB.");
+  const part = await decode(await g.arrayBuffer(), JSON.parse(await m.text()));
+  next.add(...part.meshes);
+  return { parts: [part], choice: "upload", scope: "Local package · Source coordinates · No physical alignment" };
+});
+function hitKey(h) {
+  const id = resolveElementHit(h.object, h.instanceId, h.faceIndex, h.index);
+  return id === null ? null : identityKey(h.object.userData.buildingId, h.object.userData.layer, id);
+}
+var down;
+renderer.domElement.onpointerdown = (e) => down = [e.clientX, e.clientY];
+renderer.domElement.onpointerup = (e) => {
+  if (!root || !down) return;
+  const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]);
+  down = null;
+  if (moved > 5) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(2 * (e.clientX - r.left) / r.width - 1, 1 - 2 * (e.clientY - r.top) / r.height), camera);
+  const h = pickVisible(ray, root.children, renderer.clippingPlanes).find((h2) => records[hitKey(h2)]);
+  if (h) {
+    $("search").value = "";
+    options();
+    select(hitKey(h));
+  }
+};
+$("report").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...report, render: draw.stats, events }, null, 2)], { type: "application/json" }));
+  a.download = "validation-report.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1e3);
+};
+window.bimLab = { get report() {
+  return report;
+}, get selected() {
+  return selected;
+}, get root() {
+  return root;
+}, get records() {
+  return records;
+}, get frames() {
+  return draw.stats.frames;
+}, get renderStats() {
+  return draw.stats;
+}, select, restoreView, fit, get layers() {
+  return layers;
+}, get floor() {
+  return floor;
+}, scene, camera, renderer, hitKey };
+loadExample();
+
+</script></body></html>

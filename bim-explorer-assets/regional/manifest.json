@@ -1,0 +1,115 @@
+{
+  "schema": "grimes-wearable-package/1",
+  "date": "2026-10-08",
+  "title": "Grimes \u00b7 Level 1 MEP pilot",
+  "scope": "Partial regional package, selected by existing Level 1 metadata and center distance; not a complete room or building.",
+  "units": "meters",
+  "up": "Y",
+  "objectCount": 492,
+  "triangleInstances": 80755,
+  "layers": [
+    {
+      "layer": "conduit",
+      "file": "conduit.glb",
+      "objects": 24,
+      "triangleInstances": 5264,
+      "bytes": 20784
+    },
+    {
+      "layer": "duct",
+      "file": "duct.glb",
+      "objects": 351,
+      "triangleInstances": 9738,
+      "bytes": 749620
+    },
+    {
+      "layer": "equipment",
+      "file": "equipment.glb",
+      "objects": 5,
+      "triangleInstances": 868,
+      "bytes": 11432
+    },
+    {
+      "layer": "fire",
+      "file": "fire.glb",
+      "objects": 61,
+      "triangleInstances": 53216,
+      "bytes": 577984
+    },
+    {
+      "layer": "hydronic",
+      "file": "hydronic.glb",
+      "objects": 12,
+      "triangleInstances": 3168,
+      "bytes": 20928
+    },
+    {
+      "layer": "lifesafety",
+      "file": "lifesafety.glb",
+      "objects": 7,
+      "triangleInstances": 3077,
+      "bytes": 23400
+    },
+    {
+      "layer": "lighting",
+      "file": "lighting.glb",
+      "objects": 3,
+      "triangleInstances": 12,
+      "bytes": 169540
+    },
+    {
+      "layer": "structural",
+      "file": "structural.glb",
+      "objects": 29,
+      "triangleInstances": 5412,
+      "bytes": 30688
+    }
+  ],
+  "elements": "elements.json",
+  "sourceTransform": {
+    "yaw": 3.141592653589793,
+    "translation": [
+      -35.28,
+      -97.16,
+      28.6
+    ]
+  },
+  "zone": {
+    "centerBim": [
+      -30.233741564266833,
+      7.554975051048984,
+      -21.45301786155101
+    ],
+    "horizontalRadiusM": 6
+  },
+  "spawnBim": [
+    -28.233741564266833,
+    4.572,
+    -16.45301786155101
+  ],
+  "floorBimY": 4.572,
+  "floorSource": "Existing project convention; verify on site",
+  "profiles": {
+    "quest2": {
+      "framebufferScale": 0.8,
+      "foveation": 1,
+      "pixelRatioCap": 1,
+      "hardwareValidated": false
+    },
+    "displayCard": {
+      "designSize": [
+        600,
+        600
+      ],
+      "spatialOverlay": false,
+      "hardwareValidated": false
+    }
+  },
+  "calibration": {
+    "method": "gravity-aligned rigid yaw + translation, fixed metric scale",
+    "fitPoints": 3,
+    "independentChecks": 1,
+    "pilotToleranceM": 0.15,
+    "fieldValidated": false
+  }
+}
