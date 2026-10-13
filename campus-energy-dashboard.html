@@ -1,327 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Campus Energy Dashboard · UC Berkeley Digital Twin</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a1020;--panel:rgba(15,23,42,.92);--border:rgba(253,181,21,.12);--gold:#FDB515;--cyan:#2dd4bf;--text:#e2e8f0;--dim:#64748b;--faint:#334155;--red:#f87171;--green:#34d399;--mono:'JetBrains Mono',monospace}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
-a{color:var(--cyan);text-decoration:none}
-.hdr{background:var(--panel);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)}
-.hdr-back{padding:6px 14px;border-radius:8px;border:1px solid var(--border);color:var(--dim);font-size:12px;font-weight:600}
-.hdr-back:hover{border-color:var(--gold);color:var(--gold)}
-.hdr h1{font-size:16px;color:var(--gold);font-weight:700}
-.hdr-live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green)}
-.hdr-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.hdr-ts{font-size:10px;color:var(--dim);font-family:var(--mono)}
-.wrap{max-width:1200px;margin:0 auto;padding:16px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
-.stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
-.stat-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-.stat-val{font:700 26px/1 var(--mono)}
-.stat-sub{font-size:9px;color:var(--dim);margin-top:4px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-@media(max-width:768px){.grid2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.hdr h1{font-size:13px}}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;margin-bottom:12px}
-.card-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.card-title span{font-size:9px;color:var(--dim);font-weight:400;margin-left:auto}
-.chart-box{position:relative;height:220px}
-.chart-box-sm{position:relative;height:160px}
-.sec-title{font-size:13px;font-weight:700;color:var(--text);margin:16px 0 10px;display:flex;align-items:center;gap:8px}
-.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:11px}
-.tbl th{text-align:left;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-bottom:1px solid var(--faint)}
-.tbl td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
-.tbl tr:hover td{background:rgba(253,181,21,.03)}
-.badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;font-family:var(--mono)}
-.badge-on{background:rgba(52,211,153,.15);color:var(--green)}
-.badge-off{background:rgba(100,116,139,.15);color:var(--dim)}
-.badge-warn{background:rgba(248,113,113,.15);color:var(--red)}
-.spark{display:flex;align-items:end;gap:1px;height:20px}
-.spark-bar{width:3px;border-radius:1px;background:var(--cyan);opacity:.7;min-height:1px}
-.anom{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;font-size:11px}
-.no-anom{text-align:center;padding:16px;color:var(--dim);font-size:11px}
-#loading{display:flex;align-items:center;justify-content:center;height:60vh;color:var(--dim);font-size:14px;gap:10px}
-.spin{width:20px;height:20px;border:2px solid var(--faint);border-top-color:var(--cyan);border-radius:50%;animation:sp .6s linear infinite}
-@keyframes sp{to{transform:rotate(360deg)}}
-
-.table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.grid2>*{min-width:0}.card{min-width:0}.stats>*{min-width:0}@media(max-width:768px){.hdr{flex-wrap:wrap;padding:10px;gap:8px}.hdr-ts{flex-basis:100%;padding-left:4px}.card-title{flex-wrap:wrap}.card-title span{margin-left:0}.stat-val{font-size:clamp(18px,5.8vw,26px)}.wrap{padding:10px}}
-@media(max-width:600px){.chart-box{height:280px}.hdr-back{min-height:36px;display:inline-flex;align-items:center}.card-title span{line-height:1.5}}
-</style>
-</head>
+:root{--navy:#14334b;--ink:#172b38;--muted:#526775;--line:#dbe3e8;--bg:#f3f6f8;--gold:#b57500;--teal:#007e80;--red:#a23435;--white:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:#006a78;text-underline-offset:3px}button,input,select{font:inherit}button,select{cursor:pointer}button,select,input{border:1px solid #bccbd4;border-radius:7px;padding:9px 12px;background:white;color:var(--ink);min-height:44px}button:hover{border-color:var(--teal)}:focus-visible{outline:3px solid var(--teal);outline-offset:3px}header{background:var(--navy);color:white;padding:20px max(24px,calc((100vw - 1240px)/2));display:flex;align-items:center;justify-content:space-between;gap:24px}header a{color:#d5e8ed}header strong{font-size:15px}nav{display:flex;gap:22px;font-size:13px}main{max-width:1288px;margin:auto;padding:36px 24px}h1{font-size:clamp(28px,4vw,40px);line-height:1.15;letter-spacing:-1.4px;margin:0 0 12px;font-weight:730}h2{font-size:18px;margin:0 0 8px;letter-spacing:-.3px}p{margin:0 0 12px}.intro{display:flex;justify-content:space-between;gap:28px;margin-bottom:24px}.intro p{color:var(--muted);max-width:72ch}.update{font-size:12px;max-width:270px;text-align:right;color:var(--muted)}.update button{margin-top:10px}.filters{display:flex;flex-wrap:wrap;align-items:end;gap:16px;padding:18px;background:white;border:1px solid var(--line);border-radius:10px;margin-bottom:20px}label{font-size:12px;font-weight:650;display:block}label select,label input{display:block;margin-top:5px;max-width:100%;font-weight:400}label select{min-width:200px}.segments{display:flex;gap:0;margin-top:5px}.segments button{border-radius:0;border-right-width:0;font-size:13px}.segments button:first-child{border-radius:7px 0 0 7px}.segments button:last-child{border-radius:0 7px 7px 0;border-right-width:1px}.segments button[aria-pressed=true]{background:var(--navy);color:white;border-color:var(--navy)}.filter-export{margin-left:auto}.stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:10px;background:white;overflow:hidden;margin-bottom:22px}.stat{padding:20px 22px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.stat:nth-child(3n){border-right:0}.stat:nth-child(n+4){border-bottom:0}.stat-label{font-size:12px;color:var(--muted)}.stat-value{font-size:29px;font-weight:720;letter-spacing:-.8px;font-variant-numeric:tabular-nums;margin:5px 0;line-height:1.2}.unit{font-size:14px;font-weight:500;letter-spacing:0}.stat-note{font-size:12px;color:var(--muted)}.panel{background:white;border:1px solid var(--line);border-radius:10px;padding:24px;margin-bottom:22px;min-width:0}.panel-heading{align-items:start;display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.panel-heading p{color:var(--muted);font-size:13px;margin:0}.chart{height:320px;position:relative}.small-chart{height:295px}.chart-note{font-size:12px;color:var(--muted);margin-top:14px;max-width:95ch}.two{display:grid;grid-template-columns:1.2fr 1fr;gap:22px}.two .panel{margin-bottom:22px}.badge{display:inline-block;border-radius:5px;padding:3px 7px;font-size:11px;font-weight:650;white-space:nowrap;background:#e9eff2;color:var(--muted)}.recent{color:#006363;background:#e0f2ef}.stale{color:#815200;background:#fff0cc}.unknown{color:var(--red);background:#fae7e6}.notice{border-left:3px solid var(--gold);padding:12px 16px;background:#fff5df;font-size:13px;margin-bottom:20px}.error{border-color:var(--red);background:#fcebec}.empty{height:100%;display:grid;place-content:center;color:var(--muted);font-size:14px;text-align:center;padding:24px}.table-scroll{overflow:auto;max-width:100%}table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}caption{text-align:left;font-size:12px;color:var(--muted);padding-bottom:14px}th{font-size:11px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:10px;white-space:nowrap}td{padding:11px 10px;border-bottom:1px solid #edf1f4;vertical-align:top}tbody tr:last-child td{border-bottom:0}.num{font-variant-numeric:tabular-nums;white-space:nowrap}.building-link{background:none;border:0;padding:0;min-height:32px;color:#006a78;text-align:left;text-decoration:underline;text-underline-offset:3px;font-size:13px}td small{display:block;color:var(--muted);font-size:11px}.search{min-width:220px}.section-title{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}details{font-size:13px}summary{cursor:pointer;font-weight:650;min-height:35px;display:list-item}details p,details ul{max-width:100ch;color:var(--muted)}details[open] summary{margin-bottom:16px}.sources{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px}.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--muted);margin-top:14px}.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}footer{font-size:12px;color:var(--muted);padding:8px 0 24px;display:flex;justify-content:space-between;gap:20px}.loading{padding:60px;text-align:center;color:var(--muted)}[hidden]{display:none!important}button:disabled{cursor:not-allowed;opacity:.5}
+@media(max-width:760px){header{padding:16px 20px;align-items:start;gap:14px;flex-direction:column}nav{gap:16px;flex-wrap:wrap}main{padding:24px 16px}.intro{display:block}.update{text-align:left;max-width:none;margin-top:18px}.update button{margin-left:12px}.stats{grid-template-columns:repeat(2,1fr)}.stat{padding:16px}.stat:nth-child(3n){border-right:1px solid var(--line)}.stat:nth-child(2n){border-right:0}.stat:nth-child(n+4){border-bottom:1px solid var(--line)}.stat:nth-child(n+5){border-bottom:0}.stat-value{font-size:25px}.two{grid-template-columns:1fr;gap:0}.filters{gap:12px;padding:14px}.filters>label{flex:1;min-width:0}.filters select{min-width:0;width:100%;font-size:13px}.period{width:100%}.segments button{flex:1;padding:9px}.panel{padding:18px}.panel-heading,.section-title{flex-wrap:wrap}.chart{height:300px}.small-chart{height:290px}.search{width:100%;min-width:0}.section-title label{width:100%}.filter-export{margin-left:0}footer{flex-direction:column}.update{line-height:1.8}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style></head>
 <body>
-<div class="hdr">
-  <a href="grimes-campus-map-arcgis.html" class="hdr-back">← Map</a>
-  <h1>⚡ Campus Energy Dashboard</h1>
-  <a href="weekly-report.html" class="hdr-back">Weekly history →</a>
-  <div class="hdr-live"><div class="hdr-dot"></div>Live</div>
-  <div class="hdr-ts" id="ts">--</div>
+<header><strong>UC Berkeley / Campus Digital Twin</strong><nav aria-label="Research interfaces"><a href="grimes-campus-map-arcgis.html">Campus map</a><a href="weekly-report.html">Weekly history</a><a href="grimes-bim-viewer.html">BIM viewer</a></nav></header>
+<main>
+<div class="intro"><div><h1>Campus Energy Dashboard</h1><p>Explore building demand through the observations we have.<br>Measured utility context for campus digital twin research.</p></div><div class="update"><div id="updated" aria-live="polite">Fetching the published dataset…</div><button id="refresh" type="button">Refresh data</button></div></div>
+<div id="notice" class="notice" role="status" hidden></div>
+<div id="loading" class="loading">Loading BMO observations…</div>
+<div id="app" hidden>
+<section class="filters" aria-label="Observation filters">
+<label>Building<select id="building"></select></label><label>Compare with<select id="compare"><option value="">No comparison</option></select></label>
+<div class="period"><label id="period-label">Observation window</label><div class="segments" role="group" aria-labelledby="period-label"><button data-hours="24" aria-pressed="false">24 hours</button><button data-hours="168" aria-pressed="true">7 days</button><button data-hours="0" aria-pressed="false">All available</button></div></div>
+<button id="export" class="filter-export">Export observations</button>
+</section>
+<section id="stats" class="stats" aria-label="Selected building summary"></section>
+<section class="panel"><div class="panel-heading"><div><h2 id="trend-title">Observed electricity demand</h2><p id="trend-description"></p></div><span class="badge">Measured building context</span></div><div class="chart" id="trend-wrap"><div id="trend-empty" class="empty" hidden>No observations in this window.<br>Choose another building or expand the period.</div><canvas id="trend" role="img" aria-label="Building electricity observations over time; exact readings in the expandable table below"></canvas></div><div id="trend-legend" class="legend"></div><p class="chart-note" id="history-note"></p><details id="observation-details"><summary>Inspect readings and provenance</summary><p>Original BMO timestamps use America/Los_Angeles. Repeated observations are deduplicated; invalid values and ambiguous timestamps are excluded from the chart. CSV contains the selected building and comparison in this window.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Source observations"><table><thead><tr><th>Building</th><th>Observed (Pacific)</th><th>Demand (kW)</th></tr></thead><tbody id="observations"></tbody></table></div></details></section>
+<div class="two">
+<section class="panel"><div class="panel-heading"><div><h2>Latest campus comparison</h2><p>Top 10 available readings · kW</p></div></div><div class="chart small-chart"><canvas id="ranking" role="img" aria-label="Top ten available building demand readings; all readings in the campus table below"></canvas></div><p class="chart-note">Latest available values may have different observation times and partial meter coverage. This is not a synchronized campus total or an efficiency ranking.</p></section>
+<section class="panel"><div class="panel-heading"><div><h2>Demand by building group</h2><p>Share of available readings · kW</p></div></div><div class="chart small-chart"><canvas id="categories" role="img" aria-label="Demand by project-assigned building group"></canvas></div><p class="chart-note">Project-assigned use / academic groups, not an official BMO classification or departmental allocation. Mixed-use buildings have one group.</p><div id="category-values" class="legend"></div></section>
 </div>
-<div class="wrap" id="app"><div id="loading"><div class="spin"></div>Loading energy data...</div></div>
-
-<script>
-const DATA_URL='https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy.json';
-const HIST_URL='https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy_history.json';
-
-Chart.defaults.color='#64748b';
-Chart.defaults.borderColor='rgba(255,255,255,.06)';
-Chart.defaults.font.family="'JetBrains Mono',monospace";
-Chart.defaults.font.size=10;
-
-// Vertical crosshair line on hover
-const crosshairPlugin={
-  id:'crosshair',
-  afterDraw:function(chart){
-    var tt=chart.tooltip;
-    if(!tt||!tt._active||!tt._active.length)return;
-    var activeEl=tt._active[0]&&tt._active[0].element;
-    if(!activeEl)return;
-    var x=activeEl.x;
-    var yAxis=chart.scales.y;
-    if(!yAxis)return;
-    var ctx=chart.ctx;
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x,yAxis.top);
-    ctx.lineTo(x,yAxis.bottom);
-    ctx.lineWidth=1;
-    ctx.strokeStyle='rgba(253,181,21,0.4)';
-    ctx.setLineDash([4,4]);
-    ctx.stroke();
-    ctx.restore();
-  }
-};
-Chart.register(crosshairPlugin);
-
-// Destroy old charts before re-init
-function destroyCharts(){
-  for(var k in charts){
-    if(charts[k]&&typeof charts[k].destroy==='function'){
-      charts[k].destroy();
-    }
-  }
-  charts={};
+<section class="panel"><div class="section-title"><div><h2>Campus reading inventory</h2><p id="inventory-summary" class="chart-note"></p></div><label>Find a building<input id="search" class="search" type="search" placeholder="Name or group"></label></div><div class="table-scroll" tabindex="0" role="region" aria-label="Campus readings"><table><caption>Select a building to inspect its history. “Recent” means within 60 minutes; it does not verify that every meter reported.</caption><thead><tr><th>Building / group</th><th>Latest kW</th><th>Freshness</th><th>Observed (Pacific)</th><th>Responding meters</th></tr></thead><tbody id="inventory"></tbody></table></div><p id="search-empty" hidden>No matching buildings. Try another name or group.</p></section>
+<section class="panel"><details><summary>Estimates, anomaly signals and research limits</summary><p>Energy, cost and carbon below are <strong>constant-demand scenarios</strong>: latest kW × 24 hours, then × $0.15/kWh or × 0.21 kg CO₂/kWh. They are not measured daily consumption, billed tariffs, avoided emissions or savings. The source’s next-demand estimate and anomaly flags are heuristic collector outputs, not validated forecasts or diagnoses.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Source estimates"><table><thead><tr><th>Building</th><th>24h scenario (kWh)</th><th>24h scenario ($)</th><th>24h scenario (kg CO₂)</th><th>Source forecast (kW)</th><th>Source flag</th></tr></thead><tbody id="estimates"></tbody></table></div><p style="margin-top:16px">Grimes combines responding BMO meters 3, 76 and 77. These are building / feeder readings. Brick relationships and provisional design-weighted allocations do not establish measured equipment consumption. No direct per-VAV or pump telemetry is supplied here. A missing meter is not a zero; source aggregates do not establish complete feeder coverage.</p><p>Floor count and building age are not used to claim efficiency. Occupancy, floor area and use are not controlled. No savings or causal performance conclusions are inferred from these observations.</p></details></section>
+<section class="panel"><details><summary>Data sources and collection method</summary><p>BMO CSV exports → scheduled GitHub Actions → public JSON on the data branch. A 15-minute schedule is a collection target, not a guarantee of fresh readings. This page checks the published snapshot every minute. Snapshot generation uses the collector’s UTC clock; BMO observations use Pacific wall time. Date-only or ambiguous local times are marked unavailable rather than guessed.</p><p>The history retains up to 96 collector observations per building. It can span much longer than 24 hours. Windows end at the current time; chart gaps over 60 minutes are not interpolated. Sample mean is unweighted and is not a time-weighted energy estimate.</p><div class="sources"><a id="snapshot-source" href="https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy.json">Snapshot JSON</a><a id="history-source" href="https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy_history.json">History JSON</a><a href="https://github.com/doe2park/Graduate-Project/blob/main/bmo_fetch_campus.py">Collector / calculations</a><a href="https://github.com/doe2park/Graduate-Project/blob/main/TWIN_GENERALIZATION_DESIGN.md">Measurement boundaries</a></div></details></section>
+</div><footer><span>Campus digital twin research · Grimes / Bechtel pilot</span><a href="grimes-performance.html">Design vs actual</a></footer></main>
+<script id="energy-model">
+function finite(v){return typeof v==='number'&&Number.isFinite(v)}
+const pacificParts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+const timeCache=new Map();
+function observedTime(s){
+ if(typeof s!=='string'||!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(s))return null;
+ if(timeCache.has(s))return timeCache.get(s);
+ const nums=s.split(/[- T:]/).map(Number),[y,m,d,h,mi,se]=nums;
+ const wall=Date.UTC(y,m-1,d,h,mi,se),matches=[];
+ for(const offset of [7,8]){const candidate=wall+offset*3600000,p=Object.fromEntries(pacificParts.formatToParts(candidate).map(p=>[p.type,p.value]));if(+p.year===y&&+p.month===m&&+p.day===d&&+p.hour===h&&+p.minute===mi&&+p.second===se)matches.push(candidate)}
+ const result=matches.length===1?matches[0]:null;timeCache.set(s,result);return result;
 }
-
-// Short name helper - never just first word
-function shortName(n){
-  if(!n)return '?';
-  n=n.trim();
-  const map={
-    'Grimes Engineering Center':'Grimes',
-    'Berkeley Way West':'BWW',
-    'Hearst Memorial Mining':'Hearst Mining',
-    'Hearst Memorial Mining Building':'Hearst Mining',
-    'Rec Sports Facility':'RSF',
-    'Recreational Sports Facility':'RSF',
-    'Cesar Chavez Student Center':'Chavez',
-    'Chavez Center':'Chavez',
-    'Latimer & Pimentel Hall':'Latimer',
-    'Latimer Hall':'Latimer',
-    "Hesse & O'Brien Hall":'Hesse',
-    'Hesse Hall':'Hesse',
-    'Donner Laboratory':'Donner',
-    'McLaughlin Hall':'McLaughlin',
-    'Hildebrand Hall':'Hildebrand',
-    'North Gate Hall':'North Gate',
-    'MLK Student Union':'MLK',
-    'Martin Luther King Jr Student Union':'MLK',
-    'Doe Library':'Doe',
-    'Doe Memorial Library':'Doe',
-    'Moffitt Library':'Moffitt',
-    'University Hall':'Univ Hall',
-    'Etcheverry Hall':'Etcheverry',
-    'Sutardja Dai Hall':'Sutardja',
-    'Zellerbach Hall':'Zellerbach',
-    'Stanley Hall':'Stanley',
-    'Sproul Hall':'Sproul',
-    'Mulford Hall':'Mulford',
-    'Giannini Hall':'Giannini',
-  };
-  if(map[n])return map[n];
-  // Fuzzy match
-  for(var k in map){if(n.includes(k)||k.includes(n))return map[k]}
-  return n.replace(/ Hall$/,'').replace(/ Center$/,'').replace(/ Building$/,'').replace(/ Library$/,'');
-}
-
-let charts={};
-
-async function init(){
-  destroyCharts();
-  const [dR,hR]=await Promise.all([fetch(DATA_URL+'?t='+Date.now()),fetch(HIST_URL+'?t='+Date.now()).catch(()=>null)]);
-  const data=await dR.json();
-  let hist={};try{if(hR&&hR.ok)hist=await hR.json()}catch(e){}
-  document.getElementById('ts').textContent=data.generated_at||'';
-  const app=document.getElementById('app');
-  const blds=Object.entries(data.buildings).sort((a,b)=>(b[1].kw||0)-(a[1].kw||0));
-  const online=blds.filter(([,b])=>b.kw!==null);
-  const offline=blds.filter(([,b])=>b.kw===null);
-  const totalKw=data.total_kw||0;
-  const anomalies=data.anomalies||{};
-  const anomKeys=Object.keys(anomalies);
-
-  const cats={};
-  const catColors={'Engineering':'#FDB515','Science':'#34d399','Humanities':'#a78bfa','Professional':'#60a5fa','Student Life':'#f87171','Libraries':'#38bdf8','Other':'#94a3b8'};
-  const catMap={grimes:'Engineering',cory:'Engineering',soda:'Engineering',davis:'Engineering',etch:'Engineering',hmm:'Engineering',hesse:'Engineering',sutardja:'Engineering',mclaughlin:'Engineering',stanley:'Science',tan:'Science',latimer:'Science',birge:'Science',hilde:'Science',lksc:'Science',koshland:'Science',wheeler:'Humanities',dwinelle:'Humanities',barrows:'Humanities',moses:'Humanities',stephens:'Humanities',wurster:'Professional',giannini:'Professional',tolman:'Professional',morgan:'Professional',boalt:'Professional',mlk:'Student Life',rsf:'Student Life',chavez:'Student Life',anthony:'Student Life',sproul:'Other',doe:'Libraries',moffitt:'Libraries',uhall:'Other',northgate:'Other',donner:'Other',bww:'Other',mulford:'Other'};
-  for(const [id,b] of blds){const cat=catMap[id]||'Other';if(!cats[cat])cats[cat]=0;if(b.kw)cats[cat]+=b.kw}
-
-  // Building metadata for analytics
-  var bMeta={grimes:{fl:4,yr:1980},cory:{fl:5,yr:1950},soda:{fl:7,yr:1994},davis:{fl:7,yr:1968},etch:{fl:6,yr:1964},hmm:{fl:3,yr:1907},hesse:{fl:2,yr:1942},sutardja:{fl:4,yr:2009},mclaughlin:{fl:4,yr:1951},stanley:{fl:6,yr:2007},tan:{fl:4,yr:1997},latimer:{fl:5,yr:1963},birge:{fl:9,yr:1964},hilde:{fl:4,yr:1966},wheeler:{fl:4,yr:1917},dwinelle:{fl:6,yr:1952},moses:{fl:3,yr:1931},stephens:{fl:4,yr:1923},wurster:{fl:10,yr:1964},giannini:{fl:4,yr:1930},morgan:{fl:4,yr:1962},mlk:{fl:4,yr:1961},rsf:{fl:3,yr:1984},chavez:{fl:3,yr:1961},sproul:{fl:4,yr:1941},doe:{fl:4,yr:1911},moffitt:{fl:5,yr:1970},uhall:{fl:4,yr:1959},northgate:{fl:3,yr:1906},donner:{fl:3,yr:1942},bww:{fl:7,yr:2020},mulford:{fl:4,yr:1948},anthony:{fl:3,yr:1969},boalt:{fl:4,yr:1951},tolman:{fl:5,yr:1962}};
-
-  // Compute efficiency data
-  var effData=online.map(function(e){
-    var m=bMeta[e[0]];
-    var fl=m?m.fl:3;
-    return {id:e[0],name:e[1].name,kw:e[1].kw,fl:fl,kwPerFloor:Math.round(e[1].kw/fl*10)/10,yr:m?m.yr:null};
-  }).sort(function(a,b){return b.kwPerFloor-a.kwPerFloor});
-
-  var avgEff=effData.length?Math.round(effData.reduce(function(s,e){return s+e.kwPerFloor},0)/effData.length*10)/10:0;
-
-  // Peak / min from history
-  let peakKw=totalKw,peakTime='now',minKw=totalKw,minTime='now';
-
-  app.innerHTML=`
-    <div class="stats">
-      <div class="stat"><div class="stat-lbl">Campus Load</div><div class="stat-val" style="color:var(--gold)">${totalKw.toLocaleString()}<span style="font-size:14px"> kW</span></div><div class="stat-sub">${data.buildings_online}/${data.buildings_total} buildings online</div></div>
-      <div class="stat"><div class="stat-lbl">Est. Daily Cost</div><div class="stat-val" style="color:var(--text)">$${(data.total_daily_cost||0).toLocaleString()}</div><div class="stat-sub">@ $0.15/kWh · Pacific Gas & Electric</div></div>
-      <div class="stat"><div class="stat-lbl">Avg kW/Floor</div><div class="stat-val" style="color:var(--green)">${avgEff}<span style="font-size:14px"> kW</span></div><div class="stat-sub">Demand divided by floor count</div></div>
-      <div class="stat"><div class="stat-lbl">Daily Energy</div><div class="stat-val" style="color:var(--cyan)">${((data.total_daily_kwh||0)/1000).toFixed(1)}<span style="font-size:14px"> MWh</span></div><div class="stat-sub">≈ ${Math.round((data.total_daily_kwh||0)/30)} avg US homes</div></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">⚡ Campus Load — 24hr Timeline <span>Pacific Time · hover for details</span></div>
-      <div class="chart-box"><canvas id="histLine"></canvas></div>
-    </div>
-
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">🏛 Demand by Category <span>Share of available kW readings</span></div>
-        <div class="chart-box"><canvas id="catDonut"></canvas></div>
-        <p style="font-size:11px;color:var(--dim);line-height:1.5;margin:12px 0 0">Project-assigned building groups by use / academic area; not an official BMO classification or departmental energy allocation. Mixed-use buildings have one group.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">📊 Top 10 Buildings <span>Current kW · colors match categories · tap for details</span></div>
-        <div class="chart-box"><canvas id="topBar"></canvas></div>
-      </div>
-    </div>
-
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">📐 Demand per Floor <span>kW / floor · colors match categories</span></div>
-        <div class="chart-box"><canvas id="effBar"></canvas></div>
-        <p style="font-size:11px;color:var(--dim);line-height:1.5;margin:12px 0 0">A rough size-normalized comparison, not an efficiency rating. Floor area, occupancy and building use are not controlled.</p>
-      </div>
-    </div>
-
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title">🏛 Building Age vs Energy <span>Year built vs kW · category colors · tap for details</span></div>
-        <div class="chart-box"><canvas id="ageScatter"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">💰 Cost per Building <span>Est. $/day · category colors · tap for details</span></div>
-        <div class="chart-box"><canvas id="costBar"></canvas></div>
-      </div>
-    </div>
-
-    <div class="sec-title">⚠️ Anomaly Alerts <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:8px">${anomKeys.length} active</span></div>
-    ${anomKeys.length?anomKeys.map(k=>{const a=anomalies[k];const b=data.buildings[k];return '<div class="anom">🔴 <b style="color:var(--red)">'+((b&&b.name)||k)+'</b> — '+a.current+' kW ('+(a.type==='high'?'↑':'↓')+Math.round((a.ratio-1)*100)+'% vs avg '+a.avg+' kW)</div>'}).join(''):'<div class="no-anom">✅ All buildings within normal range</div>'}
-
-    <div class="sec-title">🏢 All Buildings <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:8px">${online.length} live · ${offline.length} offline</span></div>
-    <div class="card" style="overflow-x:auto;padding:8px">
-    <div class="table-scroll" role="region" aria-label="Building readings, scroll horizontally" tabindex="0"><table class="tbl">
-      <tr><th>#</th><th>Building</th><th>Status</th><th>kW</th><th>Trend</th><th>$/day</th><th>CO₂</th><th>Predicted</th></tr>
-      ${blds.map(([id,b],i)=>{const sp=b.sparkline||[];const mx=Math.max(...sp,1);return '<tr>'+
-        '<td style="color:var(--dim)">'+(i+1)+'</td>'+
-        '<td style="font-weight:600">'+b.name+'</td>'+
-        '<td>'+(b.kw!==null?'<span class="badge badge-on">LIVE</span>':'<span class="badge badge-off">OFF</span>')+(anomalies[id]?' <span class="badge badge-warn">⚠</span>':'')+'</td>'+
-        '<td style="font-family:var(--mono);font-weight:700;color:'+(b.kw>200?'var(--red)':b.kw>100?'var(--gold)':'var(--cyan)')+'">'+(b.kw!==null?b.kw+' kW':'—')+'</td>'+
-        '<td><div class="spark">'+(sp.length?sp.map(function(v){return '<div class="spark-bar" style="height:'+Math.max(1,v/mx*20)+'px"></div>'}).join(''):'—')+'</div></td>'+
-        '<td style="font-family:var(--mono);color:var(--gold);font-size:10px">'+(b.est_daily_cost?'$'+b.est_daily_cost:'')+'</td>'+
-        '<td style="font-family:var(--mono);color:var(--green);font-size:10px">'+(b.est_daily_co2_kg?b.est_daily_co2_kg+'kg':'')+'</td>'+
-        '<td style="font-family:var(--mono);color:var(--dim);font-size:10px">'+(b.predicted_kw?'~'+b.predicted_kw:'')+'</td>'+
-        '</tr>'}).join('')}
-    </table></div>
-    </div>
-
-    <div style="text-align:center;padding:20px;font-size:9px;color:var(--faint)">
-      BMO Campus Metering · Auto-updated every 15 min · <a href="grimes-campus-map-arcgis.html">Back to Map</a> · <a href="grimes-bim-viewer.html">3D Viewer</a> · <a href="grimes-performance.html">Design vs Actual</a>
-    </div>
-  `;
-
-  // ── CHARTS ──
-  Object.values(charts).forEach(function(c){c.destroy()});charts={};
-
-  var tooltipOpts={enabled:true,backgroundColor:'rgba(10,16,32,.95)',borderColor:'rgba(253,181,21,.3)',borderWidth:1,titleFont:{size:11,weight:'bold'},bodyFont:{size:window.innerWidth<600?10:12,family:"'JetBrains Mono',monospace"},padding:10,cornerRadius:8,displayColors:true};
-
-  // 1. Donut
-  var catLabels=Object.keys(cats).filter(function(c){return cats[c]>0});
-  var catData=catLabels.map(function(c){return Math.round(cats[c])});
-  var catClrs=catLabels.map(function(c){return catColors[c]||'#94a3b8'});
-  charts.donut=new Chart(document.getElementById('catDonut'),{type:'doughnut',data:{labels:catLabels,datasets:[{data:catData,backgroundColor:catClrs,borderWidth:0,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:window.innerWidth<600?'bottom':'right',labels:{boxWidth:10,padding:8,font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return ctx.label+': '+ctx.raw+' kW ('+Math.round(ctx.raw/totalKw*100)+'%)'}}}}}});
-
-  // 2. Top 10 Bar
-  var top10=online.slice(0,10);
-  charts.topBar=new Chart(document.getElementById('topBar'),{type:'bar',data:{labels:top10.map(function(e){return shortName(e[1].name)}),datasets:[{data:top10.map(function(e){return e[1].kw}),backgroundColor:top10.map(function(e){return catColors[catMap[e[0]]||'Other']}),borderRadius:4,barThickness:16}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var entry=top10[ctx.dataIndex],b=entry[1];return [b.name,(catMap[entry[0]]||'Other')+' · '+b.kw+' kW']}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+'kW'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
-
-  // 3. History Line — normalize to even 3hr intervals
-  var allPts=[];
-  for(var id in hist){var pts=hist[id]||[];pts.forEach(function(p){allPts.push(p)})}
-  // Build time buckets every 15min over 24hrs, labeled every 3hrs
-  var allTimes=new Set();
-  for(var bid of Object.keys(hist)){(hist[bid]||[]).forEach(function(p){allTimes.add(p.t)})}
-  var times=[].concat(Array.from(allTimes)).sort();
-  // Keep last 96 points (24hrs at 15min)
-  times=times.slice(-96);
-
-  if(times.length>2){
-    var totals=times.map(function(t){var sum=0;for(var j=0;j<online.length;j++){var bid2=online[j][0];var pts2=hist[bid2]||[];var pt=null;for(var k=0;k<pts2.length;k++){if(pts2[k].t===t){pt=pts2[k];break}}if(pt)sum+=pt.kw}return Math.round(sum)});
-    // Label every 3 hours (12 ticks for 96 points)
-    var labelInterval=Math.max(1,Math.floor(times.length/8));
-    charts.hist=new Chart(document.getElementById('histLine'),{type:'line',data:{labels:times,datasets:[{label:'Campus kW',data:totals,borderColor:'#FDB515',backgroundColor:'rgba(253,181,21,.08)',fill:true,tension:.3,pointRadius:0,pointHoverRadius:6,pointHoverBackgroundColor:'#FDB515',pointHoverBorderColor:'#fff',pointHoverBorderWidth:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false,axis:'x'},hover:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{mode:'index',intersect:false,callbacks:{title:function(items){return 'Time: '+items[0].label+' PT'},label:function(ctx){return 'Campus load: '+ctx.raw.toLocaleString()+' kW'}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxTicksLimit:8,font:{size:9},callback:function(val,idx){if(idx%labelInterval===0)return times[idx];return ''}}},y:{grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v.toLocaleString()+'kW'}}}}}});
-  } else {
-    document.getElementById('histLine').parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--dim);font-size:12px">History building up... check back in a few hours</div>';
-  }
-
-  // 4. Cost Bar
-  var costTop=online.slice(0,10);
-  charts.cost=new Chart(document.getElementById('costBar'),{type:'bar',data:{labels:costTop.map(function(e){return shortName(e[1].name)}),datasets:[{label:'$/day',data:costTop.map(function(e){return e[1].est_daily_cost}),backgroundColor:costTop.map(function(e){return catColors[catMap[e[0]]||'Other']}),borderRadius:4,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var entry=costTop[ctx.dataIndex],b=entry[1];return [b.name,(catMap[entry[0]]||'Other')+' · est. $'+b.est_daily_cost+'/day',b.kw+' kW × 24 h × $0.15/kWh']}}})},scales:{x:{grid:{display:false},ticks:{font:{size:8}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return '$'+v}}}}}});
-
-  // 5. Efficiency Bar (kW per floor)
-  var effTop=effData.slice(0,10);
-  charts.eff=new Chart(document.getElementById('effBar'),{type:'bar',data:{
-    labels:effTop.map(function(e){return shortName(e.name)}),
-    datasets:[{
-      data:effTop.map(function(e){return e.kwPerFloor}),
-      backgroundColor:effTop.map(function(e){return catColors[catMap[e.id]||'Other']}),
-      borderRadius:4,barThickness:16
-    }]
-  },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var e=effTop[ctx.dataIndex];return [e.name,(catMap[e.id]||'Other')+' · '+e.kwPerFloor+' kW/floor',e.kw+' kW ÷ '+e.fl+' floors']}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+' kW/fl'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
-
-  // 6. Age vs Energy Scatter
-  var scatterData=effData.filter(function(e){return e.yr}).map(function(e){
-    return {id:e.id,x:e.yr,y:e.kw,name:e.name,fl:e.fl,eff:e.kwPerFloor};
-  });
-  var scatterColors=scatterData.map(function(e){return catColors[catMap[e.id]||'Other']});
-  var scMaxKw=Math.max.apply(null,scatterData.map(function(e){return e.y}))||500;
-  var scatterSizes=scatterData.map(function(e){return Math.max(4,Math.min(14,4+(e.y/scMaxKw)*10))});
-  charts.age=new Chart(document.getElementById('ageScatter'),{type:'scatter',data:{
-    datasets:[{
-      data:scatterData,
-      backgroundColor:scatterColors,
-      pointRadius:scatterSizes,
-      pointHitRadius:10,
-      pointHoverRadius:scatterSizes.map(function(s){return s+3}),
-    }]
-  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var d=scatterData[ctx.dataIndex];return [d.name,(catMap[d.id]||'Other')+' · '+d.y+' kW','Built '+d.x+' · '+d.fl+' floors']}}})},scales:{x:{title:{display:true,text:'Year Built',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:8}}},y:{title:{display:true,text:'Current kW',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v+'kW'}}}}}});
-}
-
-init().catch(function(e){document.getElementById('app').innerHTML='<div style="text-align:center;padding:40px;color:var(--red)">Error: '+e.message+'</div>'});
-setInterval(function(){init().catch(function(){})},60000);
+function series(raw){const byTime=new Map();for(const p of Array.isArray(raw)?raw:[]){const x=observedTime(p.ts);if(x!==null&&finite(p.kw))byTime.set(x,{x,kw:p.kw,ts:p.ts})}return [...byTime.values()].sort((a,b)=>a.x-b.x)}
+function windowSeries(points,hours,now){return points.filter(p=>p.x<=now&&(!hours||p.x>=now-hours*3600000))}
+function hasObservations(primary,comparison){return primary.length+comparison.length>0}
+function summarize(points){const values=points.map(p=>p.kw);return {count:values.length,mean:values.length?values.reduce((a,b)=>a+b,0)/values.length:null,peak:values.length?Math.max(...values):null,min:values.length?Math.min(...values):null}}
+function freshness(b,now){if(!finite(b.kw))return {label:'No reading',className:''};const t=observedTime(b.timestamp);if(t===null||t>now+300000)return {label:'Time unknown',className:'unknown'};return now-t<=3600000?{label:'Recent',className:'recent'}:{label:'Stale',className:'stale'}}
+function csvCell(v){let s=String(v??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'}
+function exportCSV(id,b,points,header=true){const rows=header?[['building_id','building','observed_at','timezone','demand_kW','source']]:[];for(const p of points)rows.push([id,b.name,p.ts,'America/Los_Angeles',p.kw,'https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy_history.json']);return rows.map(r=>r.map(csvCell).join(',')).join('\r\n')}
 </script>
-</body>
-</html>
+<script>
+const DATA_URL=document.getElementById('snapshot-source').href,HIST_URL=document.getElementById('history-source').href;
+const colors={Engineering:'#b57500',Science:'#007e80',Humanities:'#78629b',Professional:'#3879a6','Student Life':'#bb6552',Libraries:'#43979e',Other:'#82939e'};
+const groups={grimes:'Engineering',cory:'Engineering',soda:'Engineering',davis:'Engineering',etch:'Engineering',hmm:'Engineering',hesse:'Engineering',sutardja:'Engineering',mclaughlin:'Engineering',stanley:'Science',tan:'Science',latimer:'Science',birge:'Science',hilde:'Science',lksc:'Science',koshland:'Science',wheeler:'Humanities',dwinelle:'Humanities',barrows:'Humanities',moses:'Humanities',stephens:'Humanities',wurster:'Professional',giannini:'Professional',tolman:'Professional',morgan:'Professional',boalt:'Professional',mlk:'Student Life',rsf:'Student Life',chavez:'Student Life',anthony:'Student Life',doe:'Libraries',moffitt:'Libraries'};
+const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=v=>finite(v)?v.toLocaleString('en-US',{maximumFractionDigits:1}):'—';
+const timeLabel=t=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(t);
+let data=null,hist={},historyAvailable=false,normalized={},charts={},hours=168,selected='grimes',comparison='',busy=false;
+function chart(id,config){if(charts[id])charts[id].destroy();if(typeof Chart==='undefined')return;charts[id]=new Chart($(id),config)}
+function baseOptions(){return {responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#14334b',padding:12}},scales:{x:{grid:{display:false},ticks:{color:'#526775',maxRotation:0}},y:{beginAtZero:true,grid:{color:'#edf1f4'},ticks:{color:'#526775'}}}}}
+function selectedPoints(id){return windowSeries(normalized[id]||[],hours,Date.now())}
+function badge(b){const s=freshness(b,Date.now());return '<span class="badge '+s.className+'">'+s.label+'</span>'}
+function stat(label,value,note){return '<div class="stat"><div class="stat-label">'+label+'</div><div class="stat-value">'+value+'</div><div class="stat-note">'+note+'</div></div>'}
+function trendData(points){const out=[];for(const p of points){if(out.length&&p.x-out[out.length-1].x>3600000)out.push({x:p.x-1,y:null});out.push({x:p.x,y:p.kw})}return out}
+function render(){
+ if(!data)return;const b=data.buildings[selected],points=selectedPoints(selected),summary=summarize(points),entries=Object.entries(data.buildings),available=entries.filter(([,b])=>finite(b.kw)),status=freshness(b,Date.now());
+ $('stats').innerHTML=stat('Latest available demand',fmt(b.kw)+' <span class="unit">kW</span>',esc(b.name))+stat('Observation status',badge(b),b.timestamp?esc(b.timestamp)+' Pacific':'No meter timestamp supplied')+stat('Peak in selected window',fmt(summary.peak)+' <span class="unit">kW</span>',summary.count?'Highest observed sample, not a continuous peak':'No valid observations in this window')+stat('Sample mean',fmt(summary.mean)+' <span class="unit">kW</span>','Unweighted observations · not energy')+stat('Observations in window',String(summary.count),'Unique, valid timestamps · gaps retained')+stat('Campus reporting',available.length+' <span class="unit">/ '+entries.length+' buildings</span>','Available values, including stale readings');
+ $('trend-title').textContent=b.name+' demand';$('trend-description').textContent='Observed in Pacific time · '+(hours?hours===24?'last 24 hours':'last 7 days':'all retained observations');
+ const datasets=[{label:b.name,data:trendData(points),borderColor:colors[groups[selected]||'Other'],backgroundColor:colors[groups[selected]||'Other'],pointRadius:3,pointHoverRadius:6,borderWidth:2,tension:0,spanGaps:false}];
+ const cp=comparison?selectedPoints(comparison):[];
+ if(comparison)datasets.push({label:data.buildings[comparison].name,data:trendData(cp),borderColor:'#007e80',backgroundColor:'#007e80',borderDash:[5,4],pointStyle:'rectRot',pointRadius:3,borderWidth:2,tension:0,spanGaps:false});
+ $('trend-legend').innerHTML=datasets.map((d,i)=>'<span><i class="swatch" style="background:'+d.borderColor+'"></i>'+esc(d.label)+(i?' (dashed)':'')+'</span>').join('');
+ const options=baseOptions();options.interaction={mode:'nearest',intersect:false};options.scales.x={type:'linear',grid:{color:'#f1f4f6'},ticks:{maxTicksLimit:5,color:'#526775',callback:v=>timeLabel(v)}};options.scales.y.title={display:true,text:'Electric demand (kW)'};options.plugins.tooltip.callbacks={title:items=>timeLabel(items[0].parsed.x),label:ctx=>ctx.dataset.label+': '+fmt(ctx.parsed.y)+' kW'};
+ const showTrend=hasObservations(points,cp)&&typeof Chart!=='undefined';$('trend').hidden=!showTrend;$('trend-empty').hidden=showTrend;
+ if(showTrend)chart('trend',{type:'line',data:{datasets},options});else if(charts.trend){charts.trend.destroy();delete charts.trend}
+ $('history-note').textContent=!historyAvailable?'History could not be loaded. Current snapshot remains available.':points.length?'Window contains '+points.length+' '+b.name+' observations from '+timeLabel(points[0].x)+' to '+timeLabel(points.at(-1).x)+'. Gaps over 60 minutes are not connected; absent observations are not zero.':'No valid observations for this building in the selected window. Try All available or choose another building. Missing values are not zero.';
+ const rows=[...points.map(p=>({name:b.name,...p})),...cp.map(p=>({name:data.buildings[comparison].name,...p}))].sort((a,b)=>b.x-a.x);
+ $('observations').innerHTML=rows.length?rows.map(p=>'<tr><td>'+esc(p.name)+'</td><td class="num">'+esc(p.ts)+'</td><td class="num">'+fmt(p.kw)+'</td></tr>').join(''):'<tr><td colspan="3">No observations available.</td></tr>';
+ $('export').disabled=!rows.length;
+ renderInventory();
+}
+function renderInventory(){const query=$('search').value.toLowerCase(),entries=Object.entries(data.buildings).sort((a,b)=>(finite(b[1].kw)?b[1].kw:-Infinity)-(finite(a[1].kw)?a[1].kw:-Infinity));const shown=entries.filter(([id,b])=>(b.name+' '+(groups[id]||'Other')).toLowerCase().includes(query));$('inventory').innerHTML=shown.map(([id,b])=>'<tr><td><button class="building-link" data-building="'+esc(id)+'">'+esc(b.name)+'</button><small>'+esc(groups[id]||'Other')+'</small></td><td class="num">'+fmt(b.kw)+'</td><td>'+badge(b)+'</td><td class="num">'+esc(b.timestamp||'—')+'</td><td>'+esc(b.meter||'—')+'</td></tr>').join('');$('search-empty').hidden=shown.length>0;const available=entries.filter(([,b])=>finite(b.kw));const stale=available.filter(([,b])=>freshness(b,Date.now()).label==='Stale').length;$('inventory-summary').textContent=shown.length+' of '+entries.length+' buildings shown · '+available.length+' with readings · '+stale+' stale · '+(entries.length-available.length)+' without readings';}
+function renderCampus(){const entries=Object.entries(data.buildings),available=entries.filter(([,b])=>finite(b.kw)).sort((a,b)=>b[1].kw-a[1].kw),top=available.slice(0,10),opts=baseOptions();opts.indexAxis='y';opts.scales.x.title={display:true,text:'Latest available kW'};opts.scales.y.grid={display:false};opts.scales.y.ticks.font={size:11};chart('ranking',{type:'bar',data:{labels:top.map(([,b])=>b.name.replace(/ Engineering Center$/,'').replace(/ Hall$/,'')),datasets:[{data:top.map(([,b])=>b.kw),backgroundColor:top.map(([id])=>colors[groups[id]||'Other']),borderRadius:3,barThickness:16}]},options:opts});
+ const cats={};for(const [id,b]of available){const g=groups[id]||'Other';cats[g]=(cats[g]||0)+b.kw}const labels=Object.keys(cats);chart('categories',{type:'doughnut',data:{labels,datasets:[{data:labels.map(g=>cats[g]),backgroundColor:labels.map(g=>colors[g]),borderWidth:3,borderColor:'white'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)+' kW'}}}}});$('category-values').innerHTML=labels.map(g=>'<span><i class="swatch" style="background:'+colors[g]+'"></i>'+g+' '+fmt(cats[g])+' kW</span>').join('');
+ $('estimates').innerHTML=entries.map(([id,b])=>{const a=data.anomalies?.[id];return '<tr><td>'+esc(b.name)+'</td><td>'+fmt(b.est_daily_kwh)+'</td><td>'+fmt(b.est_daily_cost)+'</td><td>'+fmt(b.est_daily_co2_kg)+'</td><td>'+fmt(b.predicted_kw)+'</td><td>'+ (a?esc(a.type)+' vs source mean '+fmt(a.avg)+' kW':'No source flag')+'</td></tr>'}).join('');
+}
+async function load(){if(busy)return;busy=true;$('refresh').disabled=true;try{const responses=await Promise.allSettled([fetch(DATA_URL+'?t='+Date.now()).then(r=>{if(!r.ok)throw Error('Snapshot HTTP '+r.status);return r.json()}),fetch(HIST_URL+'?t='+Date.now()).then(r=>{if(!r.ok)throw Error('History HTTP '+r.status);return r.json()})]);if(responses[0].status!=='fulfilled')throw responses[0].reason;const next=responses[0].value;if(!next.buildings||!Object.keys(next.buildings).length)throw Error('Snapshot has no building inventory');data=next;historyAvailable=responses[1].status==='fulfilled';hist=historyAvailable?responses[1].value:{};normalized=Object.fromEntries(Object.keys(data.buildings).map(id=>[id,series(hist[id])]));if(!data.buildings[selected])selected=Object.keys(data.buildings)[0];if(!data.buildings[comparison])comparison='';const options=Object.entries(data.buildings).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,b])=>'<option value="'+esc(id)+'">'+esc(b.name)+'</option>').join('');$('building').innerHTML=options;$('compare').innerHTML='<option value="">No comparison</option>'+options;$('building').value=selected;$('compare').value=comparison;$('updated').textContent='Snapshot generated '+(data.generated_at||'time unavailable')+(data.generated_at?' UTC':'');$('app').hidden=false;$('loading').hidden=true;const warning=typeof Chart==='undefined'?'Chart library unavailable. Exact observations, filters and export remain available.':!historyAvailable?'History request failed. Snapshot readings are shown; refresh to retry.':'';$('notice').textContent=warning;$('notice').hidden=!warning;$('notice').className='notice';renderCampus();render()}catch(e){$('loading').hidden=true;$('notice').hidden=false;$('notice').className='notice error';$('notice').textContent='Could not refresh published data. '+(data?'Previously loaded readings remain visible; their observation times are unchanged. ':'')+'Use Refresh data to retry.';if(data)render()}finally{busy=false;$('refresh').disabled=false}}
+$('building').addEventListener('change',e=>{selected=e.target.value;if(comparison===selected){comparison='';$('compare').value=''}render()});$('compare').addEventListener('change',e=>{comparison=e.target.value===selected?'':e.target.value;$('compare').value=comparison;render()});document.querySelectorAll('[data-hours]').forEach(button=>button.addEventListener('click',()=>{hours=Number(button.dataset.hours);document.querySelectorAll('[data-hours]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));render()}));$('search').addEventListener('input',renderInventory);$('inventory').addEventListener('click',e=>{const button=e.target.closest('[data-building]');if(button){selected=button.dataset.building;$('building').value=selected;if(selected===comparison){comparison='';$('compare').value=''}render();$('building').focus()}});$('refresh').addEventListener('click',load);$('export').addEventListener('click',()=>{let csv=exportCSV(selected,data.buildings[selected],selectedPoints(selected));if(comparison)csv+='\r\n'+exportCSV(comparison,data.buildings[comparison],selectedPoints(comparison),false);const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='campus-observations-'+selected+(comparison?'-'+comparison:'')+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});
+load();setInterval(load,60000);
+</script></body></html>
