@@ -74,7 +74,7 @@ test('Soda channel-only readings do not contradict the brief or inventory availa
  const ui=html.match(/<script>\nconst DATA_URL[\s\S]*?<\/script>/)[0].replace(/^<script>/,'').replace(/<\/script>$/,'').replace('load();setInterval(load,60000);','');
  const ctx={Intl,Date,document:{getElementById:element,querySelectorAll:()=>[]}};vm.createContext(ctx);vm.runInContext(source+ui,ctx);
  vm.runInContext("selected='soda';data={buildings:{soda:{name:'Soda Hall',kw:null,meter:null,meters_configured:['3','76','77'],electricity_channels:[{kw:0,column:'Main 1',status:'observed',timestamp:'2026-10-12 18:45:00'},{kw:42.5,column:'Main 2',status:'observed',timestamp:'2026-10-12 18:45:00'}]}}};renderCampus();render();",ctx);
- assert.match(element('reading-brief').innerHTML,/Individual channels/);
+ assert.match(element('reading-brief').innerHTML,/Individual channels/);assert.match(element('reading-brief').innerHTML,/Device #250/);assert.doesNotMatch(element('reading-brief').innerHTML,/0 of 3 configured/);
  assert.doesNotMatch(element('reading-brief').innerHTML,/No electricity reading is available/);
  assert.match(element('inventory-summary').textContent,/1 with aggregate or separate channel readings · 0 without/);
  assert.match(element('inventory').innerHTML,/Device #250: 2 of 2/);
@@ -118,4 +118,22 @@ test('latest-day fallback excludes future observations',()=>{
 test('archive deduplication has deterministic newest-file priority regardless of request completion',()=>{
  const cache=new Map([['2026-10-13',{g:[{kw:20,ts:'2026-10-12 20:00:00',source:'new'}]}],['2026-10-12',{g:[{kw:10,ts:'2026-10-12 20:00:00',source:'old'}]}]]);
  const rows=c.series(c.mergeArchives(cache).g);assert.equal(rows.length,1);assert.equal(rows[0].kw,20);assert.equal(rows[0].source,'new');
+});
+test('dark restoration uses original compact shell without overwriting saved checkpoints',()=>{
+ assert.match(html,/<header class="hdr">/);
+ assert.match(html,/<main class="wrap">/);
+ assert.match(html,/--bg:#0a1020/);
+ assert.match(html,/<details class="research-details"/);
+ for(const [file,hash] of [['energy-dashboard-before-97c9751.html','cb8a882503f7863ec0fd6a5a981f996dfc0a50b3c804c8a524ea887f94cb0150'],['energy-dashboard-current-ba3d03c7.html','89ee28f2c45a1a96d4a1a90055678ec5dbef567f20b9afb6daf4f59b178f8479']])assert.equal(require('node:crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),hash);
+});
+test('dark overview leads with selected observed demand and retains honest trend gaps',()=>{
+ const elements={};const element=id=>elements[id]??=({innerHTML:'',textContent:'',value:'',href:'https://example.test/source',addEventListener(){},insertAdjacentHTML(_,v){this.innerHTML+=v}}),configs={};
+ const ui=html.match(/<script>\nconst DATA_URL[\s\S]*?<\/script>/)[0].replace(/^<script>/,'').replace(/<\/script>$/,'').replace('load();setInterval(load,60000);','');
+ function FakeChart(el,config){configs[Object.keys(elements).find(k=>elements[k]===el)]=config;this.destroy=()=>{}}FakeChart.defaults={font:{}};FakeChart.register=()=>{};
+ const ctx={Intl,Date,Chart:FakeChart,document:{getElementById:element,querySelectorAll:()=>[]}};vm.createContext(ctx);vm.runInContext(source+ui,ctx);
+ vm.runInContext("hours=0;selected='grimes';data={buildings:{grimes:{name:'Grimes Engineering Center',kw:116.8,timestamp:'2026-10-12 20:15:01',meter:'3+76+77'}}};hist={grimes:[{kw:0,ts:'2026-10-12 01:00:00'},{kw:116.8,ts:'2026-10-12 20:15:01'}]};render();",ctx);
+ assert.match(element('stats').innerHTML,/Latest demand/);assert.match(element('stats').innerHTML,/116.8/);assert.doesNotMatch(element('stats').innerHTML,/Daily Energy|Campus Load|Daily Cost/);
+ assert.match(element('reading-brief').innerHTML,/2026-10-12 20:15:01 Pacific/);assert.match(element('reading-brief').innerHTML,/3, 76, 77/);
+ assert.equal(configs.trend.data.datasets[0].borderColor,'#FDB515');
+ assert.equal(c.connectedSamples(c.series([{kw:0,ts:'2026-10-12 01:00:00'},{kw:2,ts:'2026-10-12 04:00:00'}]))[1].y,null);
 });
