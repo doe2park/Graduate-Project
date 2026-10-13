@@ -26,3 +26,8 @@ class Channels(unittest.TestCase):
             self.assertEqual(m.fetch_latest_kw(Session('time (US/Pacific)\tkW total (kW)\n2026-10-12 18:45:01\t0\n'),'mac','db',mid),(0,'2026-10-12 18:45:01'))
     def test_html_is_not_a_reading(self):
         self.assertTrue(all(c['kw'] is None for c in m.fetch_soda_electric_channels(Session('<html>login</html>'))))
+    def test_last_valid_time_survives_missing_response(self):
+        previous=[{'column':'Electric Main#1 (#...213) Demand (kW)','kw':0,'timestamp':'2026-10-12 18:45:00'}]
+        r=m.fetch_soda_electric_channels(Session('<html>unavailable</html>'),previous)
+        self.assertIsNone(r[0]['kw'])
+        self.assertEqual(r[0]['last_observed_at'],'2026-10-12 18:45:00')

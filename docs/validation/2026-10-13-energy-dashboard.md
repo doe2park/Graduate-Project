@@ -38,3 +38,14 @@ The original source snapshot inspected was generated 2026-10-13 01:53:27 UTC and
 - Python: 13 tests passed; MEP recovery: 7 passed.
 - Independent review: no critical or important findings.
 - Mac Chrome desktop and 390×844 mobile: no horizontal document overflow, large primary number visible in the first mobile screen; no captured console warnings/errors. Verified period/building/comparison controls, zero reading, missing reading and comparison-only chart. Existing CSV export remains covered by regression tests and earlier exact-source download verification.
+
+## Research evidence and Soda mapping correction
+
+- The historical donut summed building kW by category. It is replaced by a true partition of snapshot buildings with/without a numeric aggregate or separate electric observation. A building counts once, including zero; this is not an energy share, completeness or freshness measure.
+- Replaced the sampling chart with current research evidence and next validation priorities. Sampling details remain inspectable. The collection flow is semantic HTML with selectable text and a stacked mobile layout; no image-only explanation or diagram dependency.
+- Device IDs 76/77 are explicitly identifiers, with Grimes voltage labels from `bmo_fetch.py`. `meters_configured` carries the collector's configured denominator; it is not an inventory of all physical meters. Legacy aggregate timestamps remain explicitly unsynchronized.
+- Soda had null aggregate kW, no retained history and no numeric electricity in 187 campus archive snapshots inspected. The existing July 24 channel inventory identifies two Demand(kW) columns on device 250, while the old electricity loop only queried 3/76/77.
+- The collector now retrieves these two exact columns independently and preserves source URL, full original column, kW, unit, Pacific timestamp and response status. It does not sum them or alter legacy 3/76/77 aggregation. The last valid timestamp persists separately through missing responses. Data is written only by the existing automated workflow; its configuration and credentials are unchanged.
+- Existing workflow run 38341208888 succeeded. Published snapshot generated 2026-10-13 03:20:50 UTC contains Soda Main #1 = 199.368 kW and Main #2 = 180.908 kW, both observed 2026-10-12 20:15:00 Pacific. These are audit-time observations, not constants in the UI.
+- Independent review identified and resolved contradictory channel-only availability labels. An integration test renders the actual brief and inventory with channel-only data. Comparison color and point settings are protected by an exact regression against the approved 73fb41d rendering block.
+- Mac Chrome desktop/mobile: diagram, donut, research panel, building selection and missing states checked. At 390×844, content width and document width both 375 CSS pixels, with readable stacked flow. Only unrelated Zotero extension connection errors were captured; no dashboard script errors.

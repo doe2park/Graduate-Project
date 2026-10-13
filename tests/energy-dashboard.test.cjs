@@ -60,3 +60,28 @@ test('sampling context reports irregular cadence and real observation dates, not
 test('comparison intervals retain hours and minutes instead of dropping partial hours',()=>{
  assert.equal(c.duration(20700000,true),'5 h 45 min');assert.equal(c.duration(90000,true),'about 2 min');
 });
+test('availability partitions buildings, not meters, and includes separate channels without summing',()=>{
+ const r=c.availability({a:{kw:0},b:{kw:null},c:{kw:null,electricity_channels:[{kw:10},{kw:null}]}});
+ assert.equal(r.available,2);assert.equal(r.missing,1);assert.equal(r.total,3);
+});
+test('meter coverage counts IDs with an explicit configured denominator',()=>{
+ assert.equal(c.meterCoverage({meter:'3+76+77',meters_configured:['3','76','77']}).label,'3 of 3 configured device IDs returned kW');
+ assert.equal(c.meterCoverage({meter:null,meters_configured:['3','76','77']}).count,0);
+ assert.equal(c.meterCoverage({meter:'76'}).expected,null);
+});
+test('comparison rendering preserves approved colors and point-only settings',()=>{
+ const previous=require('node:child_process').execFileSync('git',['show','73fb41d:campus-energy-dashboard.html'],{encoding:'utf8'});
+ const block=s=>s.slice(s.indexOf(' const datasets='),s.indexOf(" $('trend-legend')"));
+ assert.equal(block(html),block(previous));
+});
+test('Soda channel-only readings do not contradict the brief or inventory availability',()=>{
+ const elements={};const element=id=>elements[id]??=({innerHTML:'',textContent:'',value:'',href:'https://example.test/source',addEventListener(){},insertAdjacentHTML(_,v){this.innerHTML+=v}});
+ const ui=html.match(/<script>\nconst DATA_URL[\s\S]*?<\/script>/)[0].replace(/^<script>/,'').replace(/<\/script>$/,'').replace('load();setInterval(load,60000);','');
+ const ctx={Intl,Date,document:{getElementById:element,querySelectorAll:()=>[]}};vm.createContext(ctx);vm.runInContext(source+ui,ctx);
+ vm.runInContext("selected='soda';data={buildings:{soda:{name:'Soda Hall',kw:null,meter:null,meters_configured:['3','76','77'],electricity_channels:[{kw:0,column:'Main 1',status:'observed',timestamp:'2026-10-12 18:45:00'},{kw:42.5,column:'Main 2',status:'observed',timestamp:'2026-10-12 18:45:00'}]}}};renderCampus();render();",ctx);
+ assert.match(element('reading-brief').innerHTML,/No building aggregate is published/);
+ assert.doesNotMatch(element('reading-brief').innerHTML,/No electricity reading is available/);
+ assert.match(element('inventory-summary').textContent,/1 with aggregate or separate channel readings · 0 without/);
+ assert.match(element('inventory').innerHTML,/Device #250: 2 of 2/);
+ assert.match(element('reading-brief').innerHTML,/0 kW/);
+});

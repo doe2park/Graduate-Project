@@ -138,7 +138,7 @@ def fetch_latest_kw(session, mac, db, meter_id):
 
 # Soda logger 250 exposes two distinct electric demand channels alongside flow.
 # Never add these to the legacy building aggregate: feeder boundaries unverified.
-def fetch_soda_electric_channels(session):
+def fetch_soda_electric_channels(session, previous=()):
     b = next(b for b in BUILDINGS if b["id"] == "soda")
     url = f"{BMO_BASE}/members/mbdev_export.php/{b['mac']}_250.csv"
     columns = ["Electric Main#1 (#...213) Demand (kW)",
@@ -146,6 +146,9 @@ def fetch_soda_electric_channels(session):
     channels = [{"device_id": "250", "column": col, "unit": "kW",
                  "kw": None, "timestamp": None, "timezone": "America/Los_Angeles",
                  "source": url, "status": "unavailable"} for col in columns]
+    for c in channels:
+        old = next((v for v in previous if v.get("column") == c["column"]), {})
+        c["last_observed_at"] = old.get("timestamp") if old.get("kw") is not None else old.get("last_observed_at")
     now = datetime.now()
     params = {"DB": b["db"], "AS": b["mac"], "MB": "250", "DOWNLOAD": "YES",
               "DATE_RANGE_STARTTIME": (now-timedelta(hours=2)).strftime("%Y-%m-%d+%H:%M:%S"),
@@ -167,6 +170,7 @@ def fetch_soda_electric_channels(session):
                 if 0 <= value < 50000:
                     c["kw"] = value
                     c["status"] = "observed"
+                    c["last_observed_at"] = c["timestamp"]
             except (TypeError, ValueError):
                 pass
     except requests.RequestException:
@@ -320,6 +324,10 @@ def run():
     print("  ✓ Logged in\n")
 
     history = load_history()
+    try:
+        prior_channels = json.loads(OUTPUT_FILE.read_text()).get("buildings", {}).get("soda", {}).get("electricity_channels", [])
+    except (OSError, ValueError):
+        prior_channels = []
     results = {}
     online = 0
 
@@ -373,7 +381,7 @@ def run():
             }
 
         if bid == "soda":
-            results[bid]["electricity_channels"] = fetch_soda_electric_channels(session)
+            results[bid]["electricity_channels"] = fetch_soda_electric_channels(session, prior_channels)
             results[bid]["electricity_scope"] = "Separate demand channels; feeder overlap unverified; not summed"
 
         # flow channels (water/steam) where the logger exposes them
