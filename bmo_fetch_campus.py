@@ -136,6 +136,44 @@ def fetch_latest_kw(session, mac, db, meter_id):
 
 
 
+# Soda logger 250 exposes two distinct electric demand channels alongside flow.
+# Never add these to the legacy building aggregate: feeder boundaries unverified.
+def fetch_soda_electric_channels(session):
+    b = next(b for b in BUILDINGS if b["id"] == "soda")
+    url = f"{BMO_BASE}/members/mbdev_export.php/{b['mac']}_250.csv"
+    columns = ["Electric Main#1 (#...213) Demand (kW)",
+               "Electric Main#2 (#...378) Demand (kW)"]
+    channels = [{"device_id": "250", "column": col, "unit": "kW",
+                 "kw": None, "timestamp": None, "timezone": "America/Los_Angeles",
+                 "source": url, "status": "unavailable"} for col in columns]
+    now = datetime.now()
+    params = {"DB": b["db"], "AS": b["mac"], "MB": "250", "DOWNLOAD": "YES",
+              "DATE_RANGE_STARTTIME": (now-timedelta(hours=2)).strftime("%Y-%m-%d+%H:%M:%S"),
+              "DATE_RANGE_ENDTIME": now.strftime("%Y-%m-%d+%H:%M:%S"),
+              "DELIMITER": "TAB", "COLNAMES": "ON", "EXPORTTIMEZONE": TIMEZONE}
+    try:
+        r = session.get(url, params=params, timeout=20)
+        if r.status_code != 200 or "<html" in r.text[:200].lower():
+            return channels
+        rows = list(csv.DictReader(io.StringIO(r.text), delimiter="\t"))
+        if not rows:
+            return channels
+        row = rows[-1]
+        for c in channels:
+            c["timestamp"] = row.get("time (US/Pacific)") or None
+            c["status"] = "column_missing" if c["column"] not in row else "invalid_or_missing"
+            try:
+                value = float(row.get(c["column"]))
+                if 0 <= value < 50000:
+                    c["kw"] = value
+                    c["status"] = "observed"
+            except (TypeError, ValueError):
+                pass
+    except requests.RequestException:
+        pass
+    return channels
+
+
 # ── Flow channels (water / steam / condensate / irrigation) ───────────────
 # Discovered by scripts/discover_channels.py → data/bmo_channels_report.json:
 # 29 buildings expose non-electric channels, almost all on meter #250 (plus a
@@ -325,6 +363,7 @@ def run():
                 "timestamp": ts,
                 "mac": b["mac"],
                 "meter": meter_used,
+                "meters_configured": b["meters"],
                 "predicted_kw": prediction,
                 "anomaly": anomaly,
                 "sparkline": sparkline,
@@ -332,6 +371,10 @@ def run():
                 "est_daily_cost": round(kw * 24 * COST_PER_KWH, 2) if kw is not None else None,
                 "est_daily_co2_kg": round(kw * 24 * CO2_PER_KWH, 1) if kw is not None else None,
             }
+
+        if bid == "soda":
+            results[bid]["electricity_channels"] = fetch_soda_electric_channels(session)
+            results[bid]["electricity_scope"] = "Separate demand channels; feeder overlap unverified; not summed"
 
         # flow channels (water/steam) where the logger exposes them
         if bid in results and bid in FLOW_METERS and "flow" not in results[bid]:
