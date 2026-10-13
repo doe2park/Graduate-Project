@@ -137,3 +137,10 @@ test('dark overview leads with selected observed demand and retains honest trend
  assert.equal(configs.trend.data.datasets[0].borderColor,'#FDB515');
  assert.equal(c.connectedSamples(c.series([{kw:0,ts:'2026-10-12 01:00:00'},{kw:2,ts:'2026-10-12 04:00:00'}]))[1].y,null);
 });
+test('24-hour guide lines adapt to retained observation spacing but cap long gaps at six hours',()=>{
+ const h=3600000,p=[0,9.375,15.125,16.625].map((x,i)=>({x:x*h,kw:i,ts:String(i)}));
+ assert.equal(typeof c.connectionLimit,'function');const limit=c.connectionLimit(p);assert.equal(limit,6*h);
+ const line=c.connectedSamples(p,limit);assert.equal(line.filter(p=>p.y===null).length,1);assert.equal(line[0].y,0);assert.equal(line.at(-1).y,3);
+ assert.equal(c.connectionLimit([{x:0},{x:h/4},{x:h/2}]),h);assert.equal(c.connectionLimit([]),h);
+ assert.equal(c.connectedSamples([{x:0,kw:1},{x:6*h+1,kw:2}],6*h)[1].y,null);
+});
