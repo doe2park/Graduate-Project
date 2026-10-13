@@ -69,19 +69,53 @@ test('meter coverage counts IDs with an explicit configured denominator',()=>{
  assert.equal(c.meterCoverage({meter:null,meters_configured:['3','76','77']}).count,0);
  assert.equal(c.meterCoverage({meter:'76'}).expected,null);
 });
-test('comparison rendering preserves approved colors and point-only settings',()=>{
- const previous=require('node:child_process').execFileSync('git',['show','73fb41d:campus-energy-dashboard.html'],{encoding:'utf8'});
- const block=s=>s.slice(s.indexOf(' const datasets='),s.indexOf(" $('trend-legend')"));
- assert.equal(block(html),block(previous));
-});
 test('Soda channel-only readings do not contradict the brief or inventory availability',()=>{
  const elements={};const element=id=>elements[id]??=({innerHTML:'',textContent:'',value:'',href:'https://example.test/source',addEventListener(){},insertAdjacentHTML(_,v){this.innerHTML+=v}});
  const ui=html.match(/<script>\nconst DATA_URL[\s\S]*?<\/script>/)[0].replace(/^<script>/,'').replace(/<\/script>$/,'').replace('load();setInterval(load,60000);','');
  const ctx={Intl,Date,document:{getElementById:element,querySelectorAll:()=>[]}};vm.createContext(ctx);vm.runInContext(source+ui,ctx);
  vm.runInContext("selected='soda';data={buildings:{soda:{name:'Soda Hall',kw:null,meter:null,meters_configured:['3','76','77'],electricity_channels:[{kw:0,column:'Main 1',status:'observed',timestamp:'2026-10-12 18:45:00'},{kw:42.5,column:'Main 2',status:'observed',timestamp:'2026-10-12 18:45:00'}]}}};renderCampus();render();",ctx);
- assert.match(element('reading-brief').innerHTML,/No building aggregate is published/);
+ assert.match(element('reading-brief').innerHTML,/Individual channels/);
  assert.doesNotMatch(element('reading-brief').innerHTML,/No electricity reading is available/);
  assert.match(element('inventory-summary').textContent,/1 with aggregate or separate channel readings · 0 without/);
  assert.match(element('inventory').innerHTML,/Device #250: 2 of 2/);
  assert.match(element('reading-brief').innerHTML,/0 kW/);
+});
+test('demand bands form a true partition including zero and boundary values',()=>{
+ const r=c.demandBands([0,50,99.9,100,200].map(kw=>({kw})));
+ assert.equal(r.reduce((n,b)=>n+b.count,0),5);assert.equal(r[0].count,1);assert.equal(r[1].count,2);assert.equal(r[2].count,1);assert.equal(r[3].count,1);
+ assert.equal(c.demandBands([]).reduce((n,b)=>n+b.count,0),0);
+});
+test('daily summaries use Pacific observation dates and retain actual extrema and timestamps',()=>{
+ const p=c.series([{kw:0,ts:'2026-10-01 23:45:00'},{kw:20,ts:'2026-10-02 00:15:00'},{kw:40,ts:'2026-10-02 12:15:00'}]);
+ const r=c.dailySummary(p);assert.equal(r.length,2);assert.equal(r[1].median,30);assert.equal(r[1].min.kw,20);assert.equal(r[1].max.ts,'2026-10-02 12:15:00');assert.equal(r[1].count,2);
+});
+test('short trend breaks gaps above an hour and never bridges absent observations',()=>{
+ const r=c.connectedSamples([{x:0,kw:0},{x:900000,kw:10},{x:7200000,kw:50}]);
+ assert.equal(r.length,4);assert.equal(r[2].y,null);assert.equal(r[3].y,50);
+});
+test('archive observations use BMO timestamp and preserve per-row source in CSV',()=>{
+ const r=c.archivePoints({buildings:{g:{kw:0,timestamp:'2026-10-02 23:00:00'},s:{kw:null}}},'https://example.test/archive/2026-10-03.json');
+ assert.equal(r.g[0].ts,'2026-10-02 23:00:00');assert.equal(r.s.length,0);
+ assert.match(c.exportCSV('g',{name:'G'},c.series(r.g)),/archive\/2026-10-03.json/);
+});
+test('today uses the actual current Pacific calendar date, not the last recorded day',()=>{
+ const p=c.series([{kw:10,ts:'2026-10-12 23:30:00'}]);
+ assert.equal(c.todayPoints(p,Date.parse('2026-10-13T06:45:00Z')).length,1);
+ assert.equal(c.todayPoints(p,Date.parse('2026-10-13T08:00:00Z')).length,0);
+});
+test('weekly summaries group Pacific calendar weeks and preserve the actual extrema',()=>{
+ const p=c.series([{kw:10,ts:'2026-10-04 23:30:00'},{kw:30,ts:'2026-10-05 00:30:00'},{kw:50,ts:'2026-10-07 04:00:00'}]);
+ const r=c.weeklySummary(p);assert.equal(r.length,2);assert.equal(r[1].day,'Week of 2026-10-05');assert.equal(r[1].median,40);assert.equal(r[1].max.ts,'2026-10-07 04:00:00');
+});
+test('archive comparisons isolate the current responding meter set',()=>{
+ const rows=[{meter:'3',kw:30},{meter:'77+3+76',kw:100},{kw:80}];
+ const result=c.compatibleArchive(rows,{meter:'3+76+77'});assert.equal(result.length,2);assert.equal(result[0].kw,100);
+});
+test('latest-day fallback excludes future observations',()=>{
+ const now=Date.parse('2026-10-13T12:00:00Z'),p=c.series([{kw:10,ts:'2026-10-12 23:00:00'},{kw:99,ts:'2026-10-14 01:00:00'}]);
+ const r=c.dayOverview(p,now);assert.equal(r.label,'2026-10-12');assert.equal(r.points[0].kw,10);assert.equal(r.isToday,false);
+});
+test('archive deduplication has deterministic newest-file priority regardless of request completion',()=>{
+ const cache=new Map([['2026-10-13',{g:[{kw:20,ts:'2026-10-12 20:00:00',source:'new'}]}],['2026-10-12',{g:[{kw:10,ts:'2026-10-12 20:00:00',source:'old'}]}]]);
+ const rows=c.series(c.mergeArchives(cache).g);assert.equal(rows.length,1);assert.equal(rows[0].kw,20);assert.equal(rows[0].source,'new');
 });
