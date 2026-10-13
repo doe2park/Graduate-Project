@@ -20,10 +20,10 @@ test('period uses elapsed observation time, not a last-96 assumption; no-data st
  const p=[{x:now-2*86400000,kw:10},{x:now-3600000,kw:0}];
  assert.equal(c.windowSeries(p,24,now).length,1);assert.equal(c.summarize([]).mean,null);assert.equal(c.summarize([p[1]]).mean,0);
 });
-test('stale, future and missing readings never receive a recent badge',()=>{
+test('data age is explicit without an arbitrary stale classification',()=>{
  assert.equal(typeof c.freshness,'function');const now=Date.parse('2026-10-13T02:00:00Z');
- assert.equal(c.freshness({kw:0,timestamp:'2026-10-12 18:45:00'},now).label,'Recent');
- assert.equal(c.freshness({kw:10,timestamp:'2026-10-11 18:45:00'},now).label,'Stale');
+ assert.equal(c.freshness({kw:0,timestamp:'2026-10-12 18:45:00'},now).label,'15 minutes ago');
+ assert.equal(c.freshness({kw:10,timestamp:'2026-10-11 18:45:00'},now).label,'1 day ago');
  assert.equal(c.freshness({kw:null,timestamp:'2026-10-12 18:45:00'},now).label,'No reading');
  assert.equal(c.freshness({kw:10,timestamp:'2026-10-14 18:45:00'},now).label,'Time unknown');
 });
@@ -35,4 +35,28 @@ test('CSV retains source observations and units, quotes cells and neutralizes fo
 test('empty chart is unavailable, but a populated comparison is still shown',()=>{
  assert.equal(typeof c.hasObservations,'function');
  assert.equal(c.hasObservations([],[]),false);assert.equal(c.hasObservations([],[{x:1,kw:0}]),true);
+});
+test('interpretation compares observations only with enough comparable samples',()=>{
+ assert.equal(typeof c.interpretation,'function');const now=Date.parse('2026-10-13T02:00:00Z');
+ const b={kw:100,timestamp:'2026-10-12 18:45:00'},points=[{x:now-1800000,kw:50},{x:now-900000,kw:100}];
+ const r=c.interpretation(b,points,now);assert.equal(r.kind,'observed');assert.equal(r.difference,50);assert.equal(r.previous.kw,50);
+ assert.equal(c.interpretation(b,[points[1]],now).kind,'insufficient');
+ assert.equal(c.interpretation({kw:0,timestamp:b.timestamp},[{x:now-1800000,kw:0},{x:now-900000,kw:0}],now).difference,0);
+});
+test('interpretation does not diagnose old data and handles unavailable timestamps',()=>{
+ const now=Date.parse('2026-10-13T02:00:00Z'),points=[{x:now-10000,kw:10},{x:now-5000,kw:20}];
+ assert.equal(c.interpretation({kw:null},points,now).kind,'missing');
+ assert.equal(c.interpretation({kw:100,timestamp:'2026-10-11 18:45:00'},points,now).kind,'insufficient');
+ assert.equal(c.interpretation({kw:100,timestamp:'bad'},points,now).kind,'unknown');
+ assert.equal(c.interpretation({kw:100,timestamp:'2026-10-12 18:45:00'},[],now).kind,'insufficient');
+});
+
+test('sampling context reports irregular cadence and real observation dates, not completeness',()=>{
+ assert.equal(typeof c.sampling,'function');
+ const p=[{x:0,kw:0,ts:'2026-10-01 00:00:00'},{x:3600000,kw:10,ts:'2026-10-01 01:00:00'},{x:10800000,kw:30,ts:'2026-10-02 00:00:00'}];
+ const r=c.sampling(p);assert.equal(r.median,10);assert.equal(r.medianGap,5400000);assert.equal(r.maxGap,7200000);assert.equal(r.days,2);assert.equal(r.peak.ts,p[2].ts);
+ assert.equal(c.sampling([]).median,null);assert.equal(c.sampling([p[0]]).medianGap,null);
+});
+test('comparison intervals retain hours and minutes instead of dropping partial hours',()=>{
+ assert.equal(c.duration(20700000,true),'5 h 45 min');assert.equal(c.duration(90000,true),'about 2 min');
 });
