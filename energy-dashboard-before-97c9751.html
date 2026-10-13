@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Campus Energy Dashboard · UC Berkeley Digital Twin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a1020;--panel:rgba(15,23,42,.92);--border:rgba(253,181,21,.12);--gold:#FDB515;--cyan:#2dd4bf;--text:#e2e8f0;--dim:#64748b;--faint:#334155;--red:#f87171;--green:#34d399;--mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh}
+a{color:var(--cyan);text-decoration:none}
+.hdr{background:var(--panel);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)}
+.hdr-back{padding:6px 14px;border-radius:8px;border:1px solid var(--border);color:var(--dim);font-size:12px;font-weight:600}
+.hdr-back:hover{border-color:var(--gold);color:var(--gold)}
+.hdr h1{font-size:16px;color:var(--gold);font-weight:700}
+.hdr-live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green)}
+.hdr-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hdr-ts{font-size:10px;color:var(--dim);font-family:var(--mono)}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+.stat-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.stat-val{font:700 26px/1 var(--mono)}
+.stat-sub{font-size:9px;color:var(--dim);margin-top:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:768px){.grid2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.hdr h1{font-size:13px}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;margin-bottom:12px}
+.card-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title span{font-size:9px;color:var(--dim);font-weight:400;margin-left:auto}
+.chart-box{position:relative;height:220px}
+.chart-box-sm{position:relative;height:160px}
+.sec-title{font-size:13px;font-weight:700;color:var(--text);margin:16px 0 10px;display:flex;align-items:center;gap:8px}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:11px}
+.tbl th{text-align:left;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;padding:6px 10px;border-bottom:1px solid var(--faint)}
+.tbl td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
+.tbl tr:hover td{background:rgba(253,181,21,.03)}
+.badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;font-family:var(--mono)}
+.badge-on{background:rgba(52,211,153,.15);color:var(--green)}
+.badge-off{background:rgba(100,116,139,.15);color:var(--dim)}
+.badge-warn{background:rgba(248,113,113,.15);color:var(--red)}
+.spark{display:flex;align-items:end;gap:1px;height:20px}
+.spark-bar{width:3px;border-radius:1px;background:var(--cyan);opacity:.7;min-height:1px}
+.anom{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;font-size:11px}
+.no-anom{text-align:center;padding:16px;color:var(--dim);font-size:11px}
+#loading{display:flex;align-items:center;justify-content:center;height:60vh;color:var(--dim);font-size:14px;gap:10px}
+.spin{width:20px;height:20px;border:2px solid var(--faint);border-top-color:var(--cyan);border-radius:50%;animation:sp .6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.table-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.grid2>*{min-width:0}.card{min-width:0}.stats>*{min-width:0}@media(max-width:768px){.hdr{flex-wrap:wrap;padding:10px;gap:8px}.hdr-ts{flex-basis:100%;padding-left:4px}.card-title{flex-wrap:wrap}.card-title span{margin-left:0}.stat-val{font-size:clamp(18px,5.8vw,26px)}.wrap{padding:10px}}
+@media(max-width:600px){.chart-box{height:280px}.hdr-back{min-height:36px;display:inline-flex;align-items:center}.card-title span{line-height:1.5}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <a href="grimes-campus-map-arcgis.html" class="hdr-back">← Map</a>
+  <h1>⚡ Campus Energy Dashboard</h1>
+  <a href="weekly-report.html" class="hdr-back">Weekly history →</a>
+  <div class="hdr-live"><div class="hdr-dot"></div>Live</div>
+  <div class="hdr-ts" id="ts">--</div>
+</div>
+<div class="wrap" id="app"><div id="loading"><div class="spin"></div>Loading energy data...</div></div>
+
+<script>
+const DATA_URL='https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy.json';
+const HIST_URL='https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy_history.json';
+
+Chart.defaults.color='#64748b';
+Chart.defaults.borderColor='rgba(255,255,255,.06)';
+Chart.defaults.font.family="'JetBrains Mono',monospace";
+Chart.defaults.font.size=10;
+
+// Vertical crosshair line on hover
+const crosshairPlugin={
+  id:'crosshair',
+  afterDraw:function(chart){
+    var tt=chart.tooltip;
+    if(!tt||!tt._active||!tt._active.length)return;
+    var activeEl=tt._active[0]&&tt._active[0].element;
+    if(!activeEl)return;
+    var x=activeEl.x;
+    var yAxis=chart.scales.y;
+    if(!yAxis)return;
+    var ctx=chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x,yAxis.top);
+    ctx.lineTo(x,yAxis.bottom);
+    ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(253,181,21,0.4)';
+    ctx.setLineDash([4,4]);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+Chart.register(crosshairPlugin);
+
+// Destroy old charts before re-init
+function destroyCharts(){
+  for(var k in charts){
+    if(charts[k]&&typeof charts[k].destroy==='function'){
+      charts[k].destroy();
+    }
+  }
+  charts={};
+}
+
+// Short name helper - never just first word
+function shortName(n){
+  if(!n)return '?';
+  n=n.trim();
+  const map={
+    'Grimes Engineering Center':'Grimes',
+    'Berkeley Way West':'BWW',
+    'Hearst Memorial Mining':'Hearst Mining',
+    'Hearst Memorial Mining Building':'Hearst Mining',
+    'Rec Sports Facility':'RSF',
+    'Recreational Sports Facility':'RSF',
+    'Cesar Chavez Student Center':'Chavez',
+    'Chavez Center':'Chavez',
+    'Latimer & Pimentel Hall':'Latimer',
+    'Latimer Hall':'Latimer',
+    "Hesse & O'Brien Hall":'Hesse',
+    'Hesse Hall':'Hesse',
+    'Donner Laboratory':'Donner',
+    'McLaughlin Hall':'McLaughlin',
+    'Hildebrand Hall':'Hildebrand',
+    'North Gate Hall':'North Gate',
+    'MLK Student Union':'MLK',
+    'Martin Luther King Jr Student Union':'MLK',
+    'Doe Library':'Doe',
+    'Doe Memorial Library':'Doe',
+    'Moffitt Library':'Moffitt',
+    'University Hall':'Univ Hall',
+    'Etcheverry Hall':'Etcheverry',
+    'Sutardja Dai Hall':'Sutardja',
+    'Zellerbach Hall':'Zellerbach',
+    'Stanley Hall':'Stanley',
+    'Sproul Hall':'Sproul',
+    'Mulford Hall':'Mulford',
+    'Giannini Hall':'Giannini',
+  };
+  if(map[n])return map[n];
+  // Fuzzy match
+  for(var k in map){if(n.includes(k)||k.includes(n))return map[k]}
+  return n.replace(/ Hall$/,'').replace(/ Center$/,'').replace(/ Building$/,'').replace(/ Library$/,'');
+}
+
+let charts={};
+
+async function init(){
+  destroyCharts();
+  const [dR,hR]=await Promise.all([fetch(DATA_URL+'?t='+Date.now()),fetch(HIST_URL+'?t='+Date.now()).catch(()=>null)]);
+  const data=await dR.json();
+  let hist={};try{if(hR&&hR.ok)hist=await hR.json()}catch(e){}
+  document.getElementById('ts').textContent=data.generated_at||'';
+  const app=document.getElementById('app');
+  const blds=Object.entries(data.buildings).sort((a,b)=>(b[1].kw||0)-(a[1].kw||0));
+  const online=blds.filter(([,b])=>b.kw!==null);
+  const offline=blds.filter(([,b])=>b.kw===null);
+  const totalKw=data.total_kw||0;
+  const anomalies=data.anomalies||{};
+  const anomKeys=Object.keys(anomalies);
+
+  const cats={};
+  const catColors={'Engineering':'#FDB515','Science':'#34d399','Humanities':'#a78bfa','Professional':'#60a5fa','Student Life':'#f87171','Libraries':'#38bdf8','Other':'#94a3b8'};
+  const catMap={grimes:'Engineering',cory:'Engineering',soda:'Engineering',davis:'Engineering',etch:'Engineering',hmm:'Engineering',hesse:'Engineering',sutardja:'Engineering',mclaughlin:'Engineering',stanley:'Science',tan:'Science',latimer:'Science',birge:'Science',hilde:'Science',lksc:'Science',koshland:'Science',wheeler:'Humanities',dwinelle:'Humanities',barrows:'Humanities',moses:'Humanities',stephens:'Humanities',wurster:'Professional',giannini:'Professional',tolman:'Professional',morgan:'Professional',boalt:'Professional',mlk:'Student Life',rsf:'Student Life',chavez:'Student Life',anthony:'Student Life',sproul:'Other',doe:'Libraries',moffitt:'Libraries',uhall:'Other',northgate:'Other',donner:'Other',bww:'Other',mulford:'Other'};
+  for(const [id,b] of blds){const cat=catMap[id]||'Other';if(!cats[cat])cats[cat]=0;if(b.kw)cats[cat]+=b.kw}
+
+  // Building metadata for analytics
+  var bMeta={grimes:{fl:4,yr:1980},cory:{fl:5,yr:1950},soda:{fl:7,yr:1994},davis:{fl:7,yr:1968},etch:{fl:6,yr:1964},hmm:{fl:3,yr:1907},hesse:{fl:2,yr:1942},sutardja:{fl:4,yr:2009},mclaughlin:{fl:4,yr:1951},stanley:{fl:6,yr:2007},tan:{fl:4,yr:1997},latimer:{fl:5,yr:1963},birge:{fl:9,yr:1964},hilde:{fl:4,yr:1966},wheeler:{fl:4,yr:1917},dwinelle:{fl:6,yr:1952},moses:{fl:3,yr:1931},stephens:{fl:4,yr:1923},wurster:{fl:10,yr:1964},giannini:{fl:4,yr:1930},morgan:{fl:4,yr:1962},mlk:{fl:4,yr:1961},rsf:{fl:3,yr:1984},chavez:{fl:3,yr:1961},sproul:{fl:4,yr:1941},doe:{fl:4,yr:1911},moffitt:{fl:5,yr:1970},uhall:{fl:4,yr:1959},northgate:{fl:3,yr:1906},donner:{fl:3,yr:1942},bww:{fl:7,yr:2020},mulford:{fl:4,yr:1948},anthony:{fl:3,yr:1969},boalt:{fl:4,yr:1951},tolman:{fl:5,yr:1962}};
+
+  // Compute efficiency data
+  var effData=online.map(function(e){
+    var m=bMeta[e[0]];
+    var fl=m?m.fl:3;
+    return {id:e[0],name:e[1].name,kw:e[1].kw,fl:fl,kwPerFloor:Math.round(e[1].kw/fl*10)/10,yr:m?m.yr:null};
+  }).sort(function(a,b){return b.kwPerFloor-a.kwPerFloor});
+
+  var avgEff=effData.length?Math.round(effData.reduce(function(s,e){return s+e.kwPerFloor},0)/effData.length*10)/10:0;
+
+  // Peak / min from history
+  let peakKw=totalKw,peakTime='now',minKw=totalKw,minTime='now';
+
+  app.innerHTML=`
+    <div class="stats">
+      <div class="stat"><div class="stat-lbl">Campus Load</div><div class="stat-val" style="color:var(--gold)">${totalKw.toLocaleString()}<span style="font-size:14px"> kW</span></div><div class="stat-sub">${data.buildings_online}/${data.buildings_total} buildings online</div></div>
+      <div class="stat"><div class="stat-lbl">Est. Daily Cost</div><div class="stat-val" style="color:var(--text)">$${(data.total_daily_cost||0).toLocaleString()}</div><div class="stat-sub">@ $0.15/kWh · Pacific Gas & Electric</div></div>
+      <div class="stat"><div class="stat-lbl">Avg kW/Floor</div><div class="stat-val" style="color:var(--green)">${avgEff}<span style="font-size:14px"> kW</span></div><div class="stat-sub">Demand divided by floor count</div></div>
+      <div class="stat"><div class="stat-lbl">Daily Energy</div><div class="stat-val" style="color:var(--cyan)">${((data.total_daily_kwh||0)/1000).toFixed(1)}<span style="font-size:14px"> MWh</span></div><div class="stat-sub">≈ ${Math.round((data.total_daily_kwh||0)/30)} avg US homes</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚡ Campus Load — 24hr Timeline <span>Pacific Time · hover for details</span></div>
+      <div class="chart-box"><canvas id="histLine"></canvas></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">🏛 Demand by Category <span>Share of available kW readings</span></div>
+        <div class="chart-box"><canvas id="catDonut"></canvas></div>
+        <p style="font-size:11px;color:var(--dim);line-height:1.5;margin:12px 0 0">Project-assigned building groups by use / academic area; not an official BMO classification or departmental energy allocation. Mixed-use buildings have one group.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Top 10 Buildings <span>Current kW · colors match categories · tap for details</span></div>
+        <div class="chart-box"><canvas id="topBar"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">📐 Demand per Floor <span>kW / floor · colors match categories</span></div>
+        <div class="chart-box"><canvas id="effBar"></canvas></div>
+        <p style="font-size:11px;color:var(--dim);line-height:1.5;margin:12px 0 0">A rough size-normalized comparison, not an efficiency rating. Floor area, occupancy and building use are not controlled.</p>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">🏛 Building Age vs Energy <span>Year built vs kW · category colors · tap for details</span></div>
+        <div class="chart-box"><canvas id="ageScatter"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">💰 Cost per Building <span>Est. $/day · category colors · tap for details</span></div>
+        <div class="chart-box"><canvas id="costBar"></canvas></div>
+      </div>
+    </div>
+
+    <div class="sec-title">⚠️ Anomaly Alerts <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:8px">${anomKeys.length} active</span></div>
+    ${anomKeys.length?anomKeys.map(k=>{const a=anomalies[k];const b=data.buildings[k];return '<div class="anom">🔴 <b style="color:var(--red)">'+((b&&b.name)||k)+'</b> — '+a.current+' kW ('+(a.type==='high'?'↑':'↓')+Math.round((a.ratio-1)*100)+'% vs avg '+a.avg+' kW)</div>'}).join(''):'<div class="no-anom">✅ All buildings within normal range</div>'}
+
+    <div class="sec-title">🏢 All Buildings <span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:8px">${online.length} live · ${offline.length} offline</span></div>
+    <div class="card" style="overflow-x:auto;padding:8px">
+    <div class="table-scroll" role="region" aria-label="Building readings, scroll horizontally" tabindex="0"><table class="tbl">
+      <tr><th>#</th><th>Building</th><th>Status</th><th>kW</th><th>Trend</th><th>$/day</th><th>CO₂</th><th>Predicted</th></tr>
+      ${blds.map(([id,b],i)=>{const sp=b.sparkline||[];const mx=Math.max(...sp,1);return '<tr>'+
+        '<td style="color:var(--dim)">'+(i+1)+'</td>'+
+        '<td style="font-weight:600">'+b.name+'</td>'+
+        '<td>'+(b.kw!==null?'<span class="badge badge-on">LIVE</span>':'<span class="badge badge-off">OFF</span>')+(anomalies[id]?' <span class="badge badge-warn">⚠</span>':'')+'</td>'+
+        '<td style="font-family:var(--mono);font-weight:700;color:'+(b.kw>200?'var(--red)':b.kw>100?'var(--gold)':'var(--cyan)')+'">'+(b.kw!==null?b.kw+' kW':'—')+'</td>'+
+        '<td><div class="spark">'+(sp.length?sp.map(function(v){return '<div class="spark-bar" style="height:'+Math.max(1,v/mx*20)+'px"></div>'}).join(''):'—')+'</div></td>'+
+        '<td style="font-family:var(--mono);color:var(--gold);font-size:10px">'+(b.est_daily_cost?'$'+b.est_daily_cost:'')+'</td>'+
+        '<td style="font-family:var(--mono);color:var(--green);font-size:10px">'+(b.est_daily_co2_kg?b.est_daily_co2_kg+'kg':'')+'</td>'+
+        '<td style="font-family:var(--mono);color:var(--dim);font-size:10px">'+(b.predicted_kw?'~'+b.predicted_kw:'')+'</td>'+
+        '</tr>'}).join('')}
+    </table></div>
+    </div>
+
+    <div style="text-align:center;padding:20px;font-size:9px;color:var(--faint)">
+      BMO Campus Metering · Auto-updated every 15 min · <a href="grimes-campus-map-arcgis.html">Back to Map</a> · <a href="grimes-bim-viewer.html">3D Viewer</a> · <a href="grimes-performance.html">Design vs Actual</a>
+    </div>
+  `;
+
+  // ── CHARTS ──
+  Object.values(charts).forEach(function(c){c.destroy()});charts={};
+
+  var tooltipOpts={enabled:true,backgroundColor:'rgba(10,16,32,.95)',borderColor:'rgba(253,181,21,.3)',borderWidth:1,titleFont:{size:11,weight:'bold'},bodyFont:{size:window.innerWidth<600?10:12,family:"'JetBrains Mono',monospace"},padding:10,cornerRadius:8,displayColors:true};
+
+  // 1. Donut
+  var catLabels=Object.keys(cats).filter(function(c){return cats[c]>0});
+  var catData=catLabels.map(function(c){return Math.round(cats[c])});
+  var catClrs=catLabels.map(function(c){return catColors[c]||'#94a3b8'});
+  charts.donut=new Chart(document.getElementById('catDonut'),{type:'doughnut',data:{labels:catLabels,datasets:[{data:catData,backgroundColor:catClrs,borderWidth:0,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:window.innerWidth<600?'bottom':'right',labels:{boxWidth:10,padding:8,font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return ctx.label+': '+ctx.raw+' kW ('+Math.round(ctx.raw/totalKw*100)+'%)'}}}}}});
+
+  // 2. Top 10 Bar
+  var top10=online.slice(0,10);
+  charts.topBar=new Chart(document.getElementById('topBar'),{type:'bar',data:{labels:top10.map(function(e){return shortName(e[1].name)}),datasets:[{data:top10.map(function(e){return e[1].kw}),backgroundColor:top10.map(function(e){return catColors[catMap[e[0]]||'Other']}),borderRadius:4,barThickness:16}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var entry=top10[ctx.dataIndex],b=entry[1];return [b.name,(catMap[entry[0]]||'Other')+' · '+b.kw+' kW']}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+'kW'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  // 3. History Line — normalize to even 3hr intervals
+  var allPts=[];
+  for(var id in hist){var pts=hist[id]||[];pts.forEach(function(p){allPts.push(p)})}
+  // Build time buckets every 15min over 24hrs, labeled every 3hrs
+  var allTimes=new Set();
+  for(var bid of Object.keys(hist)){(hist[bid]||[]).forEach(function(p){allTimes.add(p.t)})}
+  var times=[].concat(Array.from(allTimes)).sort();
+  // Keep last 96 points (24hrs at 15min)
+  times=times.slice(-96);
+
+  if(times.length>2){
+    var totals=times.map(function(t){var sum=0;for(var j=0;j<online.length;j++){var bid2=online[j][0];var pts2=hist[bid2]||[];var pt=null;for(var k=0;k<pts2.length;k++){if(pts2[k].t===t){pt=pts2[k];break}}if(pt)sum+=pt.kw}return Math.round(sum)});
+    // Label every 3 hours (12 ticks for 96 points)
+    var labelInterval=Math.max(1,Math.floor(times.length/8));
+    charts.hist=new Chart(document.getElementById('histLine'),{type:'line',data:{labels:times,datasets:[{label:'Campus kW',data:totals,borderColor:'#FDB515',backgroundColor:'rgba(253,181,21,.08)',fill:true,tension:.3,pointRadius:0,pointHoverRadius:6,pointHoverBackgroundColor:'#FDB515',pointHoverBorderColor:'#fff',pointHoverBorderWidth:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},interaction:{mode:'index',intersect:false,axis:'x'},hover:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{mode:'index',intersect:false,callbacks:{title:function(items){return 'Time: '+items[0].label+' PT'},label:function(ctx){return 'Campus load: '+ctx.raw.toLocaleString()+' kW'}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{maxTicksLimit:8,font:{size:9},callback:function(val,idx){if(idx%labelInterval===0)return times[idx];return ''}}},y:{grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v.toLocaleString()+'kW'}}}}}});
+  } else {
+    document.getElementById('histLine').parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--dim);font-size:12px">History building up... check back in a few hours</div>';
+  }
+
+  // 4. Cost Bar
+  var costTop=online.slice(0,10);
+  charts.cost=new Chart(document.getElementById('costBar'),{type:'bar',data:{labels:costTop.map(function(e){return shortName(e[1].name)}),datasets:[{label:'$/day',data:costTop.map(function(e){return e[1].est_daily_cost}),backgroundColor:costTop.map(function(e){return catColors[catMap[e[0]]||'Other']}),borderRadius:4,barThickness:18}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var entry=costTop[ctx.dataIndex],b=entry[1];return [b.name,(catMap[entry[0]]||'Other')+' · est. $'+b.est_daily_cost+'/day',b.kw+' kW × 24 h × $0.15/kWh']}}})},scales:{x:{grid:{display:false},ticks:{font:{size:8}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return '$'+v}}}}}});
+
+  // 5. Efficiency Bar (kW per floor)
+  var effTop=effData.slice(0,10);
+  charts.eff=new Chart(document.getElementById('effBar'),{type:'bar',data:{
+    labels:effTop.map(function(e){return shortName(e.name)}),
+    datasets:[{
+      data:effTop.map(function(e){return e.kwPerFloor}),
+      backgroundColor:effTop.map(function(e){return catColors[catMap[e.id]||'Other']}),
+      borderRadius:4,barThickness:16
+    }]
+  },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var e=effTop[ctx.dataIndex];return [e.name,(catMap[e.id]||'Other')+' · '+e.kwPerFloor+' kW/floor',e.kw+' kW ÷ '+e.fl+' floors']}}})},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{callback:function(v){return v+' kW/fl'}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  // 6. Age vs Energy Scatter
+  var scatterData=effData.filter(function(e){return e.yr}).map(function(e){
+    return {id:e.id,x:e.yr,y:e.kw,name:e.name,fl:e.fl,eff:e.kwPerFloor};
+  });
+  var scatterColors=scatterData.map(function(e){return catColors[catMap[e.id]||'Other']});
+  var scMaxKw=Math.max.apply(null,scatterData.map(function(e){return e.y}))||500;
+  var scatterSizes=scatterData.map(function(e){return Math.max(4,Math.min(14,4+(e.y/scMaxKw)*10))});
+  charts.age=new Chart(document.getElementById('ageScatter'),{type:'scatter',data:{
+    datasets:[{
+      data:scatterData,
+      backgroundColor:scatterColors,
+      pointRadius:scatterSizes,
+      pointHitRadius:10,
+      pointHoverRadius:scatterSizes.map(function(s){return s+3}),
+    }]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:Object.assign({},tooltipOpts,{callbacks:{label:function(ctx){var d=scatterData[ctx.dataIndex];return [d.name,(catMap[d.id]||'Other')+' · '+d.y+' kW','Built '+d.x+' · '+d.fl+' floors']}}})},scales:{x:{title:{display:true,text:'Year Built',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:8}}},y:{title:{display:true,text:'Current kW',color:'#64748b',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,ticks:{callback:function(v){return v+'kW'}}}}}});
+}
+
+init().catch(function(e){document.getElementById('app').innerHTML='<div style="text-align:center;padding:40px;color:var(--red)">Error: '+e.message+'</div>'});
+setInterval(function(){init().catch(function(){})},60000);
+</script>
+</body>
+</html>
