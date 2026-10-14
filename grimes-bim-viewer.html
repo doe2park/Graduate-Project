@@ -32,6 +32,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .lm-chips .ef small{opacity:.6;margin-left:3px}
 .tb-menu .tb-btn{text-align:left;display:flex;justify-content:space-between;gap:10px;white-space:nowrap}
 .tb-menu .tb-btn small{color:#6b7fa0;font:500 10px/1 var(--mono)}
+.tb-menu .tb-btn small.layer-retry{color:#94a3b8;font-style:italic;margin-left:4px}
 .tb-menu .tb-btn.active small{color:inherit;opacity:.7}
 @media(max-width:1150px){.tb-sub{display:none}}
 .tb-btn{padding:5px 11px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:#cbd5e1;border-radius:5px;cursor:pointer;font:500 11.5px/1 var(--font);transition:all .15s;text-decoration:none}
@@ -92,6 +93,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
 #twinPanel .badge.hi{background:rgba(248,113,113,.18);color:#f87171}
 #twinPanel .badge.lo{background:rgba(96,165,250,.18);color:#93c5fd}
 #twinPanel .badge.na{background:rgba(148,163,184,.12);color:#94a3b8}
+#twinPanel .badge.mod{background:rgba(253,181,21,.14);color:#fbbf24}
 #twinPanel .srcnote{font:9px/1.4 var(--mono);color:#475569;margin:3px 0 5px}
 #twinPanel canvas{width:100%;height:90px;border-radius:4px;background:rgba(0,0,0,.25);display:block}
 #twinPanel .pt{display:flex;justify-content:space-between;gap:8px;font:10.5px/1.6 var(--mono);padding:1px 0;color:#94a3b8}
@@ -174,6 +176,20 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
 /* ── Walk mode: center crosshair (pointer-locked aiming) ── */
 #crosshair{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;pointer-events:none;font:300 24px/1 var(--font);color:rgba(226,232,240,.75);transition:transform .12s,color .12s;text-shadow:0 0 6px rgba(0,0,0,.8)}
 #crosshair.hot{color:#34d399;transform:translate(-50%,-50%) scale(1.4)}
+/* ── Walk mode: AR gaze card (glasses-style, light, calm) ── */
+#gazeCard{position:fixed;left:0;top:0;z-index:30;max-width:260px;min-width:170px;padding:9px 12px;border-radius:12px;background:rgba(8,14,28,.62);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid rgba(34,211,238,.35);box-shadow:0 6px 24px rgba(0,0,0,.28);color:#e2e8f0;font:13px/1.4 var(--font);pointer-events:none;opacity:0;visibility:hidden;transition:opacity .15s ease,visibility 0s linear .15s}
+#gazeCard.show{opacity:1;visibility:visible;transition:opacity .15s ease,visibility 0s}
+body.capture #gazeCard,body.capture #crosshair{transition:none!important}
+body.capture #clickHint{display:none!important}
+#gazeCard .gz-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#gazeCard .gz-name{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#gazeCard .gz-badge{flex:none;font:700 9.5px/1 var(--mono);letter-spacing:.3px;padding:3px 6px;border-radius:4px;background:rgba(148,163,184,.16);color:#a8b6c9}
+#gazeCard .gz-badge.live{background:rgba(52,211,153,.18);color:#34d399}
+#gazeCard .gz-badge.mod{background:rgba(253,181,21,.16);color:#fbbf24}
+#gazeCard .gz-sub{margin-top:2px;font-size:12px;color:#94a3b8}
+#gazeCard .gz-val{margin-top:6px;font-size:14px;font-weight:600;color:#f1f5f9}
+#gazeCard .gz-det{margin-top:2px;font-size:12px;line-height:1.35;color:#94a3b8}
+#gazeToggleBtn{display:none}body.walking #gazeToggleBtn{display:inline-flex;min-height:36px;align-items:center}
 /* ── Walk mode: current-floor badge ── */
 #levelBadge{display:none;position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:80;background:rgba(8,12,24,.9);border:1px solid rgba(34,211,238,.3);border-radius:14px;padding:5px 14px;font:600 11px/1 var(--mono);color:#67e8f9;pointer-events:none;letter-spacing:.3px}
 /* ── Walk mode hint overlay ── */
@@ -245,6 +261,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
   <span class="tb-title">Grimes · BIM</span>
   <span class="tb-sub">Three.js · GLB · no external BIM service</span>
   <span class="tb-spacer"></span>
+  <button class="tb-btn" id="gazeToggleBtn" onclick="toggleGazeCards()" aria-pressed="true" title="Info cards while aiming in Walk mode (I)">Info cards: on</button>
   <button class="tb-btn" id="walkBtn" onclick="toggleWalk()" title="Explore the building in first person — WASD + mouse, like a game">🚶 Walk</button>
   <div class="tb-dd" id="layersDd">
   <button class="tb-btn" id="allElementsBtn" onclick="toggleAllElements()" aria-pressed="false" title="Show or hide every element layer; floor selection stays separate">Show all elements</button>
@@ -272,7 +289,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
       <div class="lm-chips" id="chips-hydronic" hidden></div>
       <button class="tb-btn" id="layerBtn-plumbing" onclick="toggleLayer('plumbing')" title="Plumbing piping — cast-iron no-hub, ProPress copper, fittings and supports">🚰 Plumbing <small>20.9 MB · 6,035</small></button>
       <div class="lm-chips" id="chips-plumbing" hidden></div>
-      <button class="tb-btn" id="layerBtn-fire" onclick="toggleLayer('fire')" title="Fire-protection piping (Pribuss fabrication) — sprinkler mains, branch pipes, flex drops, seismic bracing. Heaviest layer.">🧨 Fire piping <small>53 MB · 3,861</small></button>
+      <button class="tb-btn" id="layerBtn-fire" onclick="toggleLayer('fire')" title="Fire-protection piping (Pribuss fabrication) — sprinkler mains, branch pipes, flex drops, seismic bracing. Heaviest layer.">🧨 Fire piping <small>85.9 MB · 10,938</small></button>
       <div class="lm-chips" id="chips-fire" hidden></div>
     </div>
   </div>
@@ -316,6 +333,7 @@ body.twin-open #equipFilter,body.compare-on #equipFilter{display:none}
 <div id="mobileWalkPad" aria-label="Touch Walk controls"><div class="walk-move"><span></span><button data-walk-key="KeyW" aria-label="Move forward">↑</button><span></span><button data-walk-key="KeyA" aria-label="Move left">←</button><button data-walk-key="KeyS" aria-label="Move backward">↓</button><button data-walk-key="KeyD" aria-label="Move right">→</button></div><div class="walk-actions"><button id="mobileHeightUp" aria-label="Raise eye height">Height +</button><button id="mobileHeightDown" aria-label="Lower eye height">Height −</button><button id="mobileInspect">Inspect</button><button id="mobileWalkExit">Exit Walk</button></div></div>
 <section id="mobileElementBrowser" hidden role="dialog" aria-modal="true" aria-label="Find BIM element"><header><b>Find a BIM element</b><button id="mobileElementClose" aria-label="Close object search">Close</button></header><label for="mobileElementSearch">Name, tag or element ID</label><input id="mobileElementSearch" type="search" placeholder="Search equipment…" autocomplete="off"><div id="mobileElementStatus" role="status"></div><div id="mobileElementResults"></div></section>
 <div id="levelBadge"></div>
+<div id="gazeCard" role="status" aria-live="off"></div>
 <div id="walkHint"><b>WASD</b> move · <b>mouse</b> look · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>Esc</b> exit</div>
 
 <div id="twinPanel">
@@ -451,7 +469,9 @@ const SYSTEMS = [
   { name:'HVAC Duct',      label:'HVAC Ductwork',      hex:0x34d399 },
   { name:'HVAC Equipment', label:'HVAC Equipment',     hex:0x0ea87a },
   { name:'Diffusers',      label:'Diffusers / Grilles',hex:0x86efac },
-  { name:'Electrical',     label:'Spiral Ductwork',    hex:0x2dd4bf },
+  // The 'Electrical' overview mesh is a single ~8 cm, 12-triangle fragment (grimes-mep-only.glb),
+  // not a duct run and not a system-scale model; keep the label neutral and honest.
+  { name:'Electrical',     label:'Electrical (small item)', hex:0x2dd4bf },
   { name:'Piping',         label:'Plumbing / Piping',  hex:0x60a5fa },
   { name:'Pumps/Valves',   label:'Pumps / Valves',     hex:0xc084fc },
   { name:'Sprinkler',      label:'Fire Protection',    hex:0xf87171 },
@@ -547,6 +567,84 @@ function updateAim() {
   document.getElementById('crosshair').classList.toggle('hot', !!aimedMesh);
   document.getElementById('crosshair').dataset.elementId=aimedElementId||'';
 }
+
+/* ── AR gaze card: dwell on an element → highlight + small glasses-style info card ──
+   Tier logic lives in the ELEMENT DATA HELPERS block (elementFeedTier). Feeds: buildings/grimes/element-feeds.json
+   (loaded lazily, once; a failed load is treated as empty). Late async results are dropped via gazeEpoch. */
+const CAPTURE = new URLSearchParams(location.search).get('capture') === '1';   // presentation capture mode (deterministic, no fades)
+if (CAPTURE) document.body.classList.add('capture');
+const GAZE_FEEDS_URL = 'buildings/grimes/element-feeds.json';
+const GAZE_BD_URL = 'https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json';
+const _cyan = new THREE.Color(0x22d3ee);
+const gazeState = {id: null, since: 0};
+let gazeOn = true, gazeShownId = null, gazeTier = null, gazeHlId = null, gazeEpoch = 0, gazeHideT = null, gazeSuppress = null;
+let gazeData = {feeds: null, meters: {}, at: 0, ready: false}, gazeFeedsP = null;
+function loadGazeData() {
+  gazeFeedsP = gazeFeedsP || cachedJson(GAZE_FEEDS_URL).catch(() => null);
+  return Promise.all([gazeFeedsP, cachedJson(GAZE_BD_URL).catch(() => null)])
+    .then(([feeds, bd]) => (gazeData = {feeds, meters: bd?.meters || {}, at: Date.now(), ready: true}));
+}
+function gazeHighlight(id) {
+  if (gazeHlId === id) return;
+  gazeUnhighlight();
+  if (!id || equipPicked?.id === id) return;     // the inspected element already carries the amber highlight
+  for (const m of equipMeshes) highlightElementRender(m, id, true, _cyan);
+  gazeHlId = id;
+}
+function gazeUnhighlight() {
+  if (gazeHlId == null) return;
+  if (equipPicked?.id !== gazeHlId) for (const m of equipMeshes) highlightElementRender(m, gazeHlId, false);
+  gazeHlId = null;
+}
+function positionGazeCard() {
+  const card = document.getElementById('gazeCard'), ch = document.getElementById('crosshair').getBoundingClientRect();
+  const cx = ch.left + ch.width / 2, cy = ch.top + ch.height / 2, w = card.offsetWidth, h = card.offsetHeight, vw = innerWidth, vh = innerHeight, M = 8;
+  let x, y;
+  if (mobileMq.matches) { x = cx - w / 2; y = vh - 150 - h; }       // above the touch walk pad
+  else { x = cx + 28; y = cy - h / 2; if (x + w > vw - M) x = cx - 28 - w; }   // right of the crosshair, flip left at the edge
+  x = Math.max(M, Math.min(vw - w - M, x)); y = Math.max(M, Math.min(vh - h - M, y));
+  card.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
+}
+function showGaze(id) {
+  const epoch = ++gazeEpoch;
+  gazeShownId = id;
+  gazeHighlight(id);
+  const render = d => {
+    if (epoch !== gazeEpoch || gazeShownId !== id || !equipMeta[id]) return;   // stale async result
+    gazeTier = elementFeedTier(id, equipMeta[id], d.feeds, d.meters);
+    const card = document.getElementById('gazeCard');
+    card.innerHTML = gazeCardHtml(id, equipMeta[id], gazeTier);
+    positionGazeCard();
+    card.classList.add('show');
+  };
+  if (gazeData.ready && Date.now() - gazeData.at < 60000) render(gazeData); else loadGazeData().then(render);
+}
+function gazeClear() {
+  clearTimeout(gazeHideT); gazeHideT = null;
+  gazeEpoch++; gazeShownId = null; gazeTier = null;
+  document.getElementById('gazeCard').classList.remove('show');
+  gazeUnhighlight();
+}
+function updateGaze(now, opts) {
+  let id = walkMode && gazeOn && aimedElementId && equipMeta[aimedElementId] ? aimedElementId : null;
+  if (id !== gazeSuppress) gazeSuppress = null;
+  if (id && id === gazeSuppress) id = null;      // just inspected: twin panel owns this element until aim leaves
+  const want = gazeDwell(gazeState, id, now, opts).show ? id : null;
+  if (want) {
+    clearTimeout(gazeHideT); gazeHideT = null;
+    if (want !== gazeShownId) showGaze(want);
+  } else if (gazeShownId != null) {
+    if (CAPTURE || opts?.instant) gazeClear();
+    else if (!gazeHideT) gazeHideT = setTimeout(gazeClear, GAZE_GRACE_MS);
+  }
+}
+window.toggleGazeCards = () => {
+  gazeOn = !gazeOn;
+  const b = document.getElementById('gazeToggleBtn');
+  b.textContent = 'Info cards: ' + (gazeOn ? 'on' : 'off'); b.setAttribute('aria-pressed', String(gazeOn));
+  if (!gazeOn) { gazeClear(); gazeState.id = null; }
+};
+window.addEventListener('resize', () => { if (gazeShownId != null) positionGazeCard(); });
 // No AxesHelper/GridHelper exists in this scene and both glbs are
 // triangle-only, but hide any line/point objects defensively while walking.
 function setLinesVisible(v) {
@@ -603,10 +701,11 @@ scene.add(avatar);
 
 function showWalkHint() {
   const el = document.getElementById('walkHint');
+  if (CAPTURE) { el.style.display = 'none'; return; }
   el.innerHTML = mobileMq.matches ? 'Hold arrows to move · drag to look · aim + Inspect · Objects offers a searchable list' : (plockFailed
       ? '<b>drag mouse</b> to look (pointer lock unavailable) · '
       : '<b>mouse</b> look · ')
-    + '<b>WASD</b> move · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>click</b> inspect · <b>Esc</b> exit';
+    + '<b>WASD</b> move · <b>Shift</b> run · <b>Q/E</b> or <b>R/F</b> floor up/down · <b>V</b> 1st/3rd person · <b>I</b> info cards · <b>click</b> inspect · <b>Esc</b> exit';
   el.style.display = 'block'; el.style.opacity = '1';
   clearTimeout(_hintTimer);
   _hintTimer = setTimeout(() => { el.style.opacity = '0'; }, 6000);
@@ -653,6 +752,8 @@ function enterWalk() {
   camera.position.set(playerPos.x, floorY + EYE, playerPos.z);
   controls.enabled = false;                      // Orbit fully off while walking
   document.getElementById('walkBtn').classList.add('active');
+  document.body.classList.add('walking');
+  loadGazeData();   // prefetch feeds + meters so the first card is instant
   document.getElementById('levelBadge').style.display = 'block';
   updateLevelBadge();
   setLinesVisible(false);
@@ -675,6 +776,8 @@ function exitWalk() {
   controls.enabled = true;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   document.getElementById('walkBtn').classList.remove('active');
+  document.body.classList.remove('walking');
+  gazeClear(); gazeState.id = null; gazeSuppress = null;
   document.getElementById('levelBadge').style.display = 'none';
   setLinesVisible(true);
   updateCrosshair();
@@ -694,6 +797,7 @@ function inspectWalkAim(){
   updateAim();
   if(!aimedMesh){showWalkHint();return;}
   clearMobileMotion();
+  gazeSuppress=aimedElementId;gazeClear();   // release the gaze highlight before the amber inspect highlight
   if(aimedMesh.userData?.ids)pickEquipment(aimedMesh,aimedInstance,aimedElementId);else pickSystem(aimedMesh);
 }
 renderer.domElement.addEventListener('click',()=>{if(walkMode&&plockActive)inspectWalkAim();});
@@ -733,6 +837,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Escape' && !plockActive) { exitWalk(); return; } // fallback-mode Esc
   keys[e.code] = true;
   if (e.code === 'KeyV') thirdPerson = !thirdPerson;
+  if (!e.repeat && e.code === 'KeyI') toggleGazeCards();
   if (!e.repeat && (e.code === 'KeyQ' || e.code === 'KeyR')) stepFloor(1);
   if (!e.repeat && (e.code === 'KeyE' || e.code === 'KeyF')) stepFloor(-1);
 });
@@ -756,6 +861,7 @@ function updateWalk(dt) {
   // crosshair aim feedback, ~8 Hz (MEP glb is light — 8 meshes)
   _aimAcc += dt;
   if (_aimAcc > 0.12) { _aimAcc = 0; updateAim(); }
+  updateGaze(performance.now());
   // smooth floor easing (~0.6 s exponential approach)
   floorY += (floorTargetY - floorY) * Math.min(1, dt * 7);
   if (Math.abs(floorTargetY - floorY) < 0.005) floorY = floorTargetY;
@@ -771,6 +877,61 @@ function updateWalk(dt) {
     avatar.visible = false;
     camera.position.set(playerPos.x, floorY + EYE, playerPos.z);
   }
+}
+
+
+/* Presentation capture hook (only with ?capture=1; otherwise window.walkCapture is undefined).
+   Deterministic frame-stepped recording: no pointer lock, no hint, no fades, dwell can be forced.
+     enter()                      enter Walk, prefetch feeds; returns state()
+     setPose({x,y,z,yaw,pitch})   world metres / radians (camera eye y; yaw 0 looks down -Z, pitch>0 looks up); returns state()
+     aimNow({force}?)             one aiming update; force:true treats dwell as satisfied; returns state()
+     render()                     one synchronous frame; returns state()
+     ready()                      Promise that resolves once feeds + meters are loaded (cards render synchronously after)
+     state()                      {aimedId, cardVisible, tier} */
+if (CAPTURE) {
+  const state = () => ({aimedId: aimedElementId || null, cardVisible: document.getElementById('gazeCard').classList.contains('show'), tier: gazeTier ? gazeTier.tier : null});
+  window.walkCapture = {
+    enter() { if (!walkMode) enterWalk(); loadGazeData(); return state(); },
+    setPose(p = {}) {
+      if (!walkMode) enterWalk();
+      thirdPerson = false; avatar.visible = false;
+      if (Number.isFinite(p.yaw)) yaw = p.yaw;
+      if (Number.isFinite(p.pitch)) pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, p.pitch));
+      const eye = Number.isFinite(p.y) ? p.y : camera.position.y;
+      floorTargetY = floorY = eye - EYE;
+      playerPos.set(Number.isFinite(p.x) ? p.x : playerPos.x, floorY, Number.isFinite(p.z) ? p.z : playerPos.z);
+      camera.position.set(playerPos.x, eye, playerPos.z);
+      applyLook(); updateLevelBadge(); camera.updateMatrixWorld(true);
+      gazeClear(); gazeState.id = null; gazeSuppress = null;
+      return state();
+    },
+    aimNow(o) { updateAim(); updateGaze(performance.now(), {force: !!(o && o.force), instant: true}); return state(); },
+    render() { camera.updateMatrixWorld(true); renderer.render(scene, camera); return state(); },
+    ready() { return loadGazeData().then(() => state()); },
+    state,
+    // Route planning only: camera pose and an element's world-space centre (null if not loaded).
+    pose() { return {x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw, pitch}; },
+    elementPoint(id) {
+      const box = new THREE.Box3(), v = new THREE.Vector3(), m = new THREE.Matrix4();
+      for (const mesh of equipMeshes) {
+        mesh.updateMatrixWorld(true);
+        const pos = mesh.geometry.attributes.position;
+        if (mesh.isInstancedMesh) {
+          const i = mesh.userData.ids.indexOf(id); if (i < 0) continue;
+          mesh.geometry.computeBoundingBox(); mesh.getMatrixAt(i, m);
+          return box.copy(mesh.geometry.boundingBox).applyMatrix4(m).applyMatrix4(mesh.matrixWorld).getCenter(v).toArray();
+        }
+        const r = mesh.userData.ranges?.find(r => r.id === id); if (!r) continue;
+        const idx = mesh.geometry.index;
+        if (idx && !mesh.isLine) for (let k = r.start; k < r.start + r.count; k++) box.expandByPoint(v.fromBufferAttribute(pos, idx.getX(k)));
+        else for (let k = r.vertexStart; k < r.vertexStart + r.vertexCount; k++) box.expandByPoint(v.fromBufferAttribute(pos, k));
+        return box.applyMatrix4(mesh.matrixWorld).getCenter(v).toArray();
+      }
+      return null;
+    },
+    elementIds(layer) { return Object.keys(equipMeta).filter(id => !layer || equipMeta[id].layer === layer); },
+    meta(id) { const i = equipMeta[id]; return i ? {name: i.name, type: i.type, layer: i.layer, level: i.level, levelKey: elementLevelKey(i)} : null; },
+  };
 }
 
 /* ══════════ CUPIX SYNC — ported verbatim from grimes-xr.html ══════════ */
@@ -1224,6 +1385,14 @@ function resolveElementHit(object,instanceId,faceIndex,index) {
   while(low<=high){const mid=(low+high)>>1,r=ranges[mid],start=object.isLine?r.vertexStart:r.start,count=object.isLine?r.vertexCount:r.count;if(offset<start)high=mid-1;else if(offset>=start+count)low=mid+1;else return r.id;}
   return null;
 }
+// An element is selected only when its identity is resolved exactly; an unresolved hit
+// (e.g. a merged line mesh without a range match) must fall through, never default to element 0.
+function pickResolvedEquipmentHit(hit) {
+  const id = resolveElementHit(hit.object, hit.instanceId, hit.faceIndex, hit.index);
+  if (!id) return false;
+  pickEquipment(hit.object, hit.instanceId, id);
+  return true;
+}
 function highlightElementRender(mesh,id,on,color) {
   if(!id||!mesh.userData.ids?.includes(id))return;
   if(mesh.isInstancedMesh){const value=mesh.material.color.clone().set(on?(color??0xfbbf24):0xffffff);mesh.userData.ids.forEach((x,i)=>{if(x===id)mesh.setColorAt(i,value);});mesh.instanceColor.needsUpdate=true;return;}
@@ -1299,6 +1468,55 @@ function alignedMeterSeries(meters) {
   return [...maps[0]].filter(([t]) => maps.every(m => m.has(t)))
     .map(([t]) => ({t,v:maps.reduce((sum,m)=>sum+m.get(t),0)})).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
 }
+/* Shared reading vocabulary (weekly-report safe): LIVE = finite value no older than 45 min;
+   LATEST = older finite value, neutral grey, with its Pacific-time age; no value = em dash. */
+const PT_CLOCK = new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+function readingAgeText(at, now = Date.now()) {
+  if (!Number.isFinite(at)) return 'Last reading time unavailable';
+  const mins = Math.max(0, Math.round((now - at) / 60000));
+  const ago = mins < 60 ? mins + 'm ago' : mins < 2880 ? Math.floor(mins / 60) + 'h ago' : Math.floor(mins / 1440) + 'd ago';
+  return `Last reading ${PT_CLOCK.format(at)} · ${ago}`;
+}
+const NO_READING_TEXT = 'No reading in this window';
+function readingDisplay(r) {
+  if (r.value == null) return {label: 'NO READING', cls: 'badge na', note: NO_READING_TEXT, live: false};
+  if (r.state === 'LIVE') return {label: 'LIVE', cls: 'badge', note: '', live: true};
+  return {label: 'LATEST', cls: 'badge na', note: readingAgeText(r.at), live: false};
+}
+// Reading from a TwinResolver value ({value, ts}) through the same meterReading rules.
+const valueReading = v => meterReading({latest: {kw: v?.value, t: v?.ts}});
+function aggregateReadings(readings) {
+  const have = readings.filter(r => r.value != null), n = readings.length;
+  const complete = n > 0 && have.length === n, sum = have.reduce((a, r) => a + r.value, 0);
+  const partialNote = `${have.length} of ${n} meters`;
+  if (!have.length) return {have: 0, n, complete: false, sum: null, label: 'NO READING', cls: 'badge na', note: NO_READING_TEXT, live: false};
+  if (!complete) return {have: have.length, n, complete, sum, label: 'PARTIAL', cls: 'badge na', note: partialNote, live: false};
+  if (have.every(r => r.state === 'LIVE')) return {have: n, n, complete, sum, label: 'LIVE', cls: 'badge', note: '', live: true};
+  const oldest = Math.min(...have.filter(r => r.state !== 'LIVE').map(r => Number.isFinite(r.at) ? r.at : -Infinity));
+  return {have: n, n, complete, sum, label: 'LATEST', cls: 'badge na', note: readingAgeText(Number.isFinite(oldest) ? oldest : NaN), live: false};
+}
+const fmtKw = w => w < 1 ? (w * 1000).toFixed(0) + ' W' : w.toFixed(2) + ' kW';
+// MODELLED share of one building meter. Never a measurement of the element itself.
+function modelledShare(info, meters) {
+  const ap = info.apportion;
+  if (!ap) return null;
+  const reading = meterReading(meters?.[ap.meter]);
+  const share = Number.isFinite(ap.share) ? ap.share : null;
+  return {ap, reading, share, est: reading.value != null && share != null ? reading.value * share : null};
+}
+// Domestic water / steam condensate / irrigation come from one meter-250 'latest' record.
+const finiteNum = v => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(+v) ? +v : null;
+function flowReading(latest) {
+  const w1 = finiteNum(latest?.water1_rate_cfm), w2 = finiteNum(latest?.water2_rate_cfm);
+  const present = [w1, w2].filter(v => v != null);
+  const at = bmoTimestamp(latest?.timestamp ?? latest?.t);
+  const age = Date.now() - at;
+  return {at, fresh: Number.isFinite(at) && age <= 45 * 60 * 1000 && age >= -5 * 60 * 1000,
+    waterGpm: present.length ? present.reduce((a, v) => a + v, 0) * 7.481 : null, waterChannels: present.length,
+    steam: finiteNum(latest?.steam_rate_gpm), irrigation: finiteNum(latest?.irrigation_rate_gpm)};
+}
+function elementLevelKey(info) { return elementLevel(info) || 'UNKNOWN'; }
+function delegatedElementId(target) { return target?.closest?.('[data-element-id]')?.dataset?.elementId ?? null; }
 function volumeM3(raw) {
   const m = String(raw ?? '').trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*(ft\^?3|ft³|m\^?3|m³)$/i);
   if (!m) return null;
@@ -1344,6 +1562,69 @@ async function assembleElementParts(paths, loadPart, buildPart, releasePart) {
   return result;
 }
 
+/* AR gaze card — feed tier resolution, dwell and card markup (pure; see docs/ELEMENT_FEEDS.md).
+   Precedence: explicit element feed > MODELLED apportionment > building-meter CONTEXT > NONE.
+   Only an explicit entry in element-feeds.json can ever produce a LIVE element reading. */
+const GAZE_DWELL_MS = 400, GAZE_GRACE_MS = 250;
+const GAZE_TIER_CLASS = {LIVE: 'live', LATEST: 'latest', 'NO READING': 'latest', MODELLED: 'mod', CONTEXT: 'ctx', NONE: 'none'};
+function elementFeedEntry(id, meta, feeds) {
+  const els = feeds && typeof feeds === 'object' ? feeds.elements : null;
+  if (!els || typeof els !== 'object') return null;
+  // "<layer>:<id>" (collision-safe) wins over the bare source element id.
+  for (const key of [meta?.layer ? meta.layer + ':' + id : null, String(id)]) {
+    const list = key && Object.prototype.hasOwnProperty.call(els, key) ? els[key] : null;
+    const entry = Array.isArray(list) ? list.find(e => e && typeof e.ref === 'string' && e.ref) : null;
+    if (entry) return entry;
+  }
+  return null;
+}
+function elementFeedTier(id, meta, feeds, meters) {
+  const out = (tier, label, valueText, detailText = '', sourceText = '') => ({tier, label, cls: GAZE_TIER_CLASS[tier], valueText, detailText, sourceText});
+  const entry = elementFeedEntry(id, meta, feeds);
+  if (entry) {
+    const reading = meterReading(meters?.[String(entry.ref).split(':')[2]]);
+    const src = String(entry.source || entry.ref);
+    if (reading.value == null) return out('NO READING', 'NO READING', NO_READING_TEXT, '', src);
+    const unit = entry.unit && entry.unit !== 'kW' ? entry.unit : null;
+    const valueText = unit ? +reading.value.toFixed(2) + ' ' + unit : fmtKw(reading.value);
+    return reading.state === 'LIVE' ? out('LIVE', 'LIVE', valueText, '', src)
+      : out('LATEST', 'LATEST', valueText, readingAgeText(reading.at), src);
+  }
+  const share = meta?.apportion ? modelledShare(meta, meters) : null;
+  if (share) {
+    const basis = String(share.ap.basis || 'design').replace(/\s*ratio$/i, '');
+    const age = share.reading.value != null && share.reading.state !== 'LIVE' ? readingAgeText(share.reading.at) : '';
+    return out('MODELLED', 'MODELLED', share.est != null ? '≈ ' + fmtKw(share.est) + ' modelled share' : NO_READING_TEXT,
+      `from building meter ${share.ap.meter} · ${basis} ratio`, age);
+  }
+  const refs = Array.isArray(meta?.isFedBy) ? meta.isFedBy : [];
+  if (refs.length) {
+    const ids = [...new Set(refs.map(r => String(r).split(':')[2]).filter(Boolean))];
+    const agg = aggregateReadings(ids.map(n => meterReading(meters?.[n])));
+    const label = (ids.length > 1 ? 'Building meters ' : 'Building meter ') + ids.join(', ') + ' context';
+    const valueText = agg.have && agg.sum != null ? (agg.complete ? '' : 'Partial · ') + agg.sum.toFixed(1) + ' kW' : NO_READING_TEXT;
+    return out('CONTEXT', 'CONTEXT', valueText, label + ' · not this element’s own reading', agg.live ? '' : agg.have ? agg.note : '');
+  }
+  return out('NONE', 'NO FEED', 'No feed yet', 'Sensor link not yet connected');
+}
+// Dwell: the same resolved element must stay under the crosshair for GAZE_DWELL_MS. opts.force satisfies it (capture hook).
+function gazeDwell(state, id, now, opts) {
+  if (!id) { state.id = null; state.since = 0; return {show: false}; }
+  if (state.id !== id) { state.id = id; state.since = now; }
+  if (opts && opts.force) state.since = Math.min(state.since, now - GAZE_DWELL_MS);
+  return {show: now - state.since >= GAZE_DWELL_MS};
+}
+function gazeCardHtml(id, meta, tier) {
+  const short = String(meta?.name || meta?.type || 'Element');
+  const name = short.length > 34 ? short.slice(0, 33) + '…' : short;
+  const sub = [meta?.type, meta?.system, meta?.level].filter(Boolean).join(' · ');
+  return `<div class="gz-top"><span class="gz-name">${esc(name)}</span><span class="gz-badge ${esc(tier.cls)}">${esc(tier.label)}</span></div>`
+    + (sub ? `<div class="gz-sub">${esc(sub)}</div>` : '')
+    + `<div class="gz-val">${esc(tier.valueText)}</div>`
+    + (tier.detailText ? `<div class="gz-det">${esc(tier.detailText)}</div>` : '')
+    + (tier.sourceText ? `<div class="gz-det">${esc(tier.sourceText)}</div>` : '');
+}
+
 /* END ELEMENT DATA HELPERS */
 
 const fetchJson = u => fetch(u, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
@@ -1386,7 +1667,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   // Equipment (element tier) wins first — small targets beat system blobs
   if (anyLayerVisible()) {
     const eqHit = raycaster.intersectObjects(visibleEquip(), false)[0];
-    if (eqHit) { pickEquipment(eqHit.object, eqHit.instanceId, resolveElementHit(eqHit.object, eqHit.instanceId, eqHit.faceIndex, eqHit.index)); return; }
+    if (eqHit && pickResolvedEquipmentHit(eqHit)) return;
   }
   // Resolve systems after element picking; empty space clears the selection.
   const mepHit = (mepModel && mepModel.visible) ? raycaster.intersectObjects(allMeshes, false)[0] : null;
@@ -1449,7 +1730,7 @@ window.toggleLayer = (key, {bulk=false}={}) => {
   }
   if (st.loading) return st.pending;
   if (!bulk && L.mb >= 5 && mobileMq.matches && !confirm(`${L.label.slice(2)} is ${L.mb} MB — load on mobile data?`)) return;
-  st.loading = true;st.desiredVisible=true;
+  st.loading = true;st.desiredVisible=true;st.error = null;
   btn.disabled = true; btn.setAttribute('aria-busy','true');
   if (!st.labelHtml) st.labelHtml = btn.innerHTML;
   btn.textContent = `⏳ ${L.mb} MB…`;
@@ -1486,9 +1767,9 @@ window.toggleLayer = (key, {bulk=false}={}) => {
     buildEquipFilter();
     console.log(`[layer:${key}] loaded:`, st.meshes.length, 'draw calls /', Object.keys(meta).length, 'elements /', st.meshes.reduce((a, m) => a + (m.count || 1), 0), 'instances');
   }).catch(e => {
-    st.loading = false;
+    st.loading = false; st.error = e;
     btn.disabled = false; btn.removeAttribute('aria-busy');
-    btn.innerHTML = st.labelHtml;
+    btn.innerHTML = st.labelHtml + ' <small class="layer-retry">Tap to retry</small>';   // quiet, on the control itself
     console.error(`[layer:${key}] load failed —`, e);
   }).finally(updateAllElementsButton);
   return st.pending;
@@ -1502,12 +1783,18 @@ function updateAllElementsButton(){
  for(const id of ['allElementsBtn','showAllLayersQuick','loadAllScanLayers']){
   const b=document.getElementById(id);if(!b)continue;b.disabled=false;b.textContent=label;b.setAttribute('aria-pressed',active?'true':visible?'mixed':'false');
  }
- const status=document.getElementById('allElementsStatus');if(status)status.textContent=`${visible}/${keys.length} element layers visible${allElementsLoading?' · Loading in sequence':''} · Floor filter unchanged`;
+ const failed=keys.filter(k=>layerState[k]?.error&&!layerState[k]?.group&&!layerState[k]?.loading).length;
+ const status=document.getElementById('allElementsStatus');if(status)status.textContent=`${visible}/${keys.length} element layers visible${allElementsLoading?' · Loading in sequence':''}${failed?` · ${failed} not loaded · tap to retry`:''} · Floor filter unchanged`;
 }
 window.setAllElements=async show=>{
+ if(show&&typeof mobileMq!=='undefined'&&mobileMq.matches){   // one confirm for the whole sequence, not per layer
+  const mb=Object.keys(LAYERS).filter(k=>!layerState[k]?.group&&!layerState[k]?.loading).reduce((a,k)=>a+(LAYERS[k].mb||0),0);
+  if(mb>=5&&!confirm(`Show all elements loads ${mb.toFixed(1)} MB — continue on mobile data?`))return;
+ }
  const epoch=++allElementsEpoch;allElementsRequested=!!show;allElementsLoading=!!show;
  for(const key of Object.keys(LAYERS)){const st=layerState[key]||(layerState[key]={});st.desiredVisible=!!show;if(st.group)st.group.visible=!!show;document.getElementById('layerBtn-'+key)?.classList.toggle('active',!!st.group&&!!show);}
- if(mepModel)mepModel.visible=false;document.getElementById('layerBtn-mep')?.classList.remove('active');
+ if(mepModel){mepModel.visible=false;const legend=document.getElementById('legend');if(legend)legend.style.display='none';}   // overview and its legend leave together
+ document.getElementById('layerBtn-mep')?.classList.remove('active');
  if(typeof scanOnly!=='undefined')scanOnly=false;
  if(typeof window.setAllElementContext==='function')window.setAllElementContext(!!show);
  equipTypeFilter=null;clearPick();applyEquipFilter();buildEquipFilter();updateAllElementsButton();
@@ -1561,7 +1848,7 @@ function buildEquipFilter() {
   const perLayer = {};   // layer -> {type: count}
   for (const e of Object.values(equipMeta)) {
     const st = layerState[e.layer];
-    if (st && st.group && st.group.visible && e.type && (!equipLevelFilter || (elementLevel(e) || 'UNKNOWN') === equipLevelFilter))
+    if (st && st.group && st.group.visible && e.type && (!equipLevelFilter || elementLevelKey(e) === equipLevelFilter))
       (perLayer[e.layer] = perLayer[e.layer] || {})[e.type] = (perLayer[e.layer][e.type] || 0) + 1;
   }
   const allCounts = {};
@@ -1602,7 +1889,7 @@ function applyEquipFilter() {
   for (const mesh of equipMeshes) setElementRenderVisible(mesh, equipLevelFilter, equipTypeFilter, equipMeta);
   if (equipPicked) {
     const info = equipMeta[equipPicked.id];
-    if ((equipTypeFilter && info?.type !== equipTypeFilter) || (equipLevelFilter && (elementLevel(info) || 'UNKNOWN') !== equipLevelFilter)) clearPick();
+    if ((equipTypeFilter && info?.type !== equipTypeFilter) || (equipLevelFilter && elementLevelKey(info) !== equipLevelFilter)) clearPick();
   }
   const visible = visibleEquip();
   const ids = new Set();
@@ -1643,6 +1930,13 @@ function revitRows(info) {
 /* Element dashboard — neighbours (same room, else same level + type) and the
    modelled apportionment. Selecting a neighbour re-picks it through the same
    instanced path, so the panel is navigable without touching the 3D view. */
+// Delegated: ids are data attributes, never interpolated into inline handlers.
+document.getElementById('twinDetEquip').addEventListener('click', e => { const id = delegatedElementId(e.target); if (id) selectElementById(id); });
+document.getElementById('twinDetEquip').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const id = delegatedElementId(e.target);
+  if (id) { e.preventDefault(); selectElementById(id); }
+});
 window.selectElementById = (id) => {
   for (const mesh of equipMeshes) {
     const hit = findElementSelection(mesh, id);
@@ -1651,7 +1945,7 @@ window.selectElementById = (id) => {
     if (st?.group && !st.group.visible) toggleLayer(mesh.userData.layer);
     const info = equipMeta[id];
     if (equipTypeFilter && info.type !== equipTypeFilter) equipTypeFilter = null;
-    if (equipLevelFilter && elementLevel(info) !== equipLevelFilter) { equipLevelFilter = null; document.getElementById('elementFloor').value = ''; }
+    if (equipLevelFilter && elementLevelKey(info) !== equipLevelFilter) { equipLevelFilter = null; document.getElementById('elementFloor').value = ''; }
     applyEquipFilter(); buildEquipFilter();
     pickEquipment(mesh, hit.instanceId, id); return;
   }
@@ -1673,24 +1967,24 @@ function neighbourRows(id, info) {
   const head = byRoom ? `Same room · ${esc(info.location)} · ${same.length}${same.length >= 60 ? '+' : ''}`
                       : `Same level · ${esc(info.type || '')} · ${same.length}${same.length >= 60 ? '+' : ''}`;
   return dsec(head) + shown.map(([oid, o]) =>
-    `<div class="eqrow" onclick="selectElementById('${esc(oid)}')"><span class="eqtag">${esc(o.type || o.category || '')}</span>`
+    `<div class="eqrow" role="button" tabindex="0" data-element-id="${esc(oid)}"><span class="eqtag">${esc(o.type || o.category || '')}</span>`
     + `<span class="eqcat">${esc(o.mark ? 'mark ' + o.mark : (o.name || ''))}</span>`
     + `<span class="eqspec">${o.design_va ? o.design_va + ' VA' : o.flow ? esc(o.flow) : (o.levelKey || '')}</span></div>`).join('')
     + (same.length > 8 ? `<div class="pt mut"><span>… ${same.length - 8} more (use the type chips to isolate)</span></div>` : '');
 }
 function apportionRow(info, meters) {
-  const ap = info.apportion;
-  if (!ap) return '';
-  const m = meters[ap.meter];
-  const kw = m && m.latest && typeof m.latest.kw === 'number' ? m.latest.kw : null;
-  const est = kw != null ? kw * ap.share : null;
-  const fmt = w => w < 1 ? (w * 1000).toFixed(0) + ' W' : w.toFixed(2) + ' kW';
-  return `<div class="pt"><span>MODELLED share · meter ${esc(ap.meter)} × ${(ap.share * 100).toFixed(3)} %</span>`
-       + `<span class="v">${est != null ? '≈ ' + fmt(est) : 'offline'}</span></div>`
+  const m = modelledShare(info, meters);
+  if (!m) return '';
+  const {ap, reading, share, est} = m;
+  const disp = readingDisplay(reading);
+  const note = est == null ? NO_READING_TEXT : disp.live ? '' : disp.note;
+  return `<div class="pt"><span>Modelled share · meter ${esc(ap.meter)} × ${share == null ? '—' : (share * 100).toFixed(3) + ' %'}</span>`
+       + `<span class="v">${est != null ? '≈ ' + fmtKw(est) : '—'}</span></div>`
+       + (note ? `<div class="pt mut"><span>${esc(note)}</span></div>` : '')
        + `<div class="pt mut"><span>${esc(ap.basis)} ${esc(String(ap.weight))} of ${esc(String(ap.pool))} elements on this feeder — an apportionment of the meter, not a measurement of this element.</span></div>`;
 }
 async function pickEquipment(mesh, instanceId, explicitId = null) {
-  const id = explicitId || (mesh.userData.ids ? mesh.userData.ids[mesh.userData.isLine ? 0 : instanceId] : null);
+  const id = explicitId || resolveElementHit(mesh, instanceId);
   const info = id && equipMeta && equipMeta[id];
   if (!info) return;
   const epoch = ++elementPickEpoch;
@@ -1763,27 +2057,32 @@ async function pickEquipment(mesh, instanceId, explicitId = null) {
     const meters = bd.meters || {};
     const ids = [...new Set(feeds.length ? feeds.map(ref => String(ref).split(':')[2]) : [info.apportion.meter])];
     const readings = ids.map(id => meterReading(meters[id]));
-    const available = readings.filter(r => r.value != null);
-    const complete = available.length === ids.length;
-    const state = !available.length ? 'OFFLINE' : !complete ? 'PARTIAL'
-      : readings.some(r => r.state === 'STALE') ? 'STALE'
-      : readings.some(r => r.state === 'TIME UNKNOWN') ? 'TIME UNKNOWN' : 'LIVE';
-    const total = available.reduce((sum,r)=>sum+r.value,0);
-    bigEl.innerHTML = (complete ? total.toFixed(1) : '—') + ' <small>kW ' + (feeds.length ? 'feeders' : 'roof meter') + '</small>';
-    badgeEl.textContent = state; badgeEl.className = state === 'LIVE' ? 'badge' : 'badge na';
+    const agg = aggregateReadings(readings);
+    const ms = modelledShare(info, meters);
+    if (ms) {
+      // Headline = the MODELLED share (never the whole feeder, never a measurement of this element).
+      const d = readingDisplay(ms.reading);
+      bigEl.innerHTML = (ms.est != null ? '≈ ' + fmtKw(ms.est) : '—') + ' <small>modelled share</small>';
+      badgeEl.textContent = ms.est != null ? 'MODELLED' : d.label; badgeEl.className = ms.est != null ? 'badge mod' : 'badge na';
+    } else {
+      // Feeder total is building/feeder context: level- or voltage-inferred links do not make it this element's load.
+      bigEl.innerHTML = (agg.complete ? agg.sum.toFixed(1) : '—') + ' <small>kW feeder context</small>';
+      badgeEl.textContent = !agg.have ? 'NO READING' : !agg.complete ? 'PARTIAL' : 'CONTEXT'; badgeEl.className = 'badge na';
+    }
     const labels = {'3':'Roof Electric','76':'480/277 V (HVAC / lighting)','77':'208/120 V (plug / IT)'};
     ptsEl.innerHTML = ids.map((id,i) => {
-      const r = readings[i];
-      return `<div class="pt"><span>Measured feeder · ${esc(labels[id] || id)}</span><span class="v">${r.value == null ? 'unavailable' : r.value.toFixed(1)+' kW'}</span></div>`
-        + `<div class="pt mut"><span>${esc(r.state)} · ${Number.isFinite(r.at) ? esc(new Date(r.at).toISOString()) : 'timestamp unavailable'}</span></div>`;
-    }).join('') + apportionRow(info,meters)
+      const r = readings[i], d = readingDisplay(r);
+      return `<div class="pt"><span>Building meter context · ${esc(labels[id] || id)}</span><span class="v">${r.value == null ? '—' : r.value.toFixed(1)+' kW'}</span></div>`
+        + `<div class="pt mut"><span>${d.live ? 'LIVE · ' + esc(PT_CLOCK.format(r.at)) + ' PT' : esc(d.note)}</span></div>`;
+    }).join('') + (agg.have && !agg.complete ? `<div class="pt mut"><span>${agg.have} of ${agg.n} meters reporting</span></div>` : '') + apportionRow(info,meters)
       + (ids.includes('76') ? '<div class="pt mut"><span>Meter 76 is not apportioned: mixed lighting / plant loads, without defensible element weights.</span></div>' : '');
     drawSpark(document.getElementById('twinSpark'), alignedMeterSeries(ids.map(id=>meters[id])));
   } catch (e) {
     if (epoch !== elementPickEpoch) return;
-    badgeEl.textContent = 'OFFLINE'; badgeEl.className = 'badge na';
+    console.warn('[element feed]', e);
+    badgeEl.textContent = 'NO READING'; badgeEl.className = 'badge na';
     bigEl.innerHTML = '— <small>kW</small>';
-    ptsEl.innerHTML = '<div class="pt mut"><span>Live feed unreachable — ' + esc(e.message) + '</span></div>';
+    ptsEl.innerHTML = '<div class="pt mut"><span>Building meter feed is not reachable from this view.</span></div>';
   }
 }
 
@@ -1821,23 +2120,11 @@ window.showMeterHistory = id => {
   const x=p=>36+(p.at-first)/span*284,y=p=>104-(p.v-lo)/range*86;
   let path='';points.forEach((p,i)=>{path+=(i&&p.at-points[i-1].at<=30*60000?'L':'M')+x(p).toFixed(2)+','+y(p).toFixed(2)+' ';});
   const avg=points.reduce((s,p)=>s+p.v,0)/points.length;
-  host.innerHTML=`<div class="history-values"><strong>${reading.value==null?'—':reading.value.toFixed(1)} <small>kW</small></strong><span>${esc(reading.state)}</span></div><svg viewBox="0 0 336 132" role="img" aria-label="Meter ${id} measured power history in kilowatts"><path d="M36 18H320 M36 61H320 M36 104H320" stroke="#334155" fill="none"/><text x="2" y="22">${hi.toFixed(0)}</text><text x="2" y="108">${lo.toFixed(0)}</text><path d="${path}" stroke="#34d399" stroke-width="2.5" fill="none"/>${points.map(p=>`<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="1.5" fill="#34d399"><title>${esc(historyTime(p.at))}: ${p.v.toFixed(2)} kW</title></circle>`).join('')}</svg><div class="history-axis"><span>${esc(historyTime(first))}</span><span>${esc(historyTime(last))}</span></div><div class="history-note">Pacific time · ${points.length} samples · Mean ${avg.toFixed(1)} kW · Peak ${Math.max(...points.map(p=>p.v)).toFixed(1)} kW</div>`;
+  host.innerHTML=`<div class="history-values"><strong>${reading.value==null?'—':reading.value.toFixed(1)} <small>kW</small></strong><span>${esc(readingDisplay(reading).live ? 'LIVE' : readingDisplay(reading).label + (reading.value == null ? '' : ' · ' + readingDisplay(reading).note))}</span></div><svg viewBox="0 0 336 132" role="img" aria-label="Meter ${id} measured power history in kilowatts"><path d="M36 18H320 M36 61H320 M36 104H320" stroke="#334155" fill="none"/><text x="2" y="22">${hi.toFixed(0)}</text><text x="2" y="108">${lo.toFixed(0)}</text><path d="${path}" stroke="#34d399" stroke-width="2.5" fill="none"/>${points.map(p=>`<circle cx="${x(p).toFixed(2)}" cy="${y(p).toFixed(2)}" r="1.5" fill="#34d399"><title>${esc(historyTime(p.at))}: ${p.v.toFixed(2)} kW</title></circle>`).join('')}</svg><div class="history-axis"><span>${esc(historyTime(first))}</span><span>${esc(historyTime(last))}</span></div><div class="history-note">Pacific time · ${points.length} samples · Mean ${avg.toFixed(1)} kW · Peak ${Math.max(...points.map(p=>p.v)).toFixed(1)} kW</div>`;
   const latest=meter?.latest||{};
   details.innerHTML=`<div class="history-heading">Meter #${esc(id)} · received observations</div><p class="history-note">Pacific time · newest first · kW history. Voltage/current are latest-only when provided.</p><div class="history-table"><table><thead><tr><th>Observed time</th><th>kW</th></tr></thead><tbody>${[...points].reverse().map(p=>`<tr><td>${esc(historyTime(p.at))}</td><td>${p.v.toFixed(2)}</td></tr>`).join('')}</tbody></table></div><div class="dsec">Latest meter channels</div>`+[['voltage_ll','Line voltage','V'],['voltage_ln','Line–neutral','V'],['current_avg','Current','A'],['power_factor','Power factor',''],['frequency','Frequency','Hz'],['kwh_delivered','Cumulative energy','kWh']].filter(([k])=>Number.isFinite(latest[k])).map(([k,label,unit])=>drow(label,latest[k]+' '+unit)).join('')+'<p class="history-note">BMO CSV export → scheduled collection → data branch JSON. No direct device BAS feed.</p>';
 };
 
-function sumSeries(vals, points) {
-  const list = points.map(p => (vals[p.ref] && vals[p.ref].series) || []).filter(s => s.length);
-  if (!list.length) return [];
-  const n = Math.min(...list.map(s => s.length));
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    let v = 0;
-    for (const s of list) v += s[s.length - n + i].v || 0;
-    out.push({ t: list[0][list[0].length - n + i].t, v });
-  }
-  return out;
-}
 function drawSpark(cv, series) {
   const ctx = cv.getContext('2d');
   ctx.clearRect(0, 0, cv.width, cv.height);
@@ -1881,17 +2168,19 @@ const CHANNELS = {
 // Flow telemetry is real: meter #250 'Condensate & Water' on the Bechtel
 // logger (steam condensate GPM, irrigation GPM, two domestic water CFm) is
 // already fetched into data/building_data.json every 15 min by bmo_fetch.py.
-async function liveChannels(sysName, powerKw) {
-  const live = { power: powerKw };
+// Per-system channels only ever carry values their own sensor produced: a building
+// meter total is never passed in here (it is shown separately as building meter context).
+async function liveChannels(sysName) {
+  const live = {};
   if (SYS_CHANNELS[sysName] === 'piping') {
     try {
       const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
-      const w = bd && bd.water && bd.water.latest;
-      if (w) {
-        const cf = (w.water1_rate_cfm || 0) + (w.water2_rate_cfm || 0);
-        live.water = cf * 7.481;               // ft³/min → gal/min
-        live.steam = w.steam_rate_gpm;
-        live.irr = w.irrigation_rate_gpm;
+      const latest = bd && bd.water && bd.water.latest;
+      if (latest) {
+        const f = flowReading(latest);
+        live.water = {value: f.waterGpm, fresh: f.fresh, at: f.at, partial: f.waterChannels === 1};
+        live.steam = {value: f.steam, fresh: f.fresh, at: f.at};
+        live.irr = {value: f.irrigation, fresh: f.fresh, at: f.at};
       }
     } catch {}
   }
@@ -1908,8 +2197,14 @@ function channelRows(sysName, live) {
   if (!set.length) return '';
   return '<div class="sec">Sensor channels</div>' + set.map(([label, unit, kind]) => {
     const v = kind && live ? live[kind] : null;
-    if (v != null && isFinite(v)) {
-      return `<div class="pt"><span><i class="livedot"></i>${label}</span><span class="v" style="color:#34d399">${(+v).toFixed(1)} ${unit}</span></div>`;
+    if (v && v.value == null) {
+      return `<div class="pt"><span>${label}</span><span class="v">—</span></div><div class="pt mut"><span>${NO_READING_TEXT}</span></div>`;
+    }
+    if (v && Number.isFinite(v.value)) {
+      const val = v.value.toFixed(1) + ' ' + unit;
+      if (v.fresh && !v.partial) return `<div class="pt"><span><i class="livedot"></i>${label}</span><span class="v" style="color:#34d399">${val}</span></div>`;
+      const note = [v.partial ? '1 of 2 channels' : '', v.fresh ? '' : readingAgeText(v.at)].filter(Boolean).join(' · ');
+      return `<div class="pt"><span>${label}</span><span class="v">${val}</span></div><div class="pt mut"><span>${v.fresh ? 'PARTIAL' : 'LATEST'} · ${note}</span></div>`;
     }
     return `<div class="pt ch-off"><span>${label}${unit ? ' (' + unit + ')' : ''}</span><span>— not connected</span></div>`;
   }).join('');
@@ -2027,7 +2322,7 @@ async function pickSystem(mesh) {
     + '<div class="dnote">BAS/IoT sensor integration will populate the remaining channels.</div>'
     + `<div class="duri">${esc(res.uri)}</div>`;
   if (!res.points.length) {
-    const channels = await liveChannels(sysName, null);
+    const channels = await liveChannels(sysName);
     if (epoch !== elementPickEpoch) return;
     ptsEl.innerHTML = channelRows(sysName, channels)
       + '<div class="pt mut"><span>No meter on this system'
@@ -2037,21 +2332,22 @@ async function pickSystem(mesh) {
   try {
     const vals = await TwinResolver.fetchValues(twinPkg, res.points, cachedJson);
     if (epoch !== elementPickEpoch) return;
-    let total = 0;
-    const rows = res.points.map(p => {
-      const v = vals[p.ref] || {};
-      if (typeof v.value === 'number') total += v.value;
-      const nm = String(v.name || p.ref).replace(/\s*\(.*\)$/, ''); // short name
-      return `<div class="pt"><span>· ${esc(nm)}</span><span class="v">${typeof v.value === 'number' ? v.value.toFixed(1) : '—'}</span></div>`;
+    const readings = res.points.map(p => valueReading(vals[p.ref]));
+    const agg = aggregateReadings(readings);
+    const rows = res.points.map((p, i) => {
+      const nm = String((vals[p.ref] || {}).name || p.ref).replace(/\s*\(.*\)$/, ''); // short name
+      return `<div class="pt"><span>· ${esc(nm)}</span><span class="v">${readings[i].value == null ? '—' : readings[i].value.toFixed(1)}</span></div>`;
     });
-    let elec = '<div class="sec">Connected now · building electricity (proxy)</div>'
-      + `<div class="pt"><span>Total power</span><span class="v" style="color:#34d399">${total.toFixed(1)} kW</span></div>`
+    const status = agg.live ? 'LIVE' : !agg.have ? agg.note : agg.label + ' · ' + agg.note;
+    let elec = '<div class="sec">Building meter context · building electricity (proxy)</div>'
+      + `<div class="pt"><span>Building meters total</span><span class="v"${agg.live ? ' style="color:#34d399"' : ''}>${agg.complete ? agg.sum.toFixed(1) + ' kW' : '—'}</span></div>`
+      + `<div class="pt mut"><span>${esc(status)}</span></div>`
       + rows.slice(0, 3).join('');
     if (rows.length > 3) {
       elec += `<div id="twinPtsMore" style="display:none">${rows.slice(3).join('')}</div>`
         + `<div class="morebtn" onclick="toggleTwinMore('twinPtsMore')">… ${rows.length - 3} more</div>`;
     }
-    const chans = channelRows(sysName, await liveChannels(sysName, total));
+    const chans = channelRows(sysName, await liveChannels(sysName));
     if (epoch !== elementPickEpoch) return;
     if (isPiping) {
       // flow-first: electricity proxy is secondary → lives in More details
@@ -2060,9 +2356,9 @@ async function pickSystem(mesh) {
     } else {
       ptsEl.innerHTML = chans + elec;
     }
-    drawSpark(document.getElementById('twinSpark'), sumSeries(vals, res.points)); // 24h feed, in details
+    drawSpark(document.getElementById('twinSpark'), alignedMeterSeries(res.points.map(p => ({timeseries_kw: (vals[p.ref] || {}).series})))); // 24h feed, timestamp-aligned, in details
   } catch (e) {
-    if (epoch === elementPickEpoch) ptsEl.innerHTML = '<div class="pt mut"><span>⚠ live data unavailable</span></div>';
+    if (epoch === elementPickEpoch) ptsEl.innerHTML = '<div class="pt mut"><span>Live data is not reachable from this view.</span></div>';
   }
 }
 
@@ -2164,40 +2460,55 @@ async function renderFlowHeadline() {
     const bd = await cachedJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json');
     if (epoch !== elementPickEpoch) return;
     const w = bd && bd.water, L = w && w.latest;
-    if (!L) { srcEl.textContent = 'no flow data available'; return; }
-    const gpm = ((L.water1_rate_cfm || 0) + (L.water2_rate_cfm || 0)) * 7.481;
-    big.innerHTML = gpm.toFixed(1) + ' <small>GPM</small>';
-    badge.textContent = 'LIVE FLOW'; badge.className = 'badge lo';
+    if (!L) { badge.textContent = 'NO READING'; badge.className = 'badge na'; srcEl.textContent = NO_READING_TEXT; return; }
+    const f = flowReading(L), partial = f.waterChannels === 1;
+    big.innerHTML = (f.waterGpm == null ? '—' : f.waterGpm.toFixed(1)) + ' <small>GPM</small>';
+    // LIVE only for a complete (both channels) reading no older than 45 min; anything older is a neutral LATEST.
+    if (f.waterGpm == null) { badge.textContent = 'NO READING'; badge.className = 'badge na'; }
+    else if (!f.fresh) { badge.textContent = 'LATEST'; badge.className = 'badge na'; }
+    else if (partial) { badge.textContent = 'PARTIAL'; badge.className = 'badge na'; }
+    else { badge.textContent = 'LIVE'; badge.className = 'badge lo'; }
+    srcEl.textContent = ['domestic water · meter #250',
+      f.waterGpm == null ? NO_READING_TEXT : '',
+      partial ? '1 of 2 channels' : '',
+      f.waterGpm == null ? '' : f.fresh ? PT_CLOCK.format(f.at) : readingAgeText(f.at)].filter(Boolean).join(' · ');
     const st = w.stats_today && w.stats_today.water_rate;
-    srcEl.textContent = 'domestic water · meter #250'
-      + (L.timestamp ? ' · ' + L.timestamp.slice(11, 16) : '');
     const rngEl = document.getElementById('twinRange');
-    if (st && st.max != null) {
-      rngEl.innerHTML = `Today's range: <b>${(st.min * 7.481).toFixed(1)}–${(st.max * 7.481).toFixed(1)} GPM</b> · avg ${((st.avg || 0) * 7.481).toFixed(1)}`;
+    const stMin = finiteNum(st?.min), stMax = finiteNum(st?.max), stAvg = finiteNum(st?.avg);
+    if (f.fresh && stMin != null && stMax != null) {
+      rngEl.innerHTML = `Today's range: <b>${(stMin * 7.481).toFixed(1)}–${(stMax * 7.481).toFixed(1)} GPM</b>` + (stAvg != null ? ` · avg ${(stAvg * 7.481).toFixed(1)}` : '');
       rngEl.className = 'rangeline on';
     } else {
       rngEl.className = 'rangeline'; rngEl.innerHTML = '';
     }
-    drawFlowChart(cv, (w.timeseries_water || []).map(p => ({ t: p.t, v: (p.v || 0) * 7.481 })));
-    const steam = +L.steam_rate_gpm, irr = +L.irrigation_rate_gpm;
-    evEl.innerHTML =
-      `<div class="pt"><span><i class="livedot" style="background:#fb923c"></i>Steam condensate</span><span class="v" style="color:#fb923c">${isFinite(steam) ? steam.toFixed(1) : '—'} GPM</span></div>`
-      + `<div class="pt"><span><i class="livedot" style="background:#60a5fa"></i>Irrigation</span><span class="v" style="color:#93c5fd">${isFinite(irr) ? irr.toFixed(1) : '—'} GPM</span></div>`;
-  } catch (e) { console.warn('[flow]', e.message); }
+    // Missing points stay null (gap in the line), never 0.
+    drawFlowChart(cv, (w.timeseries_water || []).map(p => { const v = finiteNum(p?.v); return { t: p?.t, v: v == null ? null : v * 7.481 }; }));
+    const tone = f.fresh ? null : '#64748b';
+    const row = (name, dot, color, v) => `<div class="pt"><span><i class="livedot" style="background:${tone || dot}"></i>${name}</span><span class="v"${tone ? '' : ` style="color:${color}"`}>${v == null ? '—' : v.toFixed(1)} GPM</span></div>`;
+    evEl.innerHTML = row('Steam condensate', '#fb923c', '#fb923c', f.steam) + row('Irrigation', '#60a5fa', '#93c5fd', f.irrigation);
+  } catch (e) { console.warn('[flow]', e.message); srcEl.textContent = 'Flow data is not reachable from this view.'; }
 }
 function drawFlowChart(cv, series) {
   const ctx = cv.getContext('2d');
   ctx.clearRect(0, 0, cv.width, cv.height);
-  if (series.length < 2) return;
-  const vs = series.map(p => p.v), lo = 0, hi = Math.max(1, Math.max(...vs));
+  const known = series.filter(p => Number.isFinite(p.v));
+  if (known.length < 2) return;
+  const hi = Math.max(1, ...known.map(p => p.v)), lo = 0;
   const W = cv.width, H = cv.height, PT = 8, PB = 26, rng = hi - lo || 1;
   const X = i => i / (series.length - 1) * (W - 8) + 4;
   const Y = v => H - PB - (v - lo) / rng * (H - PB - PT);
-  ctx.beginPath();
-  series.forEach((p, i) => { i ? ctx.lineTo(X(i), Y(p.v)) : ctx.moveTo(X(0), Y(p.v)); });
-  ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2.5; ctx.stroke();
-  ctx.lineTo(X(series.length - 1), Y(0)); ctx.lineTo(X(0), Y(0)); ctx.closePath();
-  ctx.fillStyle = 'rgba(96,165,250,.12)'; ctx.fill();
+  // contiguous runs only: a missing point breaks the line instead of dropping to zero
+  const runs = []; let run = [];
+  series.forEach((p, i) => { if (Number.isFinite(p.v)) run.push(i); else if (run.length) { runs.push(run); run = []; } });
+  if (run.length) runs.push(run);
+  for (const r of runs) {
+    if (r.length === 1) { ctx.fillStyle = '#60a5fa'; ctx.beginPath(); ctx.arc(X(r[0]), Y(series[r[0]].v), 2.5, 0, 7); ctx.fill(); continue; }
+    ctx.beginPath();
+    r.forEach((i, k) => { k ? ctx.lineTo(X(i), Y(series[i].v)) : ctx.moveTo(X(i), Y(series[i].v)); });
+    ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.lineTo(X(r[r.length - 1]), Y(0)); ctx.lineTo(X(r[0]), Y(0)); ctx.closePath();
+    ctx.fillStyle = 'rgba(96,165,250,.12)'; ctx.fill();
+  }
   ctx.fillStyle = 'rgba(148,163,184,.55)';
   ctx.font = '600 17px JetBrains Mono, monospace';
   ctx.fillText(hi.toFixed(1) + ' GPM', 6, 20);
@@ -2241,19 +2552,22 @@ async function renderBaseline() {
     if (!src || !src.recent24 || !src.recent24.length) return;
     const c = src.current || {}, z = typeof c.z === 'number' ? c.z : null;
     const zt = (eb && eb.z_threshold) || 3;
-    big.innerHTML = (c.kw != null ? c.kw : '—') + ' <small>kW</small>';
+    // The baseline file is a snapshot: "normal / unusual for this hour" only holds while its current reading is recent.
+    const cur = meterReading({latest: {kw: c.kw, t: c.ts}}), disp = readingDisplay(cur), fresh = disp.live;
+    big.innerHTML = (cur.value != null ? cur.value : '—') + ' <small>kW</small>';
     // plain-language status; the z-score itself lives in ⓘ details
     const pct = (c.base && c.kw != null) ? Math.round((c.kw - c.base) / c.base * 100) : null;
-    if (z === null) { badge.textContent = 'No live reading'; badge.className = 'badge na'; }
+    if (!fresh) { badge.textContent = disp.label; badge.className = 'badge na'; }
+    else if (z === null) { badge.textContent = 'NO READING'; badge.className = 'badge na'; }
     else if (c.anomaly && z > 0) { badge.textContent = 'Using more than usual' + (pct != null ? ` (+${pct}%)` : ''); badge.className = 'badge hi'; }
     else if (c.anomaly) { badge.textContent = 'Using less than usual' + (pct != null ? ` (${pct}%)` : ''); badge.className = 'badge lo'; }
     else { badge.textContent = 'Normal for this hour'; badge.className = 'badge'; }
     document.getElementById('twinDetZ').textContent =
-      z === null ? '' : `z-score ${z} (|z|>${zt} flags anomaly) · σ ${src.sigma} kW · ${srcName} baseline`;
-    srcEl.textContent = 'bldg load vs ' + srcName + ' baseline';
+      !fresh || z === null ? '' : `z-score ${z} (|z|>${zt} flags anomaly) · σ ${src.sigma} kW · ${srcName} baseline`;
+    srcEl.textContent = fresh ? 'bldg load vs ' + srcName + ' baseline' : 'bldg load · ' + disp.note;
     // expected range, visible without hovering: baseline ± zt·σ for this hour
     const rngEl = document.getElementById('twinRange');
-    if (c.base != null) {
+    if (fresh && c.base != null) {
       const bandLo = Math.max(0, Math.round(c.base - zt * src.sigma)),
             bandHi = Math.round(c.base + zt * src.sigma);
       if (c.anomaly && c.kw != null) {
@@ -2339,7 +2653,7 @@ function drawBaseChart(cv, recent, sigma, zt, hoverI) {
 
 /* ── chart hover/scrub: crosshair + tooltip (mouse + touch drag) ── */
 const _baseCv = document.getElementById('twinBaseSpark');
-_baseCv.style.touchAction = 'none';
+_baseCv.style.touchAction = 'pan-y';   // horizontal scrub stays ours; vertical drags still scroll the page
 function chartHover(e) {
   const st = _baseCv._chart;
   if (!st || !st.recent || st.recent.length < 2) return;
@@ -2437,7 +2751,7 @@ function renderMobileElements(){
  let total=0;const entries=equipMeta[q]?[[q,equipMeta[q]]]:Object.entries(equipMeta);
  for(const [id,info] of entries){
   if(!layerState[info.layer]?.group?.visible)continue;
-  if(equipLevelFilter&&elementLevel(info)!==equipLevelFilter)continue;
+  if(equipLevelFilter&&elementLevelKey(info)!==equipLevelFilter)continue;
   const label=info.element_tag||info.mark||info.name||info.family||info.type||'Element';
   const searchable=[id,label,info.name,info.family,info.type,info.mark,info.location,info.level].join(' ').toLowerCase();
   if(q&&!searchable.includes(q))continue;

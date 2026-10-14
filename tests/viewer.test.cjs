@@ -6,8 +6,9 @@ function fixture(){
  const ctx={document:{getElementById:get,body:{classList:{add(){}}}},console,window:{},Date,Number,highlight(){},unhighlightEquip(){},equipMeshes:[],equipMeta:{'123':{name:'test',type:'Receptacle',layer:'fixtures',isFedBy:['bmo:meter:77:kw']}},drawSpark(){},dsec:s=>s,drow:(k,v)=>k+':'+v,esc:String,revitRows(){return ''},EQUIP_LABELS:{},LAYERS:{fixtures:{json:'buildings/grimes/fixtures.elements.json'}},cachedJson:async()=>({meters:{}}),apportionRow(){return ''},carbonRows(){return ''},layerState:{},setTimeout,clearTimeout};
  vm.createContext(ctx);
  vm.runInContext(block('/* ELEMENT DATA HELPERS */','/* END ELEMENT DATA HELPERS */'),ctx);
+ vm.runInContext(block('function resolveElementHit(', '// An element is selected only when'),ctx);
  vm.runInContext(block('function neighbourRows(', '\nfunction apportionRow('),ctx);
- vm.runInContext(block('async function pickEquipment(', '\nfunction sumSeries('),ctx);
+ vm.runInContext(block('async function pickEquipment(', '\nfunction drawSpark('),ctx);
  ctx.loadMeterHistory=()=>{}; // History widget is tested separately; isolate element feed races.
  return {ctx,get};
 }
@@ -15,7 +16,7 @@ test('missing meter must not become LIVE zero',async()=>{const {ctx,get}=fixture
 test('actual zero remains available',async()=>{const {ctx,get}=fixture();ctx.cachedJson=async()=>({meters:{'77':{latest:{kw:0,t:new Date().toISOString()}}}});await ctx.pickEquipment({userData:{ids:['123']}},0);assert.match(get('twinBigKw').innerHTML,/0\.0/)});
 test('line hit resolves without instanceId',async()=>{const {ctx}=fixture();await ctx.pickEquipment({userData:{ids:['123'],isLine:true}},undefined);assert.equal(ctx.equipPicked?.id,'123')});
 test('late feed response cannot overwrite newly selected structure',async()=>{const {ctx,get}=fixture();let resolve;ctx.cachedJson=()=>new Promise(r=>resolve=r);const p=ctx.pickEquipment({userData:{ids:['123']}},0);ctx.equipMeta['456']={name:'column',type:'Column',system:'Structural'};await ctx.pickEquipment({userData:{ids:['456']}},0);resolve({meters:{'77':{latest:{kw:99}}}});await p;assert.equal(get('twinBadge').textContent,'NO FEED');assert.doesNotMatch(get('twinBigKw').innerHTML,/99/)});
-test('CAD neighbours cannot cross known floors',()=>{const {ctx}=fixture();ctx.equipMeta={a:{type:'Pipe',level:'LEVEL 01'},b:{type:'Pipe',level:'LEVEL 02'},c:{type:'Pipe',level:'LEVEL 01'}};assert.doesNotMatch(ctx.neighbourRows('a',ctx.equipMeta.a),/selectElementById\('b'\)/);assert.match(ctx.neighbourRows('a',ctx.equipMeta.a),/selectElementById\('c'\)/)});
+test('CAD neighbours cannot cross known floors',()=>{const {ctx}=fixture();ctx.equipMeta={a:{type:'Pipe',level:'LEVEL 01'},b:{type:'Pipe',level:'LEVEL 02'},c:{type:'Pipe',level:'LEVEL 01'}};assert.doesNotMatch(ctx.neighbourRows('a',ctx.equipMeta.a),/data-element-id="b"/);assert.match(ctx.neighbourRows('a',ctx.equipMeta.a),/data-element-id="c"/)});
 test('unknown floors do not imply co-location',()=>{const {ctx}=fixture();ctx.equipMeta={a:{type:'Pipe'},b:{type:'Pipe'}};assert.equal(ctx.neighbourRows('a',ctx.equipMeta.a),'')});
 test('carbon converts cubic feet and refuses unknown units',()=>{const {ctx}=fixture();assert.equal(typeof ctx.volumeM3,'function');assert.ok(Math.abs(ctx.volumeM3('35.3146667 ft^3')-1)<1e-6);assert.equal(ctx.volumeM3('12 gallons'),null);assert.equal(ctx.volumeM3('-1 m3'),null)});
 test('carbon needs material, nonnegative factor and evidence',()=>{const {ctx}=fixture();assert.equal(typeof ctx.carbonEstimate,'function');const info={volume:'2 m3',structural_material:'Steel'};assert.equal(ctx.carbonEstimate(info,{value:3,source:'EPD example',scope:'A1-A3'}),6);assert.equal(ctx.carbonEstimate(info,{value:3,source:'',scope:'A1-A3'}),null);assert.equal(ctx.carbonEstimate(info,{value:-3,source:'EPD',scope:'A1-A3'}),null);assert.equal(ctx.carbonEstimate({...info,structural_material:null},{value:3,source:'EPD',scope:'A1-A3'}),null)});
