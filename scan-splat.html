@@ -56,6 +56,9 @@ try{
  renderer.domElement.onpointerdown=e=>{if(state!=='ready'||e.button!==0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);claim();};
  renderer.domElement.onpointermove=e=>{if(!drag||drag.id!==e.pointerId)return;yaw-=(e.clientX-drag.x)*.004;pitch=Math.max(-1.5,Math.min(1.5,pitch-(e.clientY-drag.y)*.004));drag.x=e.clientX;drag.y=e.clientY;camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));publish();};
  for(const name of ['pointerup','pointercancel','lostpointercapture'])renderer.domElement.addEventListener(name,()=>drag=null);
+ /* normalised mouse position for scan-compare's overlay LENS */
+ renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')send({type:'grimes-pointer',x:e.clientX/innerWidth,y:e.clientY/innerHeight});});
+ renderer.domElement.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')send({type:'grimes-pointer',x:null,y:null});});
  renderer.domElement.addEventListener('wheel',e=>{if(state!=='ready')return;e.preventDefault();claim();camera.fov=Math.max(35,Math.min(95,camera.fov+e.deltaY*.025));camera.updateProjectionMatrix();viewer.forceRenderNextFrame();publish();},{passive:false});
  const keys={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',KeyQ:'down',KeyE:'up',ShiftLeft:'fast',ShiftRight:'fast'};
  window.addEventListener('keydown',e=>{if(state!=='ready'||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)||!keys[e.code])return;e.preventDefault();if(!held.size)claim();held.add(keys[e.code]);});
