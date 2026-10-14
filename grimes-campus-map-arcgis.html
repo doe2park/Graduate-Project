@@ -432,8 +432,10 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .chat-input input:focus{border-color:var(--gold)}
 .chat-input button{background:var(--gold);color:#003262;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer}
 .chat-quick{display:flex;gap:4px;flex-wrap:wrap;padding:0 12px 8px}
-.chat-q{padding:4px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--dim);font-size:10px;cursor:pointer;white-space:nowrap}
-.chat-q:hover{border-color:var(--gold);color:var(--gold)}
+.chat-q{font-family:inherit;padding:4px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--dim);font-size:10px;cursor:pointer;white-space:nowrap}
+.chat-q:hover,.chat-q:focus-visible{border-color:var(--gold);color:var(--gold)}
+.bc:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.bt-n{background:rgba(148,163,184,.10);color:#94a3b8}
 /* Museum-label tone for bot answers — less emoji, more hierarchy */
 .chat-msg.bot .tb-kicker{font-size:9px;color:#64748b;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:3px}
 .chat-msg.bot .tb-title{font-size:14px;font-weight:600;color:#f1f5f9;letter-spacing:.1px;line-height:1.3;margin-bottom:8px}
@@ -570,7 +572,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
   <!-- Public Dashboard — Berkeley-internal framing (no external benchmarks) -->
   <div id="pubPanel">
     <div class="pub-hdr">
-      <div style="font-size:10px;color:var(--dim);letter-spacing:.6px">UC BERKELEY · LIVE</div>
+      <div style="font-size:10px;color:var(--dim);letter-spacing:.6px">UC BERKELEY · BMO FEED</div>
       <div style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px">Campus right now</div>
       <div style="font-size:10px;color:var(--dim);margin-top:3px;line-height:1.4">Where the power is going across <span id="pubMonitorCount">26</span> monitored buildings.</div>
     </div>
@@ -594,7 +596,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 
     <!-- Today's footprint: 2-up mini grid -->
     <div class="pub-row" style="flex-direction:column;gap:6px;align-items:stretch">
-      <div class="pub-label" style="width:100%">Today's footprint (so far)</div>
+      <div class="pub-label" style="width:100%">If demand stays at the latest level (24 h scenario)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">
         <div class="pub-mini"><div class="pub-mini-lbl">💰 COST</div><div class="pub-mini-val" id="pubCost">—</div><div class="pub-mini-sub">at $0.15/kWh</div></div>
         <div class="pub-mini"><div class="pub-mini-lbl">🌱 CO₂</div><div class="pub-mini-val" id="pubCo2">—</div><div class="pub-mini-sub" id="pubCo2Eq">—</div></div>
@@ -636,25 +638,153 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 <div id="chatPanel">
   <div class="chat-hdr"><h3>⚡ Campus Energy AI</h3><button class="chat-close" onclick="toggleChat()">✕</button></div>
   <div class="chat-msgs" id="chatMsgs">
-    <div class="chat-msg bot"><div class="tb-kicker">Campus AI · ready</div><div class="tb-title">Ask me about any UC Berkeley building</div><div class="tb-body"><div class="tb-line">I can look up <b>live energy</b>, show <b>24 h trends</b>, and drive the map for you. English or Korean.</div><div class="tb-line" style="margin-top:6px;color:#94a3b8">Try: <i>"zoom to Davis Hall"</i>, <i>"show only Engineering"</i>, <i>"Grimes trend"</i>.</div></div></div>
+    <div class="chat-msg bot"><div class="tb-kicker">Campus AI · ready</div><div class="tb-title">Ask me about any UC Berkeley building</div><div class="tb-body"><div class="tb-line">I can look up the <b>latest energy readings</b>, show <b>recent trends</b>, and drive the map for you. English or Korean.</div><div class="tb-line" style="margin-top:6px;color:#94a3b8">Try: <i>"zoom to Davis Hall"</i>, <i>"show only Engineering"</i>, <i>"Grimes trend"</i>.</div></div></div>
   </div>
   <div class="chat-quick" id="chatQuick">
-    <div class="chat-q" onclick="askChat(this.textContent)">Top energy users</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Campus total</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Daily cost</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">About Davis Hall</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Show only Engineering</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Zoom to Wheeler</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Reset map</div>
-    <div class="chat-q" onclick="askChat(this.textContent)">Any anomalies</div>
+    <button type="button" class="chat-q" onclick="askChat(this.textContent)">Top energy users</button>
+    <button type="button" class="chat-q" onclick="askChat(this.textContent)">Campus total</button>
+    <button type="button" class="chat-q" onclick="askChat(this.textContent)">Daily cost</button>
+    <button type="button" class="chat-q" onclick="askChat(this.textContent)">About Davis Hall</button>
+    <button type="button" class="chat-q" onclick="askChat(this.textContent)">Show only Engineering</button>
+    <button type="button" class="chat-q" onclick="askChat(this.textContent)">Zoom to Wheeler</button>
+    <button type="button" class="chat-q" onclick="askChat(this.textContent)">Reset map</button>
+    <button type="button" class="chat-q" onclick="askChat(this.textContent)">Any anomalies</button>
   </div>
   <div class="chat-input"><input id="chatIn" placeholder="Ask about buildings, energy..." onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Ask</button></div>
 </div>
 </div>
 <script src="https://js.arcgis.com/4.29/"></script>
 <script>
+/* MAP DATA HELPERS */
+/* Pure functions, unit-tested by tests/campus-map-honesty.test.cjs.
+   Vocabulary (AGENTS.md data-honesty ladder): LIVE (finite value, <=45 min old) ·
+   LATEST · HH:MM · Nh ago (older, neutral grey, Pacific) · "—" + "No reading in this window".
+   BMO timestamps are naive America/Los_Angeles wall time. Nothing here assumes sample spacing. */
+var LIVE_MAX_MS=45*60000;
+var HOME_KW=1.25; // rough continuous demand of an average US home (~11 MWh/yr, EIA RECS); illustrative only
+var PT_ZONE='America/Los_Angeles';
+function escHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function bmoTimestamp(raw){
+  var text=String(raw||'').trim();
+  if(/Z$|[+-]\d{2}:?\d{2}$/.test(text))return Date.parse(text);
+  var m=text.match(/^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)(?::(\d\d))?$/);
+  if(!m)return NaN;
+  var target=Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));
+  var fmt=new Intl.DateTimeFormat('en-US',{timeZone:PT_ZONE,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  function wall(at){var p={};fmt.formatToParts(at).forEach(function(x){p[x.type]=x.value});return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second)}
+  var at=target;
+  for(var i=0;i<3;i++)at+=target-wall(at);
+  // A naive reading inside a DST fold cannot say which occurrence was measured.
+  if(wall(at)!==target||wall(at-3600000)===target||wall(at+3600000)===target)return NaN;
+  return at;
+}
+function ptParts(ms){
+  var fmt=new Intl.DateTimeFormat('en-US',{timeZone:PT_ZONE,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'});
+  var p={};fmt.formatToParts(ms).forEach(function(x){p[x.type]=x.value});
+  var dow=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].indexOf(p.weekday);
+  return {hour:+p.hour,dow:dow,hhmm:p.hour+':'+p.minute,day:p.year+'-'+p.month+'-'+p.day};
+}
+function baselineKey(ms){var p=ptParts(ms);return {wdayMon0:p.dow,hr:p.hour}}
+function ageText(ms){
+  if(ms<45000)return 'just now';
+  if(ms<3600000)return Math.max(1,Math.round(ms/60000))+' min ago';
+  if(ms<86400000)return Math.floor(ms/3600000)+'h ago';
+  return Math.floor(ms/86400000)+'d ago';
+}
+function fmtKw(v){return v>=100?Math.round(v).toLocaleString('en-US'):v.toFixed(1)}
+function readingState(kw,ts,now){
+  if(typeof kw!=='number'||!isFinite(kw))return {state:'missing',kw:null,at:null,badge:'NO READING',text:'No reading in this window',value:'—'};
+  var at=bmoTimestamp(ts);
+  if(!isFinite(at)||at>now+300000)return {state:'unknown',kw:kw,at:null,badge:'LATEST',text:'LATEST · time unknown',value:fmtKw(kw)};
+  var age=Math.max(0,now-at);
+  if(age<=LIVE_MAX_MS)return {state:'live',kw:kw,at:at,ageMs:age,badge:'LIVE',text:'LIVE · BMO',value:fmtKw(kw)};
+  return {state:'latest',kw:kw,at:at,ageMs:age,badge:'LATEST',text:'LATEST · '+ptParts(at).hhmm+' · '+ageText(age),value:fmtKw(kw)};
+}
+function timedSeries(history,now){
+  var seen={},out=[];
+  (Array.isArray(history)?history:[]).forEach(function(p){
+    if(!p||typeof p.kw!=='number'||!isFinite(p.kw))return;
+    var x=bmoTimestamp(p.ts);
+    if(!isFinite(x)||x>now+300000||seen[x])return;
+    seen[x]=1;out.push({x:x,kw:p.kw,ts:p.ts});
+  });
+  return out.sort(function(a,b){return a.x-b.x});
+}
+function spanLabel(points){
+  if(!points||points.length<2)return null;
+  var span=points[points.length-1].x-points[0].x;
+  if(span<=0)return null;
+  if(span<5400000)return 'last '+Math.round(span/60000)+' min';
+  if(span<172800000)return 'last '+(Math.round(span/360000)/10)+' h';
+  return 'last '+Math.round(span/86400000)+' d';
+}
+function durText(ms){
+  if(ms<5400000)return Math.round(ms/60000)+' m';
+  if(ms<172800000)return (Math.round(ms/360000)/10)+' h';
+  return (Math.round(ms/8640000)/10)+' d';
+}
+function seriesStats(points){
+  if(!points||!points.length)return null;
+  var n=points.length,sum=0,peak=-Infinity,min=Infinity;
+  points.forEach(function(p){sum+=p.kw;if(p.kw>peak)peak=p.kw;if(p.kw<min)min=p.kw});
+  var avg=sum/n,sq=0;points.forEach(function(p){sq+=(p.kw-avg)*(p.kw-avg)});
+  return {avg:avg,sigma:Math.sqrt(sq/n),peak:peak,min:min,n:n};
+}
+// Forecast is offered only when recent samples really are ~15 min apart and the last one is fresh.
+function forecastStepMs(points,now){
+  if(!points||points.length<4)return null;
+  var tail=points.slice(-4),gaps=[];
+  for(var i=1;i<tail.length;i++)gaps.push(tail[i].x-tail[i-1].x);
+  gaps.sort(function(a,b){return a-b});
+  var med=gaps[1]; // median of the three most recent gaps
+  if(med<600000||med>1200000)return null;
+  if(now-tail[3].x>LIVE_MAX_MS)return null;
+  return Math.round(med/60000)*60000;
+}
+function meterIdList(m){return String(m==null?'':m).split('+').map(function(s){return s.trim()}).filter(Boolean)}
+// Names follow bmo_fetch.py METERS; no end-use claims beyond what the logger names.
+var METER_NAMES={'3':'Roof Electric · 480V 3-phase','76':'480/277V Electric','77':'208/120V Electric','250':'Condensate & Water'};
+function meterName(id){return METER_NAMES[id]||('Meter '+id)}
+function meterTopology(meter,configured){
+  var active=meterIdList(meter),ids=(Array.isArray(configured)?configured.map(String):[]);
+  active.forEach(function(id){if(ids.indexOf(id)<0)ids.push(id)});
+  return ids.map(function(id){return {id:id,label:meterName(id),active:active.indexOf(id)>=0}});
+}
+function homesEquivalent(kw){return (typeof kw==='number'&&isFinite(kw))?Math.max(1,Math.round(kw/HOME_KW)):null}
+function dailyAtCurrentText(kw){return (typeof kw==='number'&&isFinite(kw))?'At current demand, 24 h ≈ '+Math.round(kw*24).toLocaleString('en-US')+' kWh':null}
+// Typical-for-this-hour comparison. Buckets are Pacific date+hour; only buildings present both
+// now and in history are compared, and a bucket counts only if it covers every one of them.
+function moodCompare(hist,cur,nowMs){
+  if(!hist||!cur||!isFinite(nowMs))return null;
+  var ids=Object.keys(cur).filter(function(id){return cur[id]&&typeof cur[id].kw==='number'&&isFinite(cur[id].kw)&&Array.isArray(hist[id])});
+  if(!ids.length)return null;
+  var ref=ptParts(nowMs),buckets={};
+  ids.forEach(function(id){
+    var per={};
+    hist[id].forEach(function(p){
+      if(!p||typeof p.kw!=='number'||!isFinite(p.kw))return;
+      var x=bmoTimestamp(p.ts);if(!isFinite(x))return;
+      var q=ptParts(x);
+      if(q.hour!==ref.hour||q.dow!==ref.dow||q.day===ref.day)return;
+      (per[q.day]=per[q.day]||[]).push(p.kw);
+    });
+    Object.keys(per).forEach(function(day){
+      var a=per[day];(buckets[day]=buckets[day]||{})[id]=a.reduce(function(s,v){return s+v},0)/a.length;
+    });
+  });
+  var sums=[];
+  Object.keys(buckets).forEach(function(day){
+    var b=buckets[day];
+    if(ids.every(function(id){return b[id]!==undefined}))sums.push(ids.reduce(function(s,id){return s+b[id]},0));
+  });
+  if(sums.length<3)return null;
+  var typical=sums.reduce(function(s,v){return s+v},0)/sums.length;
+  var current=ids.reduce(function(s,id){return s+cur[id].kw},0);
+  return {n:sums.length,typical:typical,current:current,buildings:ids.length,pct:typical>0?(current-typical)/typical*100:0,hour:ref.hour,dow:ref.dow};
+}
+/* END MAP DATA HELPERS */
 const D=[
-  {id:'grimes',n:'Grimes Engineering Center',a:'Grimes Center',lat:37.87410,lng:-122.25815,c:'Engineering',bim:1,nrg:1,kw:37.3,
+  {id:'grimes',n:'Grimes Engineering Center',a:'Grimes Center',lat:37.87410,lng:-122.25815,c:'Engineering',bim:1,nrg:1,
    floors:4,sqft:'83,460',yr:1980,yrn:'1980 / 2025 renovation',mep:8,sensors:30,
    xr:'https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html'},
   {id:'cory',n:'Cory Hall',a:'Electrical Engineering (EECS)',lat:37.87530,lng:-122.25725,c:'Engineering',nrg:1,yr:1950,floors:5},
@@ -668,7 +798,7 @@ const D=[
   {id:'sutardja',n:'Sutardja Dai Hall',a:'CITRIS / Nanofab',lat:37.87498,lng:-122.25850,c:'Engineering',yr:2009,floors:4},
   {id:'mclaughlin',n:'McLaughlin Hall',a:'Engineering',lat:37.873829,lng:-122.259051,c:'Engineering',yr:1951,floors:4},
   {id:'blum',n:'Blum Hall',a:'Global Poverty & Practice',lat:37.8748,lng:-122.25914,c:'Engineering',yr:2012,floors:3},
-  {id:'stanley',n:'Stanley Hall',a:'Bioengineering / QB3',lat:37.87430,lng:-122.25622,c:'Science',nrg:1,yr:2007,floors:6},
+  {id:'stanley',n:'Stanley Hall',a:'Bioengineering / QB3',lat:37.87430,lng:-122.25622,c:'Science',yr:2007,floors:6},
   {id:'tan',n:'Tan Hall',a:'Chemistry / ChemE',lat:37.87332,lng:-122.25640,c:'Science',nrg:1,yr:1997,floors:4},
   {id:'latimer',n:'Latimer Hall',a:'Chemistry',lat:37.873215,lng:-122.255835,c:'Science',nrg:1,yr:1963,floors:5},
   {id:'lewis',n:'Lewis Hall',a:'Chemistry',lat:37.873009,lng:-122.254878,c:'Science',yr:1948,floors:4},
@@ -806,7 +936,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     D.forEach(function(b,i){
       var cc=C[b.c];
       var live=energyData&&energyData[b.id];
-      var kw=(live&&live.kw!==null)?live.kw:(b.kw||null);
+      var kw=(live&&typeof live.kw==='number'&&isFinite(live.kw))?live.kw:null; // never a static fallback
       var eCol=kwColor(kw,maxKw);
 
       // All buildings (including Grimes) render through the same path now —
@@ -877,7 +1007,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/baselines.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.baselines=d;}).catch(function(){});
 
   // Statistical baseline/anomaly layer (hour-of-week median + MAD z-scores) —
-  // built by scripts/build_baseline.py every 15 min. Feeds the σ-banner in popups.
+  // built by scripts/build_baseline.py. Feeds the σ-banner in popups.
   window.energyBaseline=null;
   fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/energy_baseline.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.energyBaseline=d;}).catch(function(){});
 
@@ -902,9 +1032,12 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   window.getBaseline = function(buildingId, dateObj){
     var b = window.baselines && window.baselines.buildings && window.baselines.buildings[buildingId];
     if(!b) return null;
-    var wday = dateObj.getDay();           // JS: 0=Sun..6=Sat
-    var wdayMon0 = (wday+6)%7;             // Convert to 0=Mon..6=Sun (matches Python weekday())
-    var hr = dateObj.getHours();
+    // Pacific weekday/hour (baselines are built in America/Los_Angeles), never browser-local.
+    var ms = (dateObj instanceof Date) ? dateObj.getTime() : +dateObj;
+    if(!isFinite(ms)) return null;
+    var bk = baselineKey(ms);
+    var wdayMon0 = bk.wdayMon0;            // 0=Mon..6=Sun (matches Python weekday())
+    var hr = bk.hr;
     var wclass = wdayMon0>=5 ? 'weekend' : 'weekday';
     var key1 = wdayMon0+','+hr;
     var key2 = wclass+','+hr;
@@ -1011,39 +1144,41 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   // Build a plain-language "story" for a building based on live kW vs its own 24h sparkline average.
   // Source: Opower Home Energy Reports (Allcott, 2011) — relative comparisons drive engagement.
   function buildingStory(b){
-    var homes=b.kw?Math.max(1,Math.round(b.kw/1.25)):0; // US avg household ~1.25 kW continuous (EIA RECS)
+    var homes=homesEquivalent(b.kw)||0; // rough: HOME_KW per average US home
     var shortN=b.n.split(' ').slice(0,2).join(' ');
     if(!b.kw){
-      if(b.nrg)return{icon:'\uD83C\uDF19',mood:'dim',title:shortN+' is offline right now',sub:'This building is metered by BMO, but isn\'t reporting live power at the moment.'};
+      if(b.nrg)return{icon:'\uD83D\uDCCD',mood:'dim',title:'No reading for '+shortN+' in this window',sub:'This building is on the BMO feed, but the latest pull has no reading for it.'};
       return{icon:'\uD83D\uDCCD',mood:'dim',title:'No live energy data for '+shortN,sub:'Not currently metered in the live feed. Building info is still below.'};
     }
-    var sp=(b.sparkline&&b.sparkline.length>2)?b.sparkline:null;
-    var avg=sp?sp.reduce(function(a,c){return a+c},0)/sp.length:null;
+    var ser=timedSeries(window.chatHistory&&window.chatHistory[b.id],Date.now()).slice(-24),st=seriesStats(ser.length>2?ser:[]);
+    var avg=st?st.avg:null, winTxt=spanLabel(ser)||'recent window';
     var tone='in a steady rhythm',mood='normal',icon='\u26A1';
     if(avg&&avg>0){
       var pct=(b.kw-avg)/avg*100;
-      if(pct>25){tone='<b style="color:#f87171">busier</b> than its 24-hour average';mood='busy';icon='\uD83D\uDD25';}
-      else if(pct<-25){tone='<b style="color:#60a5fa">quieter</b> than its 24-hour average';mood='quiet';icon='\uD83C\uDF0A';}
+      if(pct>25){tone='<b style="color:#f87171">busier</b> than its average over the '+winTxt;mood='busy';icon='\uD83D\uDD25';}
+      else if(pct<-25){tone='<b style="color:#60a5fa">quieter</b> than its average over the '+winTxt;mood='quiet';icon='\uD83C\uDF0A';}
       else{tone='running near its typical rhythm';}
     }
     var hStr=homes.toLocaleString()+' home'+(homes===1?'':'s');
     return{
       icon:icon,mood:mood,
-      title:'Using about '+hStr+' worth of power right now',
+      title:'Using about '+hStr+' worth of power at the latest reading',
       sub:shortN+' is '+tone+'.'
     };
   }
 
   // Translate BMO meter ID → plain-English description (reused by both popups)
-  // Meter voltage class (per BMO install convention at Berkeley):
-  //   "3"  — main service tie (often low-kW shared feed)
-  //   "76" — 480/277V mechanical/HVAC main (typically bulk of building load)
-  //   "77" — 208/120V plugs & lighting submeter
-  function meterLabel(mid){
-    if(mid==='76') return { short:'mechanical main', full:'Meter 76 — 480/277V mechanical feed (HVAC, chillers, large equipment)', excludes:'plugs & lighting not included' };
-    if(mid==='77') return { short:'plugs & lights', full:'Meter 77 — 208/120V plugs & lighting submeter', excludes:'mechanical load not included' };
-    if(mid==='3')  return { short:'main service tie', full:'Meter 3 — main service tie feed', excludes:'this may only be part of the total building load' };
-    return { short:'meter '+(mid||'?'), full:'Meter '+(mid||'?'), excludes:'' };
+  // Names follow bmo_fetch.py METERS (via meterTopology); a building reading is the SUM of the
+  // meters that responded, so describe the set, never a single "first responder".
+  function meterSummary(meter, configured){
+    var rows=meterTopology(meter,configured), on=rows.filter(function(r){return r.active});
+    if(!on.length) return {short:'no meter',full:'No meter responded',partial:false};
+    var partial=rows.length>on.length;
+    return {
+      short: on.map(function(r){return 'M'+r.id}).join(' + '),
+      full: on.map(function(r){return 'M'+r.id+' '+r.label}).join(' + '),
+      partial: partial
+    };
   }
 
   function showPop(b){
@@ -1051,29 +1186,25 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     // Pull live data off the fetched energy JSON so the popup stays fresh even
     // if the static D[] roster hasn't been re-hydrated yet
     var live = (window.currentEnergyData && window.currentEnergyData[b.id]) || null;
-    var kw = (live && typeof live.kw==='number' && live.kw>0) ? live.kw : (typeof b.kw==='number' && b.kw>0 ? b.kw : null);
-    var sparkData = (live && live.sparkline && live.sparkline.length>2) ? live.sparkline : (b.sparkline && b.sparkline.length>2 ? b.sparkline : null);
-    var meterId  = live && live.meter    ? String(live.meter)    : (b.meter?String(b.meter):null);
-    var liveTs   = live && live.timestamp? live.timestamp: b.liveTs;
-    var predicted= live && live.predicted_kw ? live.predicted_kw : b.predicted;
-    var anomaly  = live && live.anomaly  ? live.anomaly  : b.anomaly;
+    var nowMs = Date.now();
+    var rs = readingState(live ? live.kw : null, live ? live.timestamp : null, nowMs);   // LIVE / LATEST / missing
+    var kw = rs.kw;   // finite or null; never a static fallback, zero stays zero
+    // Timestamped series from the history file (the feed's `sparkline` carries no times).
+    var tpts = timedSeries(window.chatHistory && window.chatHistory[b.id], nowMs).slice(-24);
+    var sparkData = tpts.length>2 ? tpts.map(function(p){return p.kw;}) : null;
+    var spanTxt = spanLabel(tpts);
+    var meterId  = live && live.meter    ? String(live.meter)    : null;
+    var liveTs   = live && live.timestamp ? live.timestamp : null;
+    var predicted= live && live.predicted_kw ? live.predicted_kw : null;
+    var anomaly  = live && live.anomaly  ? live.anomaly  : null;
     var dailyKwh = live && live.est_daily_kwh   ? live.est_daily_kwh   : (kw?Math.round(kw*24):null);
     var dailyCost= live && live.est_daily_cost  ? live.est_daily_cost  : (kw?+(kw*24*0.15).toFixed(2):null);
     var dailyCo2 = live && live.est_daily_co2_kg? live.est_daily_co2_kg: (kw?+(kw*24*0.21).toFixed(1):null);
 
-    // 6hr stats
+    // window stats over the ACTUAL covered span (spanTxt), not an assumed 6 h
     var avg6=null, peak6=null, trough6=null, sigma6=null;
-    if(sparkData && sparkData.length>1){
-      var nums = sparkData.filter(function(v){return typeof v==='number' && !isNaN(v);});
-      if(nums.length){
-        avg6    = nums.reduce(function(a,x){return a+x;},0)/nums.length;
-        peak6   = Math.max.apply(null, nums);
-        trough6 = Math.min.apply(null, nums);
-        // standard deviation — actual diagnostic value, not shown to Public
-        var sq = nums.reduce(function(a,x){return a+(x-avg6)*(x-avg6);},0);
-        sigma6 = Math.sqrt(sq/nums.length);
-      }
-    }
+    var wst = seriesStats(sparkData ? tpts : []);
+    if(wst){ avg6=wst.avg; peak6=wst.peak; trough6=wst.min; sigma6=wst.sigma; }
     // Δ vs predicted — signed percentage
     var delta=null, deltaPct=null;
     if(kw!=null && predicted!=null && predicted>0){
@@ -1081,18 +1212,19 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       deltaPct = (delta/predicted)*100;
     }
 
-    var mLbl = meterLabel(meterId);
+    var mSum = meterSummary(meterId, live && live.meters_configured);
 
     // ── HEAD: terminal-style ID + meter chain + status LED ──
     var idTag = (b.id||'?').toUpperCase();
-    var meterTag = meterId ? ('M'+meterId) : 'NO-METER';
-    var ledClass = kw!=null ? '' : ' off';
+    var meterTag = meterId ? escHtml(mSum.short) : (b.nrg ? 'NO READING' : 'NOT METERED');
+    var ledClass = rs.state==='live' ? '' : ' off';
 
     var tags = '<span class="pe-bdg pe-bdg-cat" style="background:'+cc.h+'22;color:'+cc.h+';border:1px solid '+cc.h+'55">'+b.c+'</span>';
     if(b.bim) tags += '<span class="pe-bdg pe-bdg-bim">BIM</span>';
-    if(kw!=null) tags += '<span class="pe-bdg pe-bdg-nrg">LIVE·BMO</span>';
-    else if(b.nrg) tags += '<span class="pe-bdg pe-bdg-off">METERED·OFFLINE</span>';
-    else tags += '<span class="pe-bdg pe-bdg-off">NO-METER</span>';
+    if(rs.state==='live') tags += '<span class="pe-bdg pe-bdg-nrg">LIVE·BMO</span>';
+    else if(kw!=null) tags += '<span class="pe-bdg pe-bdg-off">'+escHtml(rs.text)+'</span>';
+    else if(b.nrg) tags += '<span class="pe-bdg pe-bdg-off">NO READING</span>';
+    else tags += '<span class="pe-bdg pe-bdg-off">NOT METERED</span>';
 
     var subParts=[];
     if(b.yr)subParts.push('BLT '+b.yr);
@@ -1103,48 +1235,44 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     var h = '<div class="pe-stripe" style="background:'+cc.h+'"></div>'
       + '<div class="pe-head">'
       + '<button class="pe-x" onclick="closePop()">✕</button>'
-      + '<div class="pe-ident"><span class="pe-ident-led'+ledClass+'"></span>['+idTag+']<span class="pe-ident-chain">▸</span>'+meterTag+'<span class="pe-ident-chain">▸</span>'+(kw!=null?'ONLINE':'OFFLINE')+'</div>'
-      + '<div class="pe-title">'+b.n+'</div>'
+      + '<div class="pe-ident"><span class="pe-ident-led'+ledClass+'"></span>['+idTag+']<span class="pe-ident-chain">▸</span>'+meterTag+'<span class="pe-ident-chain">▸</span>'+(rs.state==='live'?'LIVE':(kw!=null?'LATEST':'NO READING'))+'</div>'
+      + '<div class="pe-title">'+escHtml(b.n)+'</div>'
       + (sub?'<div class="pe-sub">'+sub+'</div>':'')
       + '<div class="pe-badges">'+tags+'</div>'
       + '</div>'
       + '<div class="pe-body">';
 
-    // ── METER TOPOLOGY — shows which of the 3 meters we're reading ──
-    // (Buildings at Berkeley typically have M3 + M76 + M77; BMO returns the first-responding.)
+    // ── METER TOPOLOGY — a building reading is the SUM of every meter that responded ──
     if(kw!=null && meterId){
-      function topoLine(mid, label, note){
-        var isActive = meterId===mid;
-        var cls = isActive ? 'active' : 'dim';
-        var chip = '<span class="pe-topo-chip">M'+mid+'</span>';
-        return '<div class="pe-topo-line '+cls+'">'+chip+' <span class="pe-topo-arrow">─</span> '+label+'<span style="margin-left:auto;color:#475569;font-size:9px">'+(isActive?'◉ READING':'—')+'</span></div>';
-      }
+      var topoRows = meterTopology(meterId, live && live.meters_configured);
       h += '<div class="pe-sec"><span>Meter Topology</span><span>BMO Feed</span></div>';
       h += '<div class="pe-topo">'
-         + topoLine('3',  '208V main service tie')
-         + topoLine('76', '480/277V mechanical (HVAC)')
-         + topoLine('77', '208/120V plugs &amp; lighting')
-         + '<div class="pe-topo-foot">Reading from <b>'+mLbl.full.replace(/Meter \d+ — /,'')+'</b>'
-         +   (mLbl.excludes?' · <span style="color:#fca5a5">'+mLbl.excludes+'</span>':'')
+         + topoRows.map(function(r){
+             return '<div class="pe-topo-line '+(r.active?'active':'dim')+'"><span class="pe-topo-chip">M'+escHtml(r.id)+'</span> <span class="pe-topo-arrow">─</span> '+escHtml(r.label)
+                  + '<span style="margin-left:auto;color:#475569;font-size:9px">'+(r.active?'◉ INCLUDED':'—')+'</span></div>';
+           }).join('')
+         + '<div class="pe-topo-foot">Reading is the sum of <b>'+escHtml(mSum.short)+'</b>'
+         +   (mSum.partial ? ' · some configured meters returned no reading, so this may be only part of the building load' : '')
          + '</div>'
          + '</div>';
     }
 
-    // ── METRIC TILES — current / Δ vs predicted / σ 6hr ──
+    // ── METRIC TILES — current / Δ vs predicted / σ over the covered window ──
     if(kw!=null){
-      var kwStr = kw>=100 ? Math.round(kw).toLocaleString() : kw.toFixed(1);
+      var kwStr = rs.value;
       var deltaCls = deltaPct==null ? '' : (Math.abs(deltaPct) < 5 ? 'green' : (deltaPct>0?'warn':'green'));
       var deltaStr = deltaPct==null ? '—' : ((deltaPct>0?'+':'')+deltaPct.toFixed(1)+'%');
       var sigStr = sigma6==null ? '—' : (sigma6>=10?Math.round(sigma6):sigma6.toFixed(1));
-      h += '<div class="pe-sec"><span>Live Readings</span><span>'+(liveTs?liveTs.slice(11,16)+' UTC':'—')+'</span></div>';
+      var isLive = rs.state==='live';
+      h += '<div class="pe-sec"><span>'+(isLive?'Live Readings':'Latest Reading')+'</span><span>'+(rs.at?escHtml(ptParts(rs.at).hhmm)+' PT'+(isLive?'':' · '+escHtml(ageText(rs.ageMs))):'time unknown')+'</span></div>';
       h += '<div class="pe-metrics">'
-         +   '<div class="pe-metric gold"><div class="pe-metric-lbl">kW Now</div><div class="pe-metric-val">'+kwStr+'</div><div class="pe-metric-sub">'+(meterId?'via M'+meterId:'meter —')+'</div></div>'
+         +   '<div class="pe-metric gold"><div class="pe-metric-lbl">'+(isLive?'kW Now':'kW Latest')+'</div><div class="pe-metric-val">'+kwStr+'</div><div class="pe-metric-sub">'+(meterId?'via '+escHtml(mSum.short):'meter —')+'</div></div>'
          +   '<div class="pe-metric '+deltaCls+'"><div class="pe-metric-lbl">Δ vs Pred</div><div class="pe-metric-val">'+deltaStr+'</div><div class="pe-metric-sub">'+(predicted!=null?'p='+((+predicted).toFixed(1)):'no baseline')+'</div></div>'
-         +   '<div class="pe-metric"><div class="pe-metric-lbl">σ 6hr</div><div class="pe-metric-val">'+sigStr+'</div><div class="pe-metric-sub">std dev</div></div>'
+         +   '<div class="pe-metric"><div class="pe-metric-lbl">σ'+(spanTxt?' · '+escHtml(spanTxt):'')+'</div><div class="pe-metric-val">'+sigStr+'</div><div class="pe-metric-sub">'+(sigma6==null?'no series':'std dev')+'</div></div>'
          + '</div>';
     } else {
-      h += '<div class="pe-sec"><span>Live Readings</span><span>—</span></div>';
-      h += '<div class="pe-offline">'+(b.nrg?'<b>METER OFFLINE</b> · BMO not responding for this point':'<b>NO METER INSTALLED</b> · BMO has no endpoint for this building')+'</div>';
+      h += '<div class="pe-sec"><span>Latest Reading</span><span>—</span></div>';
+      h += '<div class="pe-offline"><b>—</b> · No reading in this window'+(b.nrg?'':' · <span>not metered</span>')+'</div>';
     }
 
     // ── ANOMALY BANNER ──
@@ -1152,8 +1280,8 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var isHigh = anomaly.type==='high';
       var pctOff = anomaly.ratio!=null ? Math.round((anomaly.ratio-1)*100) : null;
       h += '<div class="pe-anomaly'+(isHigh?'':' low')+'">'
-         +   (isHigh?'[!]':'[i]')+' '+anomaly.type.toUpperCase()+' — '
-         +   kw+' kW vs recent '+anomaly.avg+' kW'
+         +   (isHigh?'[!]':'[i]')+' '+escHtml(String(anomaly.type).toUpperCase())+' — '
+         +   escHtml(rs.value)+' kW vs recent '+escHtml(anomaly.avg)+' kW'
          +   (pctOff!=null?' ('+(pctOff>=0?'+':'')+pctOff+'%)':'')
          + '</div>';
     }
@@ -1168,7 +1296,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       // concise: direction + z + actual vs expected, one line
       h += '<div class="pe-anomaly'+(zc.z>0?'':' low')+'">'
          +   (zc.z>0?'[!] HIGH':'[i] LOW')+' z'+Math.abs(zc.z).toFixed(1)
-         +   ' · '+zc.kw+' kW (expected '+zc.base+')'
+         +   ' · '+escHtml(zc.kw)+' kW (expected '+escHtml(zc.base)+')'
          +   (sbWn?' · weather-norm':'')
          + '</div>';
     }
@@ -1178,11 +1306,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     if(fl && (fl.water_gpm!=null || fl.steam_lb_hr!=null || fl.condensate_gpm!=null || fl.irrigation_gpm!=null)){
       // trade colors: water blue, steam/condensate orange, irrigation light blue
       var fbits=[];
-      if(fl.water_gpm!=null)      fbits.push('<span style="color:#60a5fa">💧 water '+fl.water_gpm+' GPM</span>');
-      if(fl.steam_lb_hr!=null)    fbits.push('<span style="color:#fb923c">♨️ steam '+fl.steam_lb_hr+' lb/h</span>');
-      if(fl.condensate_gpm!=null) fbits.push('<span style="color:#fb923c">condensate '+fl.condensate_gpm+' GPM</span>');
-      if(fl.irrigation_gpm!=null) fbits.push('<span style="color:#93c5fd">irrigation '+fl.irrigation_gpm+' GPM</span>');
-      h += '<div class="pe-sec" style="margin-top:8px"><span>Water &amp; Steam</span><span>live</span></div>'
+      if(fl.water_gpm!=null)      fbits.push('<span style="color:#60a5fa">💧 water '+escHtml(fl.water_gpm)+' GPM</span>');
+      if(fl.steam_lb_hr!=null)    fbits.push('<span style="color:#fb923c">♨️ steam '+escHtml(fl.steam_lb_hr)+' lb/h</span>');
+      if(fl.condensate_gpm!=null) fbits.push('<span style="color:#fb923c">condensate '+escHtml(fl.condensate_gpm)+' GPM</span>');
+      if(fl.irrigation_gpm!=null) fbits.push('<span style="color:#93c5fd">irrigation '+escHtml(fl.irrigation_gpm)+' GPM</span>');
+      h += '<div class="pe-sec" style="margin-top:8px"><span>Water &amp; Steam</span><span>'+(rs.state==='live'?'live':'latest')+'</span></div>'
          + '<div style="font:10.5px/1.7 \'JetBrains Mono\',monospace;color:#94a3b8;padding:2px 0 4px">'+fbits.join(' · ')+'</div>';
     }
 
@@ -1193,26 +1321,29 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     //      — i.e. "what's typical for this building at the actual future moment"
     //   3. If no baseline available (low-data building or unknown hour), fall back to old avg6 decay
     //   Also computes baselinePast[] / baselineFuture[] for the chart's ghost line + Public mode.
-    var liveTsForBase = liveTs ? new Date(liveTs) : new Date();
-    var baseFn = function(stepsFromNow){
-      var d = new Date(liveTsForBase.getTime() + stepsFromNow*15*60000);
-      var bl = window.getBaseline ? window.getBaseline(b.id, d) : null;
+    // Baseline is looked up at real (Pacific) instants; forecast only exists when recent samples
+    // are genuinely ~15 min apart (fStep), otherwise no cadence is invented.
+    var fStep = forecastStepMs(tpts, nowMs);
+    var tLast = tpts.length ? tpts[tpts.length-1].x : null;
+    var baseAt = function(ms){
+      var bl = (window.getBaseline && isFinite(ms)) ? window.getBaseline(b.id, ms) : null;
       return bl ? bl.mean : null;
     };
+    var baseFn = function(n){ if(tLast==null) return null; if(n===0) return baseAt(tLast); return fStep ? baseAt(tLast + n*fStep) : null; };
 
     // Build baseline series spanning past sparkline + future horizon (for chart ghost line)
     var baselinePast=[], baselineFuture=[];
     if(window.baselines){
       var nPast = sparkData ? sparkData.length : 0;
       for(var pi=0; pi<nPast; pi++){
-        baselinePast.push(baseFn(-(nPast-1-pi)));
+        baselinePast.push(baseAt(tpts[pi].x));
       }
     }
 
     var forecast=null, fcastPeak=null, fcastAvg=null;
     var baselineNowVal = baseFn(0);  // typical for THIS hour (used in Public popup)
-    if(sparkData && sparkData.length>3){
-      var fHorizon=8;  // 8 × 15min = 2hr
+    if(fStep && sparkData && sparkData.length>3){
+      var fHorizon=8;  // 8 steps of the measured cadence
       var lastVal = sparkData[sparkData.length-1];
       var tail = sparkData.slice(-4);
       var slope = (tail[tail.length-1]-tail[0]) / (tail.length-1);
@@ -1267,9 +1398,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var W=360, H=132, ML=32, MR=8, MT=8, MB=22;
       var plotW = W-ML-MR, plotH = H-MT-MB;
       // Total x domain: history + forecast; each sample is one step
-      var totalSteps = (nP-1) + nF;  // e.g. 23 history steps + 8 forecast = 31
-      var stepX = plotW / (totalSteps || 1);
-      var nowX = ML + (nP-1)*stepX;   // vertical divider position
+      // x is TIME (ms), not sample index: irregular spacing is drawn as irregular.
+      var t0 = tpts[0].x, tN = tpts[nP-1].x, tEnd = tN + (nF ? nF*fStep : 0), tSpan = (tEnd - t0) || 1;
+      var xT = function(t){ return ML + (t - t0)/tSpan*plotW; };
+      var nowX = xT(tN);   // latest reading (divider only drawn when a forecast follows)
+      var clk = function(t){ var q=ptParts(t); return (tN-t0>=72000000 ? q.day.slice(5)+' ' : '')+q.hhmm; };
 
       // Y gridlines + labels
       var gridTicks='', yLabels='';
@@ -1279,38 +1412,32 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         yLabels   += '<text x="'+(ML-5)+'" y="'+(gy+3).toFixed(1)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#64748b" text-anchor="end">'+yv+'</text>';
       }
 
-      // X labels — past side (6h/4h/2h) and future side (+1h / +2h)
-      var windowMin=(nP-1)*15, futureMin=nF*15;
+      // X labels — real Pacific clock times at start / middle / latest reading
+      var futureMin = nF*(fStep||0)/60000;
       var xLabels='';
-      // Past ticks
-      [{frac:0,lbl:windowMin>=60?(windowMin/60).toFixed(windowMin%60===0?0:1)+'h':windowMin+'m'},
-       {frac:0.5,lbl:windowMin>=60?(windowMin/2/60).toFixed(1)+'h':Math.round(windowMin/2)+'m'},
-       {frac:1,lbl:'now'}].forEach(function(t){
-        var xp = ML + t.frac*(nP-1)*stepX;
-        xLabels += '<text x="'+xp.toFixed(1)+'" y="'+(H-6)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#64748b" text-anchor="middle">'+t.lbl+'</text>';
+      [{t:t0,lbl:clk(t0)},{t:(t0+tN)/2,lbl:clk((t0+tN)/2)},{t:tN,lbl:clk(tN)+' latest'}].forEach(function(tk,ti){
+        xLabels += '<text x="'+xT(tk.t).toFixed(1)+'" y="'+(H-6)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="#64748b" text-anchor="'+(ti===0?'start':(ti===2&&!nF?'end':'middle'))+'">'+tk.lbl+'</text>';
       });
-      // Future ticks
       if(nF){
-        [{frac:0.5,lbl:'+'+(futureMin/2>=60?(futureMin/2/60).toFixed(0)+'h':futureMin/2+'m')},
-         {frac:1,lbl:'+'+(futureMin>=60?(futureMin/60).toFixed(0)+'h':futureMin+'m')}].forEach(function(t){
-          var xp = nowX + t.frac*nF*stepX;
+        [{frac:0.5,lbl:'+'+durText(futureMin*30000)},{frac:1,lbl:'+'+durText(futureMin*60000)}].forEach(function(t){
+          var xp = nowX + t.frac*(xT(tEnd)-nowX);
           xLabels += '<text x="'+xp.toFixed(1)+'" y="'+(H-6)+'" font-family="JetBrains Mono,monospace" font-size="8.5" fill="var(--cyan)" style="fill:#22d3ee" text-anchor="middle" opacity="0.85">'+t.lbl+'</text>';
         });
       }
 
       // History line
       var pts = dd.map(function(v,i){
-        var x = ML + i*stepX;
+        var x = xT(tpts[i].x);
         var y = MT + plotH - ((v-yMin)/yRange)*plotH;
         return x.toFixed(1)+','+y.toFixed(1);
       }).join(' ');
-      var areaPts = (ML)+','+(MT+plotH)+' '+pts+' '+nowX.toFixed(1)+','+(MT+plotH);
+      var areaPts = xT(t0).toFixed(1)+','+(MT+plotH)+' '+pts+' '+nowX.toFixed(1)+','+(MT+plotH);
 
       // Forecast line + confidence cone (if we have forecast + sigma)
       var fcastLine='', fcastCone='';
       if(nF){
         var fcPts = fc.map(function(v,i){
-          var x = nowX + (i+1)*stepX;
+          var x = xT(tN + (i+1)*fStep);
           var y = MT + plotH - ((v-yMin)/yRange)*plotH;
           return x.toFixed(1)+','+y.toFixed(1);
         });
@@ -1322,7 +1449,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         if(sigma6!=null && sigma6>0){
           var upper=[lastX.toFixed(1)+','+lastY.toFixed(1)], lower=[lastX.toFixed(1)+','+lastY.toFixed(1)];
           fc.forEach(function(v,i){
-            var x = nowX + (i+1)*stepX;
+            var x = xT(tN + (i+1)*fStep);
             // Confidence grows with horizon
             var growth = 1 + i*0.12;
             var uY = MT + plotH - ((v+sigma6*growth)-yMin)/yRange*plotH;
@@ -1341,7 +1468,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       }
 
       // "Now" vertical divider
-      var nowDivider = '<line x1="'+nowX.toFixed(1)+'" x2="'+nowX.toFixed(1)+'" y1="'+MT+'" y2="'+(MT+plotH)+'" stroke="#22d3ee" stroke-width="0.7" stroke-dasharray="1.5 2" opacity="0.55"/>'
+      var nowDivider = !nF ? '' : '<line x1="'+nowX.toFixed(1)+'" x2="'+nowX.toFixed(1)+'" y1="'+MT+'" y2="'+(MT+plotH)+'" stroke="#22d3ee" stroke-width="0.7" stroke-dasharray="1.5 2" opacity="0.55"/>'
                    + '<text x="'+(nowX+2).toFixed(1)+'" y="'+(MT+7)+'" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#22d3ee" opacity="0.75">⟵ past · forecast ⟶</text>';
 
       // Anomaly dots (historical)
@@ -1349,7 +1476,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       if(avg6!=null && sigma6!=null && sigma6>0){
         dd.forEach(function(v,i){
           if(Math.abs(v-avg6)>1.5*sigma6){
-            var x = ML + i*stepX;
+            var x = xT(tpts[i].x);
             var y = MT + plotH - ((v-yMin)/yRange)*plotH;
             var col = v>avg6?'#fca5a5':'#93c5fd';
             anomalyDots += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="2.6" fill="'+col+'" stroke="#0a0e1a" stroke-width="1"/>';
@@ -1361,7 +1488,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var baseLine='';
       if(avg6!=null && avg6>=yMin && avg6<=yMax){
         var by = MT + plotH - ((avg6-yMin)/yRange)*plotH;
-        baseLine = '<line x1="'+ML+'" x2="'+nowX.toFixed(1)+'" y1="'+by.toFixed(1)+'" y2="'+by.toFixed(1)+'" stroke="#34d399" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.55"/>'
+        baseLine = '<line x1="'+xT(t0).toFixed(1)+'" x2="'+nowX.toFixed(1)+'" y1="'+by.toFixed(1)+'" y2="'+by.toFixed(1)+'" stroke="#34d399" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.55"/>'
                  + '<text x="'+(nowX-2).toFixed(1)+'" y="'+(by-3).toFixed(1)+'" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34d399" text-anchor="end" opacity="0.8">avg '+avg6.toFixed(1)+'</text>';
       }
 
@@ -1372,11 +1499,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var nPast=dd.length;
       for(var ti=0; ti<nPast; ti++){
         var bv = (ti < baselinePast.length) ? baselinePast[ti] : null;
-        if(bv!=null) typicalSeries.push({x: ML + ti*stepX, y: bv});
+        if(bv!=null) typicalSeries.push({x: xT(tpts[ti].x), y: bv});
       }
       for(var ti=0; ti<baselineFuture.length; ti++){
         var bv = baselineFuture[ti];
-        if(bv!=null) typicalSeries.push({x: nowX + (ti+1)*stepX, y: bv});
+        if(bv!=null) typicalSeries.push({x: xT(tN + (ti+1)*fStep), y: bv});
       }
       if(typicalSeries.length>=3){
         var tpts = typicalSeries.map(function(p){
@@ -1386,7 +1513,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         typicalLine = '<polyline points="'+tpts+'" fill="none" stroke="#94a3b8" stroke-width="0.9" stroke-dasharray="2 2.5" opacity="0.65"/>';
       }
 
-      h += '<div class="pe-sec"><span>Power Trace + Forecast</span><span>'+nP+' actual · '+nF+' proj</span></div>';
+      h += '<div class="pe-sec"><span>Power Trace'+(nF?' + Forecast':'')+'</span><span>'+nP+' readings · '+escHtml(spanTxt||'')+(nF?' · '+nF+' proj':'')+'</span></div>';
       h += '<div class="pe-chart">'
          +   '<div class="pe-chart-tip" id="peChartTip"></div>'
          +   '<svg class="pe-chart-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" id="peChartSvg" style="height:130px">'
@@ -1405,37 +1532,33 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          +     '<line id="peChartGuide" x1="0" y1="'+MT+'" x2="0" y2="'+(MT+plotH)+'" stroke="'+cc.h+'" stroke-width="1" stroke-dasharray="2 2" opacity="0"/>'
          +     '<circle id="peChartDot" cx="0" cy="0" r="3.2" fill="'+cc.h+'" stroke="#0a0e1a" stroke-width="1.2" opacity="0"/>'
          +   '</svg>'
-         +   '<div class="pe-chart-legend"><span><span style="color:'+cc.h+'">━</span> load · <span style="color:#22d3ee">╌╌</span> forecast · <span style="color:#94a3b8">╌╌</span> typical · <span style="color:#fca5a5">●</span> σ&gt;1.5</span><span>'+Math.round(lo)+'–'+Math.round(hi)+' kW</span></div>'
+         +   '<div class="pe-chart-legend"><span><span style="color:'+cc.h+'">━</span> load · '+(nF?'<span style="color:#22d3ee">╌╌</span> forecast · ':'')+'<span style="color:#94a3b8">╌╌</span> typical · <span style="color:#fca5a5">●</span> σ&gt;1.5</span><span>'+Math.round(lo)+'–'+Math.round(hi)+' kW</span></div>'
          + '</div>';
 
       // Forecast summary strip — projection metrics
       if(nF){
         var dayKwhProj = dailyKwh;  // already set earlier from live data
+        var fHrs = durText(nF*fStep);
         var h2peakVsAvg = fcastPeak!=null && avg6!=null ? ((fcastPeak/avg6-1)*100).toFixed(0) : '—';
         var trendArrow = fcastAvg!=null && avg6!=null ? (fcastAvg>avg6*1.03?'▲ rising':(fcastAvg<avg6*0.97?'▼ falling':'→ steady')) : '—';
         var trendCls = fcastAvg!=null && avg6!=null && fcastAvg>avg6*1.1 ? 'warn' : '';
         h += '<div class="pe-fcast-strip">'
-           +   '<span class="pe-fcast-strip-item"><b>Next 2hr avg</b> '+(fcastAvg!=null?fcastAvg.toFixed(1):'—')+' kW</span>'
-           +   '<span class="pe-fcast-strip-item"><b>2hr peak</b> '+(fcastPeak!=null?fcastPeak.toFixed(1):'—')+' kW</span>'
+           +   '<span class="pe-fcast-strip-item"><b>Next '+fHrs+' avg</b> '+(fcastAvg!=null?fcastAvg.toFixed(1):'—')+' kW</span>'
+           +   '<span class="pe-fcast-strip-item"><b>'+fHrs+' peak</b> '+(fcastPeak!=null?fcastPeak.toFixed(1):'—')+' kW</span>'
            +   '<span class="pe-fcast-strip-item '+trendCls+'"><b>Trend</b> '+trendArrow+'</span>'
            + '</div>';
       }
 
       // ── RAW SAMPLES TABLE — last 12 + next 4 forecast, newest-first with full detail ──
       // Columns: HH:MM (absolute) | relative | kW | Δ pred | Δ avg | flag
-      var histSlice = dd.slice(-12);  // oldest → newest
-      // Parse live timestamp — fallback to current time if missing
-      var tBase = liveTs ? new Date(liveTs) : new Date();
-      if(isNaN(tBase.getTime())) tBase = new Date();
-
+      var histPts = tpts.slice(-12);  // oldest → newest, with real timestamps
+      var histSlice = histPts.map(function(p){return p.kw;});
       // Per-sample stats
       function fmtKw(v){ return v>=100 ? Math.round(v).toLocaleString() : (v||0).toFixed(1); }
       function fmtDelta(v){ return v==null ? '—' : ((v>=0?'+':'')+v.toFixed(1)); }
-      function pad2(n){ return n<10 ? '0'+n : ''+n; }
-      function hhmm(d){ return pad2(d.getHours())+':'+pad2(d.getMinutes()); }
 
       var histMin=Math.min.apply(null,dd), histMax=Math.max.apply(null,dd);
-      h += '<div class="pe-sec"><span>Samples (raw)</span><span>12 past + 4 proj · 15m cadence</span></div>';
+      h += '<div class="pe-sec"><span>Samples (raw)</span><span>last '+histSlice.length+' readings · actual PT times'+(nF?' + '+Math.min(4,nF)+' proj':'')+'</span></div>';
       h += '<div class="pe-samples"><table>'
          + '<tr>'
          +   '<th>Clock</th>'
@@ -1447,11 +1570,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          + '</tr>';
 
       // Render newest-first. i=0 is "now" (last hist point)
-      var histRev = histSlice.slice().reverse();  // newest first
-      histRev.forEach(function(v,i){
-        var ts = new Date(tBase.getTime() - i*15*60*1000);
-        var mins = i*15;
-        var relLbl = mins===0 ? 'now' : ('-'+(mins>=60?(mins/60).toFixed(mins%60===0?0:1)+'h':mins+'m'));
+      var histRev = histPts.slice().reverse();  // newest first
+      histRev.forEach(function(hp,i){
+        var v = hp.kw;
+        var clockLbl = ptParts(hp.x).hhmm;
+        var relLbl = i===0 ? 'latest' : ('-'+durText(tN-hp.x).replace(' ',''));
         var dltAvg = avg6!=null ? (v-avg6) : null;
         var dltPred= predicted!=null ? (v-predicted) : null;
         var dltCls = dltAvg==null ? '' : (dltAvg>0.5?'delta-pos':(dltAvg<-0.5?'delta-neg':''));
@@ -1469,7 +1592,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         if(isNow) rowCls.push('now');
         if(isAnom && !isNow) rowCls.push('anom');
         h += '<tr'+(rowCls.length?' class="'+rowCls.join(' ')+'"':'')+'>'
-           +   '<td class="col-time">'+hhmm(ts)+'</td>'
+           +   '<td class="col-time">'+clockLbl+'</td>'
            +   '<td class="col-rel">'+relLbl+'</td>'
            +   '<td class="col-kw">'+fmtKw(v)+'</td>'
            +   '<td class="col-delta '+dltPCls+'">'+fmtDelta(dltPred)+'</td>'
@@ -1480,17 +1603,16 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
       // Forecast rows (first 4 of forecast array, oldest-first inserts under "now")
       if(forecast && forecast.length){
-        var fcSubset = forecast.slice(0,4);  // next 4 × 15min = 1hr
+        var fcSubset = forecast.slice(0,4);  // next 4 steps of the measured cadence
         fcSubset.forEach(function(v,i){
-          var ts = new Date(tBase.getTime() + (i+1)*15*60*1000);
-          var mins = (i+1)*15;
-          var relLbl = '+'+(mins>=60?(mins/60).toFixed(mins%60===0?0:1)+'h':mins+'m');
+          var ts = tN + (i+1)*fStep;
+          var relLbl = '+'+durText((i+1)*fStep).replace(' ','');
           var dltAvg = avg6!=null ? (v-avg6) : null;
           var dltPred= predicted!=null ? (v-predicted) : null;
           var dltCls = dltAvg==null ? '' : (dltAvg>0.5?'delta-pos':(dltAvg<-0.5?'delta-neg':''));
           var dltPCls= dltPred==null ? '' : (dltPred>0.5?'delta-pos':(dltPred<-0.5?'delta-neg':''));
           h += '<tr class="fcast">'
-             +   '<td class="col-time">'+hhmm(ts)+'</td>'
+             +   '<td class="col-time">'+ptParts(ts).hhmm+'</td>'
              +   '<td class="col-rel">'+relLbl+'</td>'
              +   '<td class="col-kw">'+fmtKw(v)+'</td>'
              +   '<td class="col-delta '+dltPCls+'">'+fmtDelta(dltPred)+'</td>'
@@ -1504,7 +1626,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var sMin=Math.min.apply(null,histSlice), sMax=Math.max.apply(null,histSlice);
       var sAvg=histSlice.reduce(function(a,x){return a+x;},0)/histSlice.length;
       h += '<tr class="foot">'
-         +   '<td colspan="2" style="color:#64748b">12-pt stats</td>'
+         +   '<td colspan="2" style="color:#64748b">'+histSlice.length+'-pt stats</td>'
          +   '<td class="col-kw" title="avg">'+fmtKw(sAvg)+'</td>'
          +   '<td class="col-delta" title="min" style="color:#93c5fd">'+fmtKw(sMin)+'</td>'
          +   '<td class="col-delta" title="max" style="color:#fca5a5">'+fmtKw(sMax)+'</td>'
@@ -1551,7 +1673,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         var allow = {};
         meterScope.forEach(function(n){ allow[n]=true; });
         scopedEndUses = leed.end_uses.filter(function(eu){ return allow[eu.end_use]; });
-        scopeLabel = meterId==='76' ? 'mechanical scope (M76)' : (meterId==='77' ? 'plug+lighting scope (M77)' : 'meter M'+meterId+' scope');
+        scopeLabel = 'meter scope ('+mSum.short+')';
       }
       var designedKwh = scopedEndUses.reduce(function(s,e){return s+e.proposed_kwh;},0);
       var baselineKwh = scopedEndUses.reduce(function(s,e){return s+e.baseline_kwh;},0);
@@ -1580,7 +1702,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var savingsModel = baselineKwh ? Math.round((1 - designedKwh/baselineKwh)*100) : 0;
       var ttBase = 'ASHRAE 90.1-2010 code minimum · '+Math.round(baselineKwh).toLocaleString()+' kWh/yr · '+scopeLabel;
       var ttDes  = 'eQuest design model · '+Math.round(designedKwh).toLocaleString()+' kWh/yr · '+savingsModel+'% below baseline';
-      var ttProj = 'Live 6hr avg × 8760hr · '+Math.round(projAnnualKwh).toLocaleString()+' kWh/yr · M'+(meterId||'?')+' meter';
+      var ttProj = (rs.state==='live'?'Live':'Latest')+' reading, average over the '+(spanTxt||'latest reading')+' × 8760 h · '+Math.round(projAnnualKwh).toLocaleString()+' kWh/yr · '+mSum.short+' (simple scenario, not a forecast)';
       h += '<div class="pe-leed2">';
       h +=   '<div class="pe-leed2-cmp">'
          +     '<div class="pe-leed2-row" title="'+ttBase+'">'
@@ -1594,7 +1716,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
          +       '<div class="pe-leed2-val">'+Math.round(designedKwh/1000).toLocaleString()+'</div>'
          +     '</div>'
          +     '<div class="pe-leed2-row" title="'+ttProj+'">'
-         +       '<div class="pe-leed2-lbl">Live</div>'
+         +       '<div class="pe-leed2-lbl">'+(rs.state==='live'?'Live':'Latest')+'</div>'
          +       '<div class="pe-leed2-bar"><div class="projected" style="width:'+wProj.toFixed(1)+'%"></div></div>'
          +       '<div class="pe-leed2-val">'+Math.round(projAnnualKwh/1000).toLocaleString()+'</div>'
          +     '</div>'
@@ -1696,33 +1818,33 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
         var yR2=yMax2-yMin2||1;
         var W2=360,H2=132,ML2=32,MR2=8,MT2=8,MB2=22;
         var plotW2=W2-ML2-MR2, plotH2=H2-MT2-MB2;
-        var totalSteps2 = (nP2-1) + nF2;
-        var stepX2 = plotW2/(totalSteps2||1);
-        var nowX2 = ML2 + (nP2-1)*stepX2;
+        var t02 = tpts[0].x, tN2 = tpts[nP2-1].x, tSpan2 = ((tN2 + (nF2 ? nF2*fStep : 0)) - t02) || 1;
+        var xT2 = function(t){ return ML2 + (t - t02)/tSpan2*plotW2; };
+        var tFromX2 = function(svgX){ return t02 + (svgX-ML2)/plotW2*tSpan2; };
 
         function updC(clientX){
           var rect=chart.getBoundingClientRect();
           var relX = (clientX-rect.left)/rect.width;
           var svgX = relX*W2;
-          var stepIdx = Math.round((svgX-ML2)/stepX2);
-          stepIdx = Math.max(0, Math.min(totalSteps2, stepIdx));
-          var isFuture = stepIdx > (nP2-1);
-          var v, timeLbl, flavor;
+          // nearest real sample (history) or forecast step, by TIME
+          var tq = tFromX2(svgX);
+          var isFuture = nF2 && tq > tN2 + (fStep||0)/2;
+          var v, timeLbl, flavor, gx;
           if(isFuture){
-            var fi = stepIdx - (nP2-1) - 1;  // 0-based within forecast
-            if(fi<0) fi=0;
-            if(fi>=nF2) fi=nF2-1;
+            var fi = Math.round((tq - tN2)/fStep) - 1;
+            fi = Math.max(0, Math.min(nF2-1, fi));
             v = fc2[fi];
-            var mins = (fi+1)*15;
-            timeLbl = '+' + (mins>=60 ? ((mins/60).toFixed(mins%60===0?0:1)+'hr') : (mins+'m')) + ' forecast';
+            timeLbl = ptParts(tN2 + (fi+1)*fStep).hhmm + ' PT · forecast';
+            gx = xT2(tN2 + (fi+1)*fStep);
             flavor='future';
           } else {
-            v = dd2[stepIdx];
-            var minsAgo=(nP2-1-stepIdx)*15;
-            timeLbl = minsAgo===0 ? 'now' : (minsAgo>=60 ? ((minsAgo/60).toFixed(minsAgo%60===0?0:1)+'hr ago') : (minsAgo+'m ago'));
+            var bi = 0, bd = Infinity;
+            for(var k=0;k<nP2;k++){ var dk = Math.abs(tpts[k].x - tq); if(dk<bd){bd=dk;bi=k;} }
+            v = dd2[bi];
+            timeLbl = ptParts(tpts[bi].x).hhmm + ' PT' + (bi===nP2-1 ? ' · latest' : ' · '+durText(tN2-tpts[bi].x)+' earlier');
+            gx = xT2(tpts[bi].x);
             flavor='past';
           }
-          var gx = ML2 + stepIdx*stepX2;
           var gy = MT2 + plotH2 - ((v-yMin2)/yR2)*plotH2;
           guide.setAttribute('x1',gx); guide.setAttribute('x2',gx);
           guide.setAttribute('opacity', isFuture?'0.4':'0.7');
@@ -1760,36 +1882,34 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   const popPub=document.getElementById('popPub');
   function showPopPub(b){
     const cc=C[b.c]||C.Admin;
-    // Pull live kW from current energy data if available (popup may open before live data lands)
-    var liveKw=null, liveSpark=null, liveMeter=null, liveTs=null;
-    if(window.currentEnergyData && window.currentEnergyData[b.id]){
-      var lb=window.currentEnergyData[b.id];
-      if(typeof lb.kw==='number' && lb.kw>0) liveKw=lb.kw;
-      if(lb.sparkline && lb.sparkline.length>2) liveSpark=lb.sparkline;
-      if(lb.meter) liveMeter=String(lb.meter);
-      if(lb.timestamp) liveTs=lb.timestamp;
-    }
-    if(liveKw==null && typeof b.kw==='number' && b.kw>0) liveKw=b.kw;
-    if(!liveSpark && b.sparkline && b.sparkline.length>2) liveSpark=b.sparkline;
-    if(!liveTs && b.liveTs) liveTs=b.liveTs;
+    // Reading comes only from the fetched feed (never a static roster value) and carries its age.
+    var live = (window.currentEnergyData && window.currentEnergyData[b.id]) || null;
+    var nowMs = Date.now();
+    var rs = readingState(live ? live.kw : null, live ? live.timestamp : null, nowMs);
+    var liveKw = rs.kw, liveMeter = live && live.meter ? String(live.meter) : null, liveTs = live ? live.timestamp : null;
+    var isLive = rs.state==='live';
+    var tpts = timedSeries(window.chatHistory && window.chatHistory[b.id], nowMs).slice(-24);
+    var liveSpark = tpts.length>2 ? tpts.map(function(p){return p.kw;}) : null;
+    var spanTxt = spanLabel(tpts);
 
-    // Activity pill based on live kW vs. typical for this building
-    var pill={cls:'off',txt:'No live data'};
+    // Activity pill based on the latest kW vs. the average of the covered window
+    var pill={cls:'off',txt:'No reading in this window'};
     if(liveKw!=null){
       var avg = liveSpark ? (liveSpark.reduce(function(a,x){return a+x;},0)/liveSpark.length) : liveKw;
       var ratio = avg>0 ? liveKw/avg : 1;
-      if(ratio<0.8) pill={cls:'calm',txt:'🌙 Quiet right now'};
-      else if(ratio<1.15) pill={cls:'steady',txt:'🌤 Steady pace'};
-      else pill={cls:'busy',txt:'🔥 Busy — above typical'};
+      var ptxt = isLive ? '' : ' (latest)';
+      if(ratio<0.8) pill={cls:'calm',txt:'🌙 Quiet'+ptxt};
+      else if(ratio<1.15) pill={cls:'steady',txt:'🌤 Steady pace'+ptxt};
+      else pill={cls:'busy',txt:'🔥 Above typical'+ptxt};
     }
 
     var homesRow='';
     if(liveKw!=null){
-      // 1 home ≈ 1.2 kW continuous
-      var homes=Math.max(1, Math.round(liveKw/1.2));
-      homesRow='<div class="pp-homes">≈ <b>'+homes.toLocaleString()+'</b> home'+(homes===1?'':'s')+' worth of power right now</div>';
+      // rough: one average US home ≈ HOME_KW continuous
+      var homes=homesEquivalent(liveKw);
+      homesRow='<div class="pp-homes">≈ <b>'+homes.toLocaleString()+'</b> home'+(homes===1?'':'s')+' worth of power '+(isLive?'right now':'at the latest reading')+' <span style="color:#64748b">(rough: 1 home ≈ '+HOME_KW+' kW)</span></div>';
     } else {
-      homesRow='<div class="pp-homes" style="color:#64748b">This building doesn\'t have a live meter yet.</div>';
+      homesRow='<div class="pp-homes" style="color:#64748b">'+(b.nrg?'No reading in this window.':'This building is not metered in the live feed.')+'</div>';
     }
 
     var sparkSvg='';
@@ -1797,19 +1917,15 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var lo=Math.min.apply(null,liveSpark), hi=Math.max.apply(null,liveSpark);
       var r=hi-lo||1;
       var w=280, h=44;
-      var n=liveSpark.length;
-      var step=w/(n-1);
-      var pts=liveSpark.map(function(v,i){var x=i*step;var y=h-((v-lo)/r)*(h-4)-2; return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
-      // BMO poll cadence is 15-min; `sparkline` is tail-24, so window ≈ 6 hours
-      var windowMin = (n-1) * 15;
-      var windowLbl = windowMin >= 60 ? (windowMin/60).toFixed(windowMin%60===0?0:1) + 'hr' : windowMin + 'min';
-      // Axis: show label at first/mid/last position
-      var midMin = Math.round(windowMin/2);
-      var axisLeft  = windowLbl + ' ago';
-      var axisMid   = midMin >= 60 ? (midMin/60).toFixed(midMin%60===0?0:1) + 'hr ago' : midMin + 'm ago';
-      var axisRight = 'now';
+      var t0=tpts[0].x, tN=tpts[tpts.length-1].x, tSpan=(tN-t0)||1;   // x by real time
+      var pts=tpts.map(function(p){var x=(p.x-t0)/tSpan*w;var y=h-((p.kw-lo)/r)*(h-4)-2; return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+      var q0=ptParts(t0), qN=ptParts(tN), qM=ptParts((t0+tN)/2);
+      var withDay = tSpan>=72000000;
+      var axisLeft  = (withDay?q0.day.slice(5)+' ':'')+q0.hhmm;
+      var axisMid   = (withDay?qM.day.slice(5)+' ':'')+qM.hhmm;
+      var axisRight = (withDay?qN.day.slice(5)+' ':'')+qN.hhmm+' latest';
       sparkSvg='<div class="pp-spark">'
-        +'<div class="pp-spark-hdr"><span>Last '+windowLbl+'</span><span>peak '+Math.round(hi)+' kW</span></div>'
+        +'<div class="pp-spark-hdr"><span>'+escHtml(spanTxt||'Recent readings')+' (PT)</span><span>peak '+Math.round(hi)+' kW</span></div>'
         +'<div class="pp-spark-chart" id="ppSparkChart">'
         +'<div class="pp-spark-tip" id="ppSparkTip"></div>'
         +'<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'
@@ -1829,18 +1945,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     actions+='<a class="pp-btn" href="'+bUrl+'" target="_blank">🏛 More about this building</a>';
 
     var heroHtml = liveKw!=null
-      ? '<div class="pp-hero"><span class="pp-hero-num">⚡ '+Math.round(liveKw).toLocaleString()+'</span><span class="pp-hero-unit">kW flowing right now</span></div>'
-      : '<div class="pp-hero" style="border-top:none;padding-top:4px"><span class="pp-hero-unit" style="font-size:12px;color:#64748b">No live meter on this building.</span></div>';
+      ? '<div class="pp-hero"><span class="pp-hero-num">⚡ '+Math.round(liveKw).toLocaleString()+'</span><span class="pp-hero-unit">kW '+(isLive?'<span style="color:#34d399">LIVE</span>':'<span style="color:#94a3b8">'+escHtml(rs.text)+'</span>')+'</span></div>'
+      : '<div class="pp-hero" style="border-top:none;padding-top:4px"><span class="pp-hero-num" style="color:#64748b">—</span> <span class="pp-hero-unit" style="font-size:12px;color:#64748b">No reading in this window</span></div>';
 
     // Plain-English meter note so folks know the 40 kW isn't always the whole building
     var meterNote='';
     if(liveKw!=null && liveMeter){
-      var label='', scope='';
-      if(liveMeter==='76'){ label='mechanical meter'; scope="plugs & lighting aren't included"; }
-      else if(liveMeter==='77'){ label='plugs & lighting meter'; scope="HVAC isn't included"; }
-      else if(liveMeter==='3'){ label='main service feed'; scope='reads most of the building'; }
-      else { label='meter '+liveMeter; scope=''; }
-      meterNote='<div class="pp-meter-note">🔌 reading from <b>'+label+'</b>'+(scope?' · '+scope:'')+'</div>';
+      var pms=meterSummary(liveMeter, live && live.meters_configured);
+      meterNote='<div class="pp-meter-note">🔌 sum of <b>'+escHtml(pms.short)+'</b>'+(pms.partial?' · some configured meters returned no reading, so this may be only part of the building':'')+'</div>';
     }
 
     // LEED card v2 (Grimes only) — big hero number + visual baseline-vs-designed bars + status pill.
@@ -1857,11 +1969,11 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       var gapCls = gapL > 5 ? 'over' : (gapL < -5 ? 'under' : 'par');
       var statusMsg;
       if(Math.abs(gapL) < 5){
-        statusMsg = 'Tracking <b class="par">right at</b> design intent right now.';
+        statusMsg = 'Tracking <b class="par">right at</b> design intent '+(isLive?'right now':'at the latest reading')+'.';
       } else if(gapL > 0){
-        statusMsg = 'Tracking <b class="over">'+Math.round(gapL)+'% above</b> design intent right now.';
+        statusMsg = 'Tracking <b class="over">'+Math.round(gapL)+'% above</b> design intent '+(isLive?'right now':'at the latest reading')+'.';
       } else {
-        statusMsg = 'Tracking <b class="under">'+Math.round(Math.abs(gapL))+'% below</b> design intent right now — running cleaner than planned.';
+        statusMsg = 'Tracking <b class="under">'+Math.round(Math.abs(gapL))+'% below</b> design intent '+(isLive?'right now':'at the latest reading')+' — running cleaner than planned.';
       }
       // Designed bar scaled to baseline (the longer one) so the "less energy" story reads visually.
       var wDesigned = baselineL ? (designedL / baselineL) * 100 : 0;
@@ -1939,14 +2051,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     // Surfaces the same insight in two registers: SCADA ghost line for engineers, single sentence for public.
     var vsTypical='';
     if(liveKw!=null && window.getBaseline){
-      var nowDate = liveTs ? new Date(liveTs) : new Date();
-      var bl = window.getBaseline(b.id, nowDate);
+      var atMs = rs.at || nowMs;   // the reading's own Pacific instant
+      var bl = window.getBaseline(b.id, atMs);
       if(bl && bl.mean>0){
         var pct = ((liveKw - bl.mean) / bl.mean) * 100;
         var dayNames=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-        var wdayMon0 = (nowDate.getDay()+6)%7;
-        var dayLbl = dayNames[wdayMon0];
-        var hr = nowDate.getHours();
+        var bk = baselineKey(atMs);
+        var dayLbl = dayNames[bk.wdayMon0];
+        var hr = bk.hr;
         var hrLbl = (hr%12||12)+(hr<12?' AM':' PM');
         var ctx, arrowCls, arrowSym, summary;
         if(Math.abs(pct)<8){
@@ -1971,7 +2083,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     popPub.innerHTML = '<div class="pp-stripe" style="background:'+cc.h+'"></div>'
       + '<div class="pp-body">'
       + '<button class="pp-x" onclick="closePopPub()">✕</button>'
-      + '<div class="pp-name">'+b.n+'</div>'
+      + '<div class="pp-name">'+escHtml(b.n)+'</div>'
       + '<div class="pp-cat">'+window.makeCategoryIconHtml(b.c,'pp-cat-ci')+(b.a||b.c)+'</div>'
       + '<span class="pp-pill '+pill.cls+'">'+pill.txt+'</span>'
       + heroHtml
@@ -2000,20 +2112,20 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           var rect=chart.getBoundingClientRect();
           var rel=(clientX-rect.left)/rect.width;
           rel=Math.max(0,Math.min(1,rel));
-          var idx=Math.round(rel*(n2-1));
+          // nearest real sample by TIME (samples may be irregularly spaced)
+          var tq=tpts[0].x+rel*(tpts[n2-1].x-tpts[0].x), idx=0, bd=Infinity;
+          for(var k=0;k<n2;k++){var dk=Math.abs(tpts[k].x-tq);if(dk<bd){bd=dk;idx=k;}}
           var v=data[idx];
-          // Time-ago: idx 0 = oldest, idx n2-1 = now; each step = 15min
-          var minsAgo=(n2-1-idx)*15;
-          var timeLbl = minsAgo===0 ? 'now' : (minsAgo>=60 ? ((minsAgo/60).toFixed(minsAgo%60===0?0:1)+'hr ago') : (minsAgo+'m ago'));
+          var timeLbl = ptParts(tpts[idx].x).hhmm+' PT'+(idx===n2-1?' · latest':'');
           // Place guideline + dot in SVG coords (x stretches with CSS preserveAspectRatio=none)
-          var svgX=(idx/(n2-1))*svgW;
+          var svgX=((tpts[idx].x-tpts[0].x)/((tpts[n2-1].x-tpts[0].x)||1))*svgW;
           var svgY=svgH-((v-hMin)/hR)*(svgH-4)-2;
           guide.setAttribute('x1',svgX); guide.setAttribute('x2',svgX);
           guide.setAttribute('opacity','0.6');
           dot.setAttribute('cx',svgX); dot.setAttribute('cy',svgY);
           dot.setAttribute('opacity','1');
           // Position tooltip in DOM pixel coords (clamp so it doesn't clip edges)
-          var tipX=rel*rect.width;
+          var tipX=(svgX/svgW)*rect.width;
           tipX=Math.max(40,Math.min(rect.width-40,tipX));
           tip.style.left=tipX+'px';
           tip.innerHTML=Math.round(v)+' kW<div class="pp-spark-tip-sub">'+timeLbl+'</div>';
@@ -2088,8 +2200,12 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       let tags=`<span class="bt">${b.c}</span>`;
       if(b.bim)tags+=`<span class="bt bt-b">BIM</span>`;
       if(b.nrg)tags+=`<span class="bt bt-e">Energy</span>`;
-      if(b.kw)tags+=`<span class="bt bt-k">⚡${b.kw}kW</span>`;
-      card.innerHTML=`${window.makeCategoryIconHtml(b.c,'bc-ci')}<div class="bc-i"><div class="bc-n">${b.n}</div><div class="bc-m">${b.a||b.c}</div><div class="bc-t">${tags}</div></div>`;
+      const rs=readingState(b.kw,b.liveTs,Date.now());
+      if(rs.state==='live')tags+=`<span class="bt bt-k">⚡${escHtml(rs.value)} kW</span>`;
+      else if(rs.state!=='missing')tags+=`<span class="bt bt-n">${escHtml(rs.value)} kW · ${escHtml(rs.text.replace(/^LATEST · /,'latest '))}</span>`;
+      card.innerHTML=`${window.makeCategoryIconHtml(b.c,'bc-ci')}<div class="bc-i"><div class="bc-n">${escHtml(b.n)}</div><div class="bc-m">${escHtml(b.a||b.c)}</div><div class="bc-t">${tags}</div></div>`;
+      card.setAttribute('role','button');card.tabIndex=0;
+      card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.click()}});
       card.onclick=()=>{sel=b.idx;renderList();
         if(window.innerWidth<=768)document.getElementById('sb').classList.remove('show');
         view.goTo({target:new Point({longitude:b.lng,latitude:b.lat}),zoom:18},{duration:1000,easing:'ease-in-out'}).then(()=>{
@@ -2121,7 +2237,10 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
       D.forEach((b, i) => {
         const live = bldgs[b.id];
-        if (live && live.kw !== null && live.kw !== undefined) {
+        // Reset every fetch: a building that drops out of the feed must not keep its last value.
+        b.kw = null; b.liveTs = null; b.sparkline = []; b.predicted = null; b.anomaly = null;
+        b.dailyCost = null; b.dailyCo2 = null; b.meter = null; b.configured = null;
+        if (live && typeof live.kw === 'number' && isFinite(live.kw)) {
           b.kw = live.kw;
           b.nrg = 1;
           b.liveTs = live.timestamp;
@@ -2130,12 +2249,14 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
           b.anomaly = live.anomaly;
           b.dailyCost = live.est_daily_cost;
           b.dailyCo2 = live.est_daily_co2_kg;
+          b.meter = live.meter;
+          b.configured = live.meters_configured;
           updated++;
         }
       });
 
       // Update stats
-      const onlineCount = Object.values(bldgs).filter(b => b.kw !== null).length;
+      const onlineCount = Object.values(bldgs).filter(b => b && typeof b.kw === 'number' && isFinite(b.kw)).length;
       const totalKw = data.total_kw || 0;
       document.getElementById('xe').textContent = onlineCount;
       // Update mobile explore button
@@ -2147,7 +2268,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
       totalEl.innerHTML = '<b>' + Math.round(totalKw).toLocaleString() + '</b><small>Total kW</small>';
       totalEl.title = totalKw + ' kW across metered buildings';
 
-      // campus water/steam ticker (sums the flow blocks the 15-min fetch attaches)
+      // campus water/steam ticker (sums the flow blocks the fetch attaches)
       var wSum=0, sSum=0, wN=0, sN=0;
       Object.values(bldgs).forEach(function(b){
         var f=b.flow; if(!f) return;
@@ -2167,9 +2288,9 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
     }
   }
 
-  // Fetch immediately, then every 60 seconds
+  // Fetch immediately, then every 5 minutes (the feed updates at most every 15 min, in practice every few hours)
   fetchLiveData();
-  setInterval(fetchLiveData, 60000);
+  setInterval(fetchLiveData, 300000);
 });
 </script>
 <script>
@@ -2194,7 +2315,14 @@ document.addEventListener('click',function(e){
   else if(act==='reset'){window.campusMap.resetView();}
 });
 
-function addMsg(t,type){var m=document.getElementById('chatMsgs');var d=document.createElement('div');d.className='chat-msg '+type;d.innerHTML=t;m.appendChild(d);m.scrollTop=m.scrollHeight;return d}
+// Feed `generated_at` is written in UTC by the pipeline; show it in Pacific with its age.
+function feedStamp(){
+  var g=chatData&&chatData.generated_at; if(!g)return 'time unknown';
+  var t=String(g).trim(), ms=Date.parse(t.replace(' ','T')+(/Z$|[+-]\d\d:?\d\d$/.test(t)?'':'Z'));
+  if(!isFinite(ms))return 'time unknown';
+  var q=ptParts(ms);return q.day.slice(5)+' '+q.hhmm+' PT · '+ageText(Math.max(0,Date.now()-ms));
+}
+function addMsg(t,type){var m=document.getElementById('chatMsgs');var d=document.createElement('div');d.className='chat-msg '+type;if(type==='user')d.textContent=t;else d.innerHTML=t;m.appendChild(d);m.scrollTop=m.scrollHeight;return d}
 function askChat(q){document.getElementById('chatIn').value=q;sendChat()}
 
 function buildContext(){
@@ -2206,11 +2334,11 @@ function buildContext(){
   }).filter(Boolean).sort(function(a,b){return(b[1].kw||0)-(a[1].kw||0)});
 
   var lines=[];
-  lines.push('CAMPUS LIVE — '+(chatData&&chatData.updated_at?chatData.updated_at:'now'));
+  lines.push('CAMPUS LATEST SNAPSHOT (feed generated '+feedStamp()+'; individual building readings may be older)');
   lines.push('Total: '+Math.round(totalKw)+' kW · '+onCount+' online · '+offList.length+' offline');
   if(chatData&&chatData.total_daily_cost!=null)lines.push('Daily cost ≈ $'+chatData.total_daily_cost+' · CO₂ ≈ '+(chatData.total_daily_co2_kg||0)+' kg');
   lines.push('');
-  lines.push('TOP 10 BY LIVE LOAD (id · name · kW · $/day · CO₂kg/day · anomaly?):');
+  lines.push('TOP 10 BY LATEST LOAD (id · name · kW · $/day · CO₂kg/day · anomaly?):');
   ranked.slice(0,10).forEach(function(e){
     var b=e[1];
     lines.push(e[0]+' · '+(b.name||e[0])+' · '+b.kw+' · '+(b.est_daily_cost||0)+' · '+(b.est_daily_co2_kg||0)+(b.anomaly?' · ANOMALY':''));
@@ -2461,24 +2589,25 @@ function bInfo(b){
   rows.push({lbl:'Category',val:b.c});
   if(b.yr)rows.push({lbl:'Built',val:b.yr+' · '+(2026-b.yr)+' yrs'});
   if(b.floors)rows.push({lbl:'Floors',val:b.floors});
-  if(l&&l.kw!==null&&l.kw!==undefined){
-    rows.push({lbl:'Live load',val:'<b>'+l.kw+'</b> kW'});
-    if(l.est_daily_cost!=null)rows.push({lbl:'Daily cost',val:'~$'+l.est_daily_cost});
-    if(l.est_daily_co2_kg!=null)rows.push({lbl:'CO₂ today',val:l.est_daily_co2_kg+' kg'});
+  var brs=readingState(l?l.kw:null,l?l.timestamp:null,Date.now());
+  if(brs.kw!==null){
+    rows.push({lbl:brs.state==='live'?'Live load':'Latest load',val:'<b>'+escHtml(brs.value)+'</b> kW <span style="color:#64748b">'+escHtml(brs.text)+'</span>'});
+    if(l.est_daily_cost!=null)rows.push({lbl:'24 h at this rate',val:'~$'+escHtml(l.est_daily_cost)});
+    if(l.est_daily_co2_kg!=null)rows.push({lbl:'CO₂, 24 h at this rate',val:escHtml(l.est_daily_co2_kg)+' kg'});
     if(l.predicted_kw)rows.push({lbl:'Next reading',val:'~'+l.predicted_kw+' kW'});
     if(l.anomaly)rows.push({lbl:'Status',val:'<b style="color:var(--red)">Anomaly</b>'});
   } else if(l){
-    rows.push({lbl:'BMO status',val:'<b style="color:var(--red)">offline</b>'});
+    rows.push({lbl:'BMO reading',val:'<span style="color:#94a3b8">— No reading in this window</span>'});
   } else {
-    rows.push({lbl:'Energy',val:'unmetered'});
+    rows.push({lbl:'Energy',val:'not metered in the feed'});
   }
   // Optional sparkline — last 24h trend if we have history
-  var trend=bldgTrend(b.id);
-  var sparkHtml=trend?('<div class="tb-line" style="font-size:10px;color:#64748b;letter-spacing:.4px;text-transform:uppercase;font-weight:600;margin-top:6px">24 h trend</div>'+sparkSVG(trend,{color:(l&&l.anomaly)?'#f87171':'#FDB515'})):'';
+  var trendP=timedSeries(chatHistory&&chatHistory[b.id],Date.now()).slice(-96), trend=trendP.length>1?trendP.map(function(p){return p.kw}):null;
+  var sparkHtml=trend?('<div class="tb-line" style="font-size:10px;color:#64748b;letter-spacing:.4px;text-transform:uppercase;font-weight:600;margin-top:6px">Trend '+escHtml(spanLabel(trendP)||'')+'</div>'+sparkSVG(trend,{color:(l&&l.anomaly)?'#f87171':'#FDB515'})):'';
   var actions=tAct('View on map','zoom',b.id);
   if(b.xr)actions+=' <a class="tb-act sec" href="'+b.xr+'" target="_blank" rel="noopener">Open 3D viewer</a>';
   actions+=' <a class="tb-act sec" href="'+bUrl+'" target="_blank" rel="noopener" style="background:rgba(148,163,184,.08);border-color:rgba(148,163,184,.2);color:#94a3b8">berkeley.edu</a>';
-  var meta='Source: BMO · '+(chatData&&chatData.updated_at?chatData.updated_at.replace('T',' ').slice(0,16)+' UTC':'live reading');
+  var meta='Source: BMO · '+feedStamp();
   var body=rows.map(function(r){return '<div class="tb-row"><span class="tb-lbl">'+r.lbl+'</span><span class="tb-val">'+r.val+'</span></div>';}).join('');
   return '<div class="tb-kicker">Building</div>'+
          '<div class="tb-title">'+b.n+(b.a?' · <b>'+b.a+'</b>':'')+'</div>'+
@@ -2520,14 +2649,14 @@ function processQuery(q){
     return tCard('Map','View reset', ['All '+D.length+' buildings visible, camera back to default.']);
   case 'trend':
     if(bld){
-      var tr=bldgTrend(bld.id);
-      if(!tr)return tCard('Trend','No history for '+bld.n, ['This building does not have a 24-hour trend yet.']);
+      var trp=timedSeries(chatHistory&&chatHistory[bld.id],Date.now()).slice(-96), tr=trp.length>1?trp.map(function(p){return p.kw}):null;
+      if(!tr)return tCard('Trend','No history for '+bld.n, ['Not enough timestamped readings for a trend yet.']);
       var mn=Math.min.apply(null,tr),mx=Math.max.apply(null,tr),avg=tr.reduce(function(s,v){return s+v},0)/tr.length;
-      return tCard('24-hour trend', bld.n, [
+      return tCard('Trend · '+(spanLabel(trp)||'recent readings'), bld.n, [
         {lbl:'Min',val:tNum(mn.toFixed(1),'kW')},
         {lbl:'Avg',val:tNum(avg.toFixed(1),'kW')},
         {lbl:'Peak',val:tNum(mx.toFixed(1),'kW')}
-      ], 'Source: BMO · 96 readings over last 24 h') + sparkSVG(tr,{color:'#FDB515'}) + '<div style="margin-top:8px">'+tAct('View on map','zoom',bld.id)+'</div>';
+      ], 'Source: BMO · '+trp.length+' readings, '+ptParts(trp[0].x).hhmm+' to '+ptParts(trp[trp.length-1].x).hhmm+' PT (actual times)') + sparkSVG(tr,{color:'#FDB515'}) + '<div style="margin-top:8px">'+tAct('View on map','zoom',bld.id)+'</div>';
     }
     return tCard('Trend','Which building?', ['Ask about a specific building, e.g. <i>"Grimes trend"</i>.']);
 
@@ -2538,7 +2667,7 @@ function processQuery(q){
       {lbl:'Today (projected)',val:tNum(dailyKWh.toLocaleString(),'kWh')},
       {lbl:'Daily cost',val:'~$'+daily$.toLocaleString()},
       {lbl:'CO₂ today',val:dailyCO2+' t'}
-    ], 'Source: BMO · '+(chatData&&chatData.updated_at?chatData.updated_at.replace('T',' ').slice(0,16)+' UTC':'live'));
+    ], 'Source: BMO · '+feedStamp());
 
   case 'top':
     var tList=o.slice(0,5);
@@ -2567,7 +2696,7 @@ function processQuery(q){
   case 'co2':
     var tons=(chatData.total_daily_co2_kg/1000).toFixed(2);
     var trees=Math.round(chatData.total_daily_co2_kg/21.7);
-    return tCard('Carbon footprint', tNum(chatData.total_daily_co2_kg,'kg CO₂')+' emitted today', [
+    return tCard('Carbon footprint', tNum(chatData.total_daily_co2_kg,'kg CO₂')+' over 24 h at the current rate (scenario, not measured to date)', [
       {lbl:'Tons',val:tons+' t'},
       {lbl:'Trees to offset',val:tNum(trees.toLocaleString())},
       {lbl:'Annual',val:'~'+(chatData.total_daily_co2_kg*365/1000).toFixed(0)+' t'}
@@ -2608,7 +2737,7 @@ function processQuery(q){
 
   case 'report':return "📋 Weekly summaries now live in the <a href='campus-energy-dashboard.html' style='color:var(--gold)'>Energy Dashboard →</a>.";
 
-  case 'howwork':return "⚙️ <b>System:</b><br>1️⃣ BMO meters → kW every 15min<br>2️⃣ GitHub Actions → Python fetch<br>3️⃣ JSON → GitHub Pages (free)<br>4️⃣ Map + Dashboard fetch live<br>💵 Cost: <b>$0/month</b><br><br>Built by Yoonsung Chung · UC Berkeley CEE";
+  case 'howwork':return "⚙️ <b>System:</b><br>1️⃣ BMO meters → kW readings (each shown with its own time)<br>2️⃣ GitHub Actions → Python fetch<br>3️⃣ JSON → GitHub Pages (free)<br>4️⃣ Map + Dashboard fetch live<br>💵 Cost: <b>$0/month</b><br><br>Built by Yoonsung Chung · UC Berkeley CEE";
 
   case 'hi':return "👋 Hi! I know about "+D.length+" UC Berkeley buildings — energy, costs, CO₂, history. What would you like to know?";
   case 'thanks':return "😊 You're welcome! Ask anytime.";
@@ -2699,13 +2828,15 @@ function updatePublicPanel() {
   if (!bldgs) return;
 
   // ── Aggregate by building + category (real Berkeley data only) ──
-  var totalKw = 0, online = 0, topList = [], byCat = {}, byCatBldgs = {};
+  var totalKw = 0, online = 0, topList = [], byCat = {}, byCatBldgs = {}, newestAt = -Infinity;
   for (var key in bldgs) {
     var b = bldgs[key];
-    if (!b || !b.kw || b.kw <= 0) continue;
+    if (!b || typeof b.kw !== 'number' || !isFinite(b.kw)) continue;
+    var bt = bmoTimestamp(b.timestamp);
+    if (isFinite(bt) && bt > newestAt) newestAt = bt;
     totalKw += b.kw;
     online++;
-    topList.push({ id: key, name: b.name || key, kw: b.kw });
+    if (b.kw > 0) topList.push({ id: key, name: b.name || key, kw: b.kw });
     // Lookup category from the static D[] roster
     var meta = D.find(function(d){ return d.id === key; });
     var cat = (meta && meta.c) || 'Admin';
@@ -2722,9 +2853,10 @@ function updatePublicPanel() {
   var heroSub = document.getElementById('pubHeroHomes');
   var heroStr = totalKw > 1000 ? (totalKw / 1000).toFixed(1) + ' MW' : Math.round(totalKw) + ' kW';
   if (heroEl) heroEl.textContent = heroStr;
-  // 1 home ≈ 1.2 kW continuous (avg US household power draw)
-  var homes = Math.max(1, Math.round(totalKw / 1.2));
-  if (heroSub) heroSub.textContent = '≈ ' + homes.toLocaleString() + ' homes worth of power';
+  // rough: one average US home ≈ HOME_KW continuous
+  var homes = homesEquivalent(totalKw);
+  var campusRs = isFinite(newestAt) ? readingState(totalKw, new Date(newestAt).toISOString(), Date.now()) : null;
+  if (heroSub) heroSub.textContent = (homes == null ? '' : '≈ ' + homes.toLocaleString() + ' homes worth of power (rough)') + (campusRs && campusRs.state !== 'live' ? ' · ' + campusRs.text : (campusRs ? ' · LIVE' : ''));
   var monitorCount = document.getElementById('pubMonitorCount');
   if (monitorCount) monitorCount.textContent = online;
 
@@ -2732,7 +2864,7 @@ function updatePublicPanel() {
   renderEnergyMix(byCat, totalKw, byCatBldgs);
 
   // ── Today's footprint mini cards ──
-  var dailyCost = Math.round(totalKw * 24 * 0.15);
+  var dailyCost = Math.round(totalKw * 24 * 0.15);   // 24 h scenario at the latest demand
   document.getElementById('pubCost').textContent = '$' + dailyCost.toLocaleString();
 
   var dailyCo2 = Math.round(totalKw * 24 * 0.21);
@@ -2747,7 +2879,7 @@ function updatePublicPanel() {
     var barW = Math.max(5, Math.min(100, pct * 3));
     top3Html += '<div style="display:flex;align-items:center;gap:8px;margin:3px 0">';
     top3Html += '<span style="color:var(--dim);width:14px;font-size:9px">' + (i + 1) + '.</span>';
-    top3Html += '<span style="width:90px;font-size:10px;color:var(--text)">' + b.name.split(' ').slice(0, 2).join(' ') + '</span>';
+    top3Html += '<span style="width:90px;font-size:10px;color:var(--text)">' + escHtml(b.name.split(' ').slice(0, 2).join(' ')) + '</span>';
     top3Html += '<div style="flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px"><div style="width:' + barW + '%;height:100%;background:var(--gold);border-radius:3px"></div></div>';
     top3Html += '<span style="font-size:10px;font-weight:600;color:var(--gold);width:50px;text-align:right">' + Math.round(b.kw) + ' kW</span>';
     top3Html += '</div>';
@@ -2755,7 +2887,7 @@ function updatePublicPanel() {
   document.getElementById('pubTop3').innerHTML = top3Html;
 
   // Tips based on time
-  var hour = new Date().getHours();
+  var hour = ptParts(Date.now()).hour;   // Pacific, not browser-local
   var tips = [
     { h: [6,7,8,9], t: '🌅 Morning ramp-up — HVAC systems starting, expect rising demand' },
     { h: [10,11,12,13], t: '☀️ Midday — buildings at moderate load, good time for energy audits' },
@@ -2795,59 +2927,51 @@ if (typeof window.renderMarkers === 'function') {
 var _moodHist=null;
 async function _loadMoodHist(){
   if(_moodHist)return _moodHist;
+  if(window.chatHistory)return window.chatHistory;
   try{
     var r=await fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy_history.json?t='+Date.now());
     if(r.ok)_moodHist=await r.json();
   }catch(e){_moodHist={}}
   return _moodHist;
 }
-function _hourOf(ts){var d=new Date(String(ts).replace(' ','T'));return isNaN(d)?null:d.getHours()}
 async function computeCampusMood(){
   var mood=document.getElementById('campusMood');
   var txt=document.getElementById('cmText');
   if(!mood||!txt)return;
   var cur=window.currentEnergyData;
   if(!cur){return}
-  // Current total
-  var curTotal=0,onlineN=0;
-  for(var id in cur){var b=cur[id];if(b&&typeof b.kw==='number'&&b.kw>0){curTotal+=b.kw;onlineN++}}
-  if(curTotal<=0){txt.textContent='Campus offline — waiting for live data…';mood.className='';mood.classList.add('ready');return}
-  var hist=await _loadMoodHist();
-  // Sum per timestamp across all buildings
-  var sums={};
-  for(var bid in hist){(hist[bid]||[]).forEach(function(p){if(p&&p.ts&&typeof p.kw==='number'){sums[p.ts]=(sums[p.ts]||0)+p.kw}})}
-  var now=new Date(),hr=now.getHours();
-  var dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
-  // Gather matches for same hour-of-day
-  var matches=[];
-  Object.keys(sums).forEach(function(ts){var h=_hourOf(ts);if(h===hr)matches.push(sums[ts])});
+  // Current total over buildings that have a finite reading, and the newest reading time
+  var curTotal=0,onlineN=0,newest=-Infinity;
+  for(var id in cur){var b=cur[id];if(b&&typeof b.kw==='number'&&isFinite(b.kw)){curTotal+=b.kw;onlineN++;var t=bmoTimestamp(b.timestamp);if(isFinite(t)&&t>newest)newest=t}}
   mood.className='';
-  // Home-equivalent: US avg household draws ~1.25 kW continuously (EIA RECS)
-  var homes=Math.round(curTotal/1.25);
-  if(matches.length<3){
-    txt.innerHTML='Campus is drawing <span class="cm-strong">'+Math.round(curTotal)+' kW</span> — about <span class="cm-strong">'+homes.toLocaleString()+' homes</span> worth<span class="cm-sub">· baseline still forming</span>';
+  if(!onlineN){txt.textContent='— No campus reading in this window';mood.classList.add('ready');return}
+  var nowMs=Date.now(), refMs=isFinite(newest)?newest:nowMs;
+  var fr=isFinite(newest)?readingState(curTotal,new Date(newest).toISOString(),nowMs):null;
+  var stateTxt=fr&&fr.state==='live'?'Campus is drawing':'At the latest reading'+(fr?' ('+fr.text.replace(/^LATEST · /,'')+')':'')+', campus drew';
+  var hist=window.chatHistory||await _loadMoodHist();
+  var homes=homesEquivalent(curTotal);
+  // Same Pacific weekday+hour as the READING (not the browser), same buildings now and then.
+  var cmp=moodCompare(hist,cur,refMs);
+  if(!cmp){
+    txt.innerHTML=stateTxt+' <span class="cm-strong">'+Math.round(curTotal)+' kW</span> — about <span class="cm-strong">'+homes.toLocaleString()+' homes</span> worth (rough)<span class="cm-sub">· not enough comparable history yet</span>';
     mood.classList.add('ready');return;
   }
-  var typical=matches.reduce(function(a,b){return a+b},0)/matches.length;
-  var pct=typical>0?(curTotal-typical)/typical*100:0;
+  var pct=cmp.pct;
   var phrase;
-  if(pct>12){mood.classList.add('busy');phrase='<span class="cm-strong">'+Math.round(pct)+'% busier</span> than typical';}
-  else if(pct<-12){mood.classList.add('quiet');phrase='<span class="cm-strong">'+Math.round(-pct)+'% quieter</span> than typical';}
-  else{phrase='running <span class="cm-strong">about as usual</span>';}
-  // Anomaly callout: buildings >40% off their own 24h sparkline avg
-  // (Froehlich CHI'10 — surface deviations; Opower — flag "unusual" behavior)
+  if(pct>12){mood.classList.add('busy');phrase='<span class="cm-strong">'+Math.round(pct)+'% above</span> typical';}
+  else if(pct<-12){mood.classList.add('quiet');phrase='<span class="cm-strong">'+Math.round(-pct)+'% below</span> typical';}
+  else{phrase='<span class="cm-strong">about as usual</span>';}
+  // Anomaly callout: buildings >=40% off the average of their own timestamped history window
   var flagged=[];
-  for(var id in cur){
-    var b=cur[id];
-    if(!b||typeof b.kw!=='number'||b.kw<=0)continue;
-    var sp=b.sparkline;
-    if(!sp||sp.length<6)continue;
-    var avg=sp.reduce(function(a,c){return a+c},0)/sp.length;
-    if(avg<=0)continue;
-    var d=(b.kw-avg)/avg*100;
-    if(Math.abs(d)>=40){
-      flagged.push({id:id,name:(b.name||id).split(' ')[0],pct:Math.round(d)});
-    }
+  for(var id2 in cur){
+    var b2=cur[id2];
+    if(!b2||typeof b2.kw!=='number'||!isFinite(b2.kw))continue;
+    var ser=timedSeries(hist&&hist[id2],nowMs).slice(-24);
+    if(ser.length<6)continue;
+    var st=seriesStats(ser);
+    if(!st||st.avg<=0)continue;
+    var d=(b2.kw-st.avg)/st.avg*100;
+    if(Math.abs(d)>=40)flagged.push({id:id2,name:(b2.name||id2).split(' ')[0],pct:Math.round(d)});
   }
   flagged.sort(function(a,b){return Math.abs(b.pct)-Math.abs(a.pct)});
   var extra='';
@@ -2855,23 +2979,24 @@ async function computeCampusMood(){
     var top=flagged.slice(0,2).map(function(f){
       var arrow=f.pct>0?'\u25B2':'\u25BC';
       var col=f.pct>0?'#f87171':'#60a5fa';
-      return '<span style="color:'+col+'">'+arrow+' '+f.name+'</span>';
+      return '<span style="color:'+col+'">'+arrow+' '+escHtml(f.name)+'</span>';
     }).join(' · ');
     extra='<span class="cm-sub">· unusual: '+top+(flagged.length>2?' +'+(flagged.length-2):'')+'</span>';
   } else {
-    extra='<span class="cm-sub">· ~'+homes.toLocaleString()+' homes worth right now</span>';
+    extra='<span class="cm-sub">· ~'+homes.toLocaleString()+' homes worth (rough)</span>';
   }
-  txt.innerHTML='Campus is '+phrase+' for '+dayName+'s around '+hr+':00'+extra;
+  var dayName=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][cmp.dow];
+  txt.innerHTML=stateTxt+' '+phrase+' vs '+dayName+'s around '+cmp.hour+':00 PT <span class="cm-sub">· '+cmp.buildings+' buildings, '+cmp.n+' comparison days</span>'+extra;
   mood.classList.add('ready');
 }
 // Kick off when live data lands, then refresh each minute
 var _moodInit=setInterval(function(){if(window.currentEnergyData){computeCampusMood();clearInterval(_moodInit)}},400);
-setInterval(computeCampusMood,60000);
+setInterval(computeCampusMood,300000);
 </script>
 
 <!-- 24 h load timelapse: scrub or replay the last day across every marker -->
 <div id="tlBar" style="position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:110;display:flex;align-items:center;gap:10px;background:rgba(8,12,24,.93);border:1px solid rgba(148,163,184,.25);border-radius:24px;padding:8px 16px;font:11px 'JetBrains Mono',monospace;color:#94a3b8;box-shadow:0 8px 24px rgba(0,0,0,.45)">
-  <button id="tlPlay" title="Replay the last 24 h" style="background:rgba(253,181,21,.14);border:1px solid rgba(253,181,21,.35);color:#FDB515;border-radius:14px;padding:4px 12px;font:600 11px 'Calibri',sans-serif;cursor:pointer">▶ 24h</button>
+  <button id="tlPlay" title="Replay the most recent runs (up to 24)" style="background:rgba(253,181,21,.14);border:1px solid rgba(253,181,21,.35);color:#FDB515;border-radius:14px;padding:4px 12px;font:600 11px 'Calibri',sans-serif;cursor:pointer">▶ 24h</button>
   <input id="tlSlider" type="range" min="0" max="23" value="23" style="width:150px;accent-color:#FDB515">
   <span id="tlLabel" style="min-width:118px;text-align:center">live · now</span>
   <button id="tlLive" style="display:none;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.35);color:#34d399;border-radius:14px;padding:4px 10px;font:600 11px 'Calibri',sans-serif;cursor:pointer">● LIVE</button>
@@ -2881,19 +3006,30 @@ setInterval(computeCampusMood,60000);
   var idx=23, timer=null;
   var slider=document.getElementById('tlSlider'), label=document.getElementById('tlLabel'),
       playBtn=document.getElementById('tlPlay'), liveBtn=document.getElementById('tlLive');
+  // Frames come from the timestamped history (same run => same offset from the end); the label shows
+  // the real Pacific time of that run, so irregular spacing between runs is never disguised as hourly.
+  var frames=null;
+  function buildFrames(){
+    var h=window.chatHistory, now=Date.now(); if(!h) return null;
+    var series={}, ref=null;
+    Object.keys(h).forEach(function(k){var ser=timedSeries(h[k],now).slice(-24);if(ser.length){series[k]=ser;if(!ref||ser.length>ref.length)ref=ser}});
+    return ref?{series:series,ref:ref,n:ref.length}:null;
+  }
   function synth(i){
     var src=window.currentEnergyData; if(!src||!window.renderMarkers) return null;
-    var out={};
+    frames=buildFrames(); if(!frames) return null;
+    var out={}, off=23-i;   // offset from the latest run (slider 23 = latest)
+    if(off>=frames.n) return null;   // fewer than 24 runs on file: no earlier frame
     Object.keys(src).forEach(function(k){
-      var b=src[k], sp=(b.sparkline||[]).slice(-24);
-      var v=sp.length?sp[Math.min(i,sp.length-1)]:null;
-      out[k]=Object.assign({},b,{kw:(typeof v==='number'?v:null)});
+      var ser=frames.series[k], p=ser&&ser[ser.length-1-off];
+      out[k]=Object.assign({},src[k],{kw:(p&&off<ser.length?p.kw:null)});
     });
     return out;
   }
   function hourLabel(i){
-    var d=new Date(Date.now()-(23-i)*3600000), h=d.getHours(), ap=h>=12?'PM':'AM';
-    return '~'+(h%12||12)+':00 '+ap;
+    if(!frames) return '';
+    var t=frames.ref[frames.n-1-(23-i)].x, q=ptParts(t);
+    return q.day.slice(5)+' '+q.hhmm+' PT';
   }
   function apply(i){
     idx=i;
@@ -2901,7 +3037,7 @@ setInterval(computeCampusMood,60000);
     window._tlActive=true;
     liveBtn.style.display='';
     window.renderMarkers(s);
-    var tot=0; Object.values(s).forEach(function(b){if(b.kw)tot+=b.kw;});
+    var tot=0; Object.values(s).forEach(function(b){if(typeof b.kw==='number'&&isFinite(b.kw))tot+=b.kw;});
     label.textContent=hourLabel(i)+' · '+Math.round(tot)+' kW';
     slider.value=i;
   }
@@ -2916,7 +3052,8 @@ setInterval(computeCampusMood,60000);
   }
   playBtn.addEventListener('click',function(){
     if(timer){goLive();return;}                       // toggle: playing → back to live
-    apply(0);
+    frames=buildFrames();
+    apply(frames?Math.max(0,24-frames.n):0);
     playBtn.textContent='⏸ stop';
     timer=setInterval(function(){                     // 24 frames × 500 ms ≈ 12 s
       if(idx>=23){goLive();return;}

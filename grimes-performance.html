@@ -85,9 +85,9 @@ details summary{cursor:pointer;font-size:12.5px;color:var(--ink2)}
 <div class="wrap">
   <header>
     <h1 id="headline">Grimes · design vs actual<span class="plat" title="LEED v4 BD+C: New Construction · awarded July 23, 2026 · 82/110 points">◆ LEED PLATINUM</span></h1>
-    <p class="lede" id="lede">Measured electricity from the building's three revenue-grade meter counters,
+    <p class="lede" id="lede">Measured electricity from the building's three utility meter counters,
     compared against the LEED v4 EAp2 energy model — the design-stage prediction this building was
-    certified on. <b>Live: recomputed from the meter archive every 15 minutes.</b></p>
+    certified on. <b>Recomputed when new meter data arrives.</b></p>
   </header>
 
   <div class="tiles">
@@ -409,9 +409,9 @@ async function boot(){
     if (mv.eui_actual) { el('tEui').innerHTML = `${mv.eui_actual} <small>kWh/ft\u00b2\u00b7yr</small>`;
       el('tEuiS').textContent = `design EUI ${mv.eui_design}`; }
     el('dailySub').textContent = `kWh per day from cumulative counter deltas \u00b7 dashed references: LEED design (${DATA.design_daily.toLocaleString()} kWh/day) and ASHRAE baseline (${DATA.baseline_daily.toLocaleString()} kWh/day)`;
-    el('lede').innerHTML = `Measured electricity from the building's three revenue-grade meter counters, `+
+    el('lede').innerHTML = `Measured electricity from the building's three utility meter counters, `+
       `${mv.period.start} \u2192 ${mv.period.end} (${mv.period.days} days), compared against the LEED v4 EAp2 `+
-      `energy model — the design-stage prediction this building was certified on. <b>Live \u00b7 recomputed every 15 minutes.</b>`;
+      `energy model — the design-stage prediction this building was certified on. <b>Recomputed when new meter data arrives.</b>`;
     if (mv.peak_measured_kw) {
       el('tPk').innerHTML = `${Math.round(mv.peak_measured_kw)} <small>kW</small>`;
       el('tPkS').textContent = `design model ${Math.round(mv.peak_design_kw || 0)} kW · code baseline ${Math.round(mv.peak_baseline_kw || 0)} kW (${mv.peak_measured_date})`;
@@ -437,7 +437,7 @@ async function boot(){
     renderAll();
   } catch (e) {
     document.getElementById('lede').innerHTML =
-      'Live M&V series not available yet (' + e.message + ') — the pipeline generates data/mv_grimes.json on its next 15-minute run.';
+      'Live M&V series not available yet (' + e.message + ') — the pipeline generates data/mv_grimes.json on its next pipeline run.';
   }
 }
 boot();
