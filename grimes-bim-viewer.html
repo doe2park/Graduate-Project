@@ -929,6 +929,18 @@ if (CAPTURE) {
       }
       return null;
     },
+    // Figure capture: render groups that share one geometry (InstancedMesh) or one material (merged mesh).
+    renderGroups() {
+      return equipMeshes.map((m, index) => ({index, instanced: !!m.isInstancedMesh, visible: m.visible, layer: m.userData.layer,
+        levelKey: m.userData.levelKey, type: m.userData.type, elements: new Set(m.userData.ids || []).size,
+        count: m.isInstancedMesh ? m.count : (m.userData.ranges || []).length, material: m.material?.uuid, color: m.material?.color?.getHexString?.(),
+        center: (m.geometry.computeBoundingSphere(), m.isInstancedMesh ? null : m.geometry.boundingSphere.center.toArray())}));
+    },
+    tintGroup(index, hex) {
+      const m = equipMeshes[index]; if (!m) return 0;
+      const ids = [...new Set(m.userData.ids || [])]; ids.forEach(id => highlightElementRender(m, id, true, hex));
+      return ids.length;
+    },
     elementIds(layer) { return Object.keys(equipMeta).filter(id => !layer || equipMeta[id].layer === layer); },
     meta(id) { const i = equipMeta[id]; return i ? {name: i.name, type: i.type, layer: i.layer, level: i.level, levelKey: elementLevelKey(i)} : null; },
   };
