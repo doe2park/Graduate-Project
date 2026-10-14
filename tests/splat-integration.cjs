@@ -2,7 +2,7 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),base=process.env.SPLAT_TEST_ORIGIN||'http://127.0.0.1:8893';
-const manifestPath=process.env.SPLAT_PACKAGE||'capture-local/gaussian/pilot/viewer.json';
+const manifestPath=process.env.SPLAT_PACKAGE||'scan-assets/gaussian/2026-05-06/viewer.json';
 const manifest=JSON.parse(fs.readFileSync(path.join(root,manifestPath)));
 const registration=JSON.parse(fs.readFileSync(path.join(root,'alignment-analysis/accepted-registration.json')));
 function registered(pose){
@@ -18,7 +18,7 @@ const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
   const page=await browser.newPage(mobile?{viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2}:{viewport:{width:1440,height:1000}}),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   const manifestURL=new URL(manifestPath,base+'/');
-  await page.route(url=>url.pathname==='/capture-local/gaussian/pilot/viewer.json',route=>route.fulfill({json:{...manifest,file:new URL(manifest.file,manifestURL).pathname,...(manifest.mobileFile?{mobileFile:new URL(manifest.mobileFile,manifestURL).pathname}:{})}}));
+  await page.route(url=>url.pathname==='/scan-assets/gaussian/2026-05-06/viewer.json',route=>route.fulfill({json:{...manifest,file:new URL(manifest.file,manifestURL).pathname,...(manifest.mobileFile?{mobileFile:new URL(manifest.mobileFile,manifestURL).pathname}:{})}}));
   await page.goto(base+'/scan-compare.html?mode=splat');
   await page.waitForFunction(()=>document.querySelector('#scanMode').value==='splat');
   const splat=page.frames().find(f=>f.url().includes('scan-splat')),bim=page.frames().find(f=>f.url().includes('pane=bim'));

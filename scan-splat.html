@@ -1,13 +1,21 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Grimes · Experimental Gaussian reconstruction</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101923;color:#edf4fa;font:13px Arial,sans-serif}canvas{display:block;touch-action:none}#tools{position:absolute;inset:10px 10px auto;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:9px;background:#101e30ed;padding:10px;border:1px solid #52667a;border-radius:8px}#experiment{color:#ffe29b;font-weight:bold}#loading{color:#cee0eb}button{font:inherit;padding:9px;color:white;background:#244562;border:1px solid #8aa5bb;border-radius:5px;cursor:pointer;touch-action:none}button:focus-visible{outline:2px solid #ffe29b}#status{position:absolute;bottom:10px;left:10px;right:10px;z-index:2;background:#101e30ed;padding:9px;border-radius:5px;pointer-events:none;font-size:12px;line-height:1.5}#movePad{position:absolute;bottom:85px;left:50%;transform:translateX(-50%);display:flex;gap:5px;z-index:2}#movePad button{min-width:40px}#retry{display:none}body[data-state=error] #retry{display:inline-block}body[data-state=error] #movePad{display:none}@media(max-width:520px){#tools{font-size:12px;padding:8px;gap:6px}#movePad{bottom:112px}#status{font-size:11px}}
+:root{--tb-h:32px;--tb-radius:8px;--tb-bg:rgba(10,20,32,.74);--tb-border:rgba(255,255,255,.22);--tb-font:600 12px/1 Arial,Helvetica,sans-serif}
+body.touch{--tb-h:44px}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101923;color:#edf4fa;font:13px Arial,sans-serif}canvas{display:block;touch-action:none}
+#tools{position:absolute;top:8px;left:8px;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:4px;max-width:calc(100% - 16px)}
+#tools>*{height:var(--tb-h);display:inline-flex;align-items:center;padding:0 10px;border:1px solid var(--tb-border);border-radius:var(--tb-radius);background:var(--tb-bg);font:var(--tb-font);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#experiment{color:#ffe29b}#loading{color:#cee0eb}button{color:#fff;cursor:pointer;touch-action:none}button:focus-visible{outline:2px solid #ffe29b}#retry{display:none}body[data-state=error] #retry{display:inline-flex}body[data-state=error] #movePad{display:none}
+#status{position:absolute;left:50%;bottom:calc(var(--tb-h) + 18px);transform:translateX(-50%);z-index:2;max-width:calc(100% - 16px);padding:7px 12px;border-radius:999px;background:var(--tb-bg);border:1px solid var(--tb-border);font:11px/1.4 Arial;text-align:center;pointer-events:none;animation:fade 9s forwards}@keyframes fade{0%,80%{opacity:1}100%{opacity:0;visibility:hidden}}
+#movePad{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:2}#movePad button{min-width:var(--tb-h);height:var(--tb-h);padding:0 6px;border:1px solid var(--tb-border);border-radius:var(--tb-radius);background:var(--tb-bg);font:700 13px Arial}
+@media(max-width:520px){#movePad{max-width:150px;flex-wrap:wrap;justify-content:flex-end}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body data-state="loading">
-<div id="tools"><span id="experiment">EXPERIMENT · 3D Gaussian splats</span><span id="loading" role="status">Loading reconstruction…</span><button id="reset" disabled>Reset view</button><button id="retry" onclick="location.reload()">Retry</button></div>
+<div id="tools"><span id="experiment">EXPERIMENT · May 6 capture</span><span id="loading" role="status">Loading reconstruction…</span><button id="reset" disabled>Reset view</button><button id="retry" onclick="location.reload()">Retry</button></div>
 <div id="movePad" aria-label="Move camera"><button data-move="left" aria-label="Move left">←</button><button data-move="forward" aria-label="Move forward">↑</button><button data-move="back" aria-label="Move backward">↓</button><button data-move="right" aria-label="Move right">→</button><button data-move="up" aria-label="Move up">+Y</button><button data-move="down" aria-label="Move down">−Y</button></div>
-<div id="status">Drag to look · WASD / arrows: move · Q/E: down/up · Shift: faster<br>Trained appearance reconstruction · May contain holes and floaters · No collision or physical accuracy guarantee</div>
+<div id="status">Drag to look · WASD / arrows: move · Q/E: down/up · Shift: faster<br>Experimental appearance · not surveyed geometry · May contain holes and floaters</div>
 <script type="module">
 const label=document.getElementById('loading'),held=new Set();
 let state='loading',error=null,viewer=null,renderer=null,camera=null,manifest=null,count=0,epoch=0,driver='scan',linked=true,pendingClaim=false,mobile=false,drag=null,yaw=0,pitch=0,initialPose=null,selectedFile=null;
@@ -18,15 +26,15 @@ const finiteArray=(a,n)=>Array.isArray(a)&&a.length===n&&a.every(Number.isFinite
 const validPose=p=>p&&finiteArray(p.position,3)&&finiteArray(p.quaternion,4)&&Math.abs(Math.hypot(...p.quaternion)-1)<.01&&Number.isFinite(p.fov)&&p.fov>=20&&p.fov<=110&&(p.zoom===undefined||(Number.isFinite(p.zoom)&&p.zoom>0&&p.zoom<=10));
 function fail(e){error=e.message||String(e);state='error';document.body.dataset.state=state;label.textContent=error;held.clear();document.getElementById('reset').disabled=true;if(renderer)renderer.setAnimationLoop(null);if(viewer)viewer.dispose().catch(()=>{});}
 try{
- const manifestURL=new URL(new URLSearchParams(location.search).get('manifest')||'capture-local/gaussian/pilot/viewer.json',location.href);
+ const manifestURL=new URL(new URLSearchParams(location.search).get('manifest')||'scan-assets/gaussian/2026-05-06/viewer.json',location.href);
  if(manifestURL.origin!==location.origin)throw Error('Use a same-origin reconstruction manifest');
- const response=await fetch(manifestURL);if(!response.ok)throw Error('Reconstruction unavailable · train the local pilot first');manifest=await response.json();
+ const response=await fetch(manifestURL);if(!response.ok)throw Error('Gaussian reconstruction unavailable · manifest not found');manifest=await response.json();
  if(manifest.frame!=='scan-y-up-metres')throw Error('Unsupported coordinate frame · expected scan-y-up-metres');
  if(manifest.status!=='experimental-trained')throw Error('This viewer requires an experimental-trained reconstruction');
  if(!validPose(manifest.camera))throw Error('Reconstruction needs a valid initial camera pose');
  if(typeof manifest.file!=='string')throw Error('Reconstruction PLY file is missing');
  let deviceWindow=window;try{if(top.location.origin===location.origin)deviceWindow=top;}catch{}
- mobile=deviceWindow.matchMedia('(max-width:768px), (pointer:coarse)').matches;
+ mobile=deviceWindow.matchMedia('(max-width:768px), (pointer:coarse)').matches;document.body.classList.toggle('touch',mobile);
  selectedFile=mobile&&manifest.mobileFile?manifest.mobileFile:manifest.file;
  if(typeof selectedFile!=='string')throw Error('Reconstruction PLY file is missing');
  const assetURL=new URL(selectedFile,manifestURL);if(assetURL.origin!==location.origin||!(/\.(ply|ksplat)$/i).test(assetURL.pathname))throw Error('Use a same-origin Gaussian PLY or KSplat asset');

@@ -264,7 +264,30 @@ body[data-pane="bim"]:not(.controls-collapsed) #layersMenu{top:104px;max-height:
 body.controls-collapsed #scanQuickActions,body.controls-collapsed #interiorTools,body.controls-collapsed #layersMenu,body.controls-collapsed #clickHint,body.controls-collapsed #walkPad{display:none!important}
 #bimLoadProgress{position:absolute;bottom:8px;left:8px;right:8px;z-index:60;pointer-events:none;font:11px/1.4 Arial;color:#d6e5ed;text-shadow:0 1px 3px #000}
 #bimLoadProgress:empty{display:none}body:not([data-pane="bim"]) #bimLoadProgress{display:none}
-</style></head>
+</style><style>
+/* Shared compact pane toolbar (same tokens as scan-photo.html) + X-ray overlay mode */
+:root{--tb-h:32px;--tb-radius:8px;--tb-bg:rgba(10,20,32,.74);--tb-border:rgba(255,255,255,.22);--tb-font:600 12px/1 Arial,Helvetica,sans-serif}
+body.touch{--tb-h:44px}
+body.overlay-mode,html.overlay-mode,html.overlay-mode body,body.overlay-mode #main,body.overlay-mode #viewerPane{background:transparent!important}
+body.overlay-mode>*:not(#main):not(script):not(style){display:none!important}body.overlay-mode #viewerPane>*:not(canvas){display:none!important}
+body[data-pane="bim"] #scanQuickActions,body[data-pane="bim"] #sceneControlsToggle:not(.tb-btn){display:none!important}
+#paneBar{position:absolute;top:8px;left:8px;z-index:70;display:none;gap:4px;align-items:center;max-width:calc(100% - 16px)}body[data-pane="bim"] #paneBar{display:flex}
+#paneBar .tb-btn,#paneBar #sceneControlsToggle{position:static;display:inline-flex!important;align-items:center;justify-content:center;gap:5px;height:var(--tb-h);min-height:var(--tb-h);min-width:var(--tb-h);padding:0 10px;border:1px solid var(--tb-border);border-radius:var(--tb-radius);background:var(--tb-bg);color:#fff;font:var(--tb-font);white-space:nowrap;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#paneBar .tb-btn:hover{background:rgba(36,69,98,.85)}#paneBar .tb-btn:focus-visible,#paneMenu button:focus-visible,#paneMenu summary:focus-visible{outline:2px solid #ffd479;outline-offset:1px}
+#paneBar .tb-icon{padding:0;font-size:18px;line-height:1}#scanObjects::before{content:"\2315";font-size:15px}#layersBtnProxy::before{content:"\25A4";font-size:14px}#bimNavigate::before{content:"\1F6B6"}
+#paneMenu{position:absolute;top:calc(8px + var(--tb-h) + 6px);left:8px;z-index:101;width:min(260px,calc(100% - 16px));max-height:calc(100dvh - var(--tb-h) - 24px);overflow:auto;padding:4px;border:1px solid var(--tb-border);border-radius:var(--tb-radius);background:rgba(10,20,32,.94);color:#fff;font:var(--tb-font);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}#paneMenu[hidden]{display:none}
+#paneMenu button,#paneMenu summary{display:flex;width:100%;min-height:var(--tb-h);align-items:center;gap:8px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#fff;font:var(--tb-font);text-align:left;cursor:pointer;list-style:none}#paneMenu button:hover,#paneMenu summary:hover{background:rgba(255,255,255,.12)}#paneMenu button[aria-pressed="true"]{background:rgba(219,234,240,.92);color:#183144}#paneMenu button:disabled{opacity:.45}
+#paneMenu #interiorTools{display:block!important;position:static;max-width:none;padding:0;border:0;background:transparent;font:var(--tb-font);overflow:visible}#paneMenu #interiorTools>summary{display:none}#paneMenu .interior-modes{display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:0}#paneMenu .interior-options{position:static;width:auto;max-width:none;border:0;background:transparent;padding:4px 10px 8px;gap:6px}#paneMenu .interior-options label{min-height:var(--tb-h)}#paneMenu #interiorStatus{padding:2px 10px 8px;font:10px Arial;color:#a9bfd0}#paneMenu hr{border:0;border-top:1px solid rgba(255,255,255,.16);margin:4px 0}
+body[data-pane="bim"] #layersMenu{top:calc(8px + var(--tb-h) + 6px)!important;left:8px!important;max-height:calc(100dvh - var(--tb-h) - 24px)!important}
+body.controls-collapsed #paneBar>:not(#sceneControlsToggle){display:none!important}body.controls-collapsed #paneMenu>:not(.keep){display:none!important}
+body.twin-open #paneBar,body.twin-open #paneMenu{display:none!important}
+#clickHint.show{display:block;animation:hintFade 6s forwards}#clickHint{border-color:rgba(255,255,255,.22)!important;background:var(--tb-bg)!important;font:var(--tb-font)!important;bottom:12px!important;padding:7px 12px!important;border-radius:999px!important}
+@keyframes hintFade{0%,75%{opacity:1}100%{opacity:0;visibility:hidden}}
+body[data-pane="bim"] #bimLoadProgress{width:max-content;max-width:60%;left:8px;right:auto;bottom:8px;padding:4px 10px;border-radius:999px;background:var(--tb-bg);border:1px solid var(--tb-border);font:var(--tb-font);text-shadow:none}
+body[data-pane="bim"] #twinPanel{top:calc(8px + var(--tb-h) + 6px)}
+@media(prefers-reduced-motion:reduce){#clickHint.show{animation:none}}
+</style>
+</head>
 <body>
 
 <div id="topbar">
@@ -399,7 +422,7 @@ body.controls-collapsed #scanQuickActions,body.controls-collapsed #interiorTools
   <div class="hint">Calibration auto-loads from <b>data/cupix_calib.json</b> (same registration grimes-xr uses: yaw −135°, swap+flip, camMat). Local tweaks persist in this browser.</div>
 </div>
 
-<div id="scanQuickActions"><button id="scanObjects" type="button">Objects</button><button type="button" onclick="document.getElementById('layersBtn').click()">Layers</button><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate">Walk BIM</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><details id="interiorTools" aria-label="View settings"><summary>View settings</summary><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></details><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script>
+<div id="scanQuickActions"><button id="scanObjects" type="button">Objects</button><button type="button" onclick="document.getElementById('layersBtn').click()">Layers</button><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate" aria-label="Walk or look around the BIM" title="Walk or look around the BIM">Walk</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><details id="interiorTools" aria-label="View settings"><summary>View settings</summary><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></details><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -428,7 +451,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0f1a);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
 camera.position.set(35, 25, 35);
-const renderer = new THREE.WebGLRenderer({ antialias: !mobileQuality });
+const renderer = new THREE.WebGLRenderer({ antialias: !mobileQuality, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, mobileQuality ? 1 : 2));
 /* ── Render-quality pass (lighting/material/tonemapping only — NO postprocessing:
    the 21 MB shell is ~120 draw calls, SSAO etc. would tank it) ── */
@@ -697,7 +720,7 @@ function enterWalk() {
   if(!spawn){walkMode=false;renderer.toneMappingExposure=EXPOSURE_ORBIT;document.getElementById('scanStatus').textContent='No supported scan floor found. Choose another area.';return;}
   floorTargetY=spawn.y;floorY=spawn.y;playerPos.copy(spawn);
   if(splitPane!=='bim'){pitch=0;yaw=scanEntryYaw;}applyLook();document.body.classList.add('scan-walking');
-  if(splitPane==='bim')document.getElementById('bimNavigate').textContent='Exit look';
+  if(splitPane==='bim')document.getElementById('bimNavigate').textContent='Exit';
   scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}});
   camera.position.set(playerPos.x, floorY + EYE, playerPos.z);
   controls.enabled = false;                      // Orbit fully off while walking
@@ -721,7 +744,7 @@ function exitWalk() {
   avatar.visible = false;
   for (const k in keys) keys[k] = false;
   controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),8);
-  if(splitPane==='bim')document.getElementById('bimNavigate').textContent=photoNavigationMode?'Look around BIM':'Walk BIM';
+  if(splitPane==='bim')document.getElementById('bimNavigate').textContent=photoNavigationMode?'Look':'Walk';
   controls.enabled = true;
   renderer.setPixelRatio(Math.min(devicePixelRatio, mobileQuality ? 1 : 2));
   document.getElementById('walkBtn').classList.remove('active');
@@ -2634,7 +2657,37 @@ async function loadInterior(){
 }
 window.setAllElementContext=show=>{for(const key of Object.keys(interiorVisible))interiorVisible[key]=show;interiorState.mode='custom';applyInteriorVisibility();};
 // Keep full-building element layers available through Layers / Show all, not automatic.
-if(splitPane==='bim')queueMicrotask(()=>loadInterior());
+/* ══════════ X-RAY OVERLAY (scan-compare ?view=overlay) ══════════
+   Transparent canvas + only MEP/service layers. The parent stacks this iframe over the scan pane
+   and sets the iframe opacity, so alpha here is the full-strength BIM image. Architecture/furniture stay hidden. */
+const OVERLAY_LAYER_KEYS=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety','fire'];
+const overlayAtLoad=splitPane==='bim'&&new URLSearchParams(location.search).get('overlay')==='1';
+const normalBackground=scene.background;let overlayOn=false,overlayRun=0;
+window.overlayInspection=()=>({on:overlayOn,background:scene.background,layers:Object.fromEntries(Object.keys(LAYERS).map(k=>[k,{loaded:!!layerState[k]?.group,visible:!!layerState[k]?.group?.visible}])),interior:{...interiorVisible}});
+async function setOverlay(enabled){
+ enabled=!!enabled&&splitPane==='bim';if(enabled===overlayOn)return;overlayOn=enabled;const run=++overlayRun;
+ document.documentElement.classList.toggle('overlay-mode',enabled);document.body.classList.toggle('overlay-mode',enabled);
+ if(!enabled){
+  scene.background=normalBackground;
+  if(interiorState.ready){setInteriorMode('room');}else{Object.assign(interiorVisible,{furniture:true,floors:true,enclosure:true,ceilings:true});interiorState.mode='room';loadInterior();}
+  return;
+ }
+ scene.background=null;renderer.setClearColor(0,0);
+ for(const key of Object.keys(interiorVisible))interiorVisible[key]=false;interiorState.mode='custom';applyInteriorVisibility();
+ if(mepModel)mepModel.visible=false;
+ for(const key of Object.keys(LAYERS)){const st=layerState[key];if(!OVERLAY_LAYER_KEYS.includes(key)&&st?.group?.visible){st.group.visible=false;st.desiredVisible=false;document.getElementById('layerBtn-'+key)?.classList.remove('active');}}
+ for(const key of OVERLAY_LAYER_KEYS){
+  if(run!==overlayRun)return;
+  if(key==='fire'&&mobileQuality)continue; // 86 MB of piping: skipped on phones to protect memory
+  const st=layerState[key]||(layerState[key]={});st.desiredVisible=true;
+  if(st.loading)await st.pending;else if(!st.group)await toggleLayer(key,{bulk:true});
+  if(run!==overlayRun)return;
+  if(st.group){st.group.visible=true;document.getElementById('layerBtn-'+key)?.classList.add('active');}
+  applyEquipFilter();buildEquipFilter();updateAllElementsButton();
+ }
+}
+if(overlayAtLoad){for(const key of Object.keys(interiorVisible))interiorVisible[key]=false;interiorState.mode='custom';queueMicrotask(()=>setOverlay(true));}
+else if(splitPane==='bim')queueMicrotask(()=>loadInterior());
 
 document.getElementById('pauseScanLayers').onclick=()=>{stopScanLayerLoad=true;document.getElementById('pauseScanLayers').textContent='Stopping after current layer…'};
 setInterval(()=>{refreshScanLayerStatus();updateAllElementsButton();},1000);refreshScanLayerStatus();updateAllElementsButton();
@@ -2662,7 +2715,7 @@ function claimCamera(){
 function releaseBimCamera(){claimCamera();}
 renderer.domElement.addEventListener('pointerdown',()=>{claimCamera();if(photoNavigationMode&&splitPane==='bim'&&!walkMode)enterWalk();},true);
 renderer.domElement.addEventListener('wheel',claimCamera,{capture:true,passive:true});
-document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Exit look':photoNavigationMode?'Look around BIM':'Walk BIM';if(walkMode)document.getElementById('walkHint').textContent=photoNavigationMode?'Captured station · Drag to look · WASD follow capture route · aim + click to inspect':'BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
+document.getElementById('bimNavigate').onclick=()=>{claimCamera();toggleWalk();document.getElementById('bimNavigate').textContent=walkMode?'Exit':photoNavigationMode?'Look':'Walk';if(walkMode)document.getElementById('walkHint').textContent=photoNavigationMode?'Captured station · Drag to look · WASD follow capture route · aim + click to inspect':'BIM Walk · WASD move · Q/E height · aim + click · Esc releases mouse';};
 document.getElementById('bimFollow').textContent='Align views';
 document.getElementById('bimFollow').onclick=()=>window.parent.postMessage({type:'grimes-request-link'},location.origin);
 function publishScanPose(t){
@@ -2676,10 +2729,11 @@ function applyLinkedPose(p){
 }
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin||e.source!==window.parent)return;const d=e.data;
+ if(d?.type==='grimes-overlay'){setOverlay(d.enabled);return;}
  if(d?.type==='grimes-photo-mode'&&splitPane==='bim'){
   photoNavigationMode=!!d.enabled;controls.enableRotate=!photoNavigationMode;controls.enablePan=!photoNavigationMode;controls.enableZoom=!photoNavigationMode;
   document.getElementById('fitBimQuick').disabled=photoNavigationMode;
-  if(!walkMode)document.getElementById('bimNavigate').textContent=photoNavigationMode?'Look around BIM':'Walk BIM';
+  if(!walkMode)document.getElementById('bimNavigate').textContent=photoNavigationMode?'Look':'Walk';
   return;
  }
  if(d?.type==='grimes-camera-role'){
@@ -2752,9 +2806,34 @@ renderer.setAnimationLoop((t) => {
 </script>
 
 <script>
-(()=>{if(new URLSearchParams(location.search).get('pane')!=='bim')return;const button=document.getElementById('sceneControlsToggle');let device=window;try{if(top.location.origin===location.origin)device=top}catch{}
-function fold(collapsed){document.body.classList.toggle('controls-collapsed',collapsed);button.setAttribute('aria-expanded',String(!collapsed));button.textContent=collapsed?'Controls':'Hide controls';}
-fold(device.matchMedia('(max-width:768px), (pointer:coarse)').matches);button.onclick=()=>fold(!document.body.classList.contains('controls-collapsed'));
+(()=>{if(new URLSearchParams(location.search).get('pane')!=='bim')return;
+let device=window;try{if(top.location.origin===location.origin)device=top}catch{}
+const touch=device.matchMedia('(max-width:768px), (pointer:coarse)').matches;document.body.classList.toggle('touch',touch);
+const bar=document.createElement('div');bar.id='paneBar';bar.className='tb';bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','BIM controls');
+const menu=document.createElement('div');menu.id='paneMenu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','More BIM controls');menu.hidden=true;
+const objects=document.getElementById('scanObjects'),walk=document.getElementById('bimNavigate'),toggle=document.getElementById('sceneControlsToggle'),quick=document.getElementById('scanQuickActions');
+const layers=document.createElement('button');layers.id='layersBtnProxy';layers.type='button';layers.textContent='Layers';layers.setAttribute('aria-label','Layers');layers.onclick=()=>document.getElementById('layersBtn').click();
+for(const b of [objects,layers,walk])b.classList.add('tb-btn');
+objects.setAttribute('aria-label','Find BIM objects');
+toggle.classList.add('tb-btn','tb-icon');toggle.textContent='\u22EF';toggle.setAttribute('aria-haspopup','menu');toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls','paneMenu');toggle.setAttribute('aria-label','More controls');toggle.title='More';
+bar.append(objects,layers,walk,toggle);
+const all=document.getElementById('showAllLayersQuick'),fit=document.getElementById('fitBimQuick'),view=document.getElementById('interiorTools');
+const tips=document.createElement('button');tips.type='button';tips.setAttribute('role','menuitem');tips.textContent='Show tips';
+const hide=document.createElement('button');hide.type='button';hide.setAttribute('role','menuitem');hide.className='keep';hide.textContent='Hide toolbar';
+for(const b of [all,fit])b.setAttribute('role','menuitem');
+view.open=true;
+const rule=document.createElement('hr');
+menu.append(all,fit,rule,view,tips,hide);
+document.body.append(bar,menu);
+function open(on){menu.hidden=!on;toggle.setAttribute('aria-expanded',String(on));}
+toggle.onclick=e=>{e.stopPropagation();open(menu.hidden);};
+document.addEventListener('pointerdown',e=>{if(!menu.hidden&&!menu.contains(e.target)&&!toggle.contains(e.target))open(false);},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){open(false);toggle.focus();}});
+function fold(c){document.body.classList.toggle('controls-collapsed',c);hide.textContent=c?'Show toolbar':'Hide toolbar';}
+hide.onclick=()=>{fold(!document.body.classList.contains('controls-collapsed'));open(false);};
+tips.onclick=()=>{open(false);const h=document.getElementById('clickHint');h.classList.remove('show');void h.offsetWidth;h.classList.add('show');};
+/* hint is shown once as a fading toast */
+document.getElementById('clickHint').classList.add('show');
 })();
 </script>
 </body>
