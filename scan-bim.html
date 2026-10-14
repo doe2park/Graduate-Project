@@ -2689,6 +2689,10 @@ async function setOverlay(enabled){
 if(overlayAtLoad){for(const key of Object.keys(interiorVisible))interiorVisible[key]=false;interiorState.mode='custom';queueMicrotask(()=>setOverlay(true));}
 else if(splitPane==='bim')queueMicrotask(()=>loadInterior());
 
+/* scan-compare overlay LENS: report the normalised mouse position from the mesh pane */
+if(splitPane==='scan'&&parent!==window){const c=renderer.domElement;
+ c.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'){const r=c.getBoundingClientRect();parent.postMessage({type:'grimes-pointer',x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height},location.origin);}});
+ c.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')parent.postMessage({type:'grimes-pointer',x:null,y:null},location.origin);});}
 document.getElementById('pauseScanLayers').onclick=()=>{stopScanLayerLoad=true;document.getElementById('pauseScanLayers').textContent='Stopping after current layer…'};
 setInterval(()=>{refreshScanLayerStatus();updateAllElementsButton();},1000);refreshScanLayerStatus();updateAllElementsButton();
 

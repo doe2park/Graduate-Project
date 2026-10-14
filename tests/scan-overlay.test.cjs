@@ -4,7 +4,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const src=fs.readFileSync(path.join(__dirname,'../scan-compare.html'),'utf8');
 const bim=fs.readFileSync(path.join(__dirname,'../scan-bim.html'),'utf8');
 const photo=fs.readFileSync(path.join(__dirname,'../scan-photo.html'),'utf8');
-function logic(){const m=src.match(/\/\* OVERLAY LOGIC \*\/([\s\S]*?)\/\* END OVERLAY LOGIC \*\//);assert.ok(m,'overlay logic block exists');const c={URLSearchParams,Number,Math};vm.createContext(c);vm.runInContext(m[1]+';this.OVERLAY_DEFAULT_OPACITY=OVERLAY_DEFAULT_OPACITY;this.OVERLAY_LAYERS=OVERLAY_LAYERS;',c);return c}
+function logic(){const m=src.match(/\/\* OVERLAY LOGIC \*\/([\s\S]*?)\/\* END OVERLAY LOGIC \*\//);assert.ok(m,'overlay logic block exists');const c={URLSearchParams,Number,Math};vm.createContext(c);vm.runInContext(m[1]+';this.OVERLAY_DEFAULT_OPACITY=OVERLAY_DEFAULT_OPACITY;this.OVERLAY_LAYERS=OVERLAY_LAYERS;this.OVERLAY_DEFAULT_STYLE=OVERLAY_DEFAULT_STYLE;this.LENS_RADIUS_FRACTION=LENS_RADIUS_FRACTION;this.LENS_INSIDE=LENS_INSIDE;this.LENS_OUTSIDE=LENS_OUTSIDE;',c);return c}
 test('view parameter selects compare / overlay / scan / bim and rejects anything else',()=>{const c=logic();
  assert.equal(c.parseView(''),'compare');assert.equal(c.parseView('?view=overlay'),'overlay');assert.equal(c.parseView('?view=scan'),'scan');assert.equal(c.parseView('?view=bim'),'bim');
  assert.equal(c.parseView('?view=compare'),'compare');assert.equal(c.parseView('?view=OVERLAY'),'compare');assert.equal(c.parseView('?view=javascript:1'),'compare');assert.equal(c.parseView('?view='),'compare')});
@@ -50,3 +50,30 @@ test('Gaussian is enabled only from the public May manifest and never for Sep 17
  assert.equal(c.captureSelection('').date,'2026-09-17');
  assert.match(src,/value="splat" disabled/);
  assert.match(logic().splatSource('scan-assets/gaussian/2026-05-06/viewer.json'),/^scan-splat\.html\?manifest=scan-assets%2Fgaussian%2F2026-05-06%2Fviewer\.json/)});
+
+/* ── Overlay styles: lens / ghost / plain (AR X-ray vision) ── */
+test('?style= selects lens (default) / ghost / plain and rejects anything else',()=>{const c=logic();
+ assert.equal(c.OVERLAY_DEFAULT_STYLE,'lens');assert.equal(c.parseStyle(''),'lens');
+ for(const s of ['lens','ghost','plain'])assert.equal(c.parseStyle('?view=overlay&style='+s),s);
+ for(const bad of ['?style=GHOST','?style=','?style=xray','?style=javascript:1'])assert.equal(c.parseStyle(bad),'lens')});
+test('lens radius is 22% of the shorter side, centre follows a clamped pointer or stays centred',()=>{const c=logic();
+ assert.equal(c.LENS_RADIUS_FRACTION,.22);assert.equal(c.lensRadius(1600,900),198);assert.ok(Math.abs(c.lensRadius(390,844)-85.8)<1e-9);assert.equal(c.lensRadius(0,0),0);
+ assert.deepEqual({...c.lensCenter(null,1600,900)},{x:800,y:450});assert.deepEqual({...c.lensCenter({x:NaN,y:.5},1600,900)},{x:800,y:450});
+ assert.deepEqual({...c.lensCenter({x:.25,y:.5},1600,900)},{x:400,y:450});assert.deepEqual({...c.lensCenter({x:-3,y:9},1600,900)},{x:0,y:900})});
+test('lens opacities: ~85% inside, ~8% outside',()=>{const c=logic();assert.equal(c.LENS_INSIDE,.85);assert.equal(c.LENS_OUTSIDE,.08);
+ const m=c.lensMask(100,50,80);assert.match(m,/radial-gradient\(circle 80px at 100px 50px/);assert.match(m,/rgba\(0,0,0,0\.85\)/);assert.match(m,/rgba\(0,0,0,0\.08\)/)});
+test('GHOST edge layer is enabled only for 360° photos on wide, non-touch devices; otherwise falls back to plain',()=>{const c=logic();
+ assert.equal(c.ghostAvailable({display:'photo',narrowOrTouch:false}),true);
+ assert.equal(c.ghostAvailable({display:'photo',narrowOrTouch:true}),false);
+ assert.equal(c.ghostAvailable({display:'mesh',narrowOrTouch:false}),false);assert.equal(c.ghostAvailable({display:'splat',narrowOrTouch:false}),false);
+ assert.equal(c.effectiveStyle('ghost',{display:'photo',narrowOrTouch:true}),'plain');assert.equal(c.effectiveStyle('ghost',{display:'photo',narrowOrTouch:false}),'ghost');
+ assert.equal(c.effectiveStyle('lens',{display:'mesh',narrowOrTouch:true}),'lens');assert.equal(c.effectiveStyle('plain',{display:'photo',narrowOrTouch:false}),'plain')});
+test('compare page offers the Style picker (44px touch targets) and cites the X-ray techniques',()=>{
+ for(const v of ['lens','ghost','plain'])assert.match(src,new RegExp('data-style="'+v+'"'));
+ assert.match(src,/Schall et al\. 2009/);assert.match(src,/Kalkofen et al\. 2007/);assert.match(src,/Zollmann et al\. 2014/);
+ assert.match(src,/#styleBar button\{flex:1;min-height:44px/)});
+test('scan panes post normalised pointer coordinates; photo pane has an edges-only mode',()=>{
+ const splat=fs.readFileSync(path.join(__dirname,'../scan-splat.html'),'utf8');
+ for(const s of [photo,splat,bim])assert.match(s,/grimes-pointer/);
+ assert.match(photo,/edges'\)==='1'/);assert.match(photo,/Sobel/);assert.match(photo,/grimes-photo-station/)});
+test('honest alignment labels are unchanged',()=>{assert.match(src,/internal residual \\u22480\.13 m, not surveyed/);assert.match(src,/provisional alignment/)});

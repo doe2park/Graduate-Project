@@ -9,7 +9,18 @@ body[data-focus="scan"] main,body[data-focus="bim"] main{grid-template-columns:1
 @media(max-width:768px){#overlayBar{padding:6px 8px;gap:6px}#overlayBar label{flex:1 0 100%}#overlayBar input[type=range]{flex:1;width:auto;height:44px}#overlayBar select{min-height:44px;font-size:13px}}
 body[data-focus="overlay"] main{display:block;position:relative;background:#101d2c}body[data-focus="overlay"] main>section{position:absolute;inset:0;background:transparent}body[data-focus="overlay"] main>section h2{display:none}
 body[data-focus="overlay"] section[aria-label="BIM model"]{z-index:2;pointer-events:none}body[data-focus="overlay"] section[aria-label="BIM model"] iframe{background:transparent;opacity:var(--xray,.3);pointer-events:none}
-</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p><a class="rights-link" href="rights.html" target="_blank" rel="noopener">© 2026 Yoonsung Chung · Rights &amp; use</a></div><nav id="paneViews" aria-label="Comparison view"><button data-focus="both" aria-pressed="true">Compare</button><button data-focus="overlay" aria-pressed="false" title="BIM services drawn semi-transparently over the scan">Overlay</button><button data-focus="scan" aria-pressed="false">Scan</button><button data-focus="bim" aria-pressed="false">BIM</button></nav><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label></header><div id="overlayBar" role="group" aria-label="X-ray overlay controls"><label for="xrayOpacity">BIM services opacity<input id="xrayOpacity" type="range" min="0" max="100" step="5" value="30" aria-describedby="xrayValue"><output id="xrayValue" for="xrayOpacity">30%</output></label></div><main><section aria-label="Actual scan"><h2>Actual scan <select id="scanMode" aria-label="Scan display"><option value="photo">360° photos</option><option value="mesh">3D mesh</option><option value="splat" disabled>Gaussian · May experiment (appearance only)</option></select><select id="captureDate" aria-label="Capture date"><option value="2026-09-17">Sep 17, 2026 · New</option><option value="2026-05-06">May 6, 2026</option></select></h2><iframe title="Captured scan" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section></main><script>
+/* OVERLAY STYLES: Style picker, lens ring, edge layer, legibility filter */
+#styleBar{display:flex;align-items:center;gap:4px;padding:3px;background:#0d1826;border:1px solid #38506a;border-radius:10px}#styleBar>span{padding:0 6px 0 8px;color:#b4cbdc}#styleBar button{min-height:32px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:#cfe0ec;font:600 12px Arial;cursor:pointer}#styleBar button[aria-pressed="true"]{background:#315e7a;color:#fff}#styleBar button:disabled{opacity:.4;cursor:not-allowed}#styleBar button:focus-visible{outline:2px solid #ffd479;outline-offset:1px}#styleNote{color:#ffd479;font-size:11px}
+@media(max-width:768px){#styleBar{flex:1 0 100%;flex-wrap:wrap}#styleBar button{flex:1;min-height:44px;padding:0 4px}#styleBar>span:first-child{display:none}#styleNote{flex:1 0 100%;padding:0 6px 3px}}
+/* legibility in every style: slightly desaturated system colours + dark screen-space outline (outline pass) */
+body[data-focus="overlay"] section[aria-label="BIM model"] iframe{filter:saturate(.72) drop-shadow(0 0 1.2px rgba(4,9,16,.95)) drop-shadow(0 0 .7px rgba(4,9,16,.9))}
+/* LENS: cut-away mask on the BIM layer (services strong inside the hole, ghosted outside) */
+body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"]{-webkit-mask-image:var(--lens-mask,none);mask-image:var(--lens-mask,none)}body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"] iframe{opacity:1}
+body[data-focus="overlay"][data-style="lens"] #overlayBar label[for="xrayOpacity"]{opacity:.45}
+#lensRing{display:none;position:absolute;z-index:4;left:0;top:0;width:0;height:0;border-radius:50%;pointer-events:none;border:2px solid rgba(255,226,155,.95);box-shadow:0 0 0 1px rgba(5,10,18,.8),inset 0 0 0 1px rgba(5,10,18,.55);box-sizing:border-box}body[data-focus="overlay"][data-style="lens"] #lensRing{display:block}
+/* GHOST: second, edges-only scan instance above the BIM layer */
+#edgeLayer{display:none;position:absolute;inset:0;z-index:3;pointer-events:none}body[data-focus="overlay"][data-style="ghost"] #edgeLayer{display:block}#edgeLayer[data-moving="true"]{visibility:hidden}#edgeLayer iframe{position:absolute;inset:0;width:100%;height:100%;background:transparent;border:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(4,9,16,.7))}
+</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p><a class="rights-link" href="rights.html" target="_blank" rel="noopener">© 2026 Yoonsung Chung · Rights &amp; use</a></div><nav id="paneViews" aria-label="Comparison view"><button data-focus="both" aria-pressed="true">Compare</button><button data-focus="overlay" aria-pressed="false" title="BIM services drawn semi-transparently over the scan">Overlay</button><button data-focus="scan" aria-pressed="false">Scan</button><button data-focus="bim" aria-pressed="false">BIM</button></nav><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label></header><div id="overlayBar" role="group" aria-label="X-ray overlay controls"><label for="xrayOpacity">BIM services opacity<input id="xrayOpacity" type="range" min="0" max="100" step="5" value="30" aria-describedby="xrayValue"><output id="xrayValue" for="xrayOpacity">30%</output></label><div id="styleBar" role="group" aria-label="Overlay style"><span>Style</span><button data-style="lens" aria-pressed="true" title="Cut-away: services visible through a soft circular hole">Lens</button><button data-style="ghost" aria-pressed="false" title="Services plus the real room's edges drawn on top (360° photos, desktop)">Ghost</button><button data-style="plain" aria-pressed="false" title="Uniform transparency">Plain</button><span id="styleNote" role="status"></span></div></div><main><div id="lensRing" aria-hidden="true"></div><div id="edgeLayer" aria-hidden="true"></div><section aria-label="Actual scan"><h2>Actual scan <select id="scanMode" aria-label="Scan display"><option value="photo">360° photos</option><option value="mesh">3D mesh</option><option value="splat" disabled>Gaussian · May experiment (appearance only)</option></select><select id="captureDate" aria-label="Capture date"><option value="2026-09-17">Sep 17, 2026 · New</option><option value="2026-05-06">May 6, 2026</option></select></h2><iframe title="Captured scan" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section></main><script>
 /* OVERLAY LOGIC */
 const OVERLAY_DEFAULT_OPACITY=.30,OVERLAY_LAYERS=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety','fire'];
 function splatSource(manifest){return 'scan-splat.html?manifest='+encodeURIComponent(manifest)+'&revision=gaussian2';}
@@ -17,6 +28,19 @@ function parseView(search){const v=new URLSearchParams(search).get('view');retur
 function clampOpacity(v){if(v===null||v===undefined||v==='')return OVERLAY_DEFAULT_OPACITY;const n=Number(v);return Number.isFinite(n)?Math.min(1,Math.max(0,n)):OVERLAY_DEFAULT_OPACITY;}
 function parseOpacity(search){const raw=new URLSearchParams(search).get('opacity');if(raw===null||raw==='')return OVERLAY_DEFAULT_OPACITY;const n=Number(raw);return Number.isFinite(n)?clampOpacity(n/100):OVERLAY_DEFAULT_OPACITY;}
 function overlayLabel(capture){return capture.provisional?'Overlay \u00b7 provisional alignment':'Overlay \u00b7 registered (internal residual \u22480.13 m, not surveyed)';}
+/* X-RAY STYLES. Established AR X-ray-vision techniques:
+   LENS  = cut-away / virtual excavation (Schall et al. 2009, handheld AR for underground utilities) + focus+context (Kalkofen et al. 2007):
+           services are shown strongly only through a virtual hole, faintly outside it.
+   GHOST = edge-based ghosting (Kalkofen et al. 2007; Avery/Sandor): the real occluder's edges stay drawn on top of the hidden content.
+   Both keep ordinal depth cues (real room in front, services behind) rather than absolute depth (Zollmann et al. 2014). */
+const OVERLAY_STYLES=['lens','ghost','plain'],OVERLAY_DEFAULT_STYLE='lens',LENS_RADIUS_FRACTION=.22,LENS_INSIDE=.85,LENS_OUTSIDE=.08;
+function parseStyle(search){const v=new URLSearchParams(search).get('style');return OVERLAY_STYLES.includes(v)?v:OVERLAY_DEFAULT_STYLE;}
+function lensRadius(w,h){return LENS_RADIUS_FRACTION*Math.min(w,h);}
+function lensCenter(pointer,w,h){if(!pointer||!Number.isFinite(pointer.x)||!Number.isFinite(pointer.y))return {x:w/2,y:h/2};return {x:Math.min(1,Math.max(0,pointer.x))*w,y:Math.min(1,Math.max(0,pointer.y))*h};}
+function lensMask(cx,cy,r){return 'radial-gradient(circle '+r+'px at '+cx+'px '+cy+'px, rgba(0,0,0,'+LENS_INSIDE+') 0, rgba(0,0,0,'+LENS_INSIDE+') 72%, rgba(0,0,0,'+LENS_OUTSIDE+') 100%)';}
+/* GHOST needs a second panorama instance: 360° photos only, and not on phones/touch (memory and GPU cost) */
+function ghostAvailable(env){return env.display==='photo'&&!env.narrowOrTouch;}
+function effectiveStyle(style,env){return style==='ghost'&&!ghostAvailable(env)?'plain':style;}
 /* END OVERLAY LOGIC */
 const frames=document.querySelectorAll('iframe'),link=document.getElementById('linkCameras'),status=document.getElementById('linkStatus');
 /* CAPTURE SELECTION */
@@ -47,13 +71,54 @@ function setView(next,{push=true}={}){
  for(const el of [mode,capturePicker])(next==='overlay'?overlayBar:scanTitle).appendChild(el);
  if(next==='overlay'){if(registration){link.checked=true;epoch++;}link.disabled=true;}else link.disabled=!registration;
  if(push){const u=new URL(location.href);if(next==='compare')u.searchParams.delete('view');else u.searchParams.set('view',next);history.replaceState(null,'',u);}
+ applyStyle();
  roles();
 }
 document.querySelectorAll('#paneViews button').forEach(button=>button.onclick=()=>setView(button.dataset.focus==='both'?'compare':button.dataset.focus));
+/* OVERLAY STYLES RUNTIME (techniques cited at OVERLAY LOGIC) */
+let overlayStyle=parseStyle(location.search),lensTarget=null,lensNow=null,lensRaf=0,edgeFrame=null,edgeReady=false,lastStation=null,lastScanPose=null;
+const styleBtns=document.querySelectorAll('#styleBar button'),styleNote=document.getElementById('styleNote'),lensRing=document.getElementById('lensRing'),edgeLayer=document.getElementById('edgeLayer'),mainEl=document.querySelector('main');
+const touchMq=matchMedia('(max-width:768px), (pointer:coarse)'),reduceMotion=matchMedia('(prefers-reduced-motion:reduce)');
+const styleEnv=()=>({display:mode.value,narrowOrTouch:touchMq.matches});
+function setStyle(next,{push=true}={}){
+ overlayStyle=next;
+ if(push){const u=new URL(location.href);u.searchParams.set('style',next);history.replaceState(null,'',u);}
+ applyStyle();
+}
+function applyStyle(){
+ const env=styleEnv(),eff=effectiveStyle(overlayStyle,env),ghostOk=ghostAvailable(env);
+ document.body.dataset.style=eff;
+ styleBtns.forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.style===eff));if(b.dataset.style==='ghost'){b.disabled=!ghostOk;}});
+ styleNote.textContent=overlayStyle==='ghost'&&!ghostOk?'Ghost edges need 360\u00b0 photos on desktop \u00b7 showing Plain':!ghostOk?'Ghost edges: 360\u00b0 photos, desktop only':eff==='lens'?'Move the mouse to move the lens':'';
+ const wantEdges=document.body.dataset.focus==='overlay'&&eff==='ghost';
+ if(wantEdges&&!edgeFrame){edgeReady=false;edgeFrame=document.createElement('iframe');edgeFrame.title='Scan edges';edgeFrame.setAttribute('aria-hidden','true');edgeFrame.src='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&edges=1&revision=edges1';edgeLayer.appendChild(edgeFrame);}
+ else if(!wantEdges&&edgeFrame){edgeFrame.remove();edgeFrame=null;edgeReady=false;}
+ layoutLens(true);
+}
+function layoutLens(snap){
+ if(document.body.dataset.style!=='lens'||document.body.dataset.focus!=='overlay'){document.documentElement.style.removeProperty('--lens-mask');return;}
+ const w=mainEl.clientWidth,h=mainEl.clientHeight,goal=lensCenter(lensTarget,w,h);
+ if(!lensNow||snap||reduceMotion.matches)lensNow=goal;
+ else{lensNow={x:lensNow.x+(goal.x-lensNow.x)*.28,y:lensNow.y+(goal.y-lensNow.y)*.28};if(Math.hypot(goal.x-lensNow.x,goal.y-lensNow.y)<.5)lensNow=goal;else{cancelAnimationFrame(lensRaf);lensRaf=requestAnimationFrame(()=>layoutLens(false));}}
+ const r=lensRadius(w,h);document.documentElement.style.setProperty('--lens-mask',lensMask(lensNow.x,lensNow.y,r));
+ Object.assign(lensRing.style,{left:(lensNow.x-r)+'px',top:(lensNow.y-r)+'px',width:2*r+'px',height:2*r+'px'});
+}
+new ResizeObserver(()=>layoutLens(true)).observe(mainEl);touchMq.addEventListener?.('change',applyStyle);
+styleBtns.forEach(b=>b.onclick=()=>{if(!b.disabled)setStyle(b.dataset.style);});
+/* scan panes report the mouse position (normalised); touch devices keep the lens centred */
+function edgeFromScan(d){
+ if(d?.type==='grimes-pointer'){lensTarget=Number.isFinite(d.x)&&Number.isFinite(d.y)&&!touchMq.matches?{x:d.x,y:d.y}:null;layoutLens(false);return;}
+ if(d?.type==='grimes-photo-station'&&Number.isInteger(d.index)){lastStation=d.index;edgeSend({type:'grimes-photo-station',index:d.index});}
+ if(d?.type==='grimes-camera-pose'&&d.pose&&valid(d.pose))edgeRelay({type:'grimes-linked-pose',epoch:0,pose:d.pose});
+ if(d?.type==='grimes-photo-transition')edgeLayer.dataset.moving=String(!!d.moving);
+}
+function edgeSend(data){if(edgeFrame&&edgeReady)edgeFrame.contentWindow.postMessage(data,location.origin);}
+function edgeRelay(data){if(data.type==='grimes-linked-pose')lastScanPose=data;edgeSend(data);}
+window.addEventListener('message',e=>{if(e.origin!==location.origin||!edgeFrame||e.source!==edgeFrame.contentWindow||e.data?.type!=='grimes-camera-ready')return;edgeReady=true;if(lastStation!==null)edgeSend({type:'grimes-photo-station',index:lastStation});if(lastScanPose)edgeSend(lastScanPose);});
 frames[1].src='scan-bim.html?pane=bim&revision=overlay1'+(view==='overlay'?'&overlay=1':'');
 let registration=null,driver='scan',epoch=0;const poses={};
 const index=p=>p==='scan'?0:1,other=p=>p==='scan'?'bim':'scan';
-const send=(pane,data)=>frames[index(pane)].contentWindow.postMessage(data,location.origin);
+const send=(pane,data)=>{if(pane==='scan'&&data?.type==='grimes-linked-pose')edgeRelay({...data,epoch:0});frames[index(pane)].contentWindow.postMessage(data,location.origin);};
 function valid(p){return p&&Array.isArray(p.position)&&p.position.length===3&&Array.isArray(p.quaternion)&&p.quaternion.length===4&&[...p.position,...p.quaternion,p.fov,p.zoom].every(Number.isFinite)&&p.fov>0&&p.fov<180&&p.zoom>0;}
 function convert(p,from){
  const a=registration.rotationYDegrees*Math.PI/180,c=Math.cos(a),s=Math.sin(a),t=registration.translation;
@@ -67,7 +132,7 @@ function acceptedPose(p,pane){if(photoMode){if(pane==='scan')photoAnchor=p.posit
 function sync(){if(!link.checked||!registration||!poses[driver])return;const target=other(driver),pose=convert(poses[driver],driver);poses[target]=pose;send(target,{type:'grimes-linked-pose',epoch,pose});}
 function roles(){send('bim',{type:'grimes-photo-mode',enabled:photoMode});send('bim',{type:'grimes-overlay',enabled:view==='overlay'});for(const pane of ['scan','bim'])send(pane,{type:'grimes-camera-role',epoch,driver,linked:link.checked});status.textContent=view==='overlay'?(link.checked?overlayLabel(capture)+' \u00b7 Drag the scan; BIM services follow':'Overlay unavailable \u00b7 Registration missing'):link.checked?photoMode?(capture.provisional?'Provisional alignment · ':'Aligned photos · ')+'Drag either view · WASD follows capture route':(mode.value==='splat'?'Gaussian · experimental appearance, not surveyed geometry · ':(capture.provisional?'Provisional alignment · ':'Aligned views · '))+'Move either pane · '+(driver==='scan'?'Scan':'BIM')+' controls both':'Independent cameras';sync();}
 window.addEventListener('message',e=>{
- if(e.origin!==location.origin)return;const pane=e.source===frames[0].contentWindow?'scan':e.source===frames[1].contentWindow?'bim':null;if(!pane)return;const d=e.data;
+ if(e.origin!==location.origin)return;const pane=e.source===frames[0].contentWindow?'scan':e.source===frames[1].contentWindow?'bim':null;if(!pane)return;const d=e.data;if(pane==='scan')edgeFromScan(d);
  if(d?.type==='grimes-photo-transition'&&pane==='scan'&&photoMode){photoMoving=!!d.moving;if(!photoMoving)roles();return;}
  if(photoMoving&&pane==='bim'&&d?.type==='grimes-claim-camera'){roles();return;}
  if(d?.type==='grimes-camera-ready'){roles();return;}
