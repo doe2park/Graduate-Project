@@ -46,7 +46,7 @@ BMO utility observations → scheduled GitHub Actions → JSON on data branch
 BIM GLBs + element-property JSON → static web interfaces ← scan photos / mesh
 ```
 
-The collection workflow is scheduled every 15 minutes. This does not guarantee that a meter is online or its reading is fresh. GitHub Pages serves the HTML and public assets; geometry and JSON are separate files, not embedded entirely in the HTML.
+The collection workflow is scheduled every 15 minutes, but GitHub runs scheduled workflows only every few hours; an optional Cloudflare dispatcher (`worker/dispatch-cron/`) restores the 15-minute cadence, and each run backfills BMO interval rows. This does not guarantee that a meter is online or its reading is fresh. GitHub Pages serves the HTML and public assets; geometry and JSON are separate files, not embedded entirely in the HTML.
 
 - **Measured:** three Grimes building electricity meters. A total shown beside a BIM element is meter context, not a measurement of that element.
 - **Modelled:** uncalibrated design-weighted allocations—meter 77 by design VA; meter 3 by design CFM. These do not establish circuit membership or device consumption.

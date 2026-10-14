@@ -15,7 +15,7 @@ Grimes (Bechtel) Engineering Center is the deep pilot — LEED v4 BD+C:NC
 End goal: every building element carries its own live information, eventually
 viewed on-site through AR glasses.
 
-**Stack:** UC Berkeley BMO utility meters → GitHub Actions (every 15 min,
+**Stack:** UC Berkeley BMO utility meters → GitHub Actions (cron `*/15`, but GitHub fires it only every ~4-5 h; see below,
 `.github/workflows/`) → JSON on the orphan **`data` branch** → GitHub Pages
 (this repo, `main`) → static HTML interfaces. No servers, no build step —
 every page is a self-contained HTML file.
@@ -183,3 +183,10 @@ Walk loading exception (2026-09-17): while a layer loads, active Walk may render
 
 ## September capture update (2026-09-21)
 The comparison now defaults to the September 17 Level 1 capture; a date picker preserves the May 6 baseline. `scan-assets/captures/2026-09-17/` contains 100 E57 posed photos, a byte-identical exported mesh and mobile derivatives. September uses a separately labeled **provisional project-frame alignment**, not the verified status of the May registration. Its 95 temporal route edges leave four sparse gaps. Gaussian remains the May-only local experiment. See `docs/CAPTURE_UPDATE_20260917.md` for provenance, coordinate checks and limits.
+
+## Data cadence, honesty states and Walk info cards (2026-10-14)
+GitHub's `schedule` trigger fires these workflows only every ~4-5 h (verified via the Actions API). `worker/dispatch-cron/` is a separate Cloudflare Worker that dispatches both workflows every 15 min once the owner sets its `GITHUB_TOKEN` secret and deploys it (see its README). Independently, `bmo_fetch_campus.py` backfills every BMO interval row since the last stored timestamp, so history no longer depends on run cadence. A BMO outage or zero online buildings aborts the run without overwriting published files. The hour-of-week baseline cache was rebuilt (version 2) because sparkline ingestion had phase-shifted it; TOWT fits resume after ~14 days of 15-min history.
+
+Shared UI vocabulary: LIVE only for finite readings ≤45 min old; older readings show a grey LATEST badge with "Last reading HH:MM · Nh ago" (Pacific); missing values show "—", never 0. Building meter totals are labelled as context, never as an element's or system's own sensor.
+
+Walk mode has AR-style info cards (`I` toggles): dwell 400 ms on an element shows its tier — explicit element feed (`buildings/grimes/element-feeds.json`, ships empty) → MODELLED share → building-meter CONTEXT → NO FEED. See `docs/ELEMENT_FEEDS.md`. `?capture=1` exposes `window.walkCapture` for deterministic presentation recording only.
