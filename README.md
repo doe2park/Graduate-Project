@@ -2,13 +2,13 @@
 
 **Yoonsung Chung · UC Berkeley Civil & Environmental Engineering**
 
-Advisor: Prof. Kenichi Soga · Research status updated October 13, 2026
+Advisor: Prof. Kenichi Soga · Research status updated October 14, 2026
 
 A research prototype linking **captured site appearance, BIM objects and operational data**, with explicit labels for measured, modelled and inferred information.
 
 > In existing buildings with incomplete drawings and sensor coverage, does connecting these sources and showing their evidence help people understand building conditions faster and more accurately?
 
-**For research collaborators:** [Start here](docs/RESEARCH_COLLABORATION.md) · [Data and JSON guide](docs/DATA_SHARING.md) · [Reconstruction experiments](docs/RAW_VIDEO_RECONSTRUCTION.md)
+**For research collaborators:** [Start here](docs/RESEARCH_COLLABORATION.md) · [Data and JSON guide](docs/DATA_SHARING.md) · [Reconstruction experiments](docs/RAW_VIDEO_RECONSTRUCTION.md) · [Claude handoff](docs/CLAUDE_HANDOFF.md)
 
 ## Explore the public demonstrations
 
