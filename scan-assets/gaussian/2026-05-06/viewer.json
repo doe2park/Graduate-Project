@@ -1,0 +1,49 @@
+{
+  "status": "experimental-trained",
+  "frame": "scan-y-up-metres",
+  "file": "trained.ksplat",
+  "mobileFile": "mobile.ply",
+  "splatCount": 1000000,
+  "mobileSplatCount": 350000,
+  "camera": {
+    "position": [
+      23.07949764575033,
+      6.036820584536585,
+      23.48793228258317
+    ],
+    "quaternion": [
+      0.0,
+      -1.1102230246251565e-16,
+      0.0,
+      1.0
+    ],
+    "fov": 65,
+    "zoom": 1
+  },
+  "maxDistance": 120,
+  "provenance": {
+    "trainingIterations": 50000,
+    "sourceCheckpointSha256": "91eac1915c1938940d3d936eb21f7a7c32dff3c510857d3b10d7ee110791d9f7",
+    "sourceCheckpointBytes": 152001027,
+    "sourceGaussianCount": 1000000,
+    "desktopEncoding": "Lossy browser derivative: quantized centers, scales, rotations, color and retained spherical harmonics; alpha threshold 1. Source PLY is unchanged. No scene-coordinate transform.",
+    "desktopSha256": "0f0792ca2da1558a5fe3599929655f9d9c8c0fdc829521f63d46800069b0e33a",
+    "mobileSha256": "178f456cbf00afe367f0613ea16a9054b8ac510d9b54f5bfc3c58bcd43c0f627",
+    "desktopBytes": 48058596,
+    "mobileBytes": 19600427,
+    "initialStation": "83697765",
+    "mobileMethod": "SH0; opacity >=0.02; 15cm cell coverage and opacity budget. Lossy visual derivative; no change to source checkpoint.",
+    "geometryScope": "Trained appearance, not surveyed geometry or device identity. Same Cupix scan frame must be verified.",
+    "selectionStatus": "Selected local experimental default after completed 1M/2M final-checkpoint comparison; 2M did not materially improve reviewed blur. Not photorealistic or independently surveyed.",
+    "validation": {
+      "stations": 14,
+      "views": 112,
+      "psnr": 19.197687,
+      "ssim": 0.7978114,
+      "scope": "Station-held-out validation used during experimentation; no independent final test set."
+    }
+  },
+  "capture": "2026-05-06",
+  "building": "grimes",
+  "publication": "Published 2026-10-14 at the owner's request as an experimental appearance layer for the May 6 capture only. Same Cupix scan frame as the May registration; not surveyed geometry."
+}
