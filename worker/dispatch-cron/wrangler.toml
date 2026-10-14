@@ -1,0 +1,8 @@
+name = "graduate-project-dispatch"
+main = "worker.js"
+compatibility_date = "2026-07-13"
+
+# Secret GITHUB_TOKEN is set with `wrangler secret put` (never stored here).
+# These strings must match the keys in WORKFLOWS in worker.js exactly.
+[triggers]
+crons = ["*/15 * * * *", "7,22,37,52 * * * *"]
