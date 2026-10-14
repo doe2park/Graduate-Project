@@ -1,0 +1,5 @@
+{
+  "_schema": "element-feeds/1",
+  "_doc": "Explicit element-level sensor links for the Walk-mode info card. Add one entry per element: elements[<exact source element id>] = [{ref, kind, quantity, unit, source, evidence}]. Key = the sidecar key / GLB node name (dbId or CAD handle id); use \"<layer>:<id>\" (e.g. \"duct:1234\") if ids could collide across layers, which takes precedence. ref is currently a building-meter series such as bmo:meter:77:kw resolved through the same freshness rules as the twin panel (LIVE <= 45 min, otherwise LATEST with age). Leave elements empty until a real sensor is verified: no sensor is claimed here. See docs/ELEMENT_FEEDS.md.",
+  "elements": {}
+}
