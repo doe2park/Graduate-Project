@@ -2,6 +2,11 @@ name: BMO Campus Energy Fetch
 
 # Data commits go to the `data` branch (orphan) — main stays code-only.
 # Pages fetch outputs from raw.githubusercontent.com/<repo>/data/data/*.json
+#
+# NOTE: GitHub fires `schedule:` far less often than the cron says (observed ~every
+# 4-5 h). The data stays correct regardless: each run back-fills every BMO interval
+# row since the last stored timestamp. An external 15-min workflow_dispatch trigger
+# only makes the pages fresher.
 
 on:
   schedule:
@@ -14,6 +19,7 @@ permissions:
 jobs:
   fetch:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency:
       group: bmo-energy
       cancel-in-progress: true
@@ -34,33 +40,86 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install requests python-dotenv numpy
+        # Pinned (latest stable at 2026-10-14 per `pip index versions`); bump deliberately.
+        run: pip install requests==2.34.2 python-dotenv==1.2.4 numpy==2.5.4
 
       - name: Fetch campus energy data
+        # Exits non-zero WITHOUT writing when BMO is down / returns nothing; every later
+        # step (including the data commit) is then skipped and the old files stay published.
+        id: fetch
         env:
           BMO_USERNAME: ${{ secrets.BMO_USERNAME }}
           BMO_PASSWORD: ${{ secrets.BMO_PASSWORD }}
         run: python bmo_fetch_campus.py
 
+      # Post-processing is best-effort: a failure must be VISIBLE (warning + step
+      # summary, see "Post-processing report") but must not block committing readings.
       - name: Generate weekly report
-        run: python generate_weekly_report.py || true
+        id: weekly
+        continue-on-error: true
+        run: python generate_weekly_report.py
 
       - name: Build energy baseline / anomaly stats
-        run: python scripts/build_baseline.py || true
+        # Rebuilds energy_baseline_cache.json once automatically when it lacks version 2.
+        id: baseline
+        continue-on-error: true
+        run: python scripts/build_baseline.py
 
       - name: TOWT weather-normalized baseline
-        run: python scripts/towt_baseline.py || true
+        id: towt
+        continue-on-error: true
+        run: python scripts/towt_baseline.py
 
       - name: Grimes M&V series (design vs actual)
         # Counter-based measurement & verification for the performance page.
-        run: python scripts/build_mv.py || true
+        id: mv
+        continue-on-error: true
+        run: python scripts/build_mv.py
+
+      - name: Post-processing report
+        if: always() && steps.fetch.outcome == 'success'
+        env:
+          RESULTS: >-
+            weekly-report=${{ steps.weekly.outcome }}
+            energy-baseline=${{ steps.baseline.outcome }}
+            towt-baseline=${{ steps.towt.outcome }}
+            mv-grimes=${{ steps.mv.outcome }}
+        run: |
+          failed=0
+          for kv in $RESULTS; do
+            name="${kv%%=*}"; outcome="${kv#*=}"
+            if [ "$outcome" != "success" ]; then
+              failed=1
+              echo "::warning title=Post-processing failed::${name} step ${outcome}; its previous output stays published"
+              echo "- :warning: ${name}: ${outcome} (previous output kept)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          if [ "$failed" = 0 ]; then echo "- post-processing: all steps succeeded" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Validate JSON outputs
+        # A step that crashed mid-write must not publish a truncated file.
+        if: always() && steps.fetch.outcome == 'success'
+        run: |
+          for f in weekly_report energy_baseline energy_baseline_cache towt_baseline mv_grimes campus_energy campus_energy_history; do
+            p="data/${f}.json"
+            [ -f "$p" ] || continue
+            if ! python -c "import json,sys; json.load(open(sys.argv[1]))" "$p" 2>/dev/null; then
+              echo "::warning title=Corrupt output::${p} is not valid JSON; restoring the previous version"
+              echo "- :warning: ${p} invalid, restored previous" >> "$GITHUB_STEP_SUMMARY"
+              if [ -f "_data/$p" ]; then cp "_data/$p" "$p"; fi
+            fi
+          done
 
       - name: Archive daily snapshot
         run: |
           TODAY=$(date +'%Y-%m-%d')
           mkdir -p data/archive
           cp data/campus_energy.json "data/archive/${TODAY}.json"
-          cp data/building_data.json "data/archive/buildings_${TODAY}.json" 2>/dev/null || true
+          if [ -f data/building_data.json ]; then
+            cp data/building_data.json "data/archive/buildings_${TODAY}.json"
+          else
+            echo "::warning::data/building_data.json missing; no buildings_${TODAY}.json archived"
+          fi
           echo "Archived: ${TODAY}"
 
       - name: Commit and push to data branch
@@ -71,7 +130,15 @@ jobs:
           git config user.email "bmo@github-actions.bot"
           git add data/
           git diff --staged --quiet || git commit -m "🔋 Update campus energy $(date +'%H:%M')"
+          ok=0
           for i in 1 2 3; do
-            git pull --rebase origin data && git push origin data && break
+            if git pull --rebase origin data && git push origin data; then ok=1; break; fi
             sleep $((i * 5))
           done
+          if [ "$ok" != 1 ]; then echo "::error::push to data branch failed after 3 attempts"; exit 1; fi
+
+      - name: Outage notice
+        if: failure() && steps.fetch.outcome == 'failure'
+        run: |
+          echo "::warning title=BMO fetch failed::data branch not updated; pages keep showing the last good readings"
+          echo "- :x: BMO fetch failed — nothing committed, previous data stays published" >> "$GITHUB_STEP_SUMMARY"

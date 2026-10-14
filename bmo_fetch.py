@@ -22,9 +22,13 @@ import os
 import csv
 import json
 import io
+import re
+import sys
+import statistics
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 try:
     from dotenv import load_dotenv
@@ -123,6 +127,37 @@ WATER_COLS = {
 OUTPUT_DIR = Path("./data")
 OUTPUT_FILE = OUTPUT_DIR / "building_data.json"
 
+PT = ZoneInfo("America/Los_Angeles")
+TS_FMT = "%Y-%m-%d %H:%M:%S"
+REQUEST_TIMEOUT = 30
+
+
+class BMOOutage(Exception):
+    """BMO unreachable / maintenance / 5xx: the published file must NOT be overwritten."""
+
+
+_MAINTENANCE = re.compile(
+    r"(under|scheduled|down for|offline for)\s+(scheduled\s+)?maintenance|"
+    r"temporarily unavailable|service unavailable", re.I)
+
+
+def now_utc():
+    return datetime.now(timezone.utc)
+
+
+def pacific_now():
+    """Naive America/Los_Angeles wall time -- BMO exports (EXPORTTIMEZONE) are naive Pacific."""
+    return now_utc().astimezone(PT).replace(tzinfo=None)
+
+
+def _ambiguous_pt(ts):
+    """True when a naive Pacific stamp is a DST-repeated/skipped hour (instant unknown)."""
+    try:
+        dt = datetime.strptime(str(ts).strip()[:19], TS_FMT)
+    except ValueError:
+        return False
+    return dt.replace(tzinfo=PT, fold=0).utcoffset() != dt.replace(tzinfo=PT, fold=1).utcoffset()
+
 
 # ── BMO Session ───────────────────────────────────────
 def create_session():
@@ -134,10 +169,17 @@ def create_session():
     })
 
     print("  Logging into BMO...")
-    resp = session.get(BMO_BASE + "/members/", timeout=30)
+    try:
+        resp = session.get(BMO_BASE + "/members/", timeout=REQUEST_TIMEOUT)
+    except requests.RequestException as e:
+        raise BMOOutage("BMO unreachable: %s" % e)
 
     if resp.status_code == 401:
         raise Exception(f"Login failed (status 401). Check credentials in .env")
+    if not 200 <= resp.status_code < 300:
+        raise BMOOutage("BMO login page HTTP %s" % resp.status_code)
+    if _MAINTENANCE.search(resp.text[:5000]):
+        raise BMOOutage("BMO maintenance page")
 
     print(f"  ✓ Login successful (status {resp.status_code})")
     return session
@@ -160,7 +202,11 @@ def fetch_meter_csv(session, meter_id, start_time, end_time):
         "EXPORTTIMEZONE": TIMEZONE,
     }
 
-    resp = session.get(url, params=params)
+    try:
+        resp = session.get(url, params=params, timeout=REQUEST_TIMEOUT)
+    except requests.RequestException as e:
+        print(f"  ✗ Meter #{meter_id}: {type(e).__name__}")
+        return None
 
     if resp.status_code != 200:
         print(f"  ✗ Meter #{meter_id}: HTTP {resp.status_code}")
@@ -199,6 +245,8 @@ def parse_power_csv(csv_text, meter_id):
         except ValueError:
             continue
 
+        if _ambiguous_pt(row.get("time (US/Pacific)", "")):
+            continue
         kw = safe_float(row.get(cols["kw"]))
         if kw is None:
             continue
@@ -223,6 +271,8 @@ def parse_water_csv(csv_text):
         except ValueError:
             continue
 
+        if _ambiguous_pt(row.get("time (US/Pacific)", "")):
+            continue
         entry = {"timestamp": row.get("time (US/Pacific)", "")}
         for key, col in WATER_COLS.items():
             entry[key] = safe_float(row.get(col))
@@ -248,8 +298,9 @@ def compute_stats(readings, key="kw"):
     }
 
 
-def get_today_readings(readings):
-    today = datetime.now().strftime("%Y-%m-%d")
+def get_today_readings(readings, today=None):
+    """Readings on the current Pacific calendar day (timestamps are Pacific wall time)."""
+    today = today or pacific_now().strftime("%Y-%m-%d")
     return [r for r in readings if r["timestamp"].startswith(today)]
 
 
@@ -264,15 +315,36 @@ def get_timeseries(readings, key="kw", limit=96):
 
 
 # ── Main Pipeline ─────────────────────────────────────
+def observed_interval_min(readings):
+    """Median spacing of BMO rows in minutes (gaps over 3 h ignored); None if undeterminable."""
+    ts = []
+    for r in readings:
+        try:
+            ts.append(datetime.strptime(r["timestamp"][:19], TS_FMT))
+        except (ValueError, KeyError, TypeError):
+            pass
+    ts.sort()
+    d = [(b - a).total_seconds() / 60 for a, b in zip(ts, ts[1:]) if 0 < (b - a).total_seconds() <= 3 * 3600]
+    return round(statistics.median(d)) if d else None
+
+
 def run(hours=24):
-    now = datetime.now()
+    """Returns a process exit code; non-zero means nothing was written."""
+    now = pacific_now()
     start = now - timedelta(hours=hours)
 
     print(f"BMO Auto-Fetch — Grimes Engineering Center")
     print(f"  Range: {start.strftime('%Y-%m-%d %H:%M')} → {now.strftime('%Y-%m-%d %H:%M')}")
     print()
 
-    session = create_session()
+    try:
+        session = create_session()
+    except BMOOutage as e:
+        print(f"::error::BMO outage, keeping previous building_data.json: {e}")
+        return 2
+    except Exception as e:
+        print(f"::error::BMO login failed: {e}")
+        return 1
 
     output = {
         "building": {
@@ -281,8 +353,8 @@ def run(hours=24):
             "campus": "UC Berkeley",
             "device_mac": DEVICE,
         },
-        "generated_at": now.strftime("%Y-%m-%d %H:%M:%S"),
-        "update_interval_min": 15,
+        "generated_at": now_utc().strftime(TS_FMT),   # naive UTC, as before
+        "update_interval_min": None,                  # set below from observed BMO row spacing
         "meters": {},
         "water": None,
         "summary": {},
@@ -290,6 +362,8 @@ def run(hours=24):
 
     total_kw = 0
     meter_count = 0
+    answered = 0            # meters that returned >=1 valid row (a genuine 0 kW still counts)
+    intervals = []
 
     # ── Fetch power meters ──
     for meter_id in ["3", "76", "77"]:
@@ -315,6 +389,8 @@ def run(hours=24):
             continue
 
         today = get_today_readings(readings)
+        answered += 1
+        intervals.append(observed_interval_min(readings))
 
         output["meters"][meter_id] = {
             "name": name,
@@ -355,6 +431,12 @@ def run(hours=24):
     else:
         output["water"] = {"status": "offline"}
 
+    if answered == 0:
+        print("::error::no power meter returned data (BMO outage?) — building_data.json left untouched")
+        return 3
+    iv = [i for i in intervals if i]
+    output["update_interval_min"] = round(statistics.median(iv)) if iv else None
+
     # ── Summary ──
     output["summary"] = {
         "total_kw_now": round(total_kw, 2),
@@ -371,7 +453,7 @@ def run(hours=24):
 
     print(f"\n  ✓ Saved → {OUTPUT_FILE}")
     print(f"  ✓ Total: {total_kw:.1f} kW ({meter_count} meters online)")
-    print(f"  ✓ Next auto-fetch in 15 min\n")
+    return 0
 
 
 if __name__ == "__main__":
@@ -382,4 +464,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     hrs = args.days * 24 if args.days else args.hours
-    run(hours=hrs)
+    sys.exit(run(hours=hrs))

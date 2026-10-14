@@ -12,9 +12,14 @@ Reconstructs per-building hourly kW series, then computes:
   - events: recent episodes of |z| > 3 sustained >= MIN_EVENT_HOURS.
 
 Incremental by design: an accumulated hourly series lives in
-data/energy_baseline_cache.json. Each 15-min workflow run appends the latest
-snapshot + rolling history (cheap). `--backfill` additionally ingests every
-daily archive in data/archive/*.json (used once to seed, or to rebuild).
+data/energy_baseline_cache.json. Each workflow run folds in the rolling 24 h
+history (every BMO interval row, averaged per hour) and the latest snapshot.
+`--backfill` additionally ingests every daily archive in data/archive/*.json
+(one timestamped point per building per day); `--rebuild` discards the cache
+first. A cache without `version == CACHE_VERSION` is rebuilt automatically
+once: v1 caches contain phase-shifted values from the old sparkline ingestion
+(sparkline is "last 24 history rows", not 24 hourly values, and carries no
+timestamps of its own), so sparklines are no longer ingested at all.
 
 Level correction: on 2026-07-14 multi-meter summation was fixed, shifting some
 buildings (notably grimes) to a higher, correct level. Pre-cutoff samples are
@@ -24,7 +29,7 @@ old data still informs the weekly shape without dragging the level down.
 Timestamps: BMO per-building `timestamp` strings are Pacific local time; all
 binning uses those naive local stamps directly (occupancy patterns are local).
 
-Usage:  python scripts/build_baseline.py [--backfill]
+Usage:  python scripts/build_baseline.py [--backfill] [--rebuild]
 Writes: data/energy_baseline.json (published, compact)
         data/energy_baseline_cache.json (accumulated series)
 """
@@ -32,14 +37,21 @@ import json
 import math
 import os
 import sys
-from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data')
 CACHE_PATH = os.path.join(DATA, 'energy_baseline_cache.json')
 OUT_PATH = os.path.join(DATA, 'energy_baseline.json')
 
-EPOCH = datetime(2026, 1, 1)               # naive-local hour index origin
+CACHE_VERSION = 2
+# Hour-index origin (naive local). Legacy caches used 2026-01-01; a cache now
+# records its own `epoch`, and a brand-new cache derives it from the data.
+EPOCH = datetime(2026, 1, 1)
+PT = ZoneInfo('America/Los_Angeles')
+STALE_HOURS = 3                            # older current reading is shown, never flagged
 LEVEL_CUTOFF = datetime(2026, 7, 14)       # multi-meter summation fix
 RETAIN_DAYS = 150                          # cache horizon
 Z_THRESH = 3.0
@@ -47,6 +59,15 @@ MIN_EVENT_HOURS = 2
 EVENT_WINDOW_DAYS = 14
 MIN_SLOT_N = 3                             # samples needed to trust a 168-slot
 MIN_BUILDING_HOURS = 24                    # below this: no baseline published
+
+
+def pacific_now():
+    return datetime.now(timezone.utc).astimezone(PT).replace(tzinfo=None)
+
+
+def is_ambiguous_pt(dt):
+    """DST repeated/skipped wall hour: the instant is unknown, so the sample is dropped."""
+    return dt.replace(tzinfo=PT, fold=0).utcoffset() != dt.replace(tzinfo=PT, fold=1).utcoffset()
 
 
 def hour_index(dt):
@@ -88,57 +109,78 @@ def load_json(path):
 
 # ── series ingestion ────────────────────────────────────────────────────────
 
-def ingest_sparkline(series, bldg):
-    """sparkline = 24 hourly values ending at the building's own PT timestamp."""
-    ts = parse_ts(bldg.get('timestamp'))
-    spark = bldg.get('sparkline') or []
-    if not ts or not spark:
-        return
-    end = hour_index(ts)
-    n = len(spark)
-    for i, v in enumerate(spark):
-        if isinstance(v, (int, float)) and v > 0:
-            series[end - (n - 1 - i)] = round(float(v), 2)
+def point(ts, kw):
+    """(naive PT datetime, kW) or None for unusable / DST-ambiguous samples."""
+    dt = parse_ts(ts)
+    if dt is None or is_ambiguous_pt(dt):
+        return None
+    if isinstance(kw, bool) or not isinstance(kw, (int, float)) or not kw > 0:
+        return None
+    return dt, float(kw)
 
 
-def ingest_history(series, entries):
-    """campus_energy_history.json: [{kw, ts}] hourly rolling window."""
-    for e in entries or []:
-        ts = parse_ts(e.get('ts'))
-        v = e.get('kw')
-        if ts and isinstance(v, (int, float)) and v > 0:
-            series[hour_index(ts)] = round(float(v), 2)
+def hourly_means(points):
+    """[(dt, kw)] (deduplicated by dt) -> {hour_index: mean kW}."""
+    uniq = {dt: kw for dt, kw in points}
+    acc = defaultdict(list)
+    for dt, kw in uniq.items():
+        acc[hour_index(dt)].append(kw)
+    return {i: round(sum(v) / len(v), 2) for i, v in acc.items()}
 
 
-def collect(backfill):
-    """building id -> {hour_index: kw}"""
-    cache = load_json(CACHE_PATH) or {}
-    out = {}
-    for bid, ser in (cache.get('series') or {}).items():
-        out[bid] = {int(k): v for k, v in ser.items()}
+def parse_epoch(s):
+    try:
+        return datetime.strptime(str(s)[:10], '%Y-%m-%d')
+    except ValueError:
+        return None
 
-    def series_for(bid):
-        return out.setdefault(bid, {})
 
-    if backfill:
+def collect(backfill, rebuild=False):
+    """-> (building id -> {hour_index: kw}, current snapshot). Sets the global EPOCH."""
+    global EPOCH
+    cache = load_json(CACHE_PATH)
+    have_cache = isinstance(cache, dict)
+    fresh = rebuild or not have_cache or cache.get('version') != CACHE_VERSION
+
+    archive_pts, live_pts = defaultdict(list), defaultdict(list)
+    if backfill or fresh:
         arch = os.path.join(DATA, 'archive')
         for fn in sorted(os.listdir(arch)) if os.path.isdir(arch) else []:
             if fn.startswith('buildings_') or not fn.endswith('.json'):
                 continue
             snap = load_json(os.path.join(arch, fn)) or {}
             for bid, b in (snap.get('buildings') or {}).items():
-                ingest_sparkline(series_for(bid), b)
-
+                p = point(b.get('timestamp'), b.get('kw'))
+                if p:
+                    archive_pts[bid].append(p)
     hist = load_json(os.path.join(DATA, 'campus_energy_history.json')) or {}
     for bid, entries in hist.items():
-        ingest_history(series_for(bid), entries)
-
+        for e in entries or []:
+            p = point(e.get('ts'), e.get('kw'))
+            if p:
+                live_pts[bid].append(p)
     cur = load_json(os.path.join(DATA, 'campus_energy.json')) or {}
     for bid, b in (cur.get('buildings') or {}).items():
-        ingest_sparkline(series_for(bid), b)
+        p = point(b.get('timestamp'), b.get('kw'))
+        if p:
+            live_pts[bid].append(p)
 
-    # prune horizon
-    floor = hour_index(datetime.now() - timedelta(days=RETAIN_DAYS))
+    if have_cache:
+        EPOCH = parse_epoch(cache.get('epoch')) or datetime(2026, 1, 1)   # v1 caches: 2026
+    else:
+        firsts = [dt for pts in (*archive_pts.values(), *live_pts.values()) for dt, _ in pts]
+        EPOCH = datetime((min(firsts) if firsts else pacific_now()).year, 1, 1)
+
+    out = {}
+    if not fresh:
+        for bid, ser in (cache.get('series') or {}).items():
+            out[bid] = {int(k): v for k, v in ser.items()}
+    for bid, pts in archive_pts.items():
+        out.setdefault(bid, {}).update(hourly_means(pts))
+    for bid, pts in live_pts.items():          # fine-grained rows win over archive points
+        out.setdefault(bid, {}).update(hourly_means(pts))
+
+    floor = hour_index(pacific_now() - timedelta(days=RETAIN_DAYS))
     for bid in out:
         out[bid] = {k: v for k, v in out[bid].items() if k >= floor}
     return out, cur
@@ -212,7 +254,7 @@ def build_baseline(series):
 
 
 def find_events(series, zfn):
-    floor = hour_index(datetime.now() - timedelta(days=EVENT_WINDOW_DAYS))
+    floor = hour_index(pacific_now() - timedelta(days=EVENT_WINDOW_DAYS))
     pts = sorted((k, v) for k, v in series.items() if k >= floor)
     events, run = [], []
     for idx, kw in pts:
@@ -243,10 +285,10 @@ def find_events(series, zfn):
     return out
 
 
-def main():
-    backfill = '--backfill' in sys.argv
-    all_series, current_snap = collect(backfill)
-    now = datetime.now()
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    all_series, current_snap = collect('--backfill' in argv, '--rebuild' in argv)
+    now = pacific_now()
     buildings_out, corrections = {}, {}
     cache_out = {}
 
@@ -264,15 +306,19 @@ def main():
         cur_b = (current_snap.get('buildings') or {}).get(bid) or {}
         cur_kw = cur_b.get('kw')
         cur_ts = parse_ts(cur_b.get('timestamp'))
-        current = {'kw': None, 'base': None, 'z': None, 'anomaly': False, 'ts': None}
-        if isinstance(cur_kw, (int, float)) and cur_kw > 0 and cur_ts:
+        current = {'kw': None, 'base': None, 'z': None, 'anomaly': False, 'ts': None, 'stale': False}
+        if (isinstance(cur_kw, (int, float)) and cur_kw > 0 and cur_ts
+                and not is_ambiguous_pt(cur_ts)):
             base, z = zfn(cur_ts, cur_kw)
+            stale = now - cur_ts > timedelta(hours=STALE_HOURS)
             current = {'kw': round(cur_kw, 1), 'base': base, 'z': z,
-                       'anomaly': abs(z) > Z_THRESH,
-                       'ts': cur_ts.strftime('%Y-%m-%d %H:%M')}
+                       # an old reading (outage / slow cron) is displayed but never raised as an anomaly
+                       'anomaly': (abs(z) > Z_THRESH) and not stale,
+                       'ts': cur_ts.strftime('%Y-%m-%d %H:%M'), 'stale': stale}
 
         recent = []
-        for idx, kw in sorted(series.items())[-24:]:
+        last_idx = max(series) if series else 0
+        for idx, kw in sorted((k, v) for k, v in series.items() if k > last_idx - 24):
             dt = index_dt(idx)
             base, z = zfn(dt, kw)
             recent.append({'ts': dt.strftime('%Y-%m-%d %H:%M'),
@@ -301,7 +347,8 @@ def main():
     with open(OUT_PATH, 'w') as f:
         json.dump(out, f, separators=(',', ':'))
     with open(CACHE_PATH, 'w') as f:
-        json.dump({'_doc': 'accumulated hourly kW series (naive PT, hours since 2026-01-01)',
+        json.dump({'_doc': 'accumulated hourly kW series (naive PT, hours since `epoch`)',
+                   'version': CACHE_VERSION, 'epoch': EPOCH.strftime('%Y-%m-%d'),
                    'series': cache_out}, f, separators=(',', ':'))
 
     anom = [b for b, v in buildings_out.items() if v['current']['anomaly']]

@@ -1,6 +1,9 @@
 # .github/workflows/bmo-fetch.yml
 # Auto-fetch Grimes BMO data every 15 min → commit JSON to the `data` branch.
 # Main stays code-only; pages fetch from raw.githubusercontent.com/<repo>/data/
+#
+# NOTE: GitHub fires `schedule:` far less often than the cron says (observed ~every
+# 4-5 h); the script requests a 24 h window, so no data is lost between runs.
 
 name: BMO Data Fetch
 
@@ -17,6 +20,7 @@ permissions:
 jobs:
   fetch:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency:
       group: bmo-fetch
       cancel-in-progress: true
@@ -37,12 +41,16 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install requests
+        # Pinned (latest stable at 2026-10-14 per `pip index versions`); bump deliberately.
+        run: pip install requests==2.34.2 python-dotenv==1.2.4
 
       - name: Fetch BMO data
+        # Exits non-zero WITHOUT writing building_data.json on outage / empty data;
+        # the commit step below is then skipped and the last good file stays published.
+        id: fetch
         env:
           BMO_USERNAME: ${{ secrets.BMO_USERNAME }}
           BMO_PASSWORD: ${{ secrets.BMO_PASSWORD }}
@@ -56,7 +64,15 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/building_data.json
           git diff --cached --quiet || git commit -m "Update energy data $(date -u +'%Y-%m-%d %H:%M UTC')"
+          ok=0
           for i in 1 2 3; do
-            git pull --rebase origin data && git push origin data && break
+            if git pull --rebase origin data && git push origin data; then ok=1; break; fi
             sleep $((i * 5))
           done
+          if [ "$ok" != 1 ]; then echo "::error::push to data branch failed after 3 attempts"; exit 1; fi
+
+      - name: Outage notice
+        if: failure() && steps.fetch.outcome == 'failure'
+        run: |
+          echo "::warning title=BMO fetch failed::building_data.json not updated; pages keep showing the last good readings"
+          echo "- :x: BMO fetch failed — nothing committed, previous data stays published" >> "$GITHUB_STEP_SUMMARY"

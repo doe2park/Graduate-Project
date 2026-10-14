@@ -10,9 +10,10 @@ BMO Campus-Wide Energy Fetcher v2
 Output: data/campus_energy.json + data/campus_energy_history.json
 """
 
-import os, csv, io, json, requests
-from datetime import datetime, timedelta
+import os, csv, io, json, re, sys, statistics, requests
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 try:
     from dotenv import load_dotenv
@@ -79,61 +80,191 @@ KW_COLUMNS = [
 OUTPUT_DIR = Path("./data")
 OUTPUT_FILE = OUTPUT_DIR / "campus_energy.json"
 HISTORY_FILE = OUTPUT_DIR / "campus_energy_history.json"
-MAX_HISTORY = 96  # 24hrs at 15min
+
+# History is time-windowed (not count-capped): GitHub's cron actually fires every
+# few hours, so a fixed row count says nothing about elapsed time.
+HISTORY_HOURS = 24         # rows kept, by BMO timestamp
+FIRST_RUN_WINDOW_H = 2     # request window when a building has no stored rows
+MAX_WINDOW_H = 24          # upper bound for catch-up requests after an outage
+SLOT_MIN = 5               # meters' rows are aligned to this grid before summing
+
+PT = ZoneInfo("America/Los_Angeles")
+TS_FMT = "%Y-%m-%d %H:%M:%S"
+TS_COL = "time (US/Pacific)"
+
+
+class BMOOutage(Exception):
+    """BMO unreachable / maintenance / 5xx: callers must NOT overwrite published data."""
+
+
+_MAINTENANCE = re.compile(
+    r"(under|scheduled|down for|offline for)\s+(scheduled\s+)?maintenance|"
+    r"temporarily unavailable|service unavailable", re.I)
+
+
+def now_utc():
+    return datetime.now(timezone.utc)
+
+
+def pacific_now():
+    """Naive America/Los_Angeles wall time (BMO exports are naive Pacific)."""
+    return now_utc().astimezone(PT).replace(tzinfo=None)
+
+
+def parse_pt(s):
+    try:
+        return datetime.strptime(str(s).strip()[:19], TS_FMT)
+    except (ValueError, TypeError):
+        return None
+
+
+def is_ambiguous_pt(naive):
+    """True for fall-back repeated hour or spring-forward gap: wall time maps to no single instant."""
+    return naive.replace(tzinfo=PT, fold=0).utcoffset() != naive.replace(tzinfo=PT, fold=1).utcoffset()
+
+
+def bmo_param_time(dt):
+    return dt.strftime("%Y-%m-%d+%H:%M:%S")
 
 
 def create_session():
     s = requests.Session()
     s.auth = (BMO_USER, BMO_PASS)
     s.headers["User-Agent"] = "Mozilla/5.0 (Campus Energy v2)"
-    r = s.get(f"{BMO_BASE}/members/", timeout=30)
+    try:
+        r = s.get(f"{BMO_BASE}/members/", timeout=30)
+    except requests.RequestException as e:
+        raise BMOOutage("BMO unreachable: %s" % e)
     if r.status_code == 401:
         raise Exception("BMO login failed")
+    if not 200 <= r.status_code < 300:
+        raise BMOOutage("BMO login page HTTP %s" % r.status_code)
+    if _MAINTENANCE.search(r.text[:5000]):
+        raise BMOOutage("BMO maintenance page")
     return s
 
 
-def fetch_latest_kw(session, mac, db, meter_id):
-    now = datetime.now()
-    start = now - timedelta(hours=2)
+def _kw_from_row(row):
+    for col in KW_COLUMNS:
+        val = row.get(col)
+        if val is not None:
+            try:
+                kw = float(val)
+                if 0 <= kw < 50000:
+                    return round(kw, 1)
+            except (ValueError, TypeError):
+                pass
+    for col_name, val in row.items():
+        if col_name and "kW" in col_name and "kWh" not in col_name:
+            try:
+                kw = float(val)
+                if 0 <= kw < 50000:
+                    return round(kw, 1)
+            except (ValueError, TypeError):
+                pass
+    return None
+
+
+def fetch_kw_rows(session, mac, db, meter_id, start, end):
+    """All interval rows in [start, end] (naive Pacific) -> [(ts, kw)] ascending.
+
+    Rows with an unparsable or DST-ambiguous timestamp are unknown and dropped.
+    Any failure yields [] (the caller treats that as "no data", never zero).
+    """
     url = f"{BMO_BASE}/members/mbdev_export.php/{mac}_{meter_id}.csv"
     params = {
         "DB": db, "AS": mac, "MB": meter_id, "DOWNLOAD": "YES",
-        "DATE_RANGE_STARTTIME": start.strftime("%Y-%m-%d+%H:%M:%S"),
-        "DATE_RANGE_ENDTIME": now.strftime("%Y-%m-%d+%H:%M:%S"),
+        "DATE_RANGE_STARTTIME": bmo_param_time(start),
+        "DATE_RANGE_ENDTIME": bmo_param_time(end),
         "DELIMITER": "TAB", "COLNAMES": "ON", "EXPORTTIMEZONE": TIMEZONE,
     }
     try:
         r = session.get(url, params=params, timeout=20)
         if r.status_code != 200 or "<html" in r.text[:200].lower():
-            return None, None
-        reader = csv.DictReader(io.StringIO(r.text), delimiter="\t")
-        rows = list(reader)
-        if not rows:
-            return None, None
-        last_row = rows[-1]
-        timestamp = last_row.get("time (US/Pacific)", "")
-        for col in KW_COLUMNS:
-            val = last_row.get(col)
-            if val is not None:
-                try:
-                    kw = float(val)
-                    if 0 <= kw < 50000:
-                        return round(kw, 1), timestamp
-                except (ValueError, TypeError):
-                    pass
-        for col_name, val in last_row.items():
-            if "kW" in col_name and "kWh" not in col_name:
-                try:
-                    kw = float(val)
-                    if 0 <= kw < 50000:
-                        return round(kw, 1), timestamp
-                except (ValueError, TypeError):
-                    pass
-        return None, timestamp
+            return []
+        out = []
+        for row in csv.DictReader(io.StringIO(r.text), delimiter="\t"):
+            ts = row.get(TS_COL, "")
+            dt = parse_pt(ts)
+            if dt is None or is_ambiguous_pt(dt):
+                continue
+            kw = _kw_from_row(row)
+            if kw is not None:
+                out.append((dt, ts.strip(), kw))
+        out.sort(key=lambda x: x[0])
+        return [(ts, kw) for _, ts, kw in out]
     except Exception:
-        return None, None
+        return []
 
 
+def fetch_latest_kw(session, mac, db, meter_id):
+    """Latest single reading of one meter -> (kw, ts); kept for ad-hoc callers/tests."""
+    now = pacific_now()
+    rows = fetch_kw_rows(session, mac, db, meter_id, now - timedelta(hours=FIRST_RUN_WINDOW_H), now)
+    return (rows[-1][1], rows[-1][0]) if rows else (None, None)
+
+
+def _slot(dt):
+    base = dt.replace(minute=0, second=0, microsecond=0)
+    return base + timedelta(minutes=int(round((dt.minute + dt.second / 60) / SLOT_MIN)) * SLOT_MIN)
+
+
+def combine_meters(per_meter):
+    """{meter: [(ts, kw)]} -> ([(ts, kw_sum)] ascending, meters_used).
+
+    A building's load is the SUM of its meters. Only slots where every
+    responding meter has a row are emitted, so a lagging meter never produces
+    a stored partial sum. If no slot is complete (meters on unaligned grids),
+    fall back to the sum of each meter's latest row -- the legacy single
+    reading -- rather than reporting the building offline.
+    """
+    live = {mid: rows for mid, rows in per_meter.items() if rows}
+    if not live:
+        return [], []
+    slots = {}
+    for mid, rows in live.items():
+        for ts, kw in rows:
+            slots.setdefault(_slot(parse_pt(ts)), {})[mid] = (ts, kw)   # last row in slot wins
+    out = []
+    for key in sorted(slots):
+        got = slots[key]
+        if len(got) == len(live):
+            ts = max((v[0] for v in got.values()), key=parse_pt)
+            out.append((ts, round(sum(v[1] for v in got.values()), 1)))
+    if not out:
+        last = [rows[-1] for rows in live.values()]
+        out = [(max((t for t, _ in last), key=parse_pt), round(sum(k for _, k in last), 1))]
+    return out, sorted(live)
+
+
+def window_start(history_rows, now_pt):
+    """Request start: last stored BMO timestamp, bounded to MAX_WINDOW_H; 2 h when nothing stored."""
+    stamps = [parse_pt(e.get("ts")) for e in history_rows or []]
+    stamps = [t for t in stamps if t]
+    if not stamps:
+        return now_pt - timedelta(hours=FIRST_RUN_WINDOW_H)
+    return max(max(stamps), now_pt - timedelta(hours=MAX_WINDOW_H))
+
+
+def merge_history(existing, new_rows, now_pt, run_t):
+    """De-duplicate by timestamp, keep a HISTORY_HOURS window by BMO timestamp."""
+    by_ts = {e["ts"]: e for e in existing or [] if e.get("ts")}
+    for ts, kw in new_rows:
+        old = by_ts.get(ts)
+        by_ts[ts] = {"kw": kw, "ts": ts, "t": old["t"] if old and old.get("t") else run_t}
+    cutoff = now_pt - timedelta(hours=HISTORY_HOURS)
+    keep = [(parse_pt(ts), e) for ts, e in by_ts.items()]
+    return [e for t, e in sorted(((t, e) for t, e in keep if t and t >= cutoff), key=lambda x: x[0])]
+
+
+def observed_interval_min(history):
+    """Median spacing of stored rows (gaps over 3 h ignored); None if undeterminable."""
+    diffs = []
+    for rows in history.values():
+        ts = sorted(t for t in (parse_pt(e.get("ts")) for e in rows) if t)
+        diffs += [(b - a).total_seconds() / 60 for a, b in zip(ts, ts[1:])
+                  if 0 < (b - a).total_seconds() <= 3 * 3600]
+    return round(statistics.median(diffs)) if diffs else None
 
 
 # Soda logger 250 exposes two distinct electric demand channels alongside flow.
@@ -149,10 +280,10 @@ def fetch_soda_electric_channels(session, previous=()):
     for c in channels:
         old = next((v for v in previous if v.get("column") == c["column"]), {})
         c["last_observed_at"] = old.get("timestamp") if old.get("kw") is not None else old.get("last_observed_at")
-    now = datetime.now()
+    now = pacific_now()
     params = {"DB": b["db"], "AS": b["mac"], "MB": "250", "DOWNLOAD": "YES",
-              "DATE_RANGE_STARTTIME": (now-timedelta(hours=2)).strftime("%Y-%m-%d+%H:%M:%S"),
-              "DATE_RANGE_ENDTIME": now.strftime("%Y-%m-%d+%H:%M:%S"),
+              "DATE_RANGE_STARTTIME": bmo_param_time(now-timedelta(hours=2)),
+              "DATE_RANGE_ENDTIME": bmo_param_time(now),
               "DELIMITER": "TAB", "COLNAMES": "ON", "EXPORTTIMEZONE": TIMEZONE}
     try:
         r = session.get(url, params=params, timeout=20)
@@ -257,14 +388,14 @@ def fetch_flow(session, mac, db, meter_ids):
            "irrigation_gpm": None, "ts": None}
     keymap = {"water": "water_gpm", "steam": "steam_lb_hr",
               "condensate": "condensate_gpm", "irrigation": "irrigation_gpm"}
-    now = datetime.now()
+    now = pacific_now()
     start = now - timedelta(hours=2)
     for mid in meter_ids:
         url = f"{BMO_BASE}/members/mbdev_export.php/{mac}_{mid}.csv"
         params = {
             "DB": db, "AS": mac, "MB": mid, "DOWNLOAD": "YES",
-            "DATE_RANGE_STARTTIME": start.strftime("%Y-%m-%d+%H:%M:%S"),
-            "DATE_RANGE_ENDTIME": now.strftime("%Y-%m-%d+%H:%M:%S"),
+            "DATE_RANGE_STARTTIME": bmo_param_time(start),
+            "DATE_RANGE_ENDTIME": bmo_param_time(now),
             "DELIMITER": "TAB", "COLNAMES": "ON", "EXPORTTIMEZONE": TIMEZONE,
         }
         try:
@@ -317,17 +448,33 @@ def predict_next(history, bid):
 
 
 def run():
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"BMO Campus Energy v2 — {now_str}")
+    """Fetch, merge, publish. Returns a process exit code.
 
-    session = create_session()
+    Non-zero (nothing written) when BMO is down or no building answered: the
+    previously published files then remain and pages show them as older
+    readings instead of a fabricated all-zero campus.
+    """
+    now_str = now_utc().strftime(TS_FMT)
+    run_t = now_utc().strftime("%H:%M")
+    now_pt = pacific_now()
+    print(f"BMO Campus Energy v2 — {now_str} UTC / {now_pt.strftime(TS_FMT)} Pacific")
+
+    try:
+        session = create_session()
+    except BMOOutage as e:
+        print(f"::error::BMO outage, keeping previous data: {e}")
+        return 2
+    except Exception as e:
+        print(f"::error::BMO login failed: {e}")
+        return 1
     print("  ✓ Logged in\n")
 
     history = load_history()
     try:
-        prior_channels = json.loads(OUTPUT_FILE.read_text()).get("buildings", {}).get("soda", {}).get("electricity_channels", [])
+        prev_out = json.loads(OUTPUT_FILE.read_text())
     except (OSError, ValueError):
-        prior_channels = []
+        prev_out = {}
+    prior_channels = (prev_out.get("buildings", {}).get("soda", {}) or {}).get("electricity_channels", [])
     results = {}
     online = 0
 
@@ -338,27 +485,21 @@ def run():
             continue
 
         # Sum every meter that responds — a building's load is the SUM of its
-        # meters (e.g. Grimes = #3 roof + #76 HVAC/lighting + #77 outlets),
-        # not whichever single meter happened to answer first.
-        kw_sum, ts, meters_used = None, None, []
-        for mid in b["meters"]:
-            mkw, mts = fetch_latest_kw(session, b["mac"], b["db"], mid)
-            if mkw is not None:
-                kw_sum = (kw_sum or 0.0) + mkw
-                meters_used.append(mid)
-                if mts:
-                    ts = mts
-        kw = round(kw_sum, 1) if kw_sum is not None else None
-        meter_used = "+".join(meters_used) if meters_used else None
+        # meters (e.g. Grimes = #3 roof + #76 HVAC/lighting + #77 outlets).
+        # Request everything since the last stored row, parse ALL rows.
+        start = window_start(history.get(bid), now_pt)
+        per_meter = {mid: fetch_kw_rows(session, b["mac"], b["db"], mid, start, now_pt)
+                     for mid in b["meters"]}
+        rows, meters_used_ids = combine_meters(per_meter)
+        kw, ts = (rows[-1][1], rows[-1][0]) if rows else (None, None)
+        meter_used = "+".join(meters_used_ids) if meters_used_ids else None
 
         if bid not in results or (kw is not None and (results.get(bid, {}).get("kw") is None)):
             if kw is not None:
                 online += 1
-                # Update history
-                if bid not in history:
-                    history[bid] = []
-                history[bid].append({"kw": kw, "ts": ts, "t": datetime.now().strftime("%H:%M")})
-                history[bid] = history[bid][-MAX_HISTORY:]
+                history[bid] = merge_history(history.get(bid), rows, now_pt, run_t)
+            elif bid in history:
+                history[bid] = merge_history(history[bid], [], now_pt, run_t)
 
             anomaly = detect_anomaly(history, bid, kw)
             prediction = predict_next(history, bid)
@@ -393,12 +534,17 @@ def run():
         anom = f" ⚠️ {results[bid].get('anomaly',{}).get('type','')}" if results.get(bid,{}).get("anomaly") else ""
         print(f"  {icon} {b['name']:30s} {kw_str}{anom}")
 
+    if online == 0:
+        print("::error::0 buildings returned data (BMO outage?) — nothing written, previous files kept")
+        return 3
+
     total_kw = round(sum(r["kw"] for r in results.values() if r["kw"] is not None), 1)
     anomalies = {k: v["anomaly"] for k, v in results.items() if v.get("anomaly")}
 
     output = {
         "generated_at": now_str,
-        "update_interval_min": 15,
+        # observed spacing of BMO rows (cron firing cadence is NOT the data cadence)
+        "update_interval_min": observed_interval_min(history) or prev_out.get("update_interval_min"),
         "buildings_total": len(results),
         "buildings_online": online,
         "total_kw": total_kw,
@@ -419,7 +565,7 @@ def run():
     # ── Save daily snapshot (append to today's file) ──
     daily_dir = OUTPUT_DIR / "daily"
     daily_dir.mkdir(parents=True, exist_ok=True)
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = now_utc().strftime("%Y-%m-%d")
     daily_file = daily_dir / f"{today_str}.json"
     try:
         with open(daily_file) as f:
@@ -428,7 +574,7 @@ def run():
         daily = {"date": today_str, "readings": []}
 
     daily["readings"].append({
-        "time": datetime.now().strftime("%H:%M"),
+        "time": run_t,
         "total_kw": total_kw,
         "online": online,
         "buildings": {bid: r["kw"] for bid, r in results.items() if r["kw"] is not None}
@@ -446,7 +592,8 @@ def run():
     print(f"  ✓ ~${output['total_daily_cost']}/day | ~{output['total_daily_co2_kg']} kg CO2/day")
     if anomalies:
         print(f"  ⚠️ Anomalies: {list(anomalies.keys())}")
+    return 0
 
 
 if __name__ == "__main__":
-    run()
+    sys.exit(run())

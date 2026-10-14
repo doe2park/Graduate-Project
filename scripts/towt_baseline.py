@@ -10,7 +10,7 @@ TEMP_KNOTS (deg C). Fit by ridge-regularized least squares (numpy).
 
 Data:
   - hourly kW series: data/energy_baseline_cache.json (built by
-    build_baseline.py; hours since 2026-01-01, naive Pacific time)
+    build_baseline.py; hours since the cache `epoch`, naive Pacific time)
   - level corrections: reused from data/energy_baseline.json so both
     baselines see the same corrected series
   - hourly outdoor temp for Berkeley (37.873, -122.259): open-meteo
@@ -49,7 +49,17 @@ WEATHER_CACHE = os.environ.get('TOWT_WEATHER_CACHE', os.path.join(DATA, 'weather
 OUT_PATH = os.environ.get('TOWT_OUT', os.path.join(DATA, 'towt_baseline.json'))
 SKIP_FETCH = os.environ.get('TOWT_SKIP_FETCH') == '1'
 
-EPOCH = datetime(2026, 1, 1)           # same hour-index convention as build_baseline
+EPOCH = datetime(2026, 1, 1)           # legacy default; main() adopts the energy cache's own `epoch`
+LEVEL_CUTOFF = datetime(2026, 7, 14)   # multi-meter summation fix (same as build_baseline)
+CACHE_VERSION = 2                      # v1 caches hold phase-shifted sparkline values: not usable
+
+
+def epoch_from(cache):
+    """Hour-index origin recorded in a cache (v1 caches predate the field: 2026-01-01)."""
+    try:
+        return datetime.strptime(str((cache or {}).get('epoch'))[:10], '%Y-%m-%d')
+    except ValueError:
+        return datetime(2026, 1, 1)
 LAT, LON = 37.873, -122.259            # UC Berkeley campus
 TZ = 'America/Los_Angeles'
 TEMP_KNOTS = [10.0, 14.0, 18.0, 22.0, 26.0]
@@ -58,6 +68,12 @@ Z_THRESH = 3.0
 MIN_HOURS = 336                        # >= 14 days
 MAX_CVRMSE = 0.30                      # ASHRAE Guideline 14, hourly
 MIN_TEMP_COVER = 0.80
+
+
+def pacific_now():
+    from zoneinfo import ZoneInfo
+    from datetime import timezone
+    return datetime.now(timezone.utc).astimezone(ZoneInfo(TZ)).replace(tzinfo=None)
 
 
 def hour_index(dt):
@@ -91,7 +107,7 @@ def fetch_weather(need_lo, need_hi, temps):
         return
     lo_d = index_dt(min(missing)).date()
     hi_d = index_dt(max(missing)).date()
-    today = datetime.now().date()
+    today = pacific_now().date()
 
     def grab(url, params):
         try:
@@ -131,7 +147,7 @@ def temp_components(t):
 
 
 def corrected_series(raw, corr):
-    cut = hour_index(datetime(2026, 7, 14))
+    cut = hour_index(LEVEL_CUTOFF)
     if not corr:
         return raw
     mode, ratio = corr.get('mode'), corr.get('ratio', 1.0)
@@ -196,24 +212,32 @@ def nearest_temp(temps, idx, radius=2):
 
 
 def main():
+    global EPOCH
     cache = load_json(CACHE_PATH)
     eb = load_json(EB_PATH) or {}
     if not cache or not cache.get('series'):
         print('towt: no series cache — run build_baseline.py first')
         return
+    if cache.get('version') != CACHE_VERSION:
+        print('towt: series cache is not v%d (rebuild pending) — skipping' % CACHE_VERSION)
+        return
+    EPOCH = epoch_from(cache)
     corrections = eb.get('level_corrections', {})
 
     wc = load_json(WEATHER_CACHE) or {}
     temps = wc.get('hours', {})
+    if wc and epoch_from(wc) != EPOCH:
+        print('towt: weather cache epoch differs from series epoch — refetching')
+        temps = {}
     all_idx = [int(i) for ser in cache['series'].values() for i in ser.keys()]
     if not all_idx:
         print('towt: empty series')
         return
-    fetch_weather(min(all_idx), hour_index(datetime.now()) + 1, temps)
+    fetch_weather(min(all_idx), hour_index(pacific_now()) + 1, temps)
     try:
         with open(WEATHER_CACHE, 'w') as f:
-            json.dump({'_doc': 'hourly temp degC, Berkeley, hours since 2026-01-01 (naive PT), open-meteo',
-                       'hours': temps}, f, separators=(',', ':'))
+            json.dump({'_doc': 'hourly temp degC, Berkeley, hours since `epoch` (naive PT), open-meteo',
+                       'epoch': EPOCH.strftime('%Y-%m-%d'), 'hours': temps}, f, separators=(',', ':'))
     except Exception:
         pass
     if not temps:
@@ -245,7 +269,8 @@ def main():
                 pass
 
         recent = []
-        for idx, kw_v in sorted(series.items())[-24:]:
+        last_idx = max(series) if series else 0
+        for idx, kw_v in sorted((k, v) for k, v in series.items() if k > last_idx - 24):
             t = nearest_temp(temps, idx)
             if t is None:
                 continue
@@ -273,7 +298,7 @@ def main():
                 'piecewise-linear outdoor-temp terms (knots degC), ridge least squares. '
                 'use_towt = CV-RMSE<=%.2f & n>=%d h. Frontends fall back to '
                 'energy_baseline.json (median) when absent or use_towt=false.' % (MAX_CVRMSE, MIN_HOURS),
-        'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'generated_at': pacific_now().strftime('%Y-%m-%d %H:%M:%S'),
         'z_threshold': Z_THRESH,
         'buildings': out_b,
     }
