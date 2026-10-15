@@ -15,8 +15,7 @@ body[data-focus="overlay"] section[aria-label="BIM model"]{z-index:2;pointer-eve
 /* legibility in every style: slightly desaturated system colours + dark screen-space outline (outline pass) */
 body[data-focus="overlay"] section[aria-label="BIM model"] iframe{filter:saturate(.72) drop-shadow(0 0 1.2px rgba(4,9,16,.95)) drop-shadow(0 0 .7px rgba(4,9,16,.9))}
 /* LENS: cut-away mask on the BIM layer (services strong inside the hole, ghosted outside) */
-body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"]{-webkit-mask-image:var(--lens-mask,none);mask-image:var(--lens-mask,none)}body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"] iframe{opacity:1}
-body[data-focus="overlay"][data-style="lens"] #overlayBar label[for="xrayOpacity"]{opacity:.45}
+body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"]{-webkit-mask-image:var(--lens-mask,none);mask-image:var(--lens-mask,none)}body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"] iframe{opacity:var(--lens-xray,1)}
 #lensRing{display:none;position:absolute;z-index:4;left:0;top:0;width:0;height:0;border-radius:50%;pointer-events:none;border:2px solid rgba(255,226,155,.95);box-shadow:0 0 0 1px rgba(5,10,18,.8),inset 0 0 0 1px rgba(5,10,18,.55);box-sizing:border-box}body[data-focus="overlay"][data-style="lens"] #lensRing{display:block}
 /* GHOST: second, edges-only scan instance above the BIM layer */
 #edgeLayer{display:none;position:absolute;inset:0;z-index:3;pointer-events:none}body[data-focus="overlay"][data-style="ghost"] #edgeLayer{display:block}#edgeLayer[data-moving="true"]{visibility:hidden}#edgeLayer iframe{position:absolute;inset:0;width:100%;height:100%;background:transparent;border:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(4,9,16,.7))}
@@ -100,8 +99,12 @@ frames[0].src='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&re
 
 /* VIEW SWITCHER + X-RAY OVERLAY */
 let view=parseView(location.search);const overlayBar=document.getElementById('overlayBar'),xray=document.getElementById('xrayOpacity'),xrayOut=document.getElementById('xrayValue'),scanTitle=document.querySelector('section[aria-label="Actual scan"] h2');
-function setXray(fraction){const f=clampOpacity(fraction);document.documentElement.style.setProperty('--xray',String(f));xray.value=String(Math.round(f*100));xrayOut.textContent=Math.round(f*100)+'%';xray.setAttribute('aria-valuetext',Math.round(f*100)+' percent');}
-xray.oninput=()=>setXray(Number(xray.value)/100);setXray(parseOpacity(location.search));
+/* The slider drives the active style: inside the Lens it sets how strong the services look (default 100%); in Plain/Ghost it sets the whole overlay (default 30%). Each style keeps its own value. */
+let lensOpacity=1,plainOpacity=parseOpacity(location.search);
+function showXray(f){xray.value=String(Math.round(f*100));xrayOut.textContent=Math.round(f*100)+'%';xray.setAttribute('aria-valuetext',Math.round(f*100)+' percent');}
+function setXray(fraction){const f=clampOpacity(fraction);if(document.body.dataset.style==='lens'){lensOpacity=f;document.documentElement.style.setProperty('--lens-xray',String(f));}else{plainOpacity=f;document.documentElement.style.setProperty('--xray',String(f));}showXray(f);}
+function syncXray(){showXray(document.body.dataset.style==='lens'?lensOpacity:plainOpacity);}
+xray.oninput=()=>setXray(Number(xray.value)/100);document.documentElement.style.setProperty('--xray',String(plainOpacity));showXray(plainOpacity);
 function setView(next,{push=true}={}){
  view=next;document.body.dataset.focus=next==='compare'?'both':next;
  document.querySelectorAll('#paneViews button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.focus===(next==='compare'?'both':next))));
@@ -131,7 +134,7 @@ function applyStyle(){
  const wantEdges=document.body.dataset.focus==='overlay'&&eff==='ghost';
  if(wantEdges&&!edgeFrame){edgeReady=false;edgeFrame=document.createElement('iframe');edgeFrame.title='Scan edges';edgeFrame.setAttribute('aria-hidden','true');edgeFrame.src='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&edges=1&revision=edges1';edgeLayer.appendChild(edgeFrame);}
  else if(!wantEdges&&edgeFrame){edgeFrame.remove();edgeFrame=null;edgeReady=false;}
- layoutLens(true);
+ layoutLens(true);syncXray();
 }
 function layoutLens(snap){
  if(document.body.dataset.style!=='lens'||document.body.dataset.focus!=='overlay'){document.documentElement.style.removeProperty('--lens-mask');return;}

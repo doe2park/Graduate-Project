@@ -77,3 +77,9 @@ test('scan panes post normalised pointer coordinates; photo pane has an edges-on
  for(const s of [photo,splat,bim])assert.match(s,/grimes-pointer/);
  assert.match(photo,/edges'\)==='1'/);assert.match(photo,/Sobel/);assert.match(photo,/grimes-photo-station/)});
 test('honest alignment labels are unchanged',()=>{assert.match(src,/internal residual \\u22480\.13 m, not surveyed/);assert.match(src,/provisional alignment/)});
+
+test('opacity slider drives the lens too (no fixed opacity:1, no greyed label)',()=>{
+ assert.match(src,/data-style="lens"\] section\[aria-label="BIM model"\] iframe\{opacity:var\(--lens-xray,1\)\}/);
+ assert.doesNotMatch(src,/label\[for="xrayOpacity"\]\{opacity:\.45\}/);
+ assert.match(src,/function syncXray\(\)/);assert.match(src,/layoutLens\(true\);syncXray\(\);/);
+});
