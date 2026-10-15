@@ -1,6 +1,6 @@
 """Serve the repo locally and print viewer URLs for a locally trained Gaussian run.
 
-    python scripts/preview_gaussian.py --capture 2026-09-17 [--run work/gaussian/2026-09-17/<stamp>] [--port 8000]
+    python scripts/preview_gaussian.py --capture 2026-09-17 [--zone l1-c] [--run work/gaussian/2026-09-17/<stamp>] [--port 8000]
 
 Serves 127.0.0.1 only. Stop with Ctrl+C.
 """
@@ -16,9 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 WORK_ROOT = ROOT / 'work' / 'gaussian'
 
 
-def latest_run(capture, work_root=WORK_ROOT):
+def latest_run(capture, work_root=WORK_ROOT, zone=None):
     """Newest run folder (timestamps sort lexically) that has a packaged viewer.json."""
-    runs = sorted(p for p in (Path(work_root) / capture).glob('*') if (p / 'package' / 'viewer.json').is_file())
+    runs = sorted(p for p in ((Path(work_root) / capture / zone) if zone else (Path(work_root) / capture)).glob('*') if (p / 'package' / 'viewer.json').is_file())
     return runs[-1] if runs else None
 
 
@@ -33,10 +33,11 @@ def preview_urls(manifest_relative, port):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--capture', required=True)
+    p.add_argument('--zone', help='preview the newest run of this zone')
     p.add_argument('--run', type=Path, help='run folder (default: newest for the capture)')
     p.add_argument('--port', type=int, default=8000)
     a = p.parse_args(argv)
-    run = a.run.resolve() if a.run else latest_run(a.capture)
+    run = a.run.resolve() if a.run else latest_run(a.capture, zone=a.zone)
     if run is None or not (run / 'package' / 'viewer.json').is_file():
         print(f'No packaged run found for {a.capture}. Train first (see docs/GAUSSIAN_TRAINING_GUIDE.md).', file=sys.stderr)
         return 1

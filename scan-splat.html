@@ -6,41 +6,89 @@ body.touch{--tb-h:44px}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101923;color:#edf4fa;font:13px Arial,sans-serif}canvas{display:block;touch-action:none}
 #tools{position:absolute;top:8px;left:8px;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:4px;max-width:calc(100% - 16px)}
 #tools>*{height:var(--tb-h);display:inline-flex;align-items:center;padding:0 10px;border:1px solid var(--tb-border);border-radius:var(--tb-radius);background:var(--tb-bg);font:var(--tb-font);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-#experiment{color:#ffe29b}#loading{color:#cee0eb}button{color:#fff;cursor:pointer;touch-action:none}button:focus-visible{outline:2px solid #ffe29b}#retry{display:none}body[data-state=error] #retry{display:inline-flex}body[data-state=error] #movePad{display:none}
+#experiment{color:#ffe29b}#loading{color:#cee0eb}button{color:#fff;cursor:pointer;touch-action:none}button:focus-visible{outline:2px solid #ffe29b}#retry{display:none}#zoneLabel{display:none;color:#bfe3ff}body[data-zones=on] #zoneLabel{display:inline-flex}body[data-state=error] #retry{display:inline-flex}body[data-state=error] #movePad{display:none}
 #status{position:absolute;left:50%;bottom:calc(var(--tb-h) + 18px);transform:translateX(-50%);z-index:2;max-width:calc(100% - 16px);padding:7px 12px;border-radius:999px;background:var(--tb-bg);border:1px solid var(--tb-border);font:11px/1.4 Arial;text-align:center;pointer-events:none;animation:fade 9s forwards}@keyframes fade{0%,80%{opacity:1}100%{opacity:0;visibility:hidden}}
 #movePad{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:2}#movePad button{min-width:var(--tb-h);height:var(--tb-h);padding:0 6px;border:1px solid var(--tb-border);border-radius:var(--tb-radius);background:var(--tb-bg);font:700 13px Arial}
 @media(max-width:520px){#movePad{max-width:150px;flex-wrap:wrap;justify-content:flex-end}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body data-state="loading">
-<div id="tools"><span id="experiment">EXPERIMENT · May 6 capture</span><span id="loading" role="status">Loading reconstruction…</span><button id="reset" disabled>Reset view</button><button id="retry" onclick="location.reload()">Retry</button></div>
+<div id="tools"><span id="experiment">EXPERIMENT · May 6 capture</span><span id="zoneLabel" role="status"></span><span id="loading" role="status">Loading reconstruction…</span><button id="reset" disabled>Reset view</button><button id="retry" onclick="location.reload()">Retry</button></div>
 <div id="movePad" aria-label="Move camera"><button data-move="left" aria-label="Move left">←</button><button data-move="forward" aria-label="Move forward">↑</button><button data-move="back" aria-label="Move backward">↓</button><button data-move="right" aria-label="Move right">→</button><button data-move="up" aria-label="Move up">+Y</button><button data-move="down" aria-label="Move down">−Y</button></div>
 <div id="status">Drag to look · WASD / arrows: move · Q/E: down/up · Shift: faster<br>Experimental appearance · not surveyed geometry · May contain holes and floaters</div>
 <script type="module">
 const label=document.getElementById('loading'),held=new Set();
+let zoneEntries=null,currentZoneId=null,switching=false,loadedZones=0,zoneEpoch=0,failedZone=null;
 let state='loading',error=null,viewer=null,renderer=null,camera=null,manifest=null,count=0,epoch=0,driver='scan',linked=true,pendingClaim=false,mobile=false,drag=null,yaw=0,pitch=0,initialPose=null,selectedFile=null;
 const send=data=>{if(parent!==window)parent.postMessage(data,location.origin);};
 const pose=()=>camera?{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov,zoom:camera.zoom,identity:'scan'}:null;
-window.splatInspection=()=>({state,error,count,selectedFile,frame:manifest?.frame||null,mobile,status:manifest?.status||null,camera:pose(),epoch,driver,linked,pendingClaim,sharedMemory:false,renderedFrames:renderer?.info.render.frame||0,pointCloudMode:viewer?.splatMesh?.pointCloudModeEnabled||false,renderer:'GaussianSplats3D 0.4.7',provenance:manifest?.provenance||null});
+window.splatInspection=()=>({state,error,count,selectedFile,frame:manifest?.frame||null,mobile,status:manifest?.status||null,camera:pose(),epoch,driver,linked,pendingClaim,sharedMemory:false,renderedFrames:renderer?.info.render.frame||0,pointCloudMode:viewer?.splatMesh?.pointCloudModeEnabled||false,renderer:'GaussianSplats3D 0.4.7',provenance:manifest?.provenance||null,zone:zoneEntries?{id:currentZoneId,switching,count:zoneEntries.length,loaded:loadedZones}:null});
 const finiteArray=(a,n)=>Array.isArray(a)&&a.length===n&&a.every(Number.isFinite);
 const validPose=p=>p&&finiteArray(p.position,3)&&finiteArray(p.quaternion,4)&&Math.abs(Math.hypot(...p.quaternion)-1)<.01&&Number.isFinite(p.fov)&&p.fov>=20&&p.fov<=110&&(p.zoom===undefined||(Number.isFinite(p.zoom)&&p.zoom>0&&p.zoom<=10));
 function fail(e){error=e.message||String(e);state='error';document.body.dataset.state=state;label.textContent=error;held.clear();document.getElementById('reset').disabled=true;if(renderer)renderer.setAnimationLoop(null);if(viewer)viewer.dispose().catch(()=>{});}
+/* ZONE LOGIC */
+const ZONE_HYSTERESIS=1.5;/* metres: another zone must be this much closer before the view swaps */
+const zoneBoxDistance=(b,x,z)=>Math.hypot(Math.max(b.min[0]-x,0,x-b.max[0]),Math.max(b.min[2]-z,0,z-b.max[2]));
+const zoneCoreDistance=(zone,x,z)=>{const pts=zone.corePositions;if(!Array.isArray(pts)||!pts.length)return zoneBoxDistance(zone.coreBounds,x,z);let best=Infinity;for(const p of pts){const d=Math.hypot(p[0]-x,p[1]-z);if(d<best)best=d;}return best;};
+/* Zone whose core bounds contain the camera (XZ); several -> nearest core station; none -> nearest core overall.
+   The current zone is kept unless another is clearly closer, so the view does not flap on a boundary. */
+function selectZone(zones,x,z,currentId){
+ if(!Array.isArray(zones)||!zones.length||!Number.isFinite(x)||!Number.isFinite(z))return currentId||null;
+ const inside=zones.filter(zn=>zoneBoxDistance(zn.coreBounds,x,z)===0),pool=inside.length?inside:zones;
+ let best=null,bestD=Infinity;for(const zn of pool){const d=zoneCoreDistance(zn,x,z);if(d<bestD){best=zn;bestD=d;}}
+ const current=pool.find(zn=>zn.id===currentId);
+ if(current&&zoneCoreDistance(current,x,z)<=bestD+ZONE_HYSTERESIS)return current.id;
+ return best.id;
+}
+const finiteBox=b=>b&&Array.isArray(b.min)&&Array.isArray(b.max)&&b.min.length===3&&b.max.length===3&&[...b.min,...b.max].every(Number.isFinite);
+/* Validate zones/index.json and resolve each zone manifest against the index URL (same origin only). */
+function normalizeZoneIndex(index,base){
+ if(!index||index.schema!==1||index.frame!=='scan-y-up-metres'||!Array.isArray(index.zones)||!index.zones.length)throw Error('Unsupported zones index');
+ const baseURL=new URL(base,'http://localhost/'),origin=baseURL.origin,ids=new Set();
+ const zones=index.zones.map(z=>{
+  if(!z||typeof z.id!=='string'||!z.id||ids.has(z.id)||typeof z.name!=='string'||typeof z.manifest!=='string'||!finiteBox(z.coreBounds)||!finiteBox(z.bounds))throw Error('Invalid zone entry in zones index');
+  ids.add(z.id);const manifestURL=new URL(z.manifest,baseURL);if(manifestURL.origin!==origin)throw Error('Use same-origin zone manifests');
+  return {id:z.id,name:z.name,manifestURL:manifestURL.href,bounds:z.bounds,coreBounds:z.coreBounds,corePositions:Array.isArray(z.corePositions)?z.corePositions.filter(q=>Array.isArray(q)&&q.length===2&&q.every(Number.isFinite)):null,stationCount:z.stationCount};
+ });
+ const first=zones.find(z=>z.id===index.defaultZone)||zones[0];
+ return {capture:typeof index.capture==='string'?index.capture:'',defaultZone:first.id,zones};
+}
+/* END ZONE LOGIC */
 try{
- const manifestURL=new URL(new URLSearchParams(location.search).get('manifest')||'scan-assets/gaussian/2026-05-06/viewer.json',location.href);
- if(manifestURL.origin!==location.origin)throw Error('Use a same-origin reconstruction manifest');
- const response=await fetch(manifestURL);if(!response.ok)throw Error('Gaussian reconstruction unavailable · manifest not found');manifest=await response.json();
- if(manifest.frame!=='scan-y-up-metres')throw Error('Unsupported coordinate frame · expected scan-y-up-metres');
- if(manifest.status!=='experimental-trained')throw Error('This viewer requires an experimental-trained reconstruction');
- if(!validPose(manifest.camera))throw Error('Reconstruction needs a valid initial camera pose');
- if(typeof manifest.file!=='string')throw Error('Reconstruction PLY file is missing');
+ const params=new URLSearchParams(location.search),captureParam=params.get('capture');
+ if(captureParam&&!/^\d{4}-\d{2}-\d{2}$/.test(captureParam))throw Error('capture must be a YYYY-MM-DD date');
  let deviceWindow=window;try{if(top.location.origin===location.origin)deviceWindow=top;}catch{}
  mobile=deviceWindow.matchMedia('(max-width:768px), (pointer:coarse)').matches;document.body.classList.toggle('touch',mobile);
- selectedFile=mobile&&manifest.mobileFile?manifest.mobileFile:manifest.file;
- if(typeof selectedFile!=='string')throw Error('Reconstruction PLY file is missing');
- const assetURL=new URL(selectedFile,manifestURL);if(assetURL.origin!==location.origin||!(/\.(ply|ksplat)$/i).test(assetURL.pathname))throw Error('Use a same-origin Gaussian PLY or KSplat asset');
- const selectedCount=mobile&&manifest.mobileFile?manifest.mobileSplatCount:manifest.splatCount;
- if(!Number.isSafeInteger(selectedCount)||selectedCount<1)throw Error('Reconstruction needs a positive Gaussian count');
- if(selectedCount>(mobile?1000000:3000000))throw Error('Reconstruction exceeds this device’s splat budget · use a smaller export');
+ async function readManifest(url){
+  if(url.origin!==location.origin)throw Error('Use a same-origin reconstruction manifest');
+  const response=await fetch(url);if(!response.ok)throw Error('Gaussian reconstruction unavailable · manifest not found');const m=await response.json();
+  if(m.frame!=='scan-y-up-metres')throw Error('Unsupported coordinate frame · expected scan-y-up-metres');
+  if(m.status!=='experimental-trained')throw Error('This viewer requires an experimental-trained reconstruction');
+  if(!validPose(m.camera))throw Error('Reconstruction needs a valid initial camera pose');
+  if(typeof m.file!=='string')throw Error('Reconstruction PLY file is missing');
+  const file=mobile&&m.mobileFile?m.mobileFile:m.file;
+  if(typeof file!=='string')throw Error('Reconstruction PLY file is missing');
+  const assetURL=new URL(file,url);if(assetURL.origin!==location.origin||!(/\.(ply|ksplat)$/i).test(assetURL.pathname))throw Error('Use a same-origin Gaussian PLY or KSplat asset');
+  const selectedCount=mobile&&m.mobileFile?m.mobileSplatCount:m.splatCount;
+  if(!Number.isSafeInteger(selectedCount)||selectedCount<1)throw Error('Reconstruction needs a positive Gaussian count');
+  if(selectedCount>(mobile?1000000:3000000))throw Error('Reconstruction exceeds this device’s splat budget · use a smaller export');
+  return {manifest:m,assetURL,file};
+ }
+ /* Optional zone index: ?zones=<path>, else scan-assets/gaussian/<?capture or 2026-05-06>/zones/index.json unless ?manifest overrides.
+    Without an index the single-scene behaviour below is unchanged. */
+ async function loadZoneIndex(){
+  const explicit=params.get('zones');if(!explicit&&params.get('manifest'))return null;
+  const url=new URL(explicit||`scan-assets/gaussian/${captureParam||'2026-05-06'}/zones/index.json`,location.href);
+  if(url.origin!==location.origin)throw Error('Use a same-origin zones index');
+  let json=null;try{const r=await fetch(url);if(r.ok)json=await r.json();}catch(e){if(explicit)throw Error('Zones index unavailable');}
+  if(!json){if(explicit)throw Error('Zones index not found');return null;}
+  return normalizeZoneIndex(json,url.href);
+ }
+ const zoneIndex=await loadZoneIndex();
+ let manifestURL,first;
+ if(zoneIndex){zoneEntries=zoneIndex.zones;currentZoneId=zoneIndex.defaultZone;manifestURL=new URL(zoneEntries.find(z=>z.id===currentZoneId).manifestURL);document.body.dataset.zones='on';document.getElementById('experiment').textContent='EXPERIMENT · '+(zoneIndex.capture||'zoned')+' capture';}
+ else {let rel=params.get('manifest')||'scan-assets/gaussian/2026-05-06/viewer.json';if(!params.get('manifest')&&captureParam)rel=`scan-assets/gaussian/${captureParam}/viewer.json`;manifestURL=new URL(rel,location.href);}
+ first=await readManifest(manifestURL);manifest=first.manifest;selectedFile=first.file;const assetURL=first.assetURL;
  const [THREE,GS]=await Promise.all([import('three'),import('@mkkellogg/gaussian-splats-3d')]);
  camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.03,Math.max(30,Math.min(2000,Number(manifest.maxDistance)||500)));
  renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:mobile?'default':'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.setClearColor(0x101923,1);document.body.appendChild(renderer.domElement);
@@ -50,7 +98,8 @@ try{
  // External camera stays in the original scan Y-up metre frame. No scene transforms or BIM geometry.
  // No SharedArrayBuffer/COOP dependency, so the same file works on static GitHub Pages.
  // 0.4.7 Instant reveal still advances a hidden 0.003/frame fade; finish it in one update to allow idle rendering to stop.
- viewer=new GS.Viewer({camera,renderer,selfDrivenMode:false,useBuiltInControls:false,sharedMemoryForWorkers:false,gpuAcceleratedSort:false,integerBasedSort:false,halfPrecisionCovariancesOnGPU:true,sphericalHarmonicsDegree:mobile?0:2,inMemoryCompressionLevel:1,freeIntermediateSplatData:true,dynamicScene:false,sceneRevealMode:GS.SceneRevealMode.Instant,sceneFadeInRateMultiplier:1/.003,renderMode:GS.RenderMode.OnChange});
+ const makeViewer=()=>new GS.Viewer({camera,renderer,selfDrivenMode:false,useBuiltInControls:false,sharedMemoryForWorkers:false,gpuAcceleratedSort:false,integerBasedSort:false,halfPrecisionCovariancesOnGPU:true,sphericalHarmonicsDegree:mobile?0:2,inMemoryCompressionLevel:1,freeIntermediateSplatData:true,dynamicScene:false,sceneRevealMode:GS.SceneRevealMode.Instant,sceneFadeInRateMultiplier:1/.003,renderMode:GS.RenderMode.OnChange});
+ viewer=makeViewer();
  function claim(){if(state!=='ready')return;if(parent===window){pendingClaim=false;driver='scan';return;}if(!pendingClaim){pendingClaim=true;send({type:'grimes-claim-camera',pose:pose()});}}
  function publish(){if(state==='ready'&&!pendingClaim&&(!linked||driver==='scan'))send({type:'grimes-camera-pose',epoch,pose:pose()});}
  renderer.domElement.onpointerdown=e=>{if(state!=='ready'||e.button!==0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);claim();};
@@ -71,14 +120,28 @@ try{
  });
  window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);viewer.forceRenderNextFrame();});
  renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();fail(Error('Graphics context lost · reload or use a smaller export'));});
- await viewer.addSplatScene(assetURL.href,{showLoadingUI:false,progressiveLoad:false,splatAlphaRemovalThreshold:1});
- count=viewer.splatMesh.getSplatCount();if(!count)throw Error('Gaussian PLY contains no visible splats');
- state='ready';document.body.dataset.state=state;document.body.dataset.ready='true';label.textContent=`${count.toLocaleString()} trained splats${mobile&&manifest.mobileFile?' · Reduced mobile export':''}`;document.getElementById('reset').disabled=false;
+ async function loadScene(v,url){await v.addSplatScene(url,{showLoadingUI:false,progressiveLoad:false,splatAlphaRemovalThreshold:1});const n=v.splatMesh.getSplatCount();if(!n)throw Error('Gaussian PLY contains no visible splats');return n;}
+ const zoneLabel=document.getElementById('zoneLabel'),readyText=()=>`${count.toLocaleString()} trained splats${mobile&&manifest.mobileFile?' · Reduced mobile export':''}`;
+ const showZone=suffix=>{const z=zoneEntries&&zoneEntries.find(e=>e.id===currentZoneId);zoneLabel.textContent=z?`Zone: ${z.name}${suffix||''}`:'';};
+ count=await loadScene(viewer,assetURL.href);loadedZones=zoneEntries?1:0;
+ state='ready';document.body.dataset.state=state;document.body.dataset.ready='true';label.textContent=readyText();showZone();document.getElementById('reset').disabled=false;
+ /* Swap zones when the camera crosses a core boundary: load the new zone first (no blank frame), then dispose the old viewer. */
+ async function switchZone(id){
+  const entry=zoneEntries.find(z=>z.id===id);if(!entry||switching)return;switching=true;const token=++zoneEpoch;showZone(' · loading '+entry.name+'…');let next=null;
+  try{
+   const info=await readManifest(new URL(entry.manifestURL));next=makeViewer();const n=await loadScene(next,info.assetURL.href);
+   if(token!==zoneEpoch||state!=='ready'){next.dispose().catch(()=>{});next=null;return;}
+   const old=viewer;viewer=next;next=null;manifest=info.manifest;selectedFile=info.file;count=n;currentZoneId=id;loadedZones++;viewer.forceRenderNextFrame();label.textContent=readyText();showZone();
+   old.dispose().catch(()=>{});
+  }catch(e){if(next)next.dispose().catch(()=>{});failedZone={id,until:performance.now()+15000};showZone(' · '+id+' unavailable, keeping this zone');}
+  finally{switching=false;}
+ }
  // Loading can outlast a parent role handshake: announce only once the asset is usable.
  send({type:'grimes-camera-ready'});claim();
- const forward=new THREE.Vector3(),right=new THREE.Vector3(),move=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);let previous=performance.now();
+ const forward=new THREE.Vector3(),right=new THREE.Vector3(),move=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);let previous=performance.now(),lastZoneCheck=0;
  renderer.setAnimationLoop(t=>{const dt=Math.min(.05,Math.max(0,(t-previous)/1000));previous=t;if(document.hidden)return;
   if(held.size&&(!linked||driver==='scan')&&!pendingClaim){forward.set(-Math.sin(yaw),0,-Math.cos(yaw));right.crossVectors(forward,up);move.set(0,0,0);if(held.has('forward'))move.add(forward);if(held.has('back'))move.sub(forward);if(held.has('right'))move.add(right);if(held.has('left'))move.sub(right);if(held.has('up'))move.y++;if(held.has('down'))move.y--;if(move.lengthSq()){camera.position.addScaledVector(move.normalize(),dt*(held.has('fast')?4:1.4));publish();}}
+  if(zoneEntries&&!switching&&t-lastZoneCheck>250){lastZoneCheck=t;const id=selectZone(zoneEntries,camera.position.x,camera.position.z,currentZoneId);if(id&&id!==currentZoneId&&!(failedZone&&failedZone.id===id&&t<failedZone.until))switchZone(id);}
   camera.updateMatrixWorld();viewer.selfDrivenUpdate();
  });
  window.addEventListener('pagehide',()=>{renderer.setAnimationLoop(null);viewer.dispose().catch(()=>{});renderer.dispose();},{once:true});

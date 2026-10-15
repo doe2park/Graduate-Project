@@ -102,13 +102,24 @@ def select_stations(stations,center,radius,max_stations=None):
         keep={id(s)for s in sorted(near,key=lambda s:np.linalg.norm(np.array(s['position'])-c))[:max_stations]};near=[s for s in near if id(s)in keep]
     return near
 
-def build(manifest,output,center_id,radius,size=640,seed_glbs=(),point_count=50000,seed_up_axis="z",mask_nadir=False,max_stations=None):
+def select_by_ids(stations,ids,max_stations=None,center=None):
+    """Exactly the stations named in ids, in manifest order (zone training). Unknown ids are an error."""
+    ids=list(ids);known={s['id']for s in stations};missing=[i for i in ids if i not in known]
+    if missing:raise ValueError(f'Station ids not in the manifest: {missing[:5]}')
+    if len(set(ids))!=len(ids):raise ValueError('Duplicate station ids')
+    want=set(ids);picked=[s for s in stations if s['id']in want]
+    if max_stations is not None:
+        if max_stations<1:raise ValueError('max_stations must be positive')
+        c=np.array(center if center is not None else picked[0]['position']);keep={id(s)for s in sorted(picked,key=lambda s:np.linalg.norm(np.array(s['position'])-c))[:max_stations]};picked=[s for s in picked if id(s)in keep]
+    return picked
+
+def build(manifest,output,center_id,radius,size=640,seed_glbs=(),point_count=50000,seed_up_axis="z",mask_nadir=False,max_stations=None,station_ids=None):
     if not math.isfinite(radius) or radius<=0:raise ValueError("Positive finite radius required")
     if not 64<=size<=2048 or not 1<=point_count<=1000000:raise ValueError("Invalid local training size or seed count")
     if seed_up_axis not in ("z","y"):raise ValueError("Seed up axis must be z or y")
     manifest=Path(manifest).resolve();out=Path(output).resolve()
     if out.exists():raise FileExistsError('Use a new dataset output directory')
-    m=json.loads(manifest.read_text());stations=m['stations'];center=next(s for s in stations if s['id']==center_id)['position'];selected=select_stations(stations,center,radius,max_stations)
+    m=json.loads(manifest.read_text());stations=m['stations'];center=next(s for s in stations if s['id']==center_id)['position'];selected=select_by_ids(stations,station_ids,max_stations,center)if station_ids is not None else select_stations(stations,center,radius,max_stations)
     if len(selected)<4:raise ValueError('Pilot needs at least 4 captured stations')
     out.mkdir(parents=True);(out/'images').mkdir();train=[];test=[];provenance=[]
     faces=select_faces(mask_nadir)
@@ -126,9 +137,13 @@ def build(manifest,output,center_id,radius,size=640,seed_glbs=(),point_count=500
         xyz,rgb=mesh_seed(seed_glbs,center,radius+9,point_count,up_axis=seed_up_axis);save_points(out/'scan-seed.ply',xyz,rgb);common['ply_file_path']='scan-seed.ply'
     for name,frames in [('transforms.json',train),('transforms_val.json',test)]:
         (out/name).write_text(json.dumps({**common,'frames':frames},indent=2))
-    report={'status':'dataset-prepared-not-trained','sourceManifestSha256':hashlib.sha256(manifest.read_bytes()).hexdigest(),'centerId':center_id,'center':center,'radiusMetres':radius,'stations':provenance,'trainViews':len(train),'evaluationViews':len(test),'faceSize':size,'horizontalFovDegrees':100,'frame':'unchanged scan Y-up metres','seed':'sampled exported scan mesh, not BIM'if seed_glbs else'random trainer initialization','seedInputUpAxis':seed_up_axis,'nadirMasked':bool(mask_nadir),'faces':[{'index':k,'yaw':y,'pitch':pt}for k,y,pt in faces],'maxStations':max_stations,'seedSourceHashes':{Path(p).name:hashlib.sha256(Path(p).read_bytes()).hexdigest()for p in seed_glbs},'evaluationScope':'Held-out images by station; camera poses and mesh initialization originate from same Cupix reconstruction, so not independent geometry validation.'}
+    report={'status':'dataset-prepared-not-trained','sourceManifestSha256':hashlib.sha256(manifest.read_bytes()).hexdigest(),'centerId':center_id,'center':center,'radiusMetres':radius,'stations':provenance,'trainViews':len(train),'evaluationViews':len(test),'faceSize':size,'horizontalFovDegrees':100,'frame':'unchanged scan Y-up metres','seed':'sampled exported scan mesh, not BIM'if seed_glbs else'random trainer initialization','seedInputUpAxis':seed_up_axis,'nadirMasked':bool(mask_nadir),'faces':[{'index':k,'yaw':y,'pitch':pt}for k,y,pt in faces],'maxStations':max_stations,'stationSelection':'explicit-station-list'if station_ids is not None else'radius-around-center','requestedStationIds':list(station_ids)if station_ids is not None else None,'seedSourceHashes':{Path(p).name:hashlib.sha256(Path(p).read_bytes()).hexdigest()for p in seed_glbs},'evaluationScope':'Held-out images by station; camera poses and mesh initialization originate from same Cupix reconstruction, so not independent geometry validation.'}
     (out/'dataset-provenance.json').write_text(json.dumps(report,indent=2));print(json.dumps({k:v for k,v in report.items()if k!='stations'},indent=2))
     return report
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--manifest',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--center-id',required=True);p.add_argument('--radius',type=float,default=9);p.add_argument('--size',type=int,default=640);p.add_argument('--seed-glb',type=Path,action='append',default=[]);p.add_argument('--point-count',type=int,default=50000);p.add_argument('--seed-up-axis',choices=['z','y'],default='z');p.add_argument('--mask-nadir',action='store_true',help='drop the two downward-looking faces per station (camera operator at nadir); default off keeps the May run reproducible');p.add_argument('--max-stations',type=int,help='keep only the N stations nearest the centre (smoke tests)');a=p.parse_args();build(a.manifest,a.output,a.center_id,a.radius,a.size,a.seed_glb,a.point_count,a.seed_up_axis,a.mask_nadir,a.max_stations)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--manifest',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--center-id',help='seed-mesh centre station (required unless --stations is given)');p.add_argument('--stations',help='train exactly these station ids (comma separated or @file); overrides radius selection');p.add_argument('--radius',type=float,default=9);p.add_argument('--size',type=int,default=640);p.add_argument('--seed-glb',type=Path,action='append',default=[]);p.add_argument('--point-count',type=int,default=50000);p.add_argument('--seed-up-axis',choices=['z','y'],default='z');p.add_argument('--mask-nadir',action='store_true',help='drop the two downward-looking faces per station (camera operator at nadir); default off keeps the May run reproducible');p.add_argument('--max-stations',type=int,help='keep only the N stations nearest the centre (smoke tests)');a=p.parse_args()
+    from gaussian_zones import parse_station_list
+    ids=parse_station_list(a.stations)if a.stations else None
+    if not a.center_id and not ids:p.error('--center-id is required unless --stations is given')
+    build(a.manifest,a.output,a.center_id or ids[0],a.radius,a.size,a.seed_glb,a.point_count,a.seed_up_axis,a.mask_nadir,a.max_stations,ids)

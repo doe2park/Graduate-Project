@@ -54,6 +54,54 @@ settings, input hashes, tool versions, per-stage timings and held-out PSNR/SSIM 
 If a run is interrupted, finished stages are kept; re-run with `--resume <folder>`. Training itself restarts from
 step 0 (the interrupted attempt is kept as `train.interrupted-*`).
 
+## Splitting work by zone
+
+A whole floor trains as one scene in 40-120 minutes. To share the work, a capture can be split into **zones**: each zone is a
+connected group of stations (a "core") plus every station within a few metres of it (default 3 m), so neighbouring zones overlap at
+the seams. One person trains one zone; the viewer swaps zones as the camera moves. The owner can still train everything alone.
+
+Zones live in `scripts/gaussian_zones.json` (schema 1): per capture date `building`, `floor` (`L1`, `L2`, `L3`, `B1`) and a `zones`
+list with `id`, `name`, `stations` (training set), `core`, `overlapMetres`, `owner`, `status`
+(`unassigned` / `claimed` / `training` / `review` / `published`). Sep 17 Level 1 is split into four zones (`l1-a` ... `l1-d`); the map
+is `docs/images/zones-2026-09-17.png`. Zone names are inferred from a few panorama thumbnails and marked "(likely)"; fix them by PR if wrong.
+
+```bash
+.venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --list-zones
+.venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone l1-c
+.venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --all-zones   # owner: every zone, resumable
+```
+
+VS Code tasks: **Gaussian: list zones**, **Gaussian: train zone...** (pick the id), **Gaussian: train all zones (owner)**.
+
+**Claim a zone.** Open a PR that sets `owner` to your GitHub name and `status` to `claimed` for one zone (one zone per person at a time;
+check `--list-zones` first so two people do not train the same area). Change `status` to `training` / `review` / `published` as you go.
+Never change `stations` or `core` by hand: zone geometry comes from `plan_gaussian_zones.py`.
+
+**Expected time.** An estimate, not a measurement: the full Level 1 run (100 stations, 50k steps, 1M splats) took about 30-40 min on
+an M4 Pro. A Sep 17 zone has 30-35 stations; step count is unchanged and a smaller scene needs fewer splats per step, so expect roughly
+15-35 min per zone plus 1-3 min to prepare and encode. Windows/Linux GPUs are not measured. Add your timing to the table below.
+
+**Output.** `work/gaussian/<capture>/<zone>/<timestamp>/` (gitignored). `package/viewer.json` records the zone id, station list,
+core list and bounds. Preview with `scripts/preview_gaussian.py --capture 2026-09-17 --zone l1-c`.
+
+**Publish a zone.** Same checklist as a whole capture (privacy, alignment, labels): add `--publish --yes` to the zone command. Files go to
+`scan-assets/gaussian/<capture>/zones/<zone>/` and `zones/index.json` (zone names and bounds) is updated. Review `git status`, then commit
+deliberately; an existing zone folder is only replaced with `--overwrite`. When a zones index exists, `scan-splat.html` (for example
+`scan-splat.html?capture=2026-09-17`, or `?zones=<path to index.json>`) loads the zone whose core contains the camera, swaps zones
+when the camera crosses a boundary and shows "Zone: <name>". Without an index it shows the single scene as before.
+
+**Add a new floor or building.** Import the new capture first (`docs/CAPTURE_ONBOARDING.md`) so it has a panorama manifest, add a preset
+for it in `scripts/gaussian_presets.json`, then run
+
+```bash
+python3 scripts/plan_gaussian_zones.py --capture 2026-xx-xx --manifest scan-assets/captures/2026-xx-xx/panoramas/manifest.json \
+  --building grimes --floor L2 --zones 4 --overlap 3
+```
+
+The floor label (`L1`, `L2`, `L3`, `B1` for the basement) gives zone ids such as `l2-a`. The script adds a new capture entry, never
+overwrites `owner` / `status` / `name`, and refuses to re-plan an existing capture unless `--replace` is given (zones keep their owner,
+status and name by id; it refuses to drop a claimed zone). It also draws a top-down map PNG under `docs/images/` for slides.
+
 ## Preview
 
 `Gaussian: preview locally` (or `scripts/preview_gaussian.py`) serves the repo on `127.0.0.1:8000` and prints two URLs:
@@ -94,4 +142,5 @@ independent test set or a geometry accuracy figure. Compare runs only on the sam
 | Machine | GPU | Capture | Steps / splats | Wall time | PSNR / SSIM |
 |---|---|---|---|---|---|
 | M4 Pro (owner) | Metal | 2026-05-06 | 50,000 / 1M | 38 min (Brush-reported 2,274 s) | 19.20 dB / 0.798 |
+| Zone run (add yours) | | 2026-09-17 l1-a..l1-d | 50,000 / up to 1M | | |
 | Windows x64 | | | | | |
