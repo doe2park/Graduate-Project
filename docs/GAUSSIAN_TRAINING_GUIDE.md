@@ -41,6 +41,8 @@ python3 scripts/setup_gaussian_env.py                 # Windows: python scripts\
 .venv-gaussian\Scripts\python.exe scripts\run_gaussian_pipeline.py --capture 2026-09-17 --quick
 ```
 
+**Watching training:** run the task from VS Code (Terminal → Run Task…) or the integrated terminal and the Brush progress (step, splat count, held-out PSNR/SSIM every checkpoint) streams into the VS Code terminal panel. Add `--watch` (task "Gaussian: train Sep 17 (mask nadir, watch live)") to also open Brush's own live window that renders the scene as it forms; it adds some GPU load.
+
 Useful options: `--steps N` (growth schedule scales with it), `--max-splats N`, `--resolution N`, `--brush PATH`,
 `--dry-run` (print resolved settings only), `--resume <run folder>`. Per-capture settings live in
 `scripts/gaussian_presets.json`; to add a capture, copy a preset and change the manifest, seed GLB, centre station and radius.

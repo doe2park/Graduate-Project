@@ -33,9 +33,21 @@ def validate_dataset(dataset):
     return dataset
 
 
+def brush_args(binary, dataset, output, *, steps, max_splats, refine_every, growth_stop, sh_degree,
+               resolution, checkpoint_every, viewer=False):
+    """Brush CLI arguments; viewer=True adds Brush's own live training window (--with-viewer)."""
+    args = [str(binary), str(dataset), '--total-steps', str(steps),
+            '--max-splats', str(max_splats), '--refine-every', str(refine_every),
+            '--growth-stop-iter', str(growth_stop), '--sh-degree', str(sh_degree),
+            '--max-resolution', str(resolution), '--export-every', str(checkpoint_every),
+            '--eval-every', str(checkpoint_every), '--eval-save-to-disk',
+            '--export-path', str(output)]
+    return args + ['--with-viewer'] if viewer else args
+
+
 def train(binary, dataset, output, steps=50000, max_splats=1000000,
           resolution=768, checkpoint_every=5000, refine_every=400,
-          growth_stop=30000, sh_degree=2, stream=False):
+          growth_stop=30000, sh_degree=2, stream=False, viewer=False):
     binary = Path(binary).resolve()
     dataset = validate_dataset(dataset)
     output = Path(output).resolve()
@@ -48,12 +60,9 @@ def train(binary, dataset, output, steps=50000, max_splats=1000000,
     if not 0 <= growth_stop <= steps:
         raise ValueError('Growth stop must be between zero and total steps')
     output.mkdir(parents=True, exist_ok=False)
-    args = [str(binary), str(dataset), '--total-steps', str(steps),
-            '--max-splats', str(max_splats), '--refine-every', str(refine_every),
-            '--growth-stop-iter', str(growth_stop), '--sh-degree', str(sh_degree),
-            '--max-resolution', str(resolution), '--export-every', str(checkpoint_every),
-            '--eval-every', str(checkpoint_every), '--eval-save-to-disk',
-            '--export-path', str(output)]
+    args = brush_args(binary, dataset, output, steps=steps, max_splats=max_splats, refine_every=refine_every,
+                      growth_stop=growth_stop, sh_degree=sh_degree, resolution=resolution,
+                      checkpoint_every=checkpoint_every, viewer=viewer)
     record = {'startedAt': datetime.now(timezone.utc).isoformat(),
               'args': args, 'executableSha256': digest(binary),
               'datasetProvenanceSha256': digest(dataset / 'dataset-provenance.json'),

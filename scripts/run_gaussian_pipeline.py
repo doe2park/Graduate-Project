@@ -111,6 +111,7 @@ def build_parser():
     p.add_argument('--resolution', type=int, help='override Brush training resolution')
     p.add_argument('--quick', action='store_true', help='smoke test: 4 stations, 300 steps, tiny model; never publishable')
     p.add_argument('--mask-nadir', action='store_true', help='drop downward-looking faces where the camera operator appears')
+    p.add_argument('--watch', action='store_true', help="open Brush's live training window to watch the scene form")
     p.add_argument('--publish', action='store_true', help='copy results into scan-assets/gaussian/<capture>/ (needs --yes)')
     p.add_argument('--yes', action='store_true', help='confirm the publish checklist')
     p.add_argument('--overwrite', action='store_true', help='allow replacing an already published capture folder')
@@ -359,7 +360,8 @@ def main(argv=None):
             t = time.monotonic()
             tr = settings['train']
             record = train_gaussian.train(brush, dataset, train_dir, tr['steps'], tr['maxSplats'], tr['resolution'],
-                                          tr['checkpointEvery'], tr['refineEvery'], tr['growthStop'], tr['shDegree'], stream=True)
+                                          tr['checkpointEvery'], tr['refineEvery'], tr['growthStop'], tr['shDegree'], stream=True,
+                                          viewer=args.watch)
             timings['train'] = round(time.monotonic() - t, 1)
             if record['status'] != 'trained':
                 run.mark('train', 'failed', timings['train'])

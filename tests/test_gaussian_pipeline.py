@@ -245,3 +245,22 @@ class SetupAndPreviewTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class WatchTests(unittest.TestCase):
+    """--watch opens Brush's own live training window (brush_app --with-viewer)."""
+
+    def test_brush_args_add_viewer_only_when_requested(self):
+        import train_gaussian
+        base = dict(steps=300, max_splats=1000, refine_every=400, growth_stop=0, sh_degree=1,
+                    resolution=256, checkpoint_every=100)
+        quiet = train_gaussian.brush_args('/b', '/d', '/o', **base)
+        live = train_gaussian.brush_args('/b', '/d', '/o', viewer=True, **base)
+        self.assertNotIn('--with-viewer', quiet)
+        self.assertIn('--with-viewer', live)
+        self.assertEqual([a for a in live if a != '--with-viewer'], quiet)
+
+    def test_pipeline_parser_accepts_watch(self):
+        ns = pipe.build_parser().parse_args(['--capture', '2026-09-17', '--watch'])
+        self.assertTrue(ns.watch)
+        self.assertFalse(pipe.build_parser().parse_args(['--capture', '2026-09-17']).watch)
