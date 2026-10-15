@@ -392,6 +392,7 @@ body.capture #clickHint{display:none!important}
 </div>
 
 <script src="twin/twin-resolver.js"></script>
+<script src="twin/element-cards.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -1450,72 +1451,18 @@ function elementLevel(info) {
   const m = name.match(/^LEVEL 0?([1-4])$/);
   return m ? 'L' + m[1] : null;
 }
-function bmoTimestamp(raw) {
-  const text = String(raw || '').trim();
-  if (/Z$|[+-]\d{2}:?\d{2}$/.test(text)) return Date.parse(text);
-  const m = text.match(/^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)(?::(\d\d))?$/);
-  if (!m) return NaN;
-  const target = Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));
-  const fmt = new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
-  const wall = at => { const p=Object.fromEntries(fmt.formatToParts(at).map(x=>[x.type,x.value]));return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second); };
-  let at=target;
-  for(let i=0;i<3;i++) at+=target-wall(at);
-  // Naive readings during a DST fold cannot identify which occurrence was measured.
-  if(wall(at)!==target || wall(at-3600000)===target || wall(at+3600000)===target) return NaN;
-  return at;
-}
-
-function meterReading(m) {
-  const kw = m?.latest?.kw;
-  const value = Number.isFinite(kw) ? kw : null;
-  const raw = m?.latest?.t || m?.latest?.timestamp;
-  const at = bmoTimestamp(raw);
-  const age = Date.now() - at;
-  return {value, at, state: value == null ? 'OFFLINE' : !Number.isFinite(at) ? 'TIME UNKNOWN'
-    : age > 45 * 60 * 1000 || age < -5 * 60 * 1000 ? 'STALE' : 'LIVE'};
-}
+/* Pure reading/feed-tier/card helpers live in twin/element-cards.js (shared with scan-bim.html / scan-compare.html). */
+// var (not const): module-scoped in the page, but visible as properties to the vm-sandbox tests.
+var {bmoTimestamp, meterReading, PT_CLOCK, readingAgeText, NO_READING_TEXT, readingDisplay, aggregateReadings, fmtKw, modelledShare,
+  GAZE_DWELL_MS, GAZE_GRACE_MS, GAZE_TIER_CLASS, elementFeedEntry, elementFeedTier, gazeDwell, gazeCardHtml} = globalThis.ElementCards;
 function alignedMeterSeries(meters) {
   const maps = meters.map(m => new Map((m?.timeseries_kw || []).filter(p => Number.isFinite(p.v)).map(p => [p.t,p.v])));
   if (!maps.length) return [];
   return [...maps[0]].filter(([t]) => maps.every(m => m.has(t)))
     .map(([t]) => ({t,v:maps.reduce((sum,m)=>sum+m.get(t),0)})).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
 }
-/* Shared reading vocabulary (weekly-report safe): LIVE = finite value no older than 45 min;
-   LATEST = older finite value, neutral grey, with its Pacific-time age; no value = em dash. */
-const PT_CLOCK = new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
-function readingAgeText(at, now = Date.now()) {
-  if (!Number.isFinite(at)) return 'Last reading time unavailable';
-  const mins = Math.max(0, Math.round((now - at) / 60000));
-  const ago = mins < 60 ? mins + 'm ago' : mins < 2880 ? Math.floor(mins / 60) + 'h ago' : Math.floor(mins / 1440) + 'd ago';
-  return `Last reading ${PT_CLOCK.format(at)} · ${ago}`;
-}
-const NO_READING_TEXT = 'No reading in this window';
-function readingDisplay(r) {
-  if (r.value == null) return {label: 'NO READING', cls: 'badge na', note: NO_READING_TEXT, live: false};
-  if (r.state === 'LIVE') return {label: 'LIVE', cls: 'badge', note: '', live: true};
-  return {label: 'LATEST', cls: 'badge na', note: readingAgeText(r.at), live: false};
-}
 // Reading from a TwinResolver value ({value, ts}) through the same meterReading rules.
 const valueReading = v => meterReading({latest: {kw: v?.value, t: v?.ts}});
-function aggregateReadings(readings) {
-  const have = readings.filter(r => r.value != null), n = readings.length;
-  const complete = n > 0 && have.length === n, sum = have.reduce((a, r) => a + r.value, 0);
-  const partialNote = `${have.length} of ${n} meters`;
-  if (!have.length) return {have: 0, n, complete: false, sum: null, label: 'NO READING', cls: 'badge na', note: NO_READING_TEXT, live: false};
-  if (!complete) return {have: have.length, n, complete, sum, label: 'PARTIAL', cls: 'badge na', note: partialNote, live: false};
-  if (have.every(r => r.state === 'LIVE')) return {have: n, n, complete, sum, label: 'LIVE', cls: 'badge', note: '', live: true};
-  const oldest = Math.min(...have.filter(r => r.state !== 'LIVE').map(r => Number.isFinite(r.at) ? r.at : -Infinity));
-  return {have: n, n, complete, sum, label: 'LATEST', cls: 'badge na', note: readingAgeText(Number.isFinite(oldest) ? oldest : NaN), live: false};
-}
-const fmtKw = w => w < 1 ? (w * 1000).toFixed(0) + ' W' : w.toFixed(2) + ' kW';
-// MODELLED share of one building meter. Never a measurement of the element itself.
-function modelledShare(info, meters) {
-  const ap = info.apportion;
-  if (!ap) return null;
-  const reading = meterReading(meters?.[ap.meter]);
-  const share = Number.isFinite(ap.share) ? ap.share : null;
-  return {ap, reading, share, est: reading.value != null && share != null ? reading.value * share : null};
-}
 // Domestic water / steam condensate / irrigation come from one meter-250 'latest' record.
 const finiteNum = v => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(+v) ? +v : null;
 function flowReading(latest) {
@@ -1574,68 +1521,7 @@ async function assembleElementParts(paths, loadPart, buildPart, releasePart) {
   return result;
 }
 
-/* AR gaze card — feed tier resolution, dwell and card markup (pure; see docs/ELEMENT_FEEDS.md).
-   Precedence: explicit element feed > MODELLED apportionment > building-meter CONTEXT > NONE.
-   Only an explicit entry in element-feeds.json can ever produce a LIVE element reading. */
-const GAZE_DWELL_MS = 400, GAZE_GRACE_MS = 250;
-const GAZE_TIER_CLASS = {LIVE: 'live', LATEST: 'latest', 'NO READING': 'latest', MODELLED: 'mod', CONTEXT: 'ctx', NONE: 'none'};
-function elementFeedEntry(id, meta, feeds) {
-  const els = feeds && typeof feeds === 'object' ? feeds.elements : null;
-  if (!els || typeof els !== 'object') return null;
-  // "<layer>:<id>" (collision-safe) wins over the bare source element id.
-  for (const key of [meta?.layer ? meta.layer + ':' + id : null, String(id)]) {
-    const list = key && Object.prototype.hasOwnProperty.call(els, key) ? els[key] : null;
-    const entry = Array.isArray(list) ? list.find(e => e && typeof e.ref === 'string' && e.ref) : null;
-    if (entry) return entry;
-  }
-  return null;
-}
-function elementFeedTier(id, meta, feeds, meters) {
-  const out = (tier, label, valueText, detailText = '', sourceText = '') => ({tier, label, cls: GAZE_TIER_CLASS[tier], valueText, detailText, sourceText});
-  const entry = elementFeedEntry(id, meta, feeds);
-  if (entry) {
-    const reading = meterReading(meters?.[String(entry.ref).split(':')[2]]);
-    const src = String(entry.source || entry.ref);
-    if (reading.value == null) return out('NO READING', 'NO READING', NO_READING_TEXT, '', src);
-    const unit = entry.unit && entry.unit !== 'kW' ? entry.unit : null;
-    const valueText = unit ? +reading.value.toFixed(2) + ' ' + unit : fmtKw(reading.value);
-    return reading.state === 'LIVE' ? out('LIVE', 'LIVE', valueText, '', src)
-      : out('LATEST', 'LATEST', valueText, readingAgeText(reading.at), src);
-  }
-  const share = meta?.apportion ? modelledShare(meta, meters) : null;
-  if (share) {
-    const basis = String(share.ap.basis || 'design').replace(/\s*ratio$/i, '');
-    const age = share.reading.value != null && share.reading.state !== 'LIVE' ? readingAgeText(share.reading.at) : '';
-    return out('MODELLED', 'MODELLED', share.est != null ? '≈ ' + fmtKw(share.est) + ' modelled share' : NO_READING_TEXT,
-      `from building meter ${share.ap.meter} · ${basis} ratio`, age);
-  }
-  const refs = Array.isArray(meta?.isFedBy) ? meta.isFedBy : [];
-  if (refs.length) {
-    const ids = [...new Set(refs.map(r => String(r).split(':')[2]).filter(Boolean))];
-    const agg = aggregateReadings(ids.map(n => meterReading(meters?.[n])));
-    const label = (ids.length > 1 ? 'Building meters ' : 'Building meter ') + ids.join(', ') + ' context';
-    const valueText = agg.have && agg.sum != null ? (agg.complete ? '' : 'Partial · ') + agg.sum.toFixed(1) + ' kW' : NO_READING_TEXT;
-    return out('CONTEXT', 'CONTEXT', valueText, label + ' · not this element’s own reading', agg.live ? '' : agg.have ? agg.note : '');
-  }
-  return out('NONE', 'NO FEED', 'No feed yet', 'Sensor link not yet connected');
-}
-// Dwell: the same resolved element must stay under the crosshair for GAZE_DWELL_MS. opts.force satisfies it (capture hook).
-function gazeDwell(state, id, now, opts) {
-  if (!id) { state.id = null; state.since = 0; return {show: false}; }
-  if (state.id !== id) { state.id = id; state.since = now; }
-  if (opts && opts.force) state.since = Math.min(state.since, now - GAZE_DWELL_MS);
-  return {show: now - state.since >= GAZE_DWELL_MS};
-}
-function gazeCardHtml(id, meta, tier) {
-  const short = String(meta?.name || meta?.type || 'Element');
-  const name = short.length > 34 ? short.slice(0, 33) + '…' : short;
-  const sub = [meta?.type, meta?.system, meta?.level].filter(Boolean).join(' · ');
-  return `<div class="gz-top"><span class="gz-name">${esc(name)}</span><span class="gz-badge ${esc(tier.cls)}">${esc(tier.label)}</span></div>`
-    + (sub ? `<div class="gz-sub">${esc(sub)}</div>` : '')
-    + `<div class="gz-val">${esc(tier.valueText)}</div>`
-    + (tier.detailText ? `<div class="gz-det">${esc(tier.detailText)}</div>` : '')
-    + (tier.sourceText ? `<div class="gz-det">${esc(tier.sourceText)}</div>` : '');
-}
+/* AR gaze card helpers (elementFeedTier, gazeDwell, gazeCardHtml) come from twin/element-cards.js — see docs/ELEMENT_FEEDS.md. */
 
 /* END ELEMENT DATA HELPERS */
 

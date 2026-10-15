@@ -5,6 +5,7 @@ function fixture(){
  const dom=new Map();const get=id=>{if(!dom.has(id))dom.set(id,{style:{},classList:{add(){},remove(){}},innerHTML:'',textContent:''});return dom.get(id)};
  const ctx={document:{getElementById:get,body:{classList:{add(){}}}},console,window:{},Date,Number,highlight(){},unhighlightEquip(){},equipMeshes:[],equipMeta:{'123':{name:'test',type:'Receptacle',layer:'fixtures',isFedBy:['bmo:meter:77:kw']}},drawSpark(){},dsec:s=>s,drow:(k,v)=>k+':'+v,esc:String,revitRows(){return ''},EQUIP_LABELS:{},LAYERS:{fixtures:{json:'buildings/grimes/fixtures.elements.json'}},cachedJson:async()=>({meters:{}}),apportionRow(){return ''},carbonRows(){return ''},layerState:{},setTimeout,clearTimeout};
  vm.createContext(ctx);
+ vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../twin/element-cards.js'),'utf8'),ctx);
  vm.runInContext(block('/* ELEMENT DATA HELPERS */','/* END ELEMENT DATA HELPERS */'),ctx);
  vm.runInContext(block('function resolveElementHit(', '// An element is selected only when'),ctx);
  vm.runInContext(block('function neighbourRows(', '\nfunction apportionRow('),ctx);

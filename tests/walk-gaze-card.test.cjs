@@ -12,6 +12,7 @@ function load() {
   const ctx = {console, Date, Number, Intl, Map, Set, Math, document: {getElementById: () => ({style: {}, classList: {add() {}, remove() {}, toggle() {}}})}};
   ctx.window = ctx; vm.createContext(ctx);
   vm.runInContext('const esc = s => String(s).replace(/[&<>"\']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",\'"\':"&quot;","\'":"&#39;"}[c]));', ctx);
+  vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../twin/element-cards.js'),'utf8'),ctx); // shared helpers (twin/element-cards.js)
   vm.runInContext(block('/* ELEMENT DATA HELPERS */', '/* END ELEMENT DATA HELPERS */'), ctx);
   return ctx;
 }

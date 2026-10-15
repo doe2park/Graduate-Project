@@ -20,7 +20,30 @@ body[data-focus="overlay"][data-style="lens"] #overlayBar label[for="xrayOpacity
 #lensRing{display:none;position:absolute;z-index:4;left:0;top:0;width:0;height:0;border-radius:50%;pointer-events:none;border:2px solid rgba(255,226,155,.95);box-shadow:0 0 0 1px rgba(5,10,18,.8),inset 0 0 0 1px rgba(5,10,18,.55);box-sizing:border-box}body[data-focus="overlay"][data-style="lens"] #lensRing{display:block}
 /* GHOST: second, edges-only scan instance above the BIM layer */
 #edgeLayer{display:none;position:absolute;inset:0;z-index:3;pointer-events:none}body[data-focus="overlay"][data-style="ghost"] #edgeLayer{display:block}#edgeLayer[data-moving="true"]{visibility:hidden}#edgeLayer iframe{position:absolute;inset:0;width:100%;height:100%;background:transparent;border:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(4,9,16,.7))}
-</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p><a class="rights-link" href="rights.html" target="_blank" rel="noopener">© 2026 Yoonsung Chung · Rights &amp; use</a></div><nav id="paneViews" aria-label="Comparison view"><button data-focus="both" aria-pressed="true">Compare</button><button data-focus="overlay" aria-pressed="false" title="BIM services drawn semi-transparently over the scan">Overlay</button><button data-focus="scan" aria-pressed="false">Scan</button><button data-focus="bim" aria-pressed="false">BIM</button></nav><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label></header><div id="overlayBar" role="group" aria-label="X-ray overlay controls"><label for="xrayOpacity">BIM services opacity<input id="xrayOpacity" type="range" min="0" max="100" step="5" value="30" aria-describedby="xrayValue"><output id="xrayValue" for="xrayOpacity">30%</output></label><div id="styleBar" role="group" aria-label="Overlay style"><span>Style</span><button data-style="lens" aria-pressed="true" title="Cut-away: services visible through a soft circular hole">Lens</button><button data-style="ghost" aria-pressed="false" title="Services plus the real room's edges drawn on top (360° photos, desktop)">Ghost</button><button data-style="plain" aria-pressed="false" title="Uniform transparency">Plain</button><span id="styleNote" role="status"></span></div></div><main><div id="lensRing" aria-hidden="true"></div><div id="edgeLayer" aria-hidden="true"></div><section aria-label="Actual scan"><h2>Actual scan <select id="scanMode" aria-label="Scan display"><option value="photo">360° photos</option><option value="mesh">3D mesh</option><option value="splat" disabled>Gaussian · May experiment (appearance only)</option></select><select id="captureDate" aria-label="Capture date"><option value="2026-09-17">Sep 17, 2026 · New</option><option value="2026-05-06">May 6, 2026</option></select></h2><iframe title="Captured scan" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section></main><script src="registration-core.js?v=1"></script><script>
+
+/* LENS INFO CARD (glasses-style, same markup/classes as the viewer's Walk gaze card; twin/element-cards.js) */
+main{position:relative}
+#lensCard{position:absolute;left:0;top:0;z-index:6;max-width:260px;min-width:170px;padding:9px 12px;border-radius:12px;background:rgba(8,14,28,.66);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid rgba(34,211,238,.35);box-shadow:0 6px 24px rgba(0,0,0,.28);color:#e2e8f0;font:13px/1.4 Arial,sans-serif;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .15s ease,visibility 0s linear .15s}
+#lensCard.show{opacity:1;visibility:visible;transition:opacity .15s ease,visibility 0s}
+#lensCard .gz-top{display:flex;align-items:center;justify-content:space-between;gap:8px}#lensCard .gz-name{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lensCard .gz-badge{flex:none;font:700 9.5px/1 monospace;letter-spacing:.3px;padding:3px 6px;border-radius:4px;background:rgba(148,163,184,.16);color:#a8b6c9}#lensCard .gz-badge.live{background:rgba(52,211,153,.18);color:#34d399}#lensCard .gz-badge.mod{background:rgba(253,181,21,.16);color:#fbbf24}
+#lensCard .gz-sub{margin-top:2px;font-size:12px;color:#94a3b8}#lensCard .gz-val{margin-top:6px;font-size:14px;font-weight:600;color:#f1f5f9}#lensCard .gz-det{margin-top:2px;font-size:12px;line-height:1.35;color:#94a3b8}
+#lensCard .gz-adj{margin-top:5px;padding-top:4px;border-top:1px solid rgba(232,121,249,.35);font-size:11.5px;color:#f0abfc}
+@media(prefers-reduced-motion:reduce){#lensCard,#lensCard.show{transition:none}}
+/* AS-BUILT ADJUSTMENT PANEL + BADGE */
+#lensCardsToggle{min-height:32px;padding:0 10px;border:1px solid #58708a;border-radius:8px;background:#132b40;color:#cfe0ec;font:600 12px Arial;cursor:pointer}#lensCardsToggle[aria-pressed="false"]{opacity:.6}body:not([data-style="lens"]) #lensCardsToggle{display:none}@media(max-width:768px){#lensCardsToggle{min-height:44px}}
+#asBuiltToggle{min-height:32px;padding:0 12px;border:1px solid #8aa5bb;border-radius:8px;background:#244562;color:#fff;font:600 12px Arial;cursor:pointer;white-space:nowrap}#asBuiltToggle[aria-expanded="true"]{background:#7a2f86;border-color:#e879f9}
+#asBuiltBadge{position:absolute;z-index:7;left:10px;top:10px;padding:5px 9px;border-radius:7px;background:rgba(122,47,134,.92);border:1px solid #e879f9;color:#fff;font:700 11px Arial;letter-spacing:.2px;pointer-events:none}#asBuiltBadge small{font-weight:400;opacity:.9}
+#asBuiltPanel{position:absolute;z-index:8;right:10px;top:10px;width:300px;max-height:calc(100% - 20px);overflow:auto;padding:10px 12px;border-radius:12px;background:rgba(10,18,30,.94);border:1px solid #5b4a6e;color:#e6eef6;font:12px/1.4 Arial;box-shadow:0 8px 28px rgba(0,0,0,.4)}
+#asBuiltPanel:focus{outline:2px solid #e879f9;outline-offset:1px}#asBuiltPanel .ab-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}#asBuiltPanel .ab-head b{font-size:13px}
+#asBuiltPanel button{min-height:30px;border:1px solid #58708a;border-radius:6px;background:#1c3348;color:#eaf2fa;font:600 12px Arial;cursor:pointer}#asBuiltPanel button:disabled{opacity:.4;cursor:not-allowed}#asBuiltPanel button[aria-pressed="true"]{background:#7a2f86;border-color:#e879f9}
+#asBuiltPanel button:focus-visible,#asBuiltPanel input:focus-visible{outline:2px solid #ffd479;outline-offset:1px}
+#asBuiltPanel .ab-mode{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:4px 0 8px}#asBuiltPanel .ab-grid{display:grid;grid-template-columns:44px repeat(4,1fr);gap:3px;align-items:center;margin:6px 0}#asBuiltPanel .ab-grid span{color:#b4cbdc;font-weight:700}
+#asBuiltPanel input[type=text]{width:100%;min-height:28px;border:1px solid #58708a;border-radius:6px;background:#0d1826;color:#fff;padding:2px 6px;font:12px Arial}#asBuiltPanel label{display:block;margin:4px 0;color:#b4cbdc}
+#asBuiltPanel .ab-row{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}#asBuiltPanel .ab-row button{flex:1}#abTarget{padding:6px 8px;border-radius:6px;background:#132b40;margin:4px 0}#abReadout{font-variant-numeric:tabular-nums;color:#f0abfc;margin:4px 0}#abStatus,#abStats{color:#b4cbdc;font-size:11px;margin-top:4px}
+#asBuiltPanel .ab-honest{color:#f0abfc;font-size:11px;margin:4px 0}
+@media(max-width:768px){#asBuiltToggle{min-height:44px}#asBuiltPanel{left:6px;right:6px;top:auto;bottom:6px;width:auto;max-height:58%}#asBuiltPanel button{min-height:44px}#asBuiltPanel .ab-grid{grid-template-columns:40px repeat(4,1fr)}}
+</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p><a class="rights-link" href="rights.html" target="_blank" rel="noopener">© 2026 Yoonsung Chung · Rights &amp; use</a></div><nav id="paneViews" aria-label="Comparison view"><button data-focus="both" aria-pressed="true">Compare</button><button data-focus="overlay" aria-pressed="false" title="BIM services drawn semi-transparently over the scan">Overlay</button><button data-focus="scan" aria-pressed="false">Scan</button><button data-focus="bim" aria-pressed="false">BIM</button></nav><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label><button id="asBuiltToggle" type="button" aria-expanded="false" aria-controls="asBuiltPanel" title="Nudge a BIM element onto the installed one seen in the scan (manual, not surveyed)">As-built…</button></header><div id="overlayBar" role="group" aria-label="X-ray overlay controls"><label for="xrayOpacity">BIM services opacity<input id="xrayOpacity" type="range" min="0" max="100" step="5" value="30" aria-describedby="xrayValue"><output id="xrayValue" for="xrayOpacity">30%</output></label><div id="styleBar" role="group" aria-label="Overlay style"><span>Style</span><button data-style="lens" aria-pressed="true" title="Cut-away: services visible through a soft circular hole">Lens</button><button data-style="ghost" aria-pressed="false" title="Services plus the real room's edges drawn on top (360° photos, desktop)">Ghost</button><button data-style="plain" aria-pressed="false" title="Uniform transparency">Plain</button><span id="styleNote" role="status"></span></div><button id="lensCardsToggle" type="button" aria-pressed="true" title="Info cards for the element under the lens (I)">Info cards: on</button></div><main><div id="lensRing" aria-hidden="true"></div><div id="lensCard" role="status" aria-live="off"></div><div id="asBuiltBadge" hidden>AS-BUILT ADJUSTED <small>· manual, not surveyed</small></div><aside id="asBuiltPanel" hidden tabindex="-1" aria-label="As-built position adjustment"><div class="ab-head"><b>As-built position</b><button id="abClose" type="button" aria-label="Close as-built panel">×</button></div><div class="ab-mode" role="group" aria-label="Geometry shown"><button type="button" data-ab-mode="design" aria-pressed="true">Design (BIM)</button><button type="button" data-ab-mode="asbuilt" aria-pressed="false">As-built adjusted</button></div><div class="ab-honest">Adjusted positions are a manual visual match to a captured photo or mesh: manual, not surveyed. Design geometry and GLBs are never changed.</div><div id="abTarget">No element selected.</div><button id="abSelect" type="button" style="width:100%">Select element under lens</button><label>Your initials (required) <input id="abAuthor" type="text" maxlength="4" autocomplete="off" spellcheck="false" placeholder="e.g. YC"></label><div class="ab-grid" role="group" aria-label="Nudge selected element"><span>X</span><button type="button" data-ab="x" data-step="-0.05" aria-label="X minus 5 cm">−5</button><button type="button" data-ab="x" data-step="-0.01" aria-label="X minus 1 cm">−1</button><button type="button" data-ab="x" data-step="0.01" aria-label="X plus 1 cm">+1</button><button type="button" data-ab="x" data-step="0.05" aria-label="X plus 5 cm">+5</button><span>Z</span><button type="button" data-ab="z" data-step="-0.05" aria-label="Z minus 5 cm">−5</button><button type="button" data-ab="z" data-step="-0.01" aria-label="Z minus 1 cm">−1</button><button type="button" data-ab="z" data-step="0.01" aria-label="Z plus 1 cm">+1</button><button type="button" data-ab="z" data-step="0.05" aria-label="Z plus 5 cm">+5</button><span>Y ↑</span><button type="button" data-ab="y" data-step="-0.05" aria-label="Height minus 5 cm">−5</button><button type="button" data-ab="y" data-step="-0.01" aria-label="Height minus 1 cm">−1</button><button type="button" data-ab="y" data-step="0.01" aria-label="Height plus 1 cm">+1</button><button type="button" data-ab="y" data-step="0.05" aria-label="Height plus 5 cm">+5</button><span>Yaw</span><button type="button" data-ab="yaw" data-step="-5" aria-label="Yaw minus 5 degrees">−5°</button><button type="button" data-ab="yaw" data-step="-1" aria-label="Yaw minus 1 degree">−1°</button><button type="button" data-ab="yaw" data-step="1" aria-label="Yaw plus 1 degree">+1°</button><button type="button" data-ab="yaw" data-step="5" aria-label="Yaw plus 5 degrees">+5°</button></div><div id="abReadout" aria-live="polite">Δ —</div><label>Note <input id="abNote" type="text" maxlength="500" autocomplete="off" placeholder="what was matched (optional)"></label><div class="ab-row"><button id="abReset" type="button">Reset element</button><button id="abExport" type="button">Export JSON</button><button id="abImportBtn" type="button">Load JSON</button><input id="abImport" type="file" accept="application/json,.json" hidden></div><div id="abStatus" role="status"></div><div id="abStats"></div><div id="abKeys" style="color:#8ea3b6;font-size:11px;margin-top:4px">Keys (panel focused): ←/→ X, ↑/↓ Z, PgUp/PgDn height, [ ] yaw, Shift = 5 cm. Commit the exported file to buildings/grimes/as-built-adjustments.json.</div></aside><div id="edgeLayer" aria-hidden="true"></div><section aria-label="Actual scan"><h2>Actual scan <select id="scanMode" aria-label="Scan display"><option value="photo">360° photos</option><option value="mesh">3D mesh</option><option value="splat" disabled>Gaussian · May experiment (appearance only)</option></select><select id="captureDate" aria-label="Capture date"><option value="2026-09-17">Sep 17, 2026 · New</option><option value="2026-05-06">May 6, 2026</option></select></h2><iframe title="Captured scan" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section></main><script src="registration-core.js?v=1"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script>
 /* OVERLAY LOGIC */
 const OVERLAY_DEFAULT_OPACITY=.30,OVERLAY_LAYERS=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety','fire'];
 function splatSource(manifest){return 'scan-splat.html?manifest='+encodeURIComponent(manifest)+'&revision=gaussian2';}
@@ -160,4 +183,133 @@ function loadDefaultRegistration(note){return fetch(capture.registration,{cache:
 const candidatePath=registrationOverride(location.search);
 if(candidatePath&&candidatePath!=='invalid')fetch(candidatePath,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('candidate not found');return r.json()}).then(c=>{const v=RegistrationCore.validateRegistration(c,capture.date);if(!v.ok)throw Error(v.reason);useRegistration(c,true);}).catch(e=>loadDefaultRegistration('Candidate rejected ('+(e.message||'invalid')+'), showing default'));
 else loadDefaultRegistration(candidatePath==='invalid'?'Candidate path rejected, showing default':'');
-</script></body></html>
+</script>
+<script>
+/* AS-BUILT UI LOGIC (pure; tests/as-built-ui.test.cjs) */
+const AB_DRAFT_KEY='grimes-asbuilt-draft-v1',AB_FILE='buildings/grimes/as-built-adjustments.json',LENS_PROBE_MS=150;
+/* keyboard nudge while the panel has focus: arrows X/Z, PageUp/PageDown height, [ ] yaw; Shift = 5 cm / 5 degrees */
+function nudgeForKey(e){
+ const big=!!e.shiftKey,cm=big?.05:.01,deg=big?5:1;
+ switch(e.key){case 'ArrowRight':return{dx:cm};case 'ArrowLeft':return{dx:-cm};case 'ArrowUp':return{dz:-cm};case 'ArrowDown':return{dz:cm};
+  case 'PageUp':return{dy:cm};case 'PageDown':return{dy:-cm};case ']':case '}':return{dyaw:deg};case '[':case '{':return{dyaw:-deg};default:return null;}
+}
+function parseAsBuiltMode(search){return new URLSearchParams(search).get('asbuilt')==='1'?'asbuilt':'design';}
+function validInitials(v){return /^[A-Za-z]{2,4}$/.test(String(v||'').trim());}
+/* evidence = the view the owner matched against when the nudge was made */
+function evidenceFor({date,display,station,registration}){return{captureDate:date,scanMode:['photo','mesh','splat'].includes(display)?display:'photo',stationIndex:display==='photo'&&Number.isInteger(station)?station:null,stationLabel:display==='photo'&&Number.isInteger(station)?String(station+1):null,registration:registration||null};}
+function readoutText(a){if(!a)return 'Δ —';const t=a.translation.map(v=>(v*100).toFixed(1)),d=(Math.hypot(...a.translation)*100).toFixed(1);return 'Δ x '+t[0]+' · y '+t[1]+' · z '+t[2]+' cm · |Δ| '+d+' cm · yaw '+(a.yawDegrees||0).toFixed(1)+'°';}
+/* END AS-BUILT UI LOGIC */
+
+/* ── Overlay-Lens info card: the BIM pane picks at the lens centre (grimes-lens-probe -> grimes-lens-pick), this page renders ── */
+const lensCard=document.getElementById('lensCard'),lensCardsBtn=document.getElementById('lensCardsToggle');
+let lensCardsOn=true,lensSeq=0,lensLastSeq=-1,lensShownKey=null,lensHit=null,lensHideT=null,lensProbeT=null;const lensDwell={id:null,since:0};
+function lensActive(){return lensCardsOn&&document.body.dataset.focus==='overlay'&&document.body.dataset.style==='lens'&&!document.hidden;}
+function probeLens(){
+ if(!lensActive()){hideLensCard(true);return;}
+ const w=mainEl.clientWidth,h=mainEl.clientHeight,c=lensNow||{x:w/2,y:h/2};if(!w||!h)return;
+ const msg=ElementCards.lensProbeMessage(++lensSeq,Math.min(1,Math.max(0,c.x/w)),Math.min(1,Math.max(0,c.y/h)));
+ if(msg)frames[1].contentWindow?.postMessage(msg,location.origin);
+}
+function placeLensCard(){
+ const w=mainEl.clientWidth,h=mainEl.clientHeight,c=lensNow||{x:w/2,y:h/2};
+ const p=ElementCards.lensCardPosition({cx:c.x,cy:c.y,r:lensRadius(w,h),w:lensCard.offsetWidth,h:lensCard.offsetHeight,vw:w,vh:h,mobile:touchMq.matches,bottomInset:72});
+ lensCard.style.transform='translate('+p.x+'px,'+p.y+'px)';
+}
+function hideLensCard(now){
+ if(now){clearTimeout(lensHideT);lensHideT=null;lensShownKey=null;lensHit=null;lensDwell.id=null;lensCard.classList.remove('show');return;}
+ if(lensShownKey!=null&&!lensHideT)lensHideT=setTimeout(()=>{lensHideT=null;lensShownKey=null;lensCard.classList.remove('show');},ElementCards.GAZE_GRACE_MS);
+}
+function onLensPick(d){
+ const pick=ElementCards.parseLensPick(d,lensLastSeq);if(!pick)return;lensLastSeq=pick.seq;
+ if(!lensActive()){hideLensCard(true);return;}
+ const k=pick.hit?AsBuilt.key(pick.hit.layer,pick.hit.id):null;lensHit=pick.hit;
+ if(ElementCards.gazeDwell(lensDwell,k,performance.now()).show){
+  clearTimeout(lensHideT);lensHideT=null;
+  lensCard.innerHTML=ElementCards.gazeCardHtml(pick.hit.id,pick.hit.meta,pick.hit.tier,{adjustment:abMode==='asbuilt'?pick.hit.adjustment:null});
+  lensCard.dataset.elementKey=k;lensShownKey=k;placeLensCard();lensCard.classList.add('show');
+ }else if(!k)hideLensCard(false);
+ if(!abPanel.hidden)abRender();
+}
+function setLensCards(on){lensCardsOn=!!on;lensCardsBtn.setAttribute('aria-pressed',String(lensCardsOn));lensCardsBtn.textContent='Info cards: '+(lensCardsOn?'on':'off');if(!lensCardsOn)hideLensCard(true);}
+lensCardsBtn.onclick=()=>setLensCards(!lensCardsOn);
+lensProbeT=setInterval(probeLens,LENS_PROBE_MS);
+new ResizeObserver(()=>{if(lensShownKey)placeLensCard();}).observe(mainEl);
+
+/* ── As-built adjustments: this page owns the document; the BIM pane applies it at render time only ── */
+const abPanel=document.getElementById('asBuiltPanel'),abToggle=document.getElementById('asBuiltToggle'),abBadge=document.getElementById('asBuiltBadge');
+const abAuthor=document.getElementById('abAuthor'),abNote=document.getElementById('abNote'),abStatus=document.getElementById('abStatus');
+let abDoc=AsBuilt.emptyDocument(),abSource='loading',abMode=parseAsBuiltMode(location.search),abSelected=null,abApplied={applied:[],pending:[]};
+const abStore={get(k){try{return localStorage.getItem(k);}catch{return null;}},set(k,v){try{localStorage.setItem(k,v);}catch{}}};
+abAuthor.value=abStore.get('grimes-asbuilt-author')||'';
+function abSend(){frames[1].contentWindow?.postMessage({type:'grimes-asbuilt',mode:abMode,adjustments:abDoc.adjustments,selected:abSelected?{id:abSelected.id,layer:abSelected.layer}:null,pickToSelect:!abPanel.hidden},location.origin);}
+function abSaveDraft(){abStore.set(AB_DRAFT_KEY,JSON.stringify(abDoc));abSource='local draft (export and commit to keep)';}
+function abSetMode(m,{push=true}={}){abMode=m==='asbuilt'?'asbuilt':'design';if(push){const u=new URL(location.href);if(abMode==='asbuilt')u.searchParams.set('asbuilt','1');else u.searchParams.delete('asbuilt');history.replaceState(null,'',u);}if(lensShownKey){lensDwell.id=null;lensShownKey=null;}abSend();abRender();}
+function abCurrent(){return abSelected?AsBuilt.find(abDoc,AsBuilt.key(abSelected.layer,abSelected.id)):null;}
+function abRender(){
+ const n=abDoc.adjustments.filter(a=>!AsBuilt.isIdentity(a)).length;
+ abBadge.hidden=abMode!=='asbuilt';abBadge.innerHTML='AS-BUILT ADJUSTED · '+n+' element'+(n===1?'':'s')+' <small>· manual, not surveyed</small>';
+ abPanel.querySelectorAll('[data-ab-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.abMode===abMode)));
+ const cur=abCurrent(),okAuthor=validInitials(abAuthor.value);
+ document.getElementById('abTarget').innerHTML=abSelected?'<b>'+ElementCards.esc(abSelected.meta?.name||abSelected.meta?.type||'Element')+'</b><br><span style="color:#b4cbdc">'+ElementCards.esc([abSelected.meta?.type,abSelected.meta?.system,abSelected.meta?.level].filter(Boolean).join(' · '))+' · '+ElementCards.esc(abSelected.layer+':'+abSelected.id)+'</span>':(view==='overlay'?'No element selected. Hold the lens on an element until its card appears, then Select.':'No element selected. Click an element in the BIM pane, or use Overlay · Lens.');
+ document.getElementById('abSelect').disabled=!(view==='overlay'&&lensShownKey&&lensHit);
+ abPanel.querySelectorAll('[data-ab]').forEach(b=>b.disabled=!abSelected||!okAuthor);
+ document.getElementById('abReset').disabled=!cur;
+ document.getElementById('abReadout').textContent=okAuthor||!abSelected?readoutText(cur):'Enter your initials to record an adjustment';
+ if(cur&&document.activeElement!==abNote)abNote.value=cur.note||'';
+ const pend=abApplied.pending?.length?' · '+abApplied.pending.length+' waiting for their layer to load':'';
+ abStatus.textContent='Source: '+abSource+' · '+n+' adjusted'+pend+' · showing '+(abMode==='asbuilt'?'As-built adjusted':'Design (BIM)');
+ const st=AsBuilt.stats(abDoc.adjustments.filter(a=>!AsBuilt.isIdentity(a)));
+ document.getElementById('abStats').textContent=Object.entries(st).map(([k,v])=>k+': n='+v.n+', mean '+(v.meanOffsetM*100).toFixed(1)+' cm, max '+(v.maxOffsetM*100).toFixed(1)+' cm').join(' · ');
+}
+function abSelect(sel){abSelected=sel?{id:sel.id,layer:sel.layer,meta:sel.meta||{}}:null;abSend();abRender();}
+function abNudge(delta){
+ if(!abSelected||!validInitials(abAuthor.value))return;
+ const k=AsBuilt.key(abSelected.layer,abSelected.id),author=abAuthor.value.trim().toUpperCase();
+ const base=AsBuilt.find(abDoc,k)||AsBuilt.createAdjustment({id:abSelected.id,layer:abSelected.layer,info:abSelected.meta,author});
+ const next=Object.assign(AsBuilt.nudge(base,delta),{author,note:abNote.value.slice(0,500),evidence:evidenceFor({date:capture.date,display:mode.value,station:lastStation,registration:registrationPreview?candidatePath:capture.registration})});
+ abDoc=AsBuilt.upsert(abDoc,next);abSaveDraft();
+ if(abMode!=='asbuilt')abSetMode('asbuilt');else{abSend();abRender();}
+}
+abPanel.querySelectorAll('[data-ab]').forEach(b=>b.onclick=()=>{const v=Number(b.dataset.step),a=b.dataset.ab;abNudge(a==='yaw'?{dyaw:v}:{['d'+a]:v});});
+abPanel.querySelectorAll('[data-ab-mode]').forEach(b=>b.onclick=()=>abSetMode(b.dataset.abMode));
+document.getElementById('abSelect').onclick=()=>{if(lensShownKey&&lensHit)abSelect(lensHit);abPanel.focus();};
+document.getElementById('abReset').onclick=()=>{if(!abSelected)return;abDoc=AsBuilt.remove(abDoc,AsBuilt.key(abSelected.layer,abSelected.id));abSaveDraft();abSend();abRender();};
+abAuthor.oninput=()=>{abStore.set('grimes-asbuilt-author',abAuthor.value.trim());abRender();};
+abNote.onchange=()=>{const cur=abCurrent();if(cur){abDoc=AsBuilt.upsert(abDoc,{...cur,note:abNote.value.slice(0,500)});abSaveDraft();abRender();}};
+document.getElementById('abExport').onclick=()=>{
+ const text=AsBuilt.exportText(abDoc),v=AsBuilt.validateDocument(JSON.parse(text));
+ if(!v.ok){abStatus.textContent='Not exported: '+v.errors.slice(0,3).join('; ');return;}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));a.download='as-built-adjustments.json';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+ abStatus.textContent='Exported '+v.adjustments.length+' adjustment(s) · replace '+AB_FILE+' and commit';
+};
+document.getElementById('abImportBtn').onclick=()=>document.getElementById('abImport').click();
+document.getElementById('abImport').onchange=async e=>{
+ const f=e.target.files[0];e.target.value='';if(!f)return;
+ try{const v=AsBuilt.validateDocument(JSON.parse(await f.text()));if(!v.ok)throw Error(v.errors.slice(0,3).join('; '));abDoc={...AsBuilt.emptyDocument(),adjustments:v.adjustments};abSaveDraft();abSource='imported '+f.name.slice(0,60)+' (local draft)';abSend();abRender();}
+ catch(err){abStatus.textContent='Not loaded: '+(err.message||'invalid JSON');}
+};
+function abOpen(on){abPanel.hidden=!on;abToggle.setAttribute('aria-expanded',String(on));if(on)abPanel.focus();abSend();abRender();}
+abToggle.onclick=()=>abOpen(abPanel.hidden);document.getElementById('abClose').onclick=()=>abOpen(false);
+abPanel.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.key==='Escape'){abOpen(false);return;}const d=nudgeForKey(e);if(d&&abSelected){e.preventDefault();abNudge(d);}});
+document.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)||e.metaKey||e.ctrlKey||e.altKey)return;if(e.code==='KeyI'&&document.body.dataset.focus==='overlay')setLensCards(!lensCardsOn);});
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin||e.source!==frames[1].contentWindow)return;const d=e.data;
+ if(d?.type===ElementCards.LENS_PICK){onLensPick(d);return;}
+ if(d?.type==='grimes-camera-ready'){abSend();return;}
+ if(d?.type==='grimes-element-selected'&&!abPanel.hidden&&typeof d.id==='string'&&AsBuilt.LAYER_KEYS.includes(d.layer)){abSelect({id:d.id,layer:d.layer,meta:ElementCards.cardMeta(d.meta,d.layer)});return;}
+ if(d?.type==='grimes-asbuilt-applied'){
+  abApplied={applied:Array.isArray(d.applied)?d.applied:[],pending:Array.isArray(d.pending)?d.pending:[]};
+  /* record the design-geometry pivot the pane used, so a replay never depends on recomputation */
+  let changed=false;for(const [k,p] of Object.entries(d.pivots||{})){const a=AsBuilt.find(abDoc,k);if(a&&a.pivot==null&&Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)){abDoc=AsBuilt.upsert(abDoc,{...a,pivot:p});changed=true;}}
+  if(changed)abSaveDraft();abRender();
+ }
+});
+/* load: committed sidecar first; a local draft (unsaved owner edits) replaces it and is labelled as such */
+fetch(AB_FILE,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null).then(file=>{
+ const fv=file?AsBuilt.validateDocument(file):null;abDoc={...AsBuilt.emptyDocument(),adjustments:fv?fv.adjustments:[]};abSource=fv?(fv.ok?'repository file':'repository file (invalid entries skipped)'):'none (sidecar unavailable)';
+ const draft=abStore.get(AB_DRAFT_KEY);if(draft){try{const dv=AsBuilt.validateDocument(JSON.parse(draft));if(dv.adjustments.length){abDoc={...AsBuilt.emptyDocument(),adjustments:dv.adjustments};abSource='local draft (export and commit to keep)';}}catch{}}
+ abSend();abRender();
+});
+abRender();
+</script>
+</body></html>

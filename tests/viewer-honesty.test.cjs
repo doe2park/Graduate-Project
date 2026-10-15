@@ -25,7 +25,9 @@ function sandbox(extra = {}) {
   return {ctx, get, run: code => vm.runInContext(code, ctx)};
 }
 const nowIso = (offsetMin = 0) => new Date(Date.now() + offsetMin * 60000).toISOString();
-const HELPERS = () => block('/* ELEMENT DATA HELPERS */', '/* END ELEMENT DATA HELPERS */');
+// Shared pure helpers (twin/element-cards.js) are evaluated first, as the page loads them before its module script.
+const SHARED_CARDS = fs.readFileSync(path.join(__dirname, '../twin/element-cards.js'), 'utf8');
+const HELPERS = () => SHARED_CARDS + '\n' + block('/* ELEMENT DATA HELPERS */', '/* END ELEMENT DATA HELPERS */');
 const CORE = ['SYSTEMS', 'NAME_TO_SYS', 'NORM'];
 
 /* ─────────── pickSystem fixtures ─────────── */
