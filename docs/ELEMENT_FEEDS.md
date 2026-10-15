@@ -1,7 +1,8 @@
 # Element feeds and the Walk-mode info card
 
 Walk mode shows a small "AR gaze card" after the crosshair rests on one element for 400 ms.
-The card names the data tier honestly; `elementFeedTier()` in `grimes-bim-viewer.html` picks it.
+The card names the data tier honestly; `elementFeedTier()` in the shared `twin/element-cards.js` picks it
+(used by `grimes-bim-viewer.html`, `scan-bim.html` and `scan-compare.html`, so every card uses the same rules).
 
 ## Tier ladder (first match wins)
 1. **LIVE / LATEST** - an explicit entry in `buildings/grimes/element-feeds.json`. LIVE only if the reading is
@@ -33,3 +34,14 @@ building meter; CONTEXT is a building/feeder total. Neither is an element measur
 Toolbar "Info cards" button or `I` toggles the cards (default on). With `?capture=1`, `window.walkCapture`
 (`enter`, `setPose`, `aimNow`, `render`, `ready`, `state`) enables deterministic frame-stepped recording
 with no hint and no fades; it is undefined otherwise.
+
+## Overlay Lens cards (scan-compare)
+In `scan-compare.html?view=overlay` with the Lens style, the element under the lens centre gets the same card next to the
+lens ring. On desktop the lens follows the pointer. On mobile the card sits above the bottom controls. The same 400 ms dwell
+and 250 ms grace apply. It works over 360° photos, the mesh and the Gaussian scene. The parent posts
+`{type:'grimes-lens-probe', seq, x, y}` (normalised in the BIM iframe) about every 150 ms. The BIM pane raycasts its visible
+element layers with the click-pick identity (`resolveElementHit`), resolves the tier and answers
+`{type:'grimes-lens-pick', seq, x, y, hit:null|{id, layer, meta, tier, adjustment}}`. The parent drops stale or
+malformed replies (`ElementCards.parseLensPick`) and derives the badge class itself. The "Info cards" button or `I` toggles
+the cards. In As-built mode an adjusted element adds the line "As-built · manual, not surveyed · moved N cm"
+(see `docs/AS_BUILT_ADJUSTMENTS.md`).

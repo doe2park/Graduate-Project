@@ -35,3 +35,12 @@ Run `node --test tests/layer-visibility.test.cjs` for sequential bulk visibility
 ## Registration workbench
 
 `node --test tests/registration-core.test.cjs tests/registration-preview.test.cjs` and `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_registration_fit.py` cover the shared yaw+XYZ fit, RANSAC, leave-one-out, heading solve, export schema, refusal to overwrite accepted registrations, `?registration=` preview safety and JS/Python numerical agreement on `tests/fixtures/registration-pairs.fixture.json` (synthetic data). See `docs/REGISTRATION_WORKBENCH.md`.
+
+## Element cards and as-built adjustments
+
+`node --test tests/element-cards.test.cjs tests/as-built.test.cjs tests/as-built-ui.test.cjs` and `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_check_as_built.py` cover:
+- tier and card parity across the viewer, the BIM pane and `twin/element-cards.js`;
+- the lens probe/pick message contract;
+- as-built schema validation;
+- instanced and merged-range application, including exact restore on Design/As-built toggles;
+- the panel logic and `scripts/check_as_built.py` statistics.
