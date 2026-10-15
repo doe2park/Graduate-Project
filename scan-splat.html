@@ -6,7 +6,7 @@ body.touch{--tb-h:44px}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101923;color:#edf4fa;font:13px Arial,sans-serif}canvas{display:block;touch-action:none}
 #tools{position:absolute;top:8px;left:8px;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:4px;max-width:calc(100% - 16px)}
 #tools>*{height:var(--tb-h);display:inline-flex;align-items:center;padding:0 10px;border:1px solid var(--tb-border);border-radius:var(--tb-radius);background:var(--tb-bg);font:var(--tb-font);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-#experiment{color:#ffe29b}#loading{color:#cee0eb}button{color:#fff;cursor:pointer;touch-action:none}button:focus-visible{outline:2px solid #ffe29b}#retry{display:none}#zoneLabel{display:none;color:#bfe3ff}body[data-zones=on] #zoneLabel{display:inline-flex}body[data-state=error] #retry{display:inline-flex}body[data-state=error] #movePad{display:none}
+#experiment{color:#ffe29b}body.touch #tools>*{padding:0 8px;font-size:11px}body.touch #loading.quiet{display:none}body[data-state=error] #loading.quiet{display:inline-flex}#loading{color:#cee0eb}button{color:#fff;cursor:pointer;touch-action:none}button:focus-visible{outline:2px solid #ffe29b}#retry{display:none}#zoneLabel{display:none;color:#bfe3ff}body[data-zones=on] #zoneLabel{display:inline-flex}body[data-state=error] #retry{display:inline-flex}body[data-state=error] #movePad{display:none}
 #status{position:absolute;left:50%;bottom:calc(var(--tb-h) + 18px);transform:translateX(-50%);z-index:2;max-width:calc(100% - 16px);padding:7px 12px;border-radius:999px;background:var(--tb-bg);border:1px solid var(--tb-border);font:11px/1.4 Arial;text-align:center;pointer-events:none;animation:fade 9s forwards}@keyframes fade{0%,80%{opacity:1}100%{opacity:0;visibility:hidden}}
 #movePad{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:2}#movePad button{min-width:var(--tb-h);height:var(--tb-h);padding:0 6px;border:1px solid var(--tb-border);border-radius:var(--tb-radius);background:var(--tb-bg);font:700 13px Arial}
 @media(max-width:520px){#movePad{max-width:150px;flex-wrap:wrap;justify-content:flex-end}}
@@ -125,7 +125,7 @@ try{
  const zoneLabel=document.getElementById('zoneLabel'),readyText=()=>`${count.toLocaleString()} trained splats${mobile&&manifest.mobileFile?' · Reduced mobile export':''}`;
  const showZone=suffix=>{const z=zoneEntries&&zoneEntries.find(e=>e.id===currentZoneId);zoneLabel.textContent=z?`Zone: ${z.name}${suffix||''}`:'';};
  count=await loadScene(viewer,assetURL.href);loadedZones=zoneEntries?1:0;
- state='ready';document.body.dataset.state=state;document.body.dataset.ready='true';label.textContent=readyText();showZone();document.getElementById('reset').disabled=false;
+ state='ready';document.body.dataset.state=state;if(mobile){const ex=document.getElementById('experiment');ex.title=ex.textContent;ex.textContent=ex.textContent.replace(/^EXPERIMENT/,'EXP').replace(/ capture$/,'');setTimeout(()=>label.classList.add('quiet'),4000);}document.body.dataset.ready='true';label.textContent=readyText();showZone();document.getElementById('reset').disabled=false;
  /* Swap zones when the camera crosses a core boundary: load the new zone first (no blank frame), then dispose the old viewer. */
  async function switchZone(id){
   const entry=zoneEntries.find(z=>z.id===id);if(!entry||switching)return;switching=true;const token=++zoneEpoch;showZone(' · loading '+entry.name+'…');let next=null;
