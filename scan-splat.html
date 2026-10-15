@@ -117,6 +117,7 @@ try{
  window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==parent)return;const d=e.data;
   if(d?.type==='grimes-camera-role'&&Number.isInteger(d.epoch)&&d.epoch>=epoch&&['scan','bim'].includes(d.driver)&&typeof d.linked==='boolean'){epoch=d.epoch;driver=d.driver;linked=d.linked;pendingClaim=false;if(linked&&driver!=='scan'){held.clear();drag=null;}if(driver==='scan')publish();}
   if(d?.type==='grimes-linked-pose'&&d.epoch===epoch&&linked&&driver!=='scan'&&!pendingClaim&&validPose(d.pose)){applyPose(d.pose);}
+  if(d?.type==='grimes-start-pose'&&state==='ready'&&validPose(d.pose)){held.clear();applyPose(d.pose);if(!pendingClaim)claim();}
  });
  window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);viewer.forceRenderNextFrame();});
  renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();fail(Error('Graphics context lost · reload or use a smaller export'));});

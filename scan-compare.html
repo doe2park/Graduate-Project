@@ -89,7 +89,16 @@ function captureSelection(search){
 }
 /* END CAPTURE SELECTION */
 const capture=captureSelection(location.search),capturePicker=document.getElementById('captureDate');capturePicker.value=capture.date;
-function navigateCapture(date,display){const u=new URL(location.href);if(date!==capture.date)u.searchParams.delete('registration');u.searchParams.set('capture',date);u.searchParams.set('mode',display);location.assign(u);}
+/* Keep the viewpoint across a display/capture switch: the page reloads, so the current pose travels in ?at= in the
+   BIM frame (shared by every capture) and is converted with the new capture's own registration once it loads. */
+function currentBimPose(){try{if(poses.bim&&valid(poses.bim))return poses.bim;if(registration&&poses.scan&&valid(poses.scan))return convert(poses.scan,'scan');}catch(e){}return null;}
+function encodeAt(p){const q=p.quaternion,n=Math.hypot(...q)||1;return [...p.position.map(v=>v.toFixed(3)),...q.map(v=>(v/n).toFixed(4)),Math.max(20,Math.min(110,p.fov)).toFixed(1)].join(',');}
+function decodeAt(s){const v=String(s||'').split(',').map(Number);if(v.length!==8||!v.every(Number.isFinite))return null;const q=v.slice(3,7),n=Math.hypot(...q);if(!(n>.5))return null;const p={position:v.slice(0,3),quaternion:q.map(x=>x/n),fov:v[7],zoom:1};return valid(p)?p:null;}
+function navigateCapture(date,display){const u=new URL(location.href);if(date!==capture.date)u.searchParams.delete('registration');u.searchParams.set('capture',date);u.searchParams.set('mode',display);u.searchParams.delete('at');const p=currentBimPose();if(p)u.searchParams.set('at',encodeAt(p));location.assign(u);}
+let carryPose=decodeAt(new URLSearchParams(location.search).get('at')),scanReady=false;
+if(new URLSearchParams(location.search).has('at')){try{const u=new URL(location.href);u.searchParams.delete('at');history.replaceState(history.state,'',u);}catch(e){}}
+function tryCarry(){if(!carryPose||!scanReady||!registration)return;let p;try{p=convert(carryPose,'bim');}catch(e){carryPose=null;return;}carryPose=null;
+ send('scan',{type:photoMode?'grimes-photo-goto':'grimes-start-pose',pose:{...p,fov:Math.max(20,Math.min(110,p.fov)),zoom:1}});}
 capturePicker.onchange=()=>navigateCapture(capturePicker.value,mode.value==='splat'?'photo':mode.value);
 let photoMode=true,photoAnchor=null,photoMoving=false;
 const mode=document.getElementById('scanMode');
@@ -185,7 +194,7 @@ window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;const pane=e.source===frames[0].contentWindow?'scan':e.source===frames[1].contentWindow?'bim':null;if(!pane)return;const d=e.data;if(pane==='scan')edgeFromScan(d);
  if(d?.type==='grimes-photo-transition'&&pane==='scan'&&photoMode){photoMoving=!!d.moving;if(!photoMoving)roles();return;}
  if(photoMoving&&pane==='bim'&&d?.type==='grimes-claim-camera'){roles();return;}
- if(d?.type==='grimes-camera-ready'){roles();return;}
+ if(d?.type==='grimes-camera-ready'){roles();if(pane==='scan'){scanReady=true;tryCarry();}return;}
  if(d?.type==='grimes-photo-step'&&pane==='bim'&&photoMode){send('scan',{type:'grimes-photo-step',delta:d.delta,direction:d.direction});return;}
  if(d?.type==='grimes-claim-camera'){driver=pane;epoch++;if(valid(d.pose))poses[pane]=acceptedPose(d.pose,pane);roles();return;}
  if(d?.type==='grimes-request-link'){link.checked=true;epoch++;roles();return;}
@@ -200,7 +209,7 @@ fetch(GAUSSIAN_MANIFEST,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();retu
 if(view!=='compare')setView(view,{push:false});
 /* per-station photo heading offsets from a previewed candidate (empty for accepted/provisional files) */
 function sendHeadingOffsets(){if(!photoMode)return;const data={type:'grimes-heading-offsets',offsets:registrationPreview?headingOffsets(registration):{}};frames[0].contentWindow?.postMessage(data,location.origin);edgeSend(data);}
-function useRegistration(c,preview){registration=c;registrationPreview=preview;link.disabled=view==='overlay';link.checked=true;if(typeof alignOnRegistration==='function')alignOnRegistration(c,preview);epoch++;roles();}
+function useRegistration(c,preview){registration=c;registrationPreview=preview;link.disabled=view==='overlay';link.checked=true;if(typeof alignOnRegistration==='function')alignOnRegistration(c,preview);epoch++;roles();tryCarry();}
 function loadDefaultRegistration(note){return fetch(capture.registration,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(c=>{if(c.status!==(capture.provisional?'project-frame-provisional':'geometry-registered')||!Number.isFinite(c.rotationYDegrees)||!Array.isArray(c.translation)||c.translation.length!==3||!c.translation.every(Number.isFinite))throw Error();useRegistration(c,false);if(note)status.textContent=note+' \u00b7 '+status.textContent;}).catch(()=>status.textContent='Independent cameras · Registration unavailable');}
 const candidatePath=registrationOverride(location.search);
 if(candidatePath&&candidatePath!=='invalid')fetch(candidatePath,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('candidate not found');return r.json()}).then(c=>{const v=RegistrationCore.validateRegistration(c,capture.date);if(!v.ok)throw Error(v.reason);useRegistration(c,true);}).catch(e=>loadDefaultRegistration('Candidate rejected ('+(e.message||'invalid')+'), showing default'));

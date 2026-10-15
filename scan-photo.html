@@ -48,6 +48,7 @@ async function openStation(index){
   sphere.position.fromArray(s.position);orientSphere(s);
   if(active<0)camera.position.fromArray(s.position);
   if(active<0){const forward=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().fromArray(s.e57Quaternion)).applyQuaternion(axis);camera.lookAt(camera.position.clone().add(forward));angles();}
+  if(startLook){camera.quaternion.fromArray(startLook.quaternion).normalize();camera.fov=startLook.fov;camera.updateProjectionMatrix();angles();startLook=null;}
   if(edgesOnly&&old)old.dispose();
   if(edgesOnly&&edgePose)applyLinkedPose(edgePose);
   active=i;sphere.visible=true;select.value=String(i);label.textContent=`${i+1}/${stations.length} · Captured photo`;
@@ -55,6 +56,13 @@ async function openStation(index){
  }}catch(e){label.textContent='Photo unavailable · choose another capture';console.error(e)}finally{loading=false;if(requested>=0){const queued=requested;requested=-1;queueMicrotask(()=>openStation(queued));}}
 }
 let edgePose=null;
+/* scan-compare ?at=: open the station nearest a carried viewpoint and keep its view direction (mode/capture switch). */
+let startLook=null;
+function gotoPose(p){if(!stations.length||!p||!Array.isArray(p.position)||p.position.length!==3||!p.position.every(Number.isFinite)||!Array.isArray(p.quaternion)||p.quaternion.length!==4||!p.quaternion.every(Number.isFinite))return;
+ let best=-1,bd=Infinity;for(const [i,s] of stations.entries()){const d=Math.hypot(s.position[0]-p.position[0],s.position[2]-p.position[2])+Math.abs(s.position[1]-p.position[1])*3;if(d<bd){bd=d;best=i;}}
+ if(best<0)return;startLook={quaternion:p.quaternion,fov:Number.isFinite(p.fov)?Math.max(35,Math.min(95,p.fov)):camera.fov};
+ if(best===active&&!loading){camera.quaternion.fromArray(startLook.quaternion).normalize();camera.fov=startLook.fov;camera.updateProjectionMatrix();angles();startLook=null;claim();return;}
+ openStation(best);}
 /* Per-station heading offsets (degrees about +Y) from a previewed registration candidate (scan-compare ?registration=).
    Empty by default: the E57 pose is used unchanged. Offset q = rotY(deg) is pre-multiplied onto the sphere orientation. */
 let headingOffsets={};
@@ -108,6 +116,7 @@ window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==
  if(d?.type==='grimes-photo-station'&&edgesOnly&&Number.isInteger(d.index))openStation(d.index);
  if(d?.type==='grimes-heading-offsets'&&d.offsets&&typeof d.offsets==='object'){const next={};for(const [k,v] of Object.entries(d.offsets))if(Number.isFinite(v)&&Math.abs(v)<=180)next[k]=v;headingOffsets=next;if(active>=0&&!transition)orientSphere(stations[active]);}
  if(d?.type==='grimes-photo-pickmode'&&!edgesOnly){pickMode=!!d.enabled;renderer.domElement.style.cursor=pickMode?'crosshair':'';}
+ if(d?.type==='grimes-photo-goto'&&!edgesOnly)gotoPose(d.pose);
  if(d?.type==='grimes-photo-step'&&!edgesOnly)walkDirection(d.direction|| (d.delta<0?'back':'forward'));
  if(d?.type==='grimes-linked-pose'&&d.epoch===epoch){const p=d.pose;if(!p||!Array.isArray(p.quaternion)||p.quaternion.length!==4||!p.quaternion.every(Number.isFinite))return;if(edgesOnly)edgePose=p;if(active>=0)applyLinkedPose(p);}
 });
