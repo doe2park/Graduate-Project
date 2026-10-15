@@ -1,0 +1,64 @@
+{
+  "schema": "grimes-registration-candidate/1",
+  "capture": "2026-09-17",
+  "createdAt": "2026-10-15T01:55:32Z",
+  "rotationYDegrees": -0.5933353643051292,
+  "translation": [
+    -34.96492594830326,
+    0.6940869974941224,
+    -25.442730918214032
+  ],
+  "scale": 1,
+  "status": "icp-refined-unsurveyed",
+  "method": {
+    "model": "rigid yaw about +Y + XYZ translation, scale fixed at 1",
+    "solver": "trimmed point-to-point ICP (alignment-analysis/method-archive): cKDTree nearest BIM point, keep d < min(2 m, p65), closed-form yaw+XYZ update, <=40 iterations, stop at 1e-5",
+    "icp": {
+      "iterations": 40,
+      "scanVoxelMetres": 0.14,
+      "bimVoxelMetres": 0.12,
+      "bimHeightBandMetres": [
+        4.7,
+        10.0
+      ],
+      "trainPoints": 32131,
+      "evaluationPoints": 32131,
+      "evaluation": "every third scan sample trains, the next is held out"
+    },
+    "ransac": null
+  },
+  "frames": {
+    "source": "scan viewer frame, Y-up metres",
+    "target": "BIM viewer world, Y-up metres"
+  },
+  "inputs": {
+    "init": "scan-assets/captures/2026-09-17/registration.json",
+    "initSha256": "07e09a8a85bc3cd2436a3c96381376cb404c1377a0bd66c5bf0769512135d5b9",
+    "scanMeshes": {
+      "scan-assets/captures/2026-09-17/mobile/scan.glb": "30cb4b55fa07df514ba64a642498232e44edb97698abd12fcd58e8feed260d40"
+    },
+    "bimSoups": {
+      "arch.f32": "1278322117daf9ba0ecb397834125c0004c9febed8ed3128ea0fe1efe2daf6e5"
+    },
+    "bimSources": {
+      "buildings/grimes/grimes-arch.glb": "5970c96c7d6ea8f7635c3717d3b3da76eb2918ab7a0fad8043d0a41ae6d4d0f8"
+    },
+    "bimSoupNote": "float32 triangles decoded by scripts/decode_bim_soup.mjs from buildings/grimes/*.glb (read-only)"
+  },
+  "nearestPointBefore": {
+    "medianMetres": 0.16050240856829734,
+    "p80Metres": 0.41962795437008416,
+    "within025": 0.66116834209953,
+    "within05": 0.8426752979988174,
+    "points": 32131
+  },
+  "nearestPointAfter": {
+    "medianMetres": 0.14299670598826814,
+    "p80Metres": 0.37914083313000013,
+    "within025": 0.7048022159285425,
+    "within05": 0.85503096697893,
+    "points": 32131
+  },
+  "stationHeadingOffsetsDegrees": {},
+  "scope": "ICP candidate seeded by registration.json. Nearest-point distances are internal consistency against sampled BIM geometry, not surveyed accuracy. Review with independent check points and in scan-compare.html?registration=<this file>."
+}

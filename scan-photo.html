@@ -45,7 +45,7 @@ async function openStation(index){
   const texture=await loader.loadAsync(assetURL(s.file));
   if(requested!==-1){texture.dispose();continue;}
   texture.colorSpace=THREE.SRGBColorSpace;const old=material.map,oldOrientation=sphere.quaternion.clone();material.map=texture;material.needsUpdate=true;
-  sphere.position.fromArray(s.position);sphere.quaternion.copy(axis).multiply(new THREE.Quaternion().fromArray(s.e57Quaternion)).multiply(axis.clone().invert()).multiply(centerCorrection);
+  sphere.position.fromArray(s.position);orientSphere(s);
   if(active<0)camera.position.fromArray(s.position);
   if(active<0){const forward=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().fromArray(s.e57Quaternion)).applyQuaternion(axis);camera.lookAt(camera.position.clone().add(forward));angles();}
   if(edgesOnly&&old)old.dispose();
@@ -55,6 +55,11 @@ async function openStation(index){
  }}catch(e){label.textContent='Photo unavailable · choose another capture';console.error(e)}finally{loading=false;if(requested>=0){const queued=requested;requested=-1;queueMicrotask(()=>openStation(queued));}}
 }
 let edgePose=null;
+/* Per-station heading offsets (degrees about +Y) from a previewed registration candidate (scan-compare ?registration=).
+   Empty by default: the E57 pose is used unchanged. Offset q = rotY(deg) is pre-multiplied onto the sphere orientation. */
+let headingOffsets={};
+function stationOrientation(s){const q=new THREE.Quaternion().copy(axis).multiply(new THREE.Quaternion().fromArray(s.e57Quaternion)).multiply(axis.clone().invert()).multiply(centerCorrection);const d=Number(headingOffsets[s.id]);return Number.isFinite(d)&&d?new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),d*Math.PI/180).multiply(q):q;}
+function orientSphere(s){sphere.quaternion.copy(stationOrientation(s));}
 function applyLinkedPose(p){camera.quaternion.fromArray(p.quaternion);camera.fov=p.fov;camera.zoom=p.zoom;camera.updateProjectionMatrix();angles();}
 function step(delta){if(!stations.length)return;openStation((targetStation>=0?targetStation:Math.max(0,active))+delta);}
 document.getElementById('previous').onclick=()=>step(-1);document.getElementById('next').onclick=()=>step(1);select.onchange=()=>openStation(Number(select.value));
@@ -93,6 +98,7 @@ function transitionTo(position,old,orientation){
 window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==parent)return;const d=e.data;
  if(d?.type==='grimes-camera-role'){epoch=d.epoch;driver=d.driver;linked=d.linked;pendingClaim=false;if(driver==='scan')publish();}
  if(d?.type==='grimes-photo-station'&&edgesOnly&&Number.isInteger(d.index))openStation(d.index);
+ if(d?.type==='grimes-heading-offsets'&&d.offsets&&typeof d.offsets==='object'){const next={};for(const [k,v] of Object.entries(d.offsets))if(Number.isFinite(v)&&Math.abs(v)<=180)next[k]=v;headingOffsets=next;if(active>=0&&!transition)orientSphere(stations[active]);}
  if(d?.type==='grimes-photo-step'&&!edgesOnly)walkDirection(d.direction|| (d.delta<0?'back':'forward'));
  if(d?.type==='grimes-linked-pose'&&d.epoch===epoch){const p=d.pose;if(!p||!Array.isArray(p.quaternion)||p.quaternion.length!==4||!p.quaternion.every(Number.isFinite))return;if(edgesOnly)edgePose=p;if(active>=0)applyLinkedPose(p);}
 });
@@ -116,7 +122,7 @@ if(edgesOnly){
  edgeScene.add(edgeQuad);
 }
 function renderEdges(){renderer.setRenderTarget(edgeTarget);renderer.setClearColor(0x000000,1);renderer.render(scene,camera);renderer.setRenderTarget(null);renderer.setClearColor(0,0);renderer.render(edgeScene,edgeCamera);}
-window.photoInspection=()=>({active,station:stations[active],count:stations.length,loading,transitioning:!!transition,walking,mobile,camera:pose(),texture:material.map?{width:material.map.image.width,height:material.map.image.height}:null});
+window.photoInspection=()=>({headingOffset:active>=0?(headingOffsets[stations[active]?.id]||0):0,active,station:stations[active],count:stations.length,loading,transitioning:!!transition,walking,mobile,camera:pose(),texture:material.map?{width:material.map.image.width,height:material.map.image.height}:null});
 fetch(manifestURL).then(r=>{if(!r.ok)throw Error('Photo manifest unavailable');return r.json()}).then(m=>{stations=m.stations;if(m.building&&!stations.some(s=>s.neighbors?.length)){walking=false;document.getElementById('photoWalk').disabled=true;document.getElementById('photoWalk').textContent='Route pending';document.getElementById('photoWalk').setAttribute('aria-pressed','false');document.getElementById('movePad').hidden=true;document.getElementById('padToggle').disabled=true;tip('Drag to look \u00b7 use the capture picker \u00b7 walk route needs verified connections');}if(m.building)document.title=m.building+' · '+m.level+' · Captured photos';for(const [i,s]of stations.entries()){const option=document.createElement('option');option.value=i;option.textContent=`Capture ${i+1}`;select.appendChild(option);}post({type:'grimes-camera-ready'});if(edgesOnly){label.textContent='';return;}return openStation(Math.max(0,stations.findIndex(s=>s.id===m.defaultStation)))}).catch(e=>label.textContent=e.message);
 </script><script>(()=>{
 const bar=document.getElementById('tools'),toggle=document.getElementById('photoControlsToggle'),menu=document.getElementById('photoMenu'),pad=document.getElementById('movePad'),padBtn=document.getElementById('padToggle'),status=document.getElementById('status'),touch=document.body.classList.contains('touch')||matchMedia('(pointer:coarse)').matches;
