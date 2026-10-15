@@ -152,13 +152,15 @@ function gazeCardHtml(id, meta, tier, opts) {
 
 /* ── Overlay-Lens pick contract (scan-compare.html <-> scan-bim.html, same-origin postMessage) ──
    parent -> BIM pane : {type:'grimes-lens-probe', seq, x, y}            x,y normalised 0..1 in the BIM iframe rect
-   BIM pane -> parent : {type:'grimes-lens-pick', seq, x, y, hit}        hit = null | {id, layer, meta, tier, adjustment}
+   BIM pane -> parent : {type:'grimes-lens-pick', seq, x, y, hit}        hit = null | {id, layer, meta, tier, adjustment, point?}
+   point (optional) = raycast hit in BIM world metres (the frame the linked camera pose uses); used by the Overlay Align tool.
    The BIM pane raycasts its own visible element layers; the parent only positions and renders the card. */
 const LENS_PROBE = 'grimes-lens-probe', LENS_PICK = 'grimes-lens-pick';
 const CARD_META_FIELDS = ['name', 'type', 'system', 'level', 'layer'];
 const TIER_FIELDS = ['tier', 'label', 'cls', 'valueText', 'detailText', 'sourceText'];
 const KNOWN_TIERS = Object.keys(GAZE_TIER_CLASS);
 const unit = v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
+const point3 = p => Array.isArray(p) && p.length === 3 && p.every(v => typeof v === 'number' && Number.isFinite(v)) ? p.slice() : null;
 const shortStr = (v, n = 200) => typeof v === 'string' ? v.slice(0, n) : '';
 function cardMeta(info, layer) {
   const out = {};
@@ -184,8 +186,9 @@ function lensProbeMessage(seq, x, y) {
 function parseLensProbe(d) {
   return d && d.type === LENS_PROBE ? lensProbeMessage(d.seq, d.x, d.y) : null;
 }
-function lensPickMessage({seq, x, y, id, layer, info, tier, adjustment}) {
+function lensPickMessage({seq, x, y, id, layer, info, tier, adjustment, point}) {
   const hit = id != null && id !== '' && layer ? {id: String(id), layer: String(layer), meta: cardMeta(info, layer), tier: cleanTier(tier), adjustment: cleanAdjustment(adjustment)} : null;
+  if (hit && point3(point)) hit.point = point3(point);
   if (hit && !hit.tier) return {type: LENS_PICK, seq, x, y, hit: null};
   return {type: LENS_PICK, seq, x, y, hit};
 }
@@ -198,7 +201,9 @@ function parseLensPick(d, lastSeq) {
   if (typeof h.id !== 'string' || !h.id || typeof h.layer !== 'string' || !/^[a-z]+$/.test(h.layer)) return null;
   const tier = cleanTier(h.tier);
   if (!tier) return null;
-  return {seq: d.seq, x: d.x, y: d.y, hit: {id: h.id.slice(0, 80), layer: h.layer, meta: cardMeta(h.meta, h.layer), tier, adjustment: cleanAdjustment(h.adjustment)}};
+  const hit = {id: h.id.slice(0, 80), layer: h.layer, meta: cardMeta(h.meta, h.layer), tier, adjustment: cleanAdjustment(h.adjustment)};
+  if (point3(h.point)) hit.point = point3(h.point);   // optional; older panes omit it, malformed points are dropped
+  return {seq: d.seq, x: d.x, y: d.y, hit};
 }
 /* Card placement next to a lens ring (compare-page pixels). Desktop: right of the ring, flipped left at the edge.
    Mobile: centred above the bottom controls (bottomInset px reserved). */

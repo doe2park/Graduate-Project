@@ -8,7 +8,7 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.RegistrationCore=api;})(typeof self!=='undefined'?self:this,function(){
 'use strict';
 const SCHEMA='grimes-registration-candidate/1',PAIRS_SCHEMA='grimes-registration-pairs/1',MIN_FIT_PAIRS=4,MIN_SPREAD_METRES=.5;
-const CANDIDATE_STATUSES=['landmark-fit-unsurveyed','landmark-fit-surveyed-checks','icp-refined-unsurveyed'];
+const CANDIDATE_STATUSES=['landmark-fit-unsurveyed','landmark-fit-surveyed-checks','icp-refined-unsurveyed','manual-nudge-unsurveyed'];
 const D2R=Math.PI/180,R2D=180/Math.PI;
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 function vec(v,n=3){if(!Array.isArray(v)||v.length!==n||!v.every(x=>typeof x==='number'&&Number.isFinite(x)))throw new Error('Coordinates must be finite '+n+'-vectors');return v;}
@@ -30,6 +30,33 @@ function fitYawTranslation(pairs){
  reg.translation=[b[0]-ra[0],b[1]-ra[1],b[2]-ra[2]];
  reg.residualsMetres=pairs.map(p=>dist(apply(reg,p.scan),p.bim));
  return reg;
+}
+/* MANUAL ALIGN (scan-compare Overlay "Align"). Semantics are VISUAL BIM motion: the camera is what the registration maps, so
+   moving the BIM by +v (BIM frame, metres) maps the camera by -v, and turning the BIM by +phi about the vertical axis through
+   pivot c turns the mapped camera by -phi about c:  p' = R(-phi)(R(theta)p + t - c) + c - v  =>  theta' = theta - phi,
+   t' = R(-phi)(t - c) + c - v.  Returns a copy (scale 1); float noise below 1e-10 is rounded away. */
+const clean=x=>{const r=Math.round(x*1e10)/1e10;return Object.is(r,-0)?0:r;};
+const wrapDeg=d=>{let a=((d+180)%360+360)%360-180;if(a===-180)a=180;return clean(a);};
+function nudgeRegistration(reg,{moveBim=[0,0,0],yawBimDeg=0,pivot=[0,0,0]}={}){
+ vec(moveBim);vec(pivot);vec(reg.translation);if(!Number.isFinite(reg.rotationYDegrees)||!Number.isFinite(yawBimDeg))throw new Error('Angles must be finite degrees');
+ const t=reg.translation,d=rotateY([t[0]-pivot[0],t[1]-pivot[1],t[2]-pivot[2]],-yawBimDeg);
+ return{...reg,rotationYDegrees:wrapDeg(reg.rotationYDegrees-yawBimDeg),translation:[0,1,2].map(k=>clean(d[k]+pivot[k]-moveBim[k])),scale:1};
+}
+/* Element pairs {scan,bim}: 1 pair (or too little horizontal spread) -> translation only, theta kept; 2-3 well spread pairs ->
+   closed-form yaw+XYZ; 4+ -> RANSAC inliers then yaw+XYZ. Internal consistency only, never surveyed accuracy. */
+function fitFromElementPairs(reg,pairs){
+ if(!Array.isArray(pairs)||!pairs.length)throw new Error('Need at least 1 element pair');
+ for(const p of pairs){vec(p.scan);vec(p.bim);}
+ const translationOnly=note=>{const r={rotationYDegrees:reg.rotationYDegrees,translation:[0,0,0]},n=pairs.length,acc=[0,0,0];
+  for(const p of pairs){const q=apply(r,p.scan);for(let k=0;k<3;k++)acc[k]+=p.bim[k]-q[k];}
+  r.translation=acc.map(v=>clean(v/n));const out={...reg,rotationYDegrees:reg.rotationYDegrees,translation:r.translation,scale:1};
+  return{reg:out,mode:'translation',residualsMetres:pairs.map(p=>dist(apply(out,p.scan),p.bim)),note};};
+ if(pairs.length===1)return translationOnly('1 pair: translation only, yaw kept');
+ let used=pairs,inliers=null;
+ if(pairs.length>=4){try{const r=ransac(pairs);inliers=r.inliers;used=r.inliers.map(k=>pairs[k]);}catch{used=pairs;}}
+ let f;try{f=fitYawTranslation(used);}catch(e){return translationOnly('pairs too close horizontally for yaw (need '+MIN_SPREAD_METRES.toFixed(1)+' m spread): translation only');}
+ const out={...reg,rotationYDegrees:wrapDeg(f.rotationYDegrees),translation:f.translation.map(clean),scale:1};
+ return{reg:out,mode:'yaw+translation',residualsMetres:pairs.map(p=>dist(apply(out,p.scan),p.bim)),inliers,note:pairs.length+' pairs: yaw + translation'+(inliers?' (RANSAC '+inliers.length+' inliers)':'')};
 }
 function stats(errors){if(!errors.length)return{rmsMetres:null,maxMetres:null,medianMetres:null};const e=[...errors].sort((x,y)=>x-y),m=e.length;return{rmsMetres:Math.sqrt(e.reduce((s,v)=>s+v*v,0)/m),maxMetres:e[m-1],medianMetres:m%2?e[(m-1)/2]:.5*(e[m/2-1]+e[m/2])};}
 function residualRows(reg,pairs,inliers){return pairs.map((p,i)=>{const q=apply(reg,p.scan),d=[q[0]-p.bim[0],q[1]-p.bim[1],q[2]-p.bim[2]];const row={id:p.id??String(i),errorMetres:Math.sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]),horizontalMetres:Math.hypot(d[0],d[2]),verticalMetres:d[1]};if(inliers)row.inlier=inliers.has(i);return row;});}
@@ -114,7 +141,7 @@ async function buildExport(data,result,{created,extraInputs}={}){
   scope:'Visualization candidate from clicked landmarks. Fit and leave-one-out residuals are internal consistency; '+(status.endsWith('surveyed-checks')?'check points are marked surveyed by the author.':'check points are not surveyed, so this is not surveyed accuracy.')+' Review in scan-compare.html?registration=<this file> before publishing.'};
 }
 function assertCandidateName(p){const base=String(p).split('/').pop();if(base==='registration.json'||base==='accepted-registration.json')throw new Error('Refusing to replace an accepted/provisional registration; save a new dated candidate');return p;}
-function suggestFilename(capture,date){return assertCandidateName('registration-candidates/'+date+'-landmark-fit.json');}
+function suggestFilename(capture,date,kind='landmark-fit'){return assertCandidateName('registration-candidates/'+date+'-'+(/^[a-z0-9-]+$/.test(kind)?kind:'landmark-fit')+'.json');}
 /* ?registration=<path>: same-origin, relative, .json only, no traversal */
 function safeRegistrationPath(raw){if(typeof raw!=='string')return null;return /^(?!\/)(?!.*\.\.)(?!.*\/\/)[A-Za-z0-9_\-./]+\.json$/.test(raw)?raw:null;}
 function validateRegistration(r,capture){
@@ -127,5 +154,5 @@ function validateRegistration(r,capture){
  const h=r.stationHeadingOffsetsDegrees||{};if(typeof h!=='object'||!Object.values(h).every(v=>Number.isFinite(v)&&Math.abs(v)<=180))return fail('invalid heading offsets');
  return{ok:true};
 }
-return{SCHEMA,PAIRS_SCHEMA,MIN_FIT_PAIRS,CANDIDATE_STATUSES,apply,invert,rotateY,fitYawTranslation,leaveOneOut,ransac,solveHeading,splitPairs,solve,canonicalPairsText,sha256Hex,buildExport,assertCandidateName,suggestFilename,safeRegistrationPath,validateRegistration,residualRows,stats};
+return{SCHEMA,PAIRS_SCHEMA,MIN_FIT_PAIRS,CANDIDATE_STATUSES,apply,invert,rotateY,fitYawTranslation,nudgeRegistration,fitFromElementPairs,leaveOneOut,ransac,solveHeading,splitPairs,solve,canonicalPairsText,sha256Hex,buildExport,assertCandidateName,suggestFilename,safeRegistrationPath,validateRegistration,residualRows,stats};
 });

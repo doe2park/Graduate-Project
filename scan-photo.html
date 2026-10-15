@@ -63,9 +63,17 @@ function orientSphere(s){sphere.quaternion.copy(stationOrientation(s));}
 function applyLinkedPose(p){camera.quaternion.fromArray(p.quaternion);camera.fov=p.fov;camera.zoom=p.zoom;camera.updateProjectionMatrix();angles();}
 function step(delta){if(!stations.length)return;openStation((targetStation>=0?targetStation:Math.max(0,active))+delta);}
 document.getElementById('previous').onclick=()=>step(-1);document.getElementById('next').onclick=()=>step(1);select.onchange=()=>openStation(Number(select.value));
-renderer.domElement.onpointerdown=e=>{if(active<0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);claim();};
+renderer.domElement.onpointerdown=e=>{if(active<0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);claim();};
 renderer.domElement.onpointermove=e=>{if(!drag||drag.id!==e.pointerId)return;yaw-=(e.clientX-drag.x)*.004;pitch=Math.max(-1.45,Math.min(1.45,pitch-(e.clientY-drag.y)*.004));drag.x=e.clientX;drag.y=e.clientY;camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));publish();};
+renderer.domElement.addEventListener('pointerup',e=>{if(pickMode&&drag&&drag.id===e.pointerId&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<5)photoPick(e.clientX,e.clientY);});
 for(const type of ['pointerup','pointercancel','lostpointercapture'])renderer.domElement.addEventListener(type,()=>drag=null);
+/* PHOTO PICK (scan-compare Overlay Align): a click (<5 px drag) posts the clicked ray. The camera has no parent and sits at the
+   station in the scan viewer frame, and pose() publishes that same camera, so the unprojected ray is already in the frame of
+   station positions and of convert()'s input. The sphere's per-station heading offset only rotates the texture: the ray is the
+   direction of the pixel as displayed (offset included), i.e. the direction the user sees overlaid on the BIM. */
+let pickMode=false;
+function photoPick(cx,cy){if(active<0||transition||loading)return;camera.updateMatrixWorld();const x=cx/innerWidth,y=cy/innerHeight,d=new THREE.Vector3(x*2-1,-(y*2-1),.5).unproject(camera).sub(camera.position).normalize();
+ send({type:'grimes-photo-pick',x,y,direction:d.toArray(),origin:camera.position.toArray(),station:active,stationId:stations[active]?.id??null,headingOffsetDegrees:Number(headingOffsets[stations[active]?.id])||0});}
 /* normalised mouse position for the compare page's LENS (touch keeps the lens centred) */
 renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')send({type:'grimes-pointer',x:e.clientX/innerWidth,y:e.clientY/innerHeight});});
 renderer.domElement.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')send({type:'grimes-pointer',x:null,y:null});});
@@ -99,6 +107,7 @@ window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==
  if(d?.type==='grimes-camera-role'){epoch=d.epoch;driver=d.driver;linked=d.linked;pendingClaim=false;if(driver==='scan')publish();}
  if(d?.type==='grimes-photo-station'&&edgesOnly&&Number.isInteger(d.index))openStation(d.index);
  if(d?.type==='grimes-heading-offsets'&&d.offsets&&typeof d.offsets==='object'){const next={};for(const [k,v] of Object.entries(d.offsets))if(Number.isFinite(v)&&Math.abs(v)<=180)next[k]=v;headingOffsets=next;if(active>=0&&!transition)orientSphere(stations[active]);}
+ if(d?.type==='grimes-photo-pickmode'&&!edgesOnly){pickMode=!!d.enabled;renderer.domElement.style.cursor=pickMode?'crosshair':'';}
  if(d?.type==='grimes-photo-step'&&!edgesOnly)walkDirection(d.direction|| (d.delta<0?'back':'forward'));
  if(d?.type==='grimes-linked-pose'&&d.epoch===epoch){const p=d.pose;if(!p||!Array.isArray(p.quaternion)||p.quaternion.length!==4||!p.quaternion.every(Number.isFinite))return;if(edgesOnly)edgePose=p;if(active>=0)applyLinkedPose(p);}
 });
@@ -122,7 +131,7 @@ if(edgesOnly){
  edgeScene.add(edgeQuad);
 }
 function renderEdges(){renderer.setRenderTarget(edgeTarget);renderer.setClearColor(0x000000,1);renderer.render(scene,camera);renderer.setRenderTarget(null);renderer.setClearColor(0,0);renderer.render(edgeScene,edgeCamera);}
-window.photoInspection=()=>({headingOffset:active>=0?(headingOffsets[stations[active]?.id]||0):0,active,station:stations[active],count:stations.length,loading,transitioning:!!transition,walking,mobile,camera:pose(),texture:material.map?{width:material.map.image.width,height:material.map.image.height}:null});
+window.photoInspection=()=>({pickMode,headingOffset:active>=0?(headingOffsets[stations[active]?.id]||0):0,active,station:stations[active],count:stations.length,loading,transitioning:!!transition,walking,mobile,camera:pose(),texture:material.map?{width:material.map.image.width,height:material.map.image.height}:null});
 fetch(manifestURL).then(r=>{if(!r.ok)throw Error('Photo manifest unavailable');return r.json()}).then(m=>{stations=m.stations;if(m.building&&!stations.some(s=>s.neighbors?.length)){walking=false;document.getElementById('photoWalk').disabled=true;document.getElementById('photoWalk').textContent='Route pending';document.getElementById('photoWalk').setAttribute('aria-pressed','false');document.getElementById('movePad').hidden=true;document.getElementById('padToggle').disabled=true;tip('Drag to look \u00b7 use the capture picker \u00b7 walk route needs verified connections');}if(m.building)document.title=m.building+' · '+m.level+' · Captured photos';for(const [i,s]of stations.entries()){const option=document.createElement('option');option.value=i;option.textContent=`Capture ${i+1}`;select.appendChild(option);}post({type:'grimes-camera-ready'});if(edgesOnly){label.textContent='';return;}return openStation(Math.max(0,stations.findIndex(s=>s.id===m.defaultStation)))}).catch(e=>label.textContent=e.message);
 </script><script>(()=>{
 const bar=document.getElementById('tools'),toggle=document.getElementById('photoControlsToggle'),menu=document.getElementById('photoMenu'),pad=document.getElementById('movePad'),padBtn=document.getElementById('padToggle'),status=document.getElementById('status'),touch=document.body.classList.contains('touch')||matchMedia('(pointer:coarse)').matches;

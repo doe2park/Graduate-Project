@@ -43,7 +43,17 @@ main{position:relative}
 #asBuiltPanel .ab-row{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}#asBuiltPanel .ab-row button{flex:1}#abTarget{padding:6px 8px;border-radius:6px;background:#132b40;margin:4px 0}#abReadout{font-variant-numeric:tabular-nums;color:#f0abfc;margin:4px 0}#abStatus,#abStats{color:#b4cbdc;font-size:11px;margin-top:4px}
 #asBuiltPanel .ab-honest{color:#f0abfc;font-size:11px;margin:4px 0}
 @media(max-width:768px){#asBuiltToggle{min-height:44px}#asBuiltPanel{left:6px;right:6px;top:auto;bottom:6px;width:auto;max-height:58%}#asBuiltPanel button{min-height:44px}#asBuiltPanel .ab-grid{grid-template-columns:40px repeat(4,1fr)}}
-</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p><a class="rights-link" href="rights.html" target="_blank" rel="noopener">© 2026 Yoonsung Chung · Rights &amp; use</a></div><nav id="paneViews" aria-label="Comparison view"><button data-focus="both" aria-pressed="true">Compare</button><button data-focus="overlay" aria-pressed="false" title="BIM services drawn semi-transparently over the scan">Overlay</button><button data-focus="scan" aria-pressed="false">Scan</button><button data-focus="bim" aria-pressed="false">BIM</button></nav><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label><button id="asBuiltToggle" type="button" aria-expanded="false" aria-controls="asBuiltPanel" title="Nudge a BIM element onto the installed one seen in the scan (manual, not surveyed)">As-built…</button></header><div id="overlayBar" role="group" aria-label="X-ray overlay controls"><label for="xrayOpacity">BIM services opacity<input id="xrayOpacity" type="range" min="0" max="100" step="5" value="30" aria-describedby="xrayValue"><output id="xrayValue" for="xrayOpacity">30%</output></label><div id="styleBar" role="group" aria-label="Overlay style"><span>Style</span><button data-style="lens" aria-pressed="true" title="Cut-away: services visible through a soft circular hole">Lens</button><button data-style="ghost" aria-pressed="false" title="Services plus the real room's edges drawn on top (360° photos, desktop)">Ghost</button><button data-style="plain" aria-pressed="false" title="Uniform transparency">Plain</button><span id="styleNote" role="status"></span></div><button id="lensCardsToggle" type="button" aria-pressed="true" title="Info cards for the element under the lens (I)">Info cards: on</button></div><main><div id="lensRing" aria-hidden="true"></div><div id="lensCard" role="status" aria-live="off"></div><div id="asBuiltBadge" hidden>AS-BUILT ADJUSTED <small>· manual, not surveyed</small></div><aside id="asBuiltPanel" hidden tabindex="-1" aria-label="As-built position adjustment"><div class="ab-head"><b>As-built position</b><button id="abClose" type="button" aria-label="Close as-built panel">×</button></div><div class="ab-mode" role="group" aria-label="Geometry shown"><button type="button" data-ab-mode="design" aria-pressed="true">Design (BIM)</button><button type="button" data-ab-mode="asbuilt" aria-pressed="false">As-built adjusted</button></div><div class="ab-honest">Adjusted positions are a manual visual match to a captured photo or mesh: manual, not surveyed. Design geometry and GLBs are never changed.</div><div id="abTarget">No element selected.</div><button id="abSelect" type="button" style="width:100%">Select element under lens</button><label>Your initials (required) <input id="abAuthor" type="text" maxlength="4" autocomplete="off" spellcheck="false" placeholder="e.g. YC"></label><div class="ab-grid" role="group" aria-label="Nudge selected element"><span>X</span><button type="button" data-ab="x" data-step="-0.05" aria-label="X minus 5 cm">−5</button><button type="button" data-ab="x" data-step="-0.01" aria-label="X minus 1 cm">−1</button><button type="button" data-ab="x" data-step="0.01" aria-label="X plus 1 cm">+1</button><button type="button" data-ab="x" data-step="0.05" aria-label="X plus 5 cm">+5</button><span>Z</span><button type="button" data-ab="z" data-step="-0.05" aria-label="Z minus 5 cm">−5</button><button type="button" data-ab="z" data-step="-0.01" aria-label="Z minus 1 cm">−1</button><button type="button" data-ab="z" data-step="0.01" aria-label="Z plus 1 cm">+1</button><button type="button" data-ab="z" data-step="0.05" aria-label="Z plus 5 cm">+5</button><span>Y ↑</span><button type="button" data-ab="y" data-step="-0.05" aria-label="Height minus 5 cm">−5</button><button type="button" data-ab="y" data-step="-0.01" aria-label="Height minus 1 cm">−1</button><button type="button" data-ab="y" data-step="0.01" aria-label="Height plus 1 cm">+1</button><button type="button" data-ab="y" data-step="0.05" aria-label="Height plus 5 cm">+5</button><span>Yaw</span><button type="button" data-ab="yaw" data-step="-5" aria-label="Yaw minus 5 degrees">−5°</button><button type="button" data-ab="yaw" data-step="-1" aria-label="Yaw minus 1 degree">−1°</button><button type="button" data-ab="yaw" data-step="1" aria-label="Yaw plus 1 degree">+1°</button><button type="button" data-ab="yaw" data-step="5" aria-label="Yaw plus 5 degrees">+5°</button></div><div id="abReadout" aria-live="polite">Δ —</div><label>Note <input id="abNote" type="text" maxlength="500" autocomplete="off" placeholder="what was matched (optional)"></label><div class="ab-row"><button id="abReset" type="button">Reset element</button><button id="abExport" type="button">Export JSON</button><button id="abImportBtn" type="button">Load JSON</button><input id="abImport" type="file" accept="application/json,.json" hidden></div><div id="abStatus" role="status"></div><div id="abStats"></div><div id="abKeys" style="color:#8ea3b6;font-size:11px;margin-top:4px">Keys (panel focused): ←/→ X, ↑/↓ Z, PgUp/PgDn height, [ ] yaw, Shift = 5 cm. Commit the exported file to buildings/grimes/as-built-adjustments.json.</div></aside><div id="edgeLayer" aria-hidden="true"></div><section aria-label="Actual scan"><h2>Actual scan <select id="scanMode" aria-label="Scan display"><option value="photo">360° photos</option><option value="mesh">3D mesh</option><option value="splat" disabled>Gaussian · May experiment (appearance only)</option></select><select id="captureDate" aria-label="Capture date"><option value="2026-09-17">Sep 17, 2026 · New</option><option value="2026-05-06">May 6, 2026</option></select></h2><iframe title="Captured scan" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section></main><script src="registration-core.js?v=1"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script>
+/* ALIGN PANEL (temporary whole-BIM registration nudge; Overlay only) */
+#alignToggle{min-height:32px;padding:0 12px;border:1px solid #8aa5bb;border-radius:8px;background:#244562;color:#fff;font:600 12px Arial;cursor:pointer;white-space:nowrap}#alignToggle[aria-expanded="true"]{background:#8a5a12;border-color:#ffd479}body:not([data-focus="overlay"]) #alignToggle,body:not([data-focus="overlay"]) #alignPanel{display:none}
+#alignBadge{position:absolute;z-index:7;left:50%;top:10px;transform:translateX(-50%);max-width:calc(100% - 20px);padding:5px 9px;border-radius:7px;background:rgba(138,90,18,.94);border:1px solid #ffd479;color:#fff;font:700 11px Arial;letter-spacing:.2px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#alignPanel{position:absolute;z-index:8;right:10px;top:10px;width:300px;max-height:calc(100% - 20px);overflow:auto;padding:10px 12px;border-radius:12px;background:rgba(10,18,30,.94);border:1px solid #6e5a2e;color:#e6eef6;font:12px/1.4 Arial;box-shadow:0 8px 28px rgba(0,0,0,.4)}
+#alignPanel:focus{outline:2px solid #ffd479;outline-offset:1px}#alignPanel .ab-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}#alignPanel .ab-head b{font-size:13px}
+#alignPanel button,#alignPanel select{min-height:30px;border:1px solid #58708a;border-radius:6px;background:#1c3348;color:#eaf2fa;font:600 12px Arial;cursor:pointer}#alignPanel button:disabled{opacity:.4;cursor:not-allowed}#alignPanel button[aria-pressed="true"]{background:#8a5a12;border-color:#ffd479}
+#alignPanel button:focus-visible,#alignPanel select:focus-visible{outline:2px solid #ffd479;outline-offset:1px}#alignPanel label{display:flex;align-items:center;gap:6px;margin:4px 0;color:#b4cbdc}
+#alignPanel .al-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:4px 0 8px}#alignPanel .al-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin:6px 0}#alignPanel .al-yaw{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:6px 0}
+#alignPanel .ab-row{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}#alignPanel .ab-row button{flex:1}#alReadout{font-variant-numeric:tabular-nums;color:#ffd479;margin:4px 0;white-space:pre-line}#alStatus,#alPairs{color:#b4cbdc;font-size:11px;margin-top:4px}#alignPanel .ab-honest{color:#ffd479;font-size:11px;margin:4px 0}#alHelp{color:#8ea3b6;font-size:11px;margin-top:6px}
+@media(max-width:768px){#alignToggle{min-height:44px}#alignPanel{left:6px;right:6px;top:auto;bottom:6px;width:auto;max-height:58%}#alignPanel button,#alignPanel select{min-height:44px}}
+</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p><a class="rights-link" href="rights.html" target="_blank" rel="noopener">© 2026 Yoonsung Chung · Rights &amp; use</a></div><nav id="paneViews" aria-label="Comparison view"><button data-focus="both" aria-pressed="true">Compare</button><button data-focus="overlay" aria-pressed="false" title="BIM services drawn semi-transparently over the scan">Overlay</button><button data-focus="scan" aria-pressed="false">Scan</button><button data-focus="bim" aria-pressed="false">BIM</button></nav><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label><button id="asBuiltToggle" type="button" aria-expanded="false" aria-controls="asBuiltPanel" title="Nudge a BIM element onto the installed one seen in the scan (manual, not surveyed)">As-built…</button><button id="alignToggle" type="button" aria-expanded="false" aria-controls="alignPanel" title="Temporarily move the whole BIM onto the scan (preview: not saved, not surveyed)">Align…</button></header><div id="overlayBar" role="group" aria-label="X-ray overlay controls"><label for="xrayOpacity">BIM services opacity<input id="xrayOpacity" type="range" min="0" max="100" step="5" value="30" aria-describedby="xrayValue"><output id="xrayValue" for="xrayOpacity">30%</output></label><div id="styleBar" role="group" aria-label="Overlay style"><span>Style</span><button data-style="lens" aria-pressed="true" title="Cut-away: services visible through a soft circular hole">Lens</button><button data-style="ghost" aria-pressed="false" title="Services plus the real room's edges drawn on top (360° photos, desktop)">Ghost</button><button data-style="plain" aria-pressed="false" title="Uniform transparency">Plain</button><span id="styleNote" role="status"></span></div><button id="lensCardsToggle" type="button" aria-pressed="true" title="Info cards for the element under the lens (I)">Info cards: on</button></div><main><div id="lensRing" aria-hidden="true"></div><div id="lensCard" role="status" aria-live="off"></div><div id="asBuiltBadge" hidden>AS-BUILT ADJUSTED <small>· manual, not surveyed</small></div><aside id="asBuiltPanel" hidden tabindex="-1" aria-label="As-built position adjustment"><div class="ab-head"><b>As-built position</b><button id="abClose" type="button" aria-label="Close as-built panel">×</button></div><div class="ab-mode" role="group" aria-label="Geometry shown"><button type="button" data-ab-mode="design" aria-pressed="true">Design (BIM)</button><button type="button" data-ab-mode="asbuilt" aria-pressed="false">As-built adjusted</button></div><div class="ab-honest">Adjusted positions are a manual visual match to a captured photo or mesh: manual, not surveyed. Design geometry and GLBs are never changed.</div><div id="abTarget">No element selected.</div><button id="abSelect" type="button" style="width:100%">Select element under lens</button><label>Your initials (required) <input id="abAuthor" type="text" maxlength="4" autocomplete="off" spellcheck="false" placeholder="e.g. YC"></label><div class="ab-grid" role="group" aria-label="Nudge selected element"><span>X</span><button type="button" data-ab="x" data-step="-0.05" aria-label="X minus 5 cm">−5</button><button type="button" data-ab="x" data-step="-0.01" aria-label="X minus 1 cm">−1</button><button type="button" data-ab="x" data-step="0.01" aria-label="X plus 1 cm">+1</button><button type="button" data-ab="x" data-step="0.05" aria-label="X plus 5 cm">+5</button><span>Z</span><button type="button" data-ab="z" data-step="-0.05" aria-label="Z minus 5 cm">−5</button><button type="button" data-ab="z" data-step="-0.01" aria-label="Z minus 1 cm">−1</button><button type="button" data-ab="z" data-step="0.01" aria-label="Z plus 1 cm">+1</button><button type="button" data-ab="z" data-step="0.05" aria-label="Z plus 5 cm">+5</button><span>Y ↑</span><button type="button" data-ab="y" data-step="-0.05" aria-label="Height minus 5 cm">−5</button><button type="button" data-ab="y" data-step="-0.01" aria-label="Height minus 1 cm">−1</button><button type="button" data-ab="y" data-step="0.01" aria-label="Height plus 1 cm">+1</button><button type="button" data-ab="y" data-step="0.05" aria-label="Height plus 5 cm">+5</button><span>Yaw</span><button type="button" data-ab="yaw" data-step="-5" aria-label="Yaw minus 5 degrees">−5°</button><button type="button" data-ab="yaw" data-step="-1" aria-label="Yaw minus 1 degree">−1°</button><button type="button" data-ab="yaw" data-step="1" aria-label="Yaw plus 1 degree">+1°</button><button type="button" data-ab="yaw" data-step="5" aria-label="Yaw plus 5 degrees">+5°</button></div><div id="abReadout" aria-live="polite">Δ —</div><label>Note <input id="abNote" type="text" maxlength="500" autocomplete="off" placeholder="what was matched (optional)"></label><div class="ab-row"><button id="abReset" type="button">Reset element</button><button id="abExport" type="button">Export JSON</button><button id="abImportBtn" type="button">Load JSON</button><input id="abImport" type="file" accept="application/json,.json" hidden></div><div id="abStatus" role="status"></div><div id="abStats"></div><div id="abKeys" style="color:#8ea3b6;font-size:11px;margin-top:4px">Keys (panel focused): ←/→ X, ↑/↓ Z, PgUp/PgDn height, [ ] yaw, Shift = 5 cm. Commit the exported file to buildings/grimes/as-built-adjustments.json.</div></aside><div id="alignBadge" hidden>MANUAL ALIGNMENT PREVIEW · not saved · not surveyed</div><aside id="alignPanel" hidden tabindex="-1" aria-label="Manual alignment preview"><div class="ab-head"><b>Align BIM to scan</b><button id="alClose" type="button" aria-label="Close align panel">×</button></div><div class="ab-honest">Moves the whole BIM together (designed distances kept) through a temporary copy of the registration. Preview only: not saved, not surveyed. Accepted registrations are never changed.</div><div class="al-tabs" role="group" aria-label="Align mode"><button type="button" data-al-tab="move" aria-pressed="true">Move / rotate</button><button type="button" data-al-tab="match" aria-pressed="false">Match elements</button></div><div id="alMove"><label>Step <select id="alStep" aria-label="Move step"><option value="0.01">1 cm</option><option value="0.05" selected>5 cm</option><option value="0.2">20 cm</option></select></label><div class="al-pad" role="group" aria-label="Move BIM relative to the camera"><button type="button" data-al-move="up" aria-label="Move BIM up">Up ▲</button><button type="button" data-al-move="forward" aria-label="Move BIM away from the camera">Away ↑</button><button type="button" data-al-move="down" aria-label="Move BIM down">Down ▼</button><button type="button" data-al-move="left" aria-label="Move BIM left">← Left</button><button type="button" data-al-move="back" aria-label="Move BIM toward the camera">Near ↓</button><button type="button" data-al-move="right" aria-label="Move BIM right">Right →</button></div><div class="al-yaw" role="group" aria-label="Turn BIM about the camera's vertical axis"><button type="button" data-al-yaw="0.5" aria-label="Turn BIM 0.5 degrees counter-clockwise seen from above">↺ .5°</button><button type="button" data-al-yaw="0.1" aria-label="Turn BIM 0.1 degrees counter-clockwise seen from above">↺ .1°</button><button type="button" data-al-yaw="-0.1" aria-label="Turn BIM 0.1 degrees clockwise seen from above">↻ .1°</button><button type="button" data-al-yaw="-0.5" aria-label="Turn BIM 0.5 degrees clockwise seen from above">↻ .5°</button></div></div><div id="alMatch" hidden><div id="alMatchInfo">Pair = a BIM element and where it really is in the photo.</div><div class="ab-row"><button id="alAddPair" type="button">Add pair</button><button id="alLensPick" type="button" title="Use the element at the lens centre (touch: turn the photo until it is centred)">Use lens centre</button></div><div id="alPairs">0 pairs</div><div class="ab-row"><button id="alSolve" type="button">Solve</button><button id="alUndoPair" type="button">Undo last pair</button><button id="alClearPairs" type="button">Clear</button></div></div><div id="alReadout" aria-live="polite">Δ —</div><div class="ab-row"><button id="alReset" type="button">Reset to loaded registration</button><button id="alExport" type="button">Export candidate JSON</button></div><div id="alStatus" role="status"></div><div id="alHelp">Keys (click this panel first): Shift+←/→ left/right, Shift+↑/↓ away/near, Shift+PgUp/PgDn up/down, [ ] turn 0.1°, { } 0.5°. Turning pivots about the current camera. Kept in this browser per capture until Reset. Export, save the file under <span id="alFolder"></span> and preview with scan-compare.html?view=overlay&amp;registration=&lt;that path&gt;.</div></aside><div id="edgeLayer" aria-hidden="true"></div><section aria-label="Actual scan"><h2>Actual scan <select id="scanMode" aria-label="Scan display"><option value="photo">360° photos</option><option value="splat" disabled>Gaussian · May experiment (appearance only)</option></select><select id="captureDate" aria-label="Capture date"><option value="2026-09-17">Sep 17, 2026 · New</option><option value="2026-05-06">May 6, 2026</option></select></h2><iframe title="Captured scan" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section></main><script src="registration-core.js?v=1"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script>
 /* OVERLAY LOGIC */
 const OVERLAY_DEFAULT_OPACITY=.30,OVERLAY_LAYERS=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety','fire'];
 function splatSource(manifest){return 'scan-splat.html?manifest='+encodeURIComponent(manifest)+'&revision=gaussian2';}
@@ -85,8 +95,8 @@ let photoMode=true,photoAnchor=null,photoMoving=false;
 const mode=document.getElementById('scanMode');
 mode.onchange=()=>navigateCapture(mode.value==='splat'?'2026-05-06':capture.date,mode.value);
 const requestedMode=new URLSearchParams(location.search).get('mode');
-if(requestedMode==='mesh'){mode.value='mesh';photoMode=false;frames[0].src=capture.mesh;}
-else frames[0].src='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&revision=mobile-controls1';
+// The 3D mesh view was retired (reconstruction too distorted to read); old ?mode=mesh links open the 360° photos.
+frames[0].src='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&revision=mobile-controls1';
 
 /* VIEW SWITCHER + X-RAY OVERLAY */
 let view=parseView(location.search);const overlayBar=document.getElementById('overlayBar'),xray=document.getElementById('xrayOpacity'),xrayOut=document.getElementById('xrayValue'),scanTitle=document.querySelector('section[aria-label="Actual scan"] h2');
@@ -158,7 +168,7 @@ function convert(p,from){
 }
 function acceptedPose(p,pane){if(photoMode){if(pane==='scan')photoAnchor=p.position.slice();else if(photoAnchor&&registration)p={...p,position:convert({...p,position:photoAnchor},'scan').position};}return p;}
 function sync(){if(!link.checked||!registration||!poses[driver])return;const target=other(driver),pose=convert(poses[driver],driver);poses[target]=pose;send(target,{type:'grimes-linked-pose',epoch,pose});}
-function roles(){send('bim',{type:'grimes-photo-mode',enabled:photoMode});send('bim',{type:'grimes-overlay',enabled:view==='overlay'});for(const pane of ['scan','bim'])send(pane,{type:'grimes-camera-role',epoch,driver,linked:link.checked});sendHeadingOffsets();status.textContent=view==='overlay'?(link.checked?(registrationPreview?previewLabel(registration):overlayLabel(capture))+' \u00b7 Drag the scan; BIM services follow':'Overlay unavailable \u00b7 Registration missing'):link.checked?photoMode?(registrationPreview?'Preview candidate · ':capture.provisional?'Provisional alignment · ':'Aligned photos · ')+'Drag either view · WASD follows capture route':(mode.value==='splat'?'Gaussian · experimental appearance, not surveyed geometry · ':(registrationPreview?'Preview candidate · ':capture.provisional?'Provisional alignment · ':'Aligned views · '))+'Move either pane · '+(driver==='scan'?'Scan':'BIM')+' controls both':'Independent cameras';sync();}
+function roles(){send('bim',{type:'grimes-photo-mode',enabled:photoMode});send('bim',{type:'grimes-overlay',enabled:view==='overlay'});for(const pane of ['scan','bim'])send(pane,{type:'grimes-camera-role',epoch,driver,linked:link.checked});sendHeadingOffsets();status.textContent=view==='overlay'?(link.checked?(registrationPreview?previewLabel(registration):overlayLabel(capture))+' \u00b7 Drag the scan; BIM services follow':'Overlay unavailable \u00b7 Registration missing'):link.checked?photoMode?(registrationPreview?'Preview candidate · ':capture.provisional?'Provisional alignment · ':'Aligned photos · ')+'Drag either view · WASD follows capture route':(mode.value==='splat'?'Gaussian · experimental appearance, not surveyed geometry · ':(registrationPreview?'Preview candidate · ':capture.provisional?'Provisional alignment · ':'Aligned views · '))+'Move either pane · '+(driver==='scan'?'Scan':'BIM')+' controls both':'Independent cameras';if(typeof alignStatusText==='function'){const a=alignStatusText();if(a)status.textContent=a;}sync();}
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;const pane=e.source===frames[0].contentWindow?'scan':e.source===frames[1].contentWindow?'bim':null;if(!pane)return;const d=e.data;if(pane==='scan')edgeFromScan(d);
  if(d?.type==='grimes-photo-transition'&&pane==='scan'&&photoMode){photoMoving=!!d.moving;if(!photoMoving)roles();return;}
@@ -178,7 +188,7 @@ fetch(GAUSSIAN_MANIFEST,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();retu
 if(view!=='compare')setView(view,{push:false});
 /* per-station photo heading offsets from a previewed candidate (empty for accepted/provisional files) */
 function sendHeadingOffsets(){if(!photoMode)return;const data={type:'grimes-heading-offsets',offsets:registrationPreview?headingOffsets(registration):{}};frames[0].contentWindow?.postMessage(data,location.origin);edgeSend(data);}
-function useRegistration(c,preview){registration=c;registrationPreview=preview;link.disabled=view==='overlay';link.checked=true;epoch++;roles();}
+function useRegistration(c,preview){registration=c;registrationPreview=preview;link.disabled=view==='overlay';link.checked=true;if(typeof alignOnRegistration==='function')alignOnRegistration(c,preview);epoch++;roles();}
 function loadDefaultRegistration(note){return fetch(capture.registration,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(c=>{if(c.status!==(capture.provisional?'project-frame-provisional':'geometry-registered')||!Number.isFinite(c.rotationYDegrees)||!Array.isArray(c.translation)||c.translation.length!==3||!c.translation.every(Number.isFinite))throw Error();useRegistration(c,false);if(note)status.textContent=note+' \u00b7 '+status.textContent;}).catch(()=>status.textContent='Independent cameras · Registration unavailable');}
 const candidatePath=registrationOverride(location.search);
 if(candidatePath&&candidatePath!=='invalid')fetch(candidatePath,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('candidate not found');return r.json()}).then(c=>{const v=RegistrationCore.validateRegistration(c,capture.date);if(!v.ok)throw Error(v.reason);useRegistration(c,true);}).catch(e=>loadDefaultRegistration('Candidate rejected ('+(e.message||'invalid')+'), showing default'));
@@ -311,5 +321,164 @@ fetch(AB_FILE,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null).th
  abSend();abRender();
 });
 abRender();
+</script>
+<script>
+/* ALIGN NUDGE (pure; tests/align-nudge.test.cjs). Whole-BIM visual alignment = a temporary copy of the registration
+   (RegistrationCore.nudgeRegistration / fitFromElementPairs). BIM geometry and the loaded/accepted files are never changed. */
+const ALIGN_BANNER='Manual alignment preview · not saved · not surveyed',ALIGN_STATUS='manual-nudge-unsurveyed',ALIGN_DRAFT_PREFIX='grimes-align-nudge-v1:',ALIGN_MIN_SPREAD=.5;
+function alignDraftKey(capture){return ALIGN_DRAFT_PREFIX+capture;}
+function alignCandidateFolder(capture){return capture==='2026-05-06'?'alignment-analysis/candidates/':'scan-assets/captures/'+capture+'/registration-candidates/';}
+/* horizontal camera basis from a Three.js quaternion [x,y,z,w]: forward = -Z of the camera, right = forward x up */
+function alignBasis(q){
+ const [x,y,z,w]=q;let fx=-2*(x*z+w*y),fz=-(1-2*(x*x+y*y));
+ if(Math.hypot(fx,fz)<1e-6){fx=2*(x*y-w*z);fz=2*(y*z+w*x);}/* looking straight down/up: the camera's up points "forward" */
+ const n=Math.hypot(fx,fz)||1;fx/=n;fz/=n;return{forward:[fx,0,fz],right:[-fz,0,fx]};
+}
+function alignMove(dir,step,basis){const f=basis.forward,r=basis.right,m=(v,k)=>v.map(a=>a*k+0);
+ switch(dir){case 'right':return m(r,step);case 'left':return m(r,-step);case 'forward':return m(f,step);case 'back':return m(f,-step);case 'up':return[0,step,0];case 'down':return[0,-step,0];default:return null;}}
+/* keyboard while the panel is open: Shift+arrows move, Shift+PgUp/PgDn height, [ ] 0.1 deg, { } 0.5 deg; plain arrows/WASD stay with walking */
+function alignKeyAction(e){
+ if(e.metaKey||e.ctrlKey||e.altKey)return null;
+ if(e.shiftKey){const m={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'forward',ArrowDown:'back',PageUp:'up',PageDown:'down'}[e.key];if(m)return{move:m};}
+ switch(e.key){case ']':return{yaw:.1};case '}':return{yaw:.5};case '[':return{yaw:-.1};case '{':return{yaw:-.5};default:return null;}
+}
+function alignDelta(base,cur){const dt=[0,1,2].map(k=>cur.translation[k]-base.translation[k]);const d=cur.rotationYDegrees-base.rotationYDegrees;return{yawDeg:((d+180)%360+360)%360-180,dt,dtNormCm:Math.hypot(...dt)*100};}
+function alignModified(base,cur){if(!base||!cur||base===cur)return false;const d=alignDelta(base,cur);return Math.abs(d.yawDeg)>1e-6||d.dt.some(v=>Math.abs(v)>1e-6);}
+/* the working registration: transform from the nudge, everything else (heading offsets, capture) from the loaded base */
+function alignWorking(base,t){const next={...base,rotationYDegrees:t.rotationYDegrees,translation:t.translation.slice(),scale:1};return alignModified(base,next)?{...next,status:ALIGN_STATUS}:base;}
+function alignReadout(base,cur){
+ if(!base||!cur)return 'Δ —';const d=alignDelta(base,cur),sg=v=>(v>=0?'+':'')+v;
+ return 'Δ yaw '+sg(d.yawDeg.toFixed(2))+'° · Δt '+d.dt.map(v=>sg((v*100).toFixed(1))).join(' / ')+' cm (|'+d.dtNormCm.toFixed(1)+'| cm)\nθ '+cur.rotationYDegrees.toFixed(3)+'° · t ['+cur.translation.map(v=>v.toFixed(3)).join(', ')+'] m';
+}
+function alignStatusLine(modified,basePath){return modified?ALIGN_BANNER+' · base '+String(basePath||'').split('/').slice(-2).join('/'):'';}
+/* which solve the pairs allow (mirrors RegistrationCore.fitFromElementPairs: RMS horizontal spread of the scan points >= 0.5 m) */
+function alignSolveMode(pairs){
+ if(!pairs.length)return 'none';if(pairs.length===1)return 'translation';
+ const n=pairs.length,cx=pairs.reduce((s,p)=>s+p.scan[0],0)/n,cz=pairs.reduce((s,p)=>s+p.scan[2],0)/n;
+ return Math.sqrt(pairs.reduce((s,p)=>s+(p.scan[0]-cx)**2+(p.scan[2]-cz)**2,0)/n)>=ALIGN_MIN_SPREAD?'yaw+translation':'translation';
+}
+function alignPairsText(pairs){const m=alignSolveMode(pairs);return pairs.length+' pair'+(pairs.length===1?'':'s')+' · '+(m==='none'?'add 1 pair for translation, 2+ spread ≥1 m apart for yaw':m==='translation'?'Solve = translation only'+(pairs.length>1?' (pairs too close for yaw)':''):'Solve = yaw + translation');}
+/* photo-click depth: the scan point lies on the clicked ray at the station-distance of the picked BIM point (mapped with reg) */
+function alignPhotoPoint(bimPoint,pick,reg,invert){
+ const s=invert(reg,bimPoint),o=pick.origin,d=pick.direction,r=Math.hypot(s[0]-o[0],s[1]-o[1],s[2]-o[2]),n=Math.hypot(d[0],d[1],d[2]);
+ return [o[0]+d[0]/n*r,o[1]+d[1]/n*r,o[2]+d[2]/n*r];
+}
+const v3=v=>Array.isArray(v)&&v.length===3&&v.every(Number.isFinite);
+function alignValidPick(d){return !!d&&d.type==='grimes-photo-pick'&&Number.isFinite(d.x)&&Number.isFinite(d.y)&&d.x>=0&&d.x<=1&&d.y>=0&&d.y<=1&&v3(d.direction)&&Math.hypot(...d.direction)>1e-9&&v3(d.origin);}
+function alignCandidate({capture,base,basePath,reg,solver,pairs,fit,created}){
+ const out={schema:'grimes-registration-candidate/1',capture,createdAt:created,rotationYDegrees:reg.rotationYDegrees,translation:reg.translation.slice(),scale:1,status:ALIGN_STATUS,
+  method:{model:'yaw+translation',solver,base:basePath,baseRotationYDegrees:base.rotationYDegrees,baseTranslation:base.translation.slice(),pivot:'turns about the BIM camera position at the time of each nudge'},
+  frames:{source:'scan viewer frame, Y-up metres (photo stations and scan mesh)',target:'BIM viewer world, Y-up metres'},
+  stationHeadingOffsetsDegrees:{...((base&&base.stationHeadingOffsetsDegrees)||{})},
+  scope:'Manual visual alignment made in scan-compare.html Overlay · Align. Not surveyed and not the accepted registration. '+(pairs&&pairs.length?'Element-pair residuals are internal consistency only; photo-click depth assumes the true element lies at the same distance from the station as the picked BIM point. ':'')+'Review with scan-compare.html?registration=<this file> before any promotion.'};
+ if(pairs&&pairs.length){out.pairs=pairs.map(p=>({id:p.id,element:p.element,station:p.station,scan:p.scan.slice(),bim:p.bim.slice(),surveyed:false}));if(fit)out.method.pairFit={mode:fit.mode,residualsMetres:fit.residualsMetres,note:fit.note};}
+ return out;
+}
+function alignDraftText({capture,basePath,reg,solver,pairs}){return JSON.stringify({v:1,capture,basePath,rotationYDegrees:reg.rotationYDegrees,translation:reg.translation,solver,pairs:pairs||[]});}
+function alignRestore(text,capture,basePath){
+ if(typeof text!=='string'||!text)return null;let d;try{d=JSON.parse(text);}catch{return null;}
+ if(!d||d.v!==1||d.capture!==capture||d.basePath!==basePath||!Number.isFinite(d.rotationYDegrees)||!v3(d.translation))return null;
+ return{rotationYDegrees:d.rotationYDegrees,translation:d.translation.slice(),solver:typeof d.solver==='string'?d.solver.slice(0,60):'manual nudge',pairs:Array.isArray(d.pairs)?d.pairs.filter(p=>p&&v3(p.scan)&&v3(p.bim)).slice(0,50):[]};
+}
+/* storage may be missing or throw (private mode, blocked site data): every access is guarded, the page works without it */
+function alignStore(ls){return{get(k){try{return ls.getItem(k);}catch{return null;}},set(k,v){try{ls.setItem(k,v);return true;}catch{return false;}},del(k){try{ls.removeItem(k);}catch{}}};}
+/* END ALIGN NUDGE */
+
+/* ── Align runtime: changes only the in-memory `registration`, then epoch++ / roles() re-poses the BIM camera ── */
+const alPanel=document.getElementById('alignPanel'),alToggle=document.getElementById('alignToggle'),alBadge=document.getElementById('alignBadge'),alStatusEl=document.getElementById('alStatus');
+const alStore=alignStore((()=>{try{return window.localStorage;}catch{return null;}})());
+let alBase=null,alBasePath=null,alSolver='manual nudge',alPairs=[],alFit=null,alMatch=null,alPending=null,alProbeSeq=-1,alTab='move',alNextId=1;
+document.getElementById('alFolder').textContent=alignCandidateFolder(capture.date);
+function alMsg(t){alStatusEl.textContent=t;}
+function alignStatusText(){return alignStatusLine(alignModified(alBase,registration),alBasePath);}
+function alignOnRegistration(c,preview){
+ alBase=c;alBasePath=preview?candidatePath:capture.registration;alPairs=[];alFit=null;alSolver='manual nudge';
+ const d=alignRestore(alStore.get(alignDraftKey(capture.date)),capture.date,alBasePath);
+ if(d){registration=alignWorking(alBase,d);alSolver=d.solver;alPairs=d.pairs;alNextId=alPairs.length+1;if(alignModified(alBase,registration))alMsg('Restored your unsaved preview from this browser');}
+ alRender();
+}
+function alSave(){const k=alignDraftKey(capture.date);if(alignModified(alBase,registration)||alPairs.length)alStore.set(k,alignDraftText({capture:capture.date,basePath:alBasePath,reg:registration,solver:alSolver,pairs:alPairs}));else alStore.del(k);}
+function alApply(next,solver){
+ if(!alBase)return;registration=alignWorking(alBase,next);
+ if(solver)alSolver=solver==='manual nudge'&&alSolver.startsWith('element pairs')?'element pairs + manual nudge':solver;
+ alSave();if(poses.scan)driver='scan';epoch++;roles();alRender();
+}
+/* BIM camera pose now (pivot + camera-relative directions) */
+function alCameraPose(){return poses.scan&&registration?convert(poses.scan,'scan'):poses.bim||null;}
+function alNudge({move,yaw}){
+ const pose=alCameraPose();if(!registration||!pose){alMsg('Waiting for the linked camera…');return;}
+ const v=move?alignMove(move,Number(document.getElementById('alStep').value),alignBasis(pose.quaternion)):[0,0,0];
+ alApply(RegistrationCore.nudgeRegistration(registration,{moveBim:v,yawBimDeg:yaw||0,pivot:pose.position}),'manual nudge');
+}
+function alPickMode(on){frames[0].contentWindow?.postMessage({type:'grimes-photo-pickmode',enabled:!!on},location.origin);}
+function alSetMatch(state){alMatch=state;alPickMode(!!state);alRender();}
+function alProbe(x,y){alProbeSeq=++lensSeq;const m=ElementCards.lensProbeMessage(alProbeSeq,Math.min(1,Math.max(0,x)),Math.min(1,Math.max(0,y)));if(m)frames[1].contentWindow?.postMessage(m,location.origin);alMsg('Looking for a BIM element there…');}
+function alRender(){
+ const mod=alignModified(alBase,registration),photo=mode.value==='photo';
+ alBadge.hidden=!mod;alToggle.textContent=mod?'Align… ●':'Align…';
+ if(alPanel.hidden)return;
+ alPanel.querySelectorAll('[data-al-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.alTab===alTab)));
+ document.getElementById('alMove').hidden=alTab!=='move';document.getElementById('alMatch').hidden=alTab!=='match';
+ alPanel.querySelectorAll('[data-al-move],[data-al-yaw]').forEach(b=>b.disabled=!registration);
+ document.getElementById('alReadout').textContent=registration&&alBase?alignReadout(alBase,registration)+(mod?'\n'+ALIGN_BANNER:''):'Registration not loaded';
+ document.getElementById('alReset').disabled=!mod&&!alPairs.length;document.getElementById('alExport').disabled=!mod;
+ document.getElementById('alPairs').textContent=alignPairsText(alPairs)+(alFit?' · last residuals '+alFit.residualsMetres.map(r=>(r*100).toFixed(1)).join(', ')+' cm (internal, not surveyed)':'');
+ document.getElementById('alMatchInfo').textContent=!photo?'Match elements needs 360° photos (photo clicks give the ray).':alMatch==='bim'?'Step 1/2: click the BIM element in the overlay, or press Use lens centre.':alMatch==='photo'?'Step 2/2: click where '+(alPending?.name||'that element')+' really is in the photo.':'Pair = a BIM element + where it really is in the photo.';
+ document.getElementById('alAddPair').disabled=!photo||!registration;document.getElementById('alAddPair').textContent=alMatch?'Cancel pair':'Add pair';
+ document.getElementById('alLensPick').disabled=alMatch!=='bim';
+ document.getElementById('alSolve').disabled=!alPairs.length;document.getElementById('alUndoPair').disabled=!alPairs.length;document.getElementById('alClearPairs').disabled=!alPairs.length;
+}
+function alOpen(on){
+ alPanel.hidden=!on;alToggle.setAttribute('aria-expanded',String(on));
+ if(on&&!abPanel.hidden)abOpen(false);if(!on&&alMatch)alSetMatch(null);if(on)alPanel.focus();alRender();
+}
+alToggle.onclick=()=>alOpen(alPanel.hidden);document.getElementById('alClose').onclick=()=>alOpen(false);
+abToggle.addEventListener('click',()=>{if(!abPanel.hidden&&!alPanel.hidden)alOpen(false);});
+alPanel.querySelectorAll('[data-al-tab]').forEach(b=>b.onclick=()=>{alTab=b.dataset.alTab;if(alTab!=='match'&&alMatch)alSetMatch(null);alRender();});
+alPanel.querySelectorAll('[data-al-move]').forEach(b=>b.onclick=()=>alNudge({move:b.dataset.alMove}));
+alPanel.querySelectorAll('[data-al-yaw]').forEach(b=>b.onclick=()=>alNudge({yaw:Number(b.dataset.alYaw)}));
+document.getElementById('alReset').onclick=()=>{if(!alBase)return;alPairs=[];alFit=null;alPending=null;alSolver='manual nudge';alStore.del(alignDraftKey(capture.date));if(alMatch)alSetMatch(null);registration=alBase;if(poses.scan)driver='scan';epoch++;roles();alMsg('Back to the loaded registration');alRender();};
+document.getElementById('alAddPair').onclick=()=>{alPending=null;alSetMatch(alMatch?null:'bim');};
+document.getElementById('alLensPick').onclick=()=>{const w=mainEl.clientWidth,h=mainEl.clientHeight,c=lensNow||{x:w/2,y:h/2};if(w&&h)alProbe(c.x/w,c.y/h);};
+document.getElementById('alUndoPair').onclick=()=>{alPairs.pop();alFit=null;alSave();alRender();};
+document.getElementById('alClearPairs').onclick=()=>{alPairs=[];alFit=null;alSave();alRender();};
+document.getElementById('alSolve').onclick=()=>{
+ try{const r=RegistrationCore.fitFromElementPairs(registration,alPairs);alFit={mode:r.mode,residualsMetres:r.residualsMetres,note:r.note};alApply(r.reg,'element pairs');alMsg('Solved: '+r.note);}
+ catch(e){alMsg('Not solved: '+(e.message||'invalid pairs'));}
+};
+document.getElementById('alExport').onclick=()=>{
+ if(!alignModified(alBase,registration))return;
+ const created=new Date().toISOString().replace(/\.\d{3}Z$/,'Z'),out=alignCandidate({capture:capture.date,base:alBase,basePath:alBasePath,reg:registration,solver:alSolver,pairs:alPairs,fit:alFit,created});
+ const v=RegistrationCore.validateRegistration(out,capture.date);if(!v.ok){alMsg('Not exported: '+v.reason);return;}
+ let name;try{name=RegistrationCore.suggestFilename(capture.date,created.slice(0,10),'manual-nudge').split('/').pop();RegistrationCore.assertCandidateName(name);}catch(e){alMsg('Not exported: '+e.message);return;}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)+'\n'],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+ alMsg('Downloaded '+name+' · save it as '+alignCandidateFolder(capture.date)+name+' and open ?registration='+alignCandidateFolder(capture.date)+name);
+};
+document.addEventListener('keydown',e=>{
+ if(alPanel.hidden||document.body.dataset.focus!=='overlay'||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)||abPanel.contains(e.target))return;
+ if(e.key==='Escape'&&alPanel.contains(e.target)){alOpen(false);return;}
+ const a=alignKeyAction(e);if(a){e.preventDefault();alNudge(a);}
+});
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin)return;const d=e.data;
+ if(e.source===frames[0].contentWindow&&d?.type==='grimes-photo-pick'){
+  if(!alMatch||!alignValidPick(d))return;
+  if(alMatch==='bim'){alProbe(d.x,d.y);return;}
+  if(alMatch==='photo'&&alPending){
+   const scan=alignPhotoPoint(alPending.point,d,registration,RegistrationCore.invert);
+   alPairs.push({id:'pair-'+(alNextId++),element:{id:alPending.id,layer:alPending.layer},name:alPending.name,station:Number.isInteger(d.station)?d.station:null,scan,bim:alPending.point.slice()});
+   alPending=null;alFit=null;alSave();alSetMatch(null);alMsg('Pair added · '+alignPairsText(alPairs));
+  }
+  return;
+ }
+ if(e.source===frames[1].contentWindow&&d?.type===ElementCards.LENS_PICK&&d.seq===alProbeSeq&&alMatch==='bim'){
+  const pick=ElementCards.parseLensPick(d);alProbeSeq=-1;
+  if(!pick?.hit?.point){alMsg('No BIM element with a hit point there · try again');return;}
+  alPending={id:pick.hit.id,layer:pick.hit.layer,name:pick.hit.meta?.name||pick.hit.meta?.type||pick.hit.layer+':'+pick.hit.id,point:pick.hit.point};
+  alMatch='photo';alMsg('Picked '+alPending.name);alRender();
+ }
+});
+if(registration&&!alBase){alignOnRegistration(registration,registrationPreview);epoch++;roles();}
+alRender();
 </script>
 </body></html>

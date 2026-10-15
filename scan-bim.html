@@ -2702,11 +2702,11 @@ function lensPickRay(x,y){
  const hit=raycaster.intersectObjects(visibleEquip(),false)[0];
  if(!hit||interiorBlocksRay(hit.distance))return null;
  const id=resolveElementHit(hit.object,hit.instanceId,hit.faceIndex,hit.index),layer=hit.object.userData.layer,info=id&&elementInfo(layer,id);
- return info?{id,layer,info}:null;
+ return info?{id,layer,info,point:hit.point.toArray()}:null;
 }
 async function answerLensProbe(probe){
  const data=await loadLensData(),hit=lensPick(probe.x,probe.y);
- const msg=ElementCards.lensPickMessage({seq:probe.seq,x:probe.x,y:probe.y,...(hit?{id:hit.id,layer:hit.layer,info:hit.info,tier:ElementCards.elementFeedTier(hit.id,hit.info,data.feeds,data.meters),adjustment:asBuiltApplied(hit.layer,hit.id)}:{})});
+ const msg=ElementCards.lensPickMessage({seq:probe.seq,x:probe.x,y:probe.y,...(hit?{id:hit.id,layer:hit.layer,info:hit.info,tier:ElementCards.elementFeedTier(hit.id,hit.info,data.feeds,data.meters),adjustment:asBuiltApplied(hit.layer,hit.id),point:hit.point}:{})});
  window.parent.postMessage(msg,location.origin);
 }
 const asBuilt={mode:'design',adjustments:[],selected:null,pickToSelect:false,adjuster:AsBuilt.createAdjuster(),last:null};
