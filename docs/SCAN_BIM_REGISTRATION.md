@@ -56,6 +56,9 @@ The algorithm and numerical outputs are archived. The temporary point-sample inp
 
 ## Next validation
 
+The owner-run correction workflow (landmark pairs with independent checks, per-photo heading, ICP refinement, dated candidates previewed with `scan-compare.html?registration=`) and the 2026-10-14 overlay diagnosis are in [REGISTRATION_WORKBENCH.md](REGISTRATION_WORKBENCH.md).
+
+
 Obtain independently measured, well-distributed fixed control points across Level 1, verify units and coordinate origins, and evaluate points excluded from fitting and candidate selection. Report spatial error distributions separately from camera-sync correctness and device-to-sensor linkage.
 
 ## Suggested spoken answer

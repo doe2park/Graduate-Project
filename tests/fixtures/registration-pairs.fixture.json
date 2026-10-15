@@ -1,0 +1,262 @@
+{
+ "schema": "grimes-registration-pairs/1",
+ "capture": "2026-09-17",
+ "note": "SYNTHETIC test fixture. True transform yaw -0.7 deg, translation [-35.25, 0.56, -25.0]; fixed noise up to 2 cm on fit/check pairs; pair f7 is a deliberate 0.9 m outlier. Not real landmarks.",
+ "truth": {
+  "rotationYDegrees": -0.7,
+  "translation": [
+   -35.25,
+   0.56,
+   -25.0
+  ]
+ },
+ "ransac": {
+  "enabled": true,
+  "thresholdMetres": 0.25
+ },
+ "pairs": [
+  {
+   "id": "f1",
+   "role": "fit",
+   "label": "column NW corner",
+   "source": "mesh-raycast",
+   "surveyed": false,
+   "scan": [
+    2.1,
+    4.55,
+    5.2
+   ],
+   "noise": [
+    0.012,
+    -0.004,
+    0.006
+   ],
+   "bim": [
+    -33.201685,
+    5.106,
+    -19.768732
+   ]
+  },
+  {
+   "id": "f2",
+   "role": "fit",
+   "label": "door jamb east",
+   "source": "mesh-raycast",
+   "surveyed": false,
+   "scan": [
+    48.3,
+    5.25,
+    7.9
+   ],
+   "noise": [
+    -0.008,
+    0.01,
+    -0.015
+   ],
+   "bim": [
+    12.941881,
+    5.82,
+    -16.525508
+   ]
+  },
+  {
+   "id": "f3",
+   "role": "fit",
+   "label": "stair nosing",
+   "source": "mesh-raycast",
+   "surveyed": false,
+   "scan": [
+    25.6,
+    4.31,
+    36.4
+   ],
+   "noise": [
+    0.005,
+    0.002,
+    0.018
+   ],
+   "bim": [
+    -10.091609,
+    4.872,
+    11.728039
+   ]
+  },
+  {
+   "id": "f4",
+   "role": "fit",
+   "label": "diffuser centre",
+   "source": "photo+mesh-depth",
+   "surveyed": false,
+   "scan": [
+    12.8,
+    8.45,
+    20.1
+   ],
+   "noise": [
+    -0.017,
+    -0.006,
+    0.003
+   ],
+   "bim": [
+    -22.713517,
+    9.004,
+    -4.742122
+   ]
+  },
+  {
+   "id": "f5",
+   "role": "fit",
+   "label": "column SE corner",
+   "source": "mesh-raycast",
+   "surveyed": false,
+   "scan": [
+    39.7,
+    4.55,
+    30.2
+   ],
+   "noise": [
+    0.009,
+    0.004,
+    -0.011
+   ],
+   "bim": [
+    4.087084,
+    5.114,
+    5.671761
+   ]
+  },
+  {
+   "id": "f6",
+   "role": "fit",
+   "label": "window mullion",
+   "source": "mesh-raycast",
+   "surveyed": false,
+   "scan": [
+    6.4,
+    6.1,
+    33.8
+   ],
+   "noise": [
+    -0.004,
+    -0.012,
+    -0.007
+   ],
+   "bim": [
+    -29.267412,
+    6.648,
+    8.868666
+   ]
+  },
+  {
+   "id": "f7",
+   "role": "fit",
+   "label": "mis-clicked light (outlier)",
+   "source": "photo+mesh-depth",
+   "surveyed": false,
+   "scan": [
+    30.1,
+    8.02,
+    14.6
+   ],
+   "noise": [
+    0.7,
+    0.05,
+    -0.56
+   ],
+   "bim": [
+    -4.630615,
+    8.63,
+    -10.593358
+   ]
+  },
+  {
+   "id": "c1",
+   "role": "check",
+   "label": "door jamb west",
+   "source": "mesh-raycast",
+   "surveyed": false,
+   "scan": [
+    18.2,
+    5.25,
+    9.3
+   ],
+   "noise": [
+    0.006,
+    0.003,
+    -0.009
+   ],
+   "bim": [
+    -17.158976,
+    5.813,
+    -15.487345
+   ]
+  },
+  {
+   "id": "c2",
+   "role": "check",
+   "label": "column mid",
+   "source": "mesh-raycast",
+   "surveyed": false,
+   "scan": [
+    33.5,
+    4.55,
+    24.7
+   ],
+   "noise": [
+    -0.011,
+    0.002,
+    0.004
+   ],
+   "bim": [
+    -2.06526,
+    5.112,
+    0.111426
+   ]
+  }
+ ],
+ "headingObservations": [
+  {
+   "station": "pano_A",
+   "stationPosition": [
+    20.0,
+    6.3,
+    20.0
+   ],
+   "trueHeadingOffsetDegrees": 2.5,
+   "photoDirections": [
+    [
+     0.854223708,
+     0.453848559,
+     0.253620467
+    ],
+    [
+     -0.339103343,
+     0.315122133,
+     0.88640113
+    ],
+    [
+     -0.743859966,
+     -0.15430335,
+     -0.650279037
+    ]
+   ],
+   "bimTargets": [
+    [
+     -11.508348,
+     8.96,
+     -3.708359
+    ],
+    [
+     -17.568985,
+     8.96,
+     1.217966
+    ],
+    [
+     -20.446591,
+     5.86,
+     -8.817939
+    ]
+   ]
+  }
+ ]
+}
