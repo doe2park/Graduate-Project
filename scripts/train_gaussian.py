@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 
 
@@ -34,7 +35,7 @@ def validate_dataset(dataset):
 
 def train(binary, dataset, output, steps=50000, max_splats=1000000,
           resolution=768, checkpoint_every=5000, refine_every=400,
-          growth_stop=30000, sh_degree=2):
+          growth_stop=30000, sh_degree=2, stream=False):
     binary = Path(binary).resolve()
     dataset = validate_dataset(dataset)
     output = Path(output).resolve()
@@ -62,9 +63,24 @@ def train(binary, dataset, output, steps=50000, max_splats=1000000,
     record_path.write_text(json.dumps(record, indent=2))
     started = time.monotonic()
     try:
-        with (output / 'train.log').open('w') as log:
-            result = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT,
-                                    env={**os.environ, 'RUST_LOG': 'warn,brush_cli=info,brush_process=info'})
+        env = {**os.environ, 'RUST_LOG': 'warn,brush_cli=info,brush_process=info'}
+        with (output / 'train.log').open('wb') as log:
+            if stream:  # tee Brush output to the console while keeping the full log
+                process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+                try:
+                    while chunk := process.stdout.read1(4096):
+                        log.write(chunk)
+                        log.flush()
+                        sys.stdout.buffer.write(chunk)
+                        sys.stdout.buffer.flush()
+                except BaseException:
+                    process.terminate()
+                    raise
+                finally:
+                    process.wait()
+                result = process
+            else:
+                result = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT, env=env)
         record['exitCode'] = result.returncode
         checkpoint = output / f'export_{steps}.ply'
         record['status'] = 'trained' if result.returncode == 0 and checkpoint.is_file() else 'failed'

@@ -143,7 +143,9 @@ window.addEventListener('message',e=>{
  if(link.checked&&pane!==driver)return;poses[pane]=acceptedPose(d.pose,pane);if(pane===driver)sync();
 });
 link.onchange=()=>{epoch++;roles()};
-const GAUSSIAN_MANIFEST='scan-assets/gaussian/2026-05-06/viewer.json';
+let GAUSSIAN_MANIFEST='scan-assets/gaussian/2026-05-06/viewer.json';
+// A local run can be previewed with ?manifest=work/gaussian/...; the override is honoured on localhost only.
+{const o=['localhost','127.0.0.1'].includes(location.hostname)?new URLSearchParams(location.search).get('manifest'):null;if(o&&/^[\w.\/-]+\.json$/.test(o)&&!o.includes('..'))GAUSSIAN_MANIFEST=o;}
 fetch(GAUSSIAN_MANIFEST,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(m=>{if(m.status!=='experimental-trained'||m.frame!=='scan-y-up-metres')return;mode.querySelector('[value=splat]').disabled=false;if(new URLSearchParams(location.search).get('mode')==='splat'){mode.value='splat';photoMode=false;frames[0].src=splatSource(GAUSSIAN_MANIFEST);epoch++;roles();}}).catch(()=>{});
 if(view!=='compare')setView(view,{push:false});
 fetch(capture.registration,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(c=>{if(c.status!==(capture.provisional?'project-frame-provisional':'geometry-registered')||!Number.isFinite(c.rotationYDegrees)||!Array.isArray(c.translation)||c.translation.length!==3||!c.translation.every(Number.isFinite))throw Error();registration=c;link.disabled=view==='overlay';link.checked=true;epoch++;roles()}).catch(()=>status.textContent='Independent cameras · Registration unavailable');

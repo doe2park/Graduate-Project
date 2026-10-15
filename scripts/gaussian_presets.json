@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "brush": {"version": "v0.3.0"},
+  "encoder": {"package": "@mkkellogg/gaussian-splats-3d", "version": "0.4.7"},
+  "quick": {
+    "maxStations": 4,
+    "steps": 300,
+    "size": 256,
+    "pointCount": 20000,
+    "maxSplats": 100000,
+    "checkpointEvery": 150,
+    "refineEvery": 100,
+    "growthStop": 200,
+    "mobileBudget": 20000
+  },
+  "captures": {
+    "2026-05-06": {
+      "building": "grimes",
+      "label": "Level 1, May 6 2026 capture (whole 100-station archive)",
+      "manifest": "scan-assets/panoramas/manifest.json",
+      "registration": "alignment-analysis/accepted-registration.json",
+      "seedGlbs": [
+        "scan-assets/level1-scan-2026-05-06.glb",
+        "scan-assets/level1-scan-2026-05-06-part2.glb"
+      ],
+      "centerId": "83697765",
+      "radius": 200,
+      "size": 768,
+      "pointCount": 150000,
+      "seedUpAxis": "z",
+      "train": {
+        "steps": 50000,
+        "maxSplats": 1000000,
+        "resolution": 768,
+        "checkpointEvery": 5000,
+        "refineEvery": 400,
+        "growthStop": 30000,
+        "shDegree": 2
+      },
+      "mobileBudget": 350000,
+      "notes": "Reproduces the published May run: 86 train / 14 held-out stations (every 7th station, offset 3)."
+    },
+    "2026-09-17": {
+      "building": "grimes",
+      "label": "Level 1, September 17 2026 capture (60 m around pano_103114745)",
+      "manifest": "scan-assets/captures/2026-09-17/panoramas/manifest.json",
+      "registration": "scan-assets/captures/2026-09-17/registration.json",
+      "seedGlbs": ["scan-assets/captures/2026-09-17/scan.glb"],
+      "centerId": "pano_103114745",
+      "radius": 60,
+      "size": 768,
+      "pointCount": 150000,
+      "seedUpAxis": "z",
+      "train": {
+        "steps": 50000,
+        "maxSplats": 1000000,
+        "resolution": 768,
+        "checkpointEvery": 5000,
+        "refineEvery": 400,
+        "growthStop": 30000,
+        "shDegree": 2
+      },
+      "mobileBudget": 350000,
+      "notes": "Same settings as May. Panoramas show the camera operator at nadir: consider --mask-nadir."
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "cwd": "${workspaceFolder}"
+  },
+  "tasks": [
+    {
+      "label": "Gaussian: setup",
+      "detail": "Create .venv-gaussian, install pinned Python/npm deps, download Brush v0.3.0 (once).",
+      "type": "shell",
+      "command": "python3 scripts/setup_gaussian_env.py",
+      "windows": { "command": "python scripts/setup_gaussian_env.py" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Gaussian: quick smoke test",
+      "detail": "4 stations, 300 steps, tiny model. A few minutes. Never publishable.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --quick",
+      "windows": { "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --quick" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Gaussian: train May 6",
+      "detail": "Full 50k-step run (38-118 min, saturates the GPU). Output in work/gaussian/. Does not publish.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-05-06",
+      "windows": { "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-05-06" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Gaussian: train Sep 17",
+      "detail": "Full 50k-step run (38-118 min, saturates the GPU). Output in work/gaussian/. Does not publish.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17",
+      "windows": { "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Gaussian: train Sep 17 (mask nadir)",
+      "detail": "Same as Sep 17 but drops the downward faces where the camera operator appears.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir",
+      "windows": { "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Gaussian: preview locally",
+      "detail": "Serve the repo on 127.0.0.1:8000 and print viewer URLs (with ?manifest override) for the newest run of the chosen capture.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/preview_gaussian.py --capture ${input:gaussianCapture}",
+      "windows": { "command": ".venv-gaussian\\Scripts\\python.exe scripts\\preview_gaussian.py --capture ${input:gaussianCapture}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "gaussianCapture",
+      "type": "pickString",
+      "description": "Capture to preview",
+      "options": ["2026-09-17", "2026-05-06"],
+      "default": "2026-09-17"
+    }
+  ]
+}

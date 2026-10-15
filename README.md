@@ -93,6 +93,8 @@ python3 -m http.server 8000
 
 Open `http://localhost:8000/grimes-campus-map-arcgis.html`. Internet access is needed for CDN libraries and online data. Cloning the repository also downloads its tracked public assets; local Gaussian training outputs are not included.
 
+To train a Gaussian scene for a capture yourself (Mac or Windows with a GPU), follow the [Gaussian training guide](docs/GAUSSIAN_TRAINING_GUIDE.md).
+
 For implementation changes, read [AGENTS.md](AGENTS.md). Preserve GLB identity nodes and existing Draco bytes; sidecars bind to source-scoped element identifiers. See [MEP recovery](docs/MEP_RECOVERY.md) and [new capture onboarding](docs/CAPTURE_ONBOARDING.md).
 
 ## Copyright and reuse
