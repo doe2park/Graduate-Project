@@ -22,6 +22,7 @@ body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"]{-w
 
 /* LENS INFO CARD (glasses-style, same markup/classes as the viewer's Walk gaze card; twin/element-cards.js) */
 main{position:relative}
+.gz-spark{margin-top:6px}.gz-spark svg{display:block;width:100%;height:34px}.gz-spark-cap{font-size:10.5px;color:#94a3b8;margin-top:2px}@media(max-width:768px),(pointer:coarse){#lensCard{max-width:calc(100% - 16px)!important;font-size:12px!important}}
 #lensCard{position:absolute;left:0;top:0;z-index:6;max-width:260px;min-width:170px;padding:9px 12px;border-radius:12px;background:rgba(8,14,28,.66);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid rgba(34,211,238,.35);box-shadow:0 6px 24px rgba(0,0,0,.28);color:#e2e8f0;font:13px/1.4 Arial,sans-serif;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .15s ease,visibility 0s linear .15s}
 #lensCard.show{opacity:1;visibility:visible;transition:opacity .15s ease,visibility 0s}
 #lensCard .gz-top{display:flex;align-items:center;justify-content:space-between;gap:8px}#lensCard .gz-name{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -136,12 +137,20 @@ function applyStyle(){
  else if(!wantEdges&&edgeFrame){edgeFrame.remove();edgeFrame=null;edgeReady=false;}
  layoutLens(true);syncXray();
 }
+/* Phones: the card docks at the bottom, so lift the lens into the space above it and keep the two apart. */
+const LENS_CARD_RESERVE=72+150+12,LENS_TOOLBAR_RESERVE=56;
+function lensGeom(w,h){
+ if(!touchMq.matches)return {c:lensCenter(lensTarget,w,h),r:lensRadius(w,h)};
+ let cover=0;try{const m=mainEl.getBoundingClientRect().top;for(const el of [document.querySelector('header'),overlayBar])if(el){const b=el.getBoundingClientRect().bottom-m;if(Number.isFinite(b)&&b>cover)cover=b;}}catch(e){}
+ const top=Math.min(h-120,Math.max(0,cover)+LENS_TOOLBAR_RESERVE),bottom=Math.max(top+80,h-LENS_CARD_RESERVE),r=Math.max(36,Math.min(lensRadius(w,h),(bottom-top)/2-6));
+ return {c:{x:w/2,y:top+(bottom-top)/2},r};
+}
 function layoutLens(snap){
  if(document.body.dataset.style!=='lens'||document.body.dataset.focus!=='overlay'){document.documentElement.style.removeProperty('--lens-mask');return;}
- const w=mainEl.clientWidth,h=mainEl.clientHeight,goal=lensCenter(lensTarget,w,h);
+ const w=mainEl.clientWidth,h=mainEl.clientHeight,goal=lensGeom(w,h).c;
  if(!lensNow||snap||reduceMotion.matches)lensNow=goal;
  else{lensNow={x:lensNow.x+(goal.x-lensNow.x)*.28,y:lensNow.y+(goal.y-lensNow.y)*.28};if(Math.hypot(goal.x-lensNow.x,goal.y-lensNow.y)<.5)lensNow=goal;else{cancelAnimationFrame(lensRaf);lensRaf=requestAnimationFrame(()=>layoutLens(false));}}
- const r=lensRadius(w,h);document.documentElement.style.setProperty('--lens-mask',lensMask(lensNow.x,lensNow.y,r));
+ const r=lensGeom(w,h).r;document.documentElement.style.setProperty('--lens-mask',lensMask(lensNow.x,lensNow.y,r));
  Object.assign(lensRing.style,{left:(lensNow.x-r)+'px',top:(lensNow.y-r)+'px',width:2*r+'px',height:2*r+'px'});
 }
 new ResizeObserver(()=>layoutLens(true)).observe(mainEl);touchMq.addEventListener?.('change',applyStyle);
@@ -225,7 +234,7 @@ function probeLens(){
 }
 function placeLensCard(){
  const w=mainEl.clientWidth,h=mainEl.clientHeight,c=lensNow||{x:w/2,y:h/2};
- const p=ElementCards.lensCardPosition({cx:c.x,cy:c.y,r:lensRadius(w,h),w:lensCard.offsetWidth,h:lensCard.offsetHeight,vw:w,vh:h,mobile:touchMq.matches,bottomInset:72});
+ const p=ElementCards.lensCardPosition({cx:c.x,cy:c.y,r:lensGeom(w,h).r,w:lensCard.offsetWidth,h:lensCard.offsetHeight,vw:w,vh:h,mobile:touchMq.matches,bottomInset:72});
  lensCard.style.transform='translate('+p.x+'px,'+p.y+'px)';
 }
 function hideLensCard(now){
@@ -239,9 +248,23 @@ function onLensPick(d){
  if(ElementCards.gazeDwell(lensDwell,k,performance.now()).show){
   clearTimeout(lensHideT);lensHideT=null;
   lensCard.innerHTML=ElementCards.gazeCardHtml(pick.hit.id,pick.hit.meta,pick.hit.tier,{adjustment:abMode==='asbuilt'?pick.hit.adjustment:null});
+  try{lensCard.insertAdjacentHTML('beforeend',lensSparkHtml(pick.hit.tier));}catch(e){}
   lensCard.dataset.elementKey=k;lensShownKey=k;placeLensCard();lensCard.classList.add('show');
  }else if(!k)hideLensCard(false);
  if(!abPanel.hidden)abRender();
+}
+/* Building-meter context for the card: Grimes whole-building demand, last 24 h (BMO, published every 15 min).
+   Labelled as the building, never as the element. Any fetch/parse failure simply leaves the card as before. */
+let lensSpark=null;
+fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/campus_energy_history.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+ const pts=(d&&Array.isArray(d.grimes)?d.grimes:[]).map(p=>Number(p&&p.kw)).filter(Number.isFinite);if(pts.length>=4)lensSpark=pts.slice(-96);}).catch(()=>{});
+function lensSparkHtml(tier){
+ if(!lensSpark||!tier||!['CONTEXT','MODELLED','LIVE','LATEST'].includes(tier.tier))return '';
+ const v=lensSpark,W=220,H=34,mx=Math.max(...v),mn=Math.min(...v),sp=(mx-mn)||1;
+ const xy=v.map((k,i)=>[(i/(v.length-1))*W,H-2-((k-mn)/sp)*(H-6)]);
+ const line=xy.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' '),last=xy[xy.length-1];
+ return '<div class="gz-spark"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,'+H+' '+line+' '+W+','+H+'" fill="rgba(253,181,21,.18)"/><polyline points="'+line+'" fill="none" stroke="#FDB515" stroke-width="1.6"/><circle cx="'+last[0].toFixed(1)+'" cy="'+last[1].toFixed(1)+'" r="2.6" fill="#FDB515"/></svg>'
+  +'<div class="gz-spark-cap">Grimes building · last 24 h · '+Math.round(v[v.length-1])+' kW now (BMO)</div></div>';
 }
 function setLensCards(on){lensCardsOn=!!on;lensCardsBtn.setAttribute('aria-pressed',String(lensCardsOn));lensCardsBtn.textContent='Info cards: '+(lensCardsOn?'on':'off');if(!lensCardsOn)hideLensCard(true);}
 lensCardsBtn.onclick=()=>setLensCards(!lensCardsOn);
