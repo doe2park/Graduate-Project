@@ -31,3 +31,7 @@ The browser test injects inspection hooks into its HTML response only, uses dete
 ## Registered comparison
 
 Run `node --test tests/layer-visibility.test.cjs` for sequential bulk visibility, cancellation and latest-intent checks. `tests/registered-comparison.cjs` loads the actual scan, interior and ten BIM layers, verifies the accepted camera transform in both directions, and checks all-element visibility including interior while retaining the floor. It accepts `PLAYWRIGHT_MODULE`, `CHROME_EXECUTABLE`, `THREE_MODULE`, `VIEWER_BASE_URL` and `VALIDATION_OUTPUT`; see the browser test setup above. It uses real public data, not meter fixtures.
+
+## Registration workbench
+
+`node --test tests/registration-core.test.cjs tests/registration-preview.test.cjs` and `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_registration_fit.py` cover the shared yaw+XYZ fit, RANSAC, leave-one-out, heading solve, export schema, refusal to overwrite accepted registrations, `?registration=` preview safety and JS/Python numerical agreement on `tests/fixtures/registration-pairs.fixture.json` (synthetic data). See `docs/REGISTRATION_WORKBENCH.md`.

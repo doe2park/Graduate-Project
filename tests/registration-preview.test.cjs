@@ -20,3 +20,8 @@ test('the shipped September ICP candidate validates for September only',()=>{
  const c=JSON.parse(fs.readFileSync(path.join(__dirname,'../scan-assets/captures/2026-09-17/registration-candidates/2026-10-14-icp-arch.json'),'utf8'));
  assert.equal(RegistrationCore.validateRegistration(c,'2026-09-17').ok,true);assert.equal(RegistrationCore.validateRegistration(c,'2026-05-06').ok,false);
  assert.equal(c.status,'icp-refined-unsurveyed');assert.match(c.scope,/not surveyed/)});
+test('workbench uses the shared core, labels residuals honestly and never offers accepted filenames',()=>{
+ const wb=fs.readFileSync(path.join(__dirname,'../registration-workbench.html'),'utf8');
+ assert.match(wb,/<script src="registration-core\.js[^"]*"><\/script>/);assert.match(wb,/not surveyed accuracy/);assert.match(wb,/assertCandidateName/);
+ assert.match(wb,/scale fixed at 1/);assert.doesNotMatch(wb,/download\([^)]*accepted-registration/);
+ assert.match(wb,/NOT surveyed/);assert.match(wb,/leave-one-out/i)});

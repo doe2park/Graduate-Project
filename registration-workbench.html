@@ -1,0 +1,192 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Grimes · Registration workbench</title>
+<style>
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;display:flex;flex-direction:column;background:#0b1522;color:#eaf2fa;font:13px Arial,Helvetica,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 12px;border-bottom:1px solid #38506a}h1{margin:0;font-size:16px}
+header .note{color:#ffd479;font-size:11px;flex:1 1 320px}select,button,input{font:12px Arial;color:#fff;background:#244562;border:1px solid #8aa5bb;border-radius:5px;padding:5px 8px}button{cursor:pointer}button[aria-pressed="true"]{background:#d9a93a;color:#111;border-color:#ffd479}button:disabled{opacity:.45;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #ffd479;outline-offset:1px}
+main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 360px;gap:2px;background:#38506a}
+.view{position:relative;min-width:0;min-height:0;background:#0a111c}.view canvas{display:block;width:100%;height:100%}
+.view h2{position:absolute;left:8px;top:8px;margin:0;z-index:2;padding:4px 8px;border-radius:6px;background:rgba(10,20,32,.8);font-size:12px;pointer-events:none}
+.view .hint{position:absolute;left:8px;bottom:8px;right:8px;z-index:2;padding:4px 8px;border-radius:6px;background:rgba(10,20,32,.8);font-size:11px;color:#cfe0ec;pointer-events:none}
+aside{overflow:auto;background:#101d2c;padding:10px}aside h3{margin:12px 0 6px;font-size:13px;color:#ffd479}aside p{margin:4px 0;color:#c6d6e3;line-height:1.35}
+table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:3px 4px;border-bottom:1px solid #26405a;text-align:left;vertical-align:middle}td input[type=text]{width:100%;padding:2px 4px}td select{padding:2px}
+.num{font-variant-numeric:tabular-nums;text-align:right}.bad{color:#ff8f7a}.ok{color:#9be29b}.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
+#result{white-space:pre-wrap;font:11px/1.4 ui-monospace,Menlo,monospace;background:#0a111c;border:1px solid #26405a;padding:6px;border-radius:5px}
+#status{min-height:18px;color:#ffd479}code{font-size:11px;background:#0a111c;padding:1px 4px;border-radius:3px;word-break:break-all}
+body[data-mode="heading"] .landmark-only,body[data-mode="landmarks"] .heading-only{display:none}
+@media(max-width:1000px){main{grid-template-columns:1fr 1fr;grid-template-rows:1fr auto}aside{grid-column:1/-1;max-height:45vh}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<script src="registration-core.js?v=1"></script></head><body data-mode="landmarks">
+<header><h1>Registration workbench</h1>
+<label>Capture <select id="capture"><option value="2026-09-17">Sep 17, 2026</option><option value="2026-05-06">May 6, 2026</option></select></label>
+<span role="group" aria-label="Mode"><button id="modeLandmarks" aria-pressed="true">1 · Landmark pairs</button> <button id="modeHeading" aria-pressed="false">2 · Photo heading</button></span>
+<label title="Hide geometry above this height in both views (plan picking)">Section <input id="section" type="range" min="4" max="14" step=".1" value="9.3" style="width:110px;padding:0"> <output id="sectionOut">9.3 m</output></label>
+<span class="note">Rigid yaw + XYZ, scale fixed at 1. Residuals are internal consistency, not surveyed accuracy unless every check point comes from a survey.</span></header>
+<main><section class="view" id="leftView"><h2 id="leftTitle">Scan mesh (scan frame)</h2><div class="hint" id="leftHint">Drag to orbit · scroll to zoom · click (without dragging) a sharp, fixed feature to pick it</div></section>
+<section class="view" id="rightView"><h2 id="rightTitle">BIM (viewer world)</h2><div class="hint" id="rightHint">Click the same feature in BIM. Lines show where the current fit puts each scan pick.</div></section>
+<aside>
+<div id="status" role="status" aria-live="polite">Loading…</div>
+<div class="landmark-only">
+<h3>Pairs</h3>
+<p>Pick ≥4 <b>fit</b> pairs spread over the whole floor (corners of the plan, not one room) and ≥2 <b>check</b> pairs elsewhere. Good: column corners, door jambs, stair nosings, wall corners, ceiling diffuser centres. Avoid furniture.</p>
+<div class="row"><button id="syncBim" title="Move the BIM camera to the scan camera through the current fit or baseline">Align BIM view to scan</button><button id="undoPick">Cancel pending pick</button></div>
+<table><thead><tr><th>id</th><th>label</th><th>role</th><th title="check point coordinates come from an independent survey">srv</th><th class="num">fit m</th><th class="num">LOO m</th><th></th></tr></thead><tbody id="pairRows"></tbody></table>
+<div class="row"><label><input id="ransac" type="checkbox" checked> RANSAC</label><label>threshold <input id="ransacT" type="number" min=".05" max="2" step=".05" value=".25" style="width:60px"> m</label><button id="fit">Fit</button></div>
+<div id="result" aria-live="polite">No fit yet.</div>
+</div>
+<div class="heading-only">
+<h3>Per-photo heading</h3>
+<p>The right view shows the photo at its station with BIM drawn on top through the current fit. Rotate the photo with the slider until a fixed BIM feature (column, door, light) sits on the real one, or pick 2+ photo/BIM feature pairs and solve. Positive values turn the photo content left (counter-clockwise from above).</p>
+<div class="row"><label>Station <select id="station"></select></label><button id="prevStation">‹</button><button id="nextStation">›</button></div>
+<div class="row"><label>Offset <input id="headingSlider" type="range" min="-20" max="20" step=".1" value="0" style="width:160px;padding:0"></label><output id="headingOut">0.0°</output><button id="resetHeading">0</button></div>
+<div class="row"><label>BIM opacity <input id="bimAlpha" type="range" min=".1" max=".9" step=".05" value=".4" style="width:120px;padding:0"></label></div>
+<div class="row"><button id="pickHeading" aria-pressed="false">Pick photo → BIM pairs</button><button id="solveHeading">Solve heading</button><button id="clearHeading">Clear picks</button></div>
+<div id="headingResult">No heading picks.</div>
+<table><thead><tr><th>station</th><th class="num">offset °</th><th>source</th></tr></thead><tbody id="headingRows"></tbody></table>
+</div>
+<h3>Export</h3>
+<div class="row"><button id="exportPairs">Save pairs JSON</button><button id="exportReg">Save candidate registration</button><label class="row" style="margin:0"><button id="importBtn">Load pairs JSON</button><input id="importFile" type="file" accept="application/json" hidden></label></div>
+<p>Save the candidate into <code id="savePath"></code>, then preview it in <a id="previewLink" href="#" style="color:#9fd0ff">Overlay</a>. Reproduce or refine:</p>
+<p><code id="cliFit"></code></p><p><code id="cliIcp"></code></p>
+<p>Never overwrite <code>accepted-registration.json</code> or a capture's <code>registration.json</code>; promotion is a reviewed, separate commit (docs/REGISTRATION_WORKBENCH.md).</p>
+</aside></main>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const RC=window.RegistrationCore,$=id=>document.getElementById(id);
+const CAPTURES={
+ '2026-05-06':{baseline:'alignment-analysis/accepted-registration.json',manifest:'scan-assets/panoramas/manifest.json',mesh:['scan-assets/mobile/level1-scan-2026-05-06.glb','scan-assets/mobile/level1-scan-2026-05-06-part2.glb'],folder:'alignment-analysis/candidates/'},
+ '2026-09-17':{baseline:'scan-assets/captures/2026-09-17/registration.json',manifest:'scan-assets/captures/2026-09-17/panoramas/manifest.json',mesh:['scan-assets/captures/2026-09-17/mobile/scan.glb'],folder:'scan-assets/captures/2026-09-17/'}};
+const BIM_LAYERS=['buildings/grimes/grimes-arch.glb','buildings/grimes/grimes-lighting.glb'],EQUIP_OFFSET=[-35.28,-97.16,28.60];
+const capture=new URLSearchParams(location.search).get('capture')==='2026-05-06'?'2026-05-06':'2026-09-17',cfg=CAPTURES[capture];$('capture').value=capture;
+$('capture').onchange=()=>{const u=new URL(location.href);u.searchParams.set('capture',$('capture').value);location.assign(u);};
+const status=t=>$('status').textContent=t;
+/* ---------- two views, each with its own renderer (no geometry shared) ---------- */
+function makeView(el,near=.05){const r=new THREE.WebGLRenderer({antialias:true});r.setPixelRatio(Math.min(devicePixelRatio,1.5));r.localClippingEnabled=true;el.appendChild(r.domElement);
+ const scene=new THREE.Scene();scene.background=new THREE.Color(0x0a111c);scene.add(new THREE.HemisphereLight(0xffffff,0x334455,2.2));const dl=new THREE.DirectionalLight(0xffffff,1.2);dl.position.set(30,60,20);scene.add(dl);
+ const camera=new THREE.PerspectiveCamera(60,1,near,3000),controls=new OrbitControls(camera,r.domElement);controls.enableDamping=false;
+ const v={el,renderer:r,scene,camera,controls,dirty:true};controls.addEventListener('change',()=>v.dirty=true);
+ new ResizeObserver(()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;r.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();v.dirty=true;}).observe(el);return v;}
+const L=makeView($('leftView')),R=makeView($('rightView'));
+/* render on demand only (keeps the GPU idle on slower Macs) */
+(function loop(){requestAnimationFrame(loop);for(const v of [L,R])if(v.dirty){v.dirty=false;v.renderer.render(v.scene,v.camera);}})();
+const section=new THREE.Plane(new THREE.Vector3(0,-1,0),9.3);for(const v of [L,R])v.renderer.clippingPlanes=[section];
+$('section').oninput=()=>{const h=Number($('section').value),on=h<14;section.constant=h;$('sectionOut').textContent=on?h.toFixed(1)+' m':'off';for(const v of [L,R]){v.renderer.clippingPlanes=on&&!(v===R&&mode==='heading')?[section]:[];v.dirty=true;}};
+/* ---------- load data ---------- */
+const draco=new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'),loader=new GLTFLoader().setDRACOLoader(draco);
+let baseline=null,manifest=null;const scanMeshes=[],bimMeshes=[],scanRoot=new THREE.Group(),bimRoot=new THREE.Group();scanRoot.rotation.x=-Math.PI/2;L.scene.add(scanRoot);
+bimRoot.rotation.y=Math.PI;bimRoot.position.fromArray(EQUIP_OFFSET);R.scene.add(bimRoot);
+async function loadAll(){
+ [baseline,manifest]=await Promise.all([fetch(cfg.baseline).then(r=>r.json()),fetch(cfg.manifest).then(r=>r.json())]);
+ for(const [i,s] of manifest.stations.entries()){const o=document.createElement('option');o.value=i;o.textContent=(i+1)+' · '+s.id;$('station').appendChild(o);}
+ for(const [i,p] of cfg.mesh.entries()){status(`Loading scan mesh ${i+1}/${cfg.mesh.length}…`);const g=await loader.loadAsync(p);g.scene.traverse(o=>{if(o.isMesh){const m=o.material;o.material=new THREE.MeshBasicMaterial({map:m.map,side:THREE.DoubleSide});m.dispose();scanMeshes.push(o);}});scanRoot.add(g.scene);}
+ scanRoot.updateMatrixWorld(true);const sb=new THREE.Box3().setFromObject(scanRoot),sc=sb.getCenter(new THREE.Vector3());L.controls.target.copy(sc);L.camera.position.copy(sc).add(new THREE.Vector3(0,45,25));L.controls.update();L.dirty=true;
+ for(const [i,p] of BIM_LAYERS.entries()){status(`Loading BIM layer ${i+1}/${BIM_LAYERS.length}…`);const g=await loader.loadAsync(p);const light=/lighting/.test(p);g.scene.traverse(o=>{if(o.isMesh){o.material=new THREE.MeshStandardMaterial({color:light?0xffd479:0xb9c6d3,roughness:.9,side:THREE.DoubleSide});o.userData.layer=light?'lighting':'arch';bimMeshes.push(o);}});bimRoot.add(g.scene);}
+ bimRoot.updateMatrixWorld(true);syncBim();status('Ready · '+capture+' · baseline '+baseline.status);updateCli();
+}
+loadAll().catch(e=>{console.error(e);status('Load failed: '+e.message);});
+/* ---------- state ---------- */
+let pairs=[],pending={scan:null,bim:null},lastResult=null,nextId=1,headingStore={},headingPicks=[],pickHeading=false,mode='landmarks';
+const currentReg=()=>lastResult?{rotationYDegrees:lastResult.rotationYDegrees,translation:lastResult.translation}:baseline;
+/* ---------- picking ---------- */
+const ray=new THREE.Raycaster();
+function pickAt(v,e,meshes){const r=v.renderer.domElement.getBoundingClientRect(),p=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(p,v.camera);const clip=v.renderer.clippingPlanes.length?section.constant:Infinity;return ray.intersectObjects(meshes,false).find(h=>h.point.y<=clip+1e-6&&h.object.visible)||null;}
+function clickHandler(v,fn){let down=null;v.renderer.domElement.addEventListener('pointerdown',e=>down={x:e.clientX,y:e.clientY});v.renderer.domElement.addEventListener('pointerup',e=>{if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<4)fn(e);down=null;});}
+const markerGeo=new THREE.SphereGeometry(.09,12,8);
+function marker(color){return new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({color,depthTest:false}));}
+const markersL=new THREE.Group(),markersR=new THREE.Group();L.scene.add(markersL);R.scene.add(markersR);markersL.renderOrder=markersR.renderOrder=10;
+clickHandler(L,e=>{if(mode!=='landmarks')return;const h=pickAt(L,e,scanMeshes);if(!h)return status('No scan surface under the cursor');pending.scan=h.point.toArray();completePair();});
+clickHandler(R,e=>{if(mode==='heading'){headingClick(e);return;}const h=pickAt(R,e,bimMeshes);if(!h)return status('No BIM surface under the cursor');pending.bim=h.point.toArray();completePair();});
+function completePair(){
+ if(pending.scan&&pending.bim){const role=pairs.filter(p=>p.role==='fit').length<4?'fit':(pairs.length%3===2?'check':'fit');pairs.push({id:(role==='fit'?'f':'c')+nextId++,role,label:'',source:'mesh-raycast / bim-raycast',surveyed:false,scan:pending.scan.map(round6),bim:pending.bim.map(round6)});pending={scan:null,bim:null};lastResult=null;renderPairs();status('Pair added · label it and choose fit or check');}
+ else status(pending.scan?'Scan point picked · now click the same feature in BIM':'BIM point picked · now click the same feature in the scan');drawMarkers();
+}
+const round6=v=>Math.round(v*1e6)/1e6;
+$('undoPick').onclick=()=>{pending={scan:null,bim:null};drawMarkers();status('Pending pick cleared');};
+function drawMarkers(){
+ markersL.clear();markersR.clear();const reg=currentReg();
+ for(const p of pairs){const c=p.role==='fit'?0x4fc3f7:0xff9f43;const a=marker(c);a.position.fromArray(p.scan);markersL.add(a);const b=marker(c);b.position.fromArray(p.bim);markersR.add(b);
+  if(reg){const q=RC.apply(reg,p.scan),g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...p.bim),new THREE.Vector3(...q)]);markersR.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff4d6d,depthTest:false})));const m=marker(0xff4d6d);m.scale.setScalar(.6);m.position.fromArray(q);markersR.add(m);}}
+ if(pending.scan){const m=marker(0xffffff);m.position.fromArray(pending.scan);markersL.add(m);}if(pending.bim){const m=marker(0xffffff);m.position.fromArray(pending.bim);markersR.add(m);}
+ L.dirty=R.dirty=true;
+}
+function renderPairs(){
+ const tb=$('pairRows');tb.replaceChildren();const fitRes=Object.fromEntries((lastResult?.fit.residuals||[]).map(r=>[r.id,r])),chk=Object.fromEntries((lastResult?.checks.residuals||[]).map(r=>[r.id,r])),loo=Object.fromEntries((lastResult?.leaveOneOut.errors||[]).map(r=>[r.id,r.errorMetres]));
+ for(const p of pairs){const tr=document.createElement('tr'),res=p.role==='fit'?fitRes[p.id]:chk[p.id];
+  const lab=Object.assign(document.createElement('input'),{type:'text',value:p.label,placeholder:'feature'});lab.oninput=()=>p.label=lab.value;
+  const role=document.createElement('select');for(const r of ['fit','check'])role.add(new Option(r,r,false,p.role===r));role.onchange=()=>{p.role=role.value;lastResult=null;renderPairs();drawMarkers();};
+  const srv=Object.assign(document.createElement('input'),{type:'checkbox',checked:!!p.surveyed,disabled:p.role!=='check',title:'Only for check points whose BIM coordinates come from an independent survey'});srv.onchange=()=>p.surveyed=srv.checked;
+  const del=Object.assign(document.createElement('button'),{textContent:'×',title:'Delete pair'});del.onclick=()=>{pairs=pairs.filter(x=>x!==p);lastResult=null;renderPairs();drawMarkers();};
+  const cells=[p.id,lab,role,srv,res?(res.errorMetres.toFixed(3)+(res.inlier===false?' out':'')):'–',loo[p.id]!==undefined?loo[p.id].toFixed(3):'–',del];
+  cells.forEach((c,i)=>{const td=document.createElement('td');if(i===4||i===5)td.className='num'+(res&&res.errorMetres>.25&&i===4?' bad':'');td.append(c instanceof Node?c:document.createTextNode(c));tr.append(td);});tb.append(tr);}
+}
+function pairsData(){return{schema:RC.PAIRS_SCHEMA,capture,baseline:cfg.baseline,createdWith:'registration-workbench.html',
+ ransac:{enabled:$('ransac').checked,thresholdMetres:Number($('ransacT').value)},pairs,
+ headingObservations:Object.entries(headingStore).filter(([,h])=>h.observations).map(([station,h])=>h.observations),
+ manualHeadingOffsetsDegrees:Object.fromEntries(Object.entries(headingStore).filter(([,h])=>!h.observations&&h.offset).map(([s,h])=>[s,h.offset]))};}
+$('fit').onclick=()=>{try{lastResult=RC.solve(pairsData());const r=lastResult;
+ $('result').textContent=`yaw ${r.rotationYDegrees.toFixed(4)}°  t [${r.translation.map(v=>v.toFixed(3)).join(', ')}] m  scale 1\n`+
+  `fit (${r.fit.pairs} inliers): RMS ${r.fit.rmsMetres.toFixed(3)} m, max ${r.fit.maxMetres.toFixed(3)} m\n`+
+  `leave-one-out: RMS ${r.leaveOneOut.rmsMetres.toFixed(3)} m, max ${r.leaveOneOut.maxMetres.toFixed(3)} m\n`+
+  `checks (${r.checks.pairs}, ${r.checks.surveyed?'surveyed':'NOT surveyed'}): RMS ${r.checks.rmsMetres.toFixed(3)} m, max ${r.checks.maxMetres.toFixed(3)} m\n`+
+  (r.ransac.enabled?`RANSAC ${r.ransac.thresholdMetres} m · outliers: ${r.ransac.outlierIds.join(', ')||'none'}\n`:'')+
+  `baseline: yaw ${baseline.rotationYDegrees.toFixed(4)}°, t [${baseline.translation.map(v=>v.toFixed(3)).join(', ')}]`;
+ status('Fitted · red lines show remaining pair errors');}catch(e){lastResult=null;$('result').textContent=e.message;status('Fit refused: '+e.message);}renderPairs();drawMarkers();updateCli();};
+function syncBim(){const reg=currentReg();if(!reg)return;const p=RC.apply(reg,L.camera.position.toArray()),t=RC.apply(reg,L.controls.target.toArray());R.camera.position.fromArray(p);R.controls.target.fromArray(t);R.camera.fov=L.camera.fov;R.camera.updateProjectionMatrix();R.controls.update();R.dirty=true;}
+$('syncBim').onclick=syncBim;
+/* ---------- photo heading mode (right view: photo sphere + BIM through the current fit) ---------- */
+const axis=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2),centerCorrection=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI);
+/* photo drawn OVER the opaque BIM (no depth test), so only the nearest BIM surface shows through: no stacked transparency */
+const sphereGeo=new THREE.SphereGeometry(60,64,40);sphereGeo.scale(-1,1,1);const sphere=new THREE.Mesh(sphereGeo,new THREE.MeshBasicMaterial({depthWrite:false,depthTest:false,transparent:true,opacity:.6,toneMapped:false}));sphere.renderOrder=10;sphere.visible=false;R.scene.add(sphere);
+const texLoader=new THREE.TextureLoader();let stationIndex=0,stationTex=null;
+/* same orientation chain as scan-photo.html, then the registration yaw into BIM */
+function stationQuaternion(s,offsetDeg){const q=new THREE.Quaternion().copy(axis).multiply(new THREE.Quaternion().fromArray(s.e57Quaternion)).multiply(axis.clone().invert()).multiply(centerCorrection);const yaw=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),(currentReg().rotationYDegrees+offsetDeg)*Math.PI/180);return yaw.multiply(q);}
+const offsetOf=s=>headingStore[s.id]?.offset||0;
+async function showStation(i){
+ stationIndex=Math.max(0,Math.min(manifest.stations.length-1,i));$('station').value=stationIndex;const s=manifest.stations[stationIndex];headingPicks=[];renderHeadingPicks();
+ const tex=await texLoader.loadAsync(new URL('mobile/'+s.file,new URL(cfg.manifest,location.href)).href);tex.colorSpace=THREE.SRGBColorSpace;stationTex?.dispose();stationTex=tex;sphere.material.map=tex;sphere.material.needsUpdate=true;
+ const p=RC.apply(currentReg(),s.position);sphere.position.fromArray(p);R.camera.position.fromArray(p);const fwd=new THREE.Vector3(0,0,-1);R.controls.target.copy(R.camera.position).addScaledVector(fwd,.01);R.controls.update();
+ $('headingSlider').value=offsetOf(s);applyHeading();
+}
+function applyHeading(){if(!manifest)return;const s=manifest.stations[stationIndex],d=Number($('headingSlider').value);$('headingOut').textContent=d.toFixed(1)+'°';sphere.quaternion.copy(stationQuaternion(s,d));R.dirty=true;}
+$('headingSlider').oninput=()=>{applyHeading();const s=manifest.stations[stationIndex],d=Number($('headingSlider').value);headingStore[s.id]={offset:d,source:'manual slider'};renderHeadingRows();};
+$('resetHeading').onclick=()=>{$('headingSlider').value=0;$('headingSlider').oninput();};
+$('station').onchange=()=>showStation(Number($('station').value));$('prevStation').onclick=()=>showStation(stationIndex-1);$('nextStation').onclick=()=>showStation(stationIndex+1);
+$('bimAlpha').oninput=()=>{sphere.material.opacity=1-Number($('bimAlpha').value);R.dirty=true;};
+$('pickHeading').onclick=()=>{pickHeading=!pickHeading;$('pickHeading').setAttribute('aria-pressed',String(pickHeading));status(pickHeading?'Click a feature in the PHOTO, then the same feature in BIM':'Heading picking off');};
+let pendingDir=null;
+function headingClick(e){if(!pickHeading)return;const r=R.renderer.domElement.getBoundingClientRect(),p=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(p,R.camera);
+ if(!pendingDir){/* displayed direction in BIM frame -> scan frame -> remove the currently applied offset = raw photo direction */
+  const d=ray.ray.direction.toArray(),reg=currentReg(),scanDir=RC.rotateY(d,-reg.rotationYDegrees),raw=RC.rotateY(scanDir,-Number($('headingSlider').value));pendingDir=raw;status('Photo feature picked · now click the same feature in BIM');return;}
+ const h=pickAt(R,e,bimMeshes);if(!h)return status('No BIM surface there');headingPicks.push({dir:pendingDir,bim:h.point.toArray()});pendingDir=null;renderHeadingPicks();status(headingPicks.length+' heading pair(s)');}
+function renderHeadingPicks(){$('headingResult').textContent=headingPicks.length?headingPicks.length+' photo/BIM pair(s) at this station':'No heading picks.';}
+$('clearHeading').onclick=()=>{headingPicks=[];pendingDir=null;renderHeadingPicks();};
+$('solveHeading').onclick=()=>{const s=manifest.stations[stationIndex],obs={station:s.id,stationPosition:s.position,photoDirections:headingPicks.map(p=>p.dir.map(v=>Math.round(v*1e9)/1e9)),bimTargets:headingPicks.map(p=>p.bim.map(round6))};
+ try{const h=RC.solveHeading(obs,currentReg());headingStore[s.id]={offset:h.headingOffsetDegrees,source:'picks',observations:obs};$('headingSlider').value=h.headingOffsetDegrees;applyHeading();
+  $('headingResult').textContent=`offset ${h.headingOffsetDegrees.toFixed(2)}° · residuals ${h.residualsDegrees.map(v=>v.toFixed(2)).join(', ')}° · elevation residuals ${h.elevationResidualsDegrees.map(v=>v.toFixed(2)).join(', ')}° (large elevation residuals suggest a station position/height error, not heading)`;renderHeadingRows();}
+ catch(e){$('headingResult').textContent=e.message;}};
+function renderHeadingRows(){const tb=$('headingRows');tb.replaceChildren();for(const [id,h] of Object.entries(headingStore)){if(!h.offset&&!h.observations)continue;const tr=document.createElement('tr');for(const [c,cls] of [[id,''],[h.offset.toFixed(2),'num'],[h.source,'']]){const td=document.createElement('td');td.className=cls;td.textContent=c;tr.append(td);}tb.append(tr);}}
+function setMode(m){mode=m;document.body.dataset.mode=m;$('modeLandmarks').setAttribute('aria-pressed',String(m==='landmarks'));$('modeHeading').setAttribute('aria-pressed',String(m==='heading'));
+ sphere.visible=m==='heading';markersR.visible=m==='landmarks';$('bimAlpha').oninput();$('section').oninput();/* the photo sphere must never be sectioned */
+ $('rightTitle').textContent=m==='heading'?'Photo + BIM at station (current fit)':'BIM (viewer world)';$('rightHint').textContent=m==='heading'?'Drag to look around · slider rotates the photo only':'Click the same feature in BIM. Lines show where the current fit puts each scan pick.';
+ if(m==='heading'){R.controls.enableZoom=false;R.controls.enablePan=false;R.controls.rotateSpeed=-.35;showStation(stationIndex);}else{R.controls.enableZoom=true;R.controls.enablePan=true;R.controls.rotateSpeed=1;syncBim();}R.dirty=true;}
+$('modeLandmarks').onclick=()=>setMode('landmarks');$('modeHeading').onclick=()=>{if(manifest)setMode('heading');};
+/* ---------- export / import ---------- */
+function download(name,obj){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)+'\n'],{type:'application/json'}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+const today=()=>new Date().toISOString().slice(0,10);
+$('exportPairs').onclick=()=>download(today()+'-pairs-'+capture+'.json',pairsData());
+$('exportReg').onclick=async()=>{try{const data=pairsData(),result=RC.solve(data),out=await RC.buildExport(data,result,{extraInputs:{tool:'registration-workbench.html'}});const name=RC.suggestFilename(capture,today()).split('/').pop();RC.assertCandidateName(name);download(name,out);status('Saved '+name+' · move it into '+$('savePath').textContent);}catch(e){status('Export refused: '+e.message);}};
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=async()=>{const f=$('importFile').files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(d.capture&&d.capture!==capture)throw Error('pairs belong to capture '+d.capture);pairs=(d.pairs||[]).map(p=>({...p}));nextId=pairs.length+1;$('ransac').checked=!!d.ransac?.enabled;if(d.ransac?.thresholdMetres)$('ransacT').value=d.ransac.thresholdMetres;
+ headingStore={};for(const o of d.headingObservations||[])headingStore[o.station]={offset:RC.solveHeading(o,baseline).headingOffsetDegrees,source:'picks (re-solve after fit)',observations:o};for(const [k,v] of Object.entries(d.manualHeadingOffsetsDegrees||{}))headingStore[k]={offset:v,source:'manual slider'};
+ lastResult=null;renderPairs();renderHeadingRows();drawMarkers();status('Loaded '+pairs.length+' pairs · press Fit');}catch(e){status('Import failed: '+e.message);}};
+function updateCli(){const name=RC.suggestFilename(capture,today()).split('/').pop(),dir=capture==='2026-05-06'?'alignment-analysis/candidates/':cfg.folder+'registration-candidates/';$('savePath').textContent=dir+name;
+ $('previewLink').href='scan-compare.html?view=overlay&capture='+capture+'&registration='+encodeURIComponent(dir+name);
+ $('cliFit').textContent='python3 scripts/registration_fit.py fit <pairs.json> --output '+dir+today()+'-landmark-fit-reproduced.json';
+ $('cliIcp').textContent='python3 scripts/registration_fit.py icp --capture '+capture+' --init '+dir+name+' --bim-soup /tmp/arch.f32 --bim-source buildings/grimes/grimes-arch.glb --pairs <pairs.json> --output '+dir+today()+'-icp-from-landmarks.json   (soup: node scripts/decode_bim_soup.mjs /tmp/arch.f32 buildings/grimes/grimes-arch.glb --ymin 3 --ymax 12)';}
+window.workbenchInspection=()=>({capture,pairs:pairs.length,mode,fit:lastResult&&{yaw:lastResult.rotationYDegrees,t:lastResult.translation},scanMeshes:scanMeshes.length,bimMeshes:bimMeshes.length,station:manifest?.stations[stationIndex]?.id,heading:Number($('headingSlider').value)});
+window.workbenchTest={pickScan:p=>{pending.scan=p;completePair();},pickBim:p=>{pending.bim=p;completePair();}};
+</script></body></html>
