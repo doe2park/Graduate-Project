@@ -144,3 +144,39 @@ test('24-hour guide lines adapt to retained observation spacing but cap long gap
  assert.equal(c.connectionLimit([{x:0},{x:h/4},{x:h/2}]),h);assert.equal(c.connectionLimit([]),h);
  assert.equal(c.connectedSamples([{x:0,kw:1},{x:6*h+1,kw:2}],6*h)[1].y,null);
 });
+test('multi-day windows start at Pacific midnight; 24 hours stays rolling',()=>{
+ assert.equal(typeof c.windowStart,'function');
+ const now=Date.parse('2026-10-16T20:12:00Z'); // 13:12 PDT
+ assert.equal(c.windowStart(24,now),now-24*3600000);
+ assert.equal(c.windowStart(168,now),Date.parse('2026-10-10T07:00:00Z')); // Oct 10 00:00 PDT, 7 dates incl. today
+ assert.equal(c.windowStart(720,now),Date.parse('2026-09-17T07:00:00Z'));
+ assert.equal(c.windowStart(0,now),null);
+ const p=[{x:Date.parse('2026-10-10T06:59:59Z'),kw:1},{x:Date.parse('2026-10-10T07:00:00Z'),kw:2},{x:now,kw:3},{x:now+1,kw:4}];
+ assert.deepEqual(c.windowSeries(p,168,now).map(q=>q.kw),[2,3]);
+});
+test('a 7-day window across the November fall-back keeps 7 Pacific dates (169 hours)',()=>{
+ const now=Date.parse('2026-11-03T20:00:00Z'); // 12:00 PST
+ const start=c.windowStart(168,now);
+ assert.equal(start,Date.parse('2026-10-28T07:00:00Z')); // Oct 28 00:00 PDT
+ assert.equal((Date.parse('2026-11-04T08:00:00Z')-start)/3600000,169);
+});
+test('Pacific date files are chosen by Pacific calendar date, never future dates',()=>{
+ assert.equal(typeof c.windowDates,'function');
+ const now=Date.parse('2026-10-17T04:30:00Z'); // Oct 16 21:30 PDT, already Oct 17 in UTC
+ const have=['2026-10-08','2026-10-09','2026-10-10','2026-10-15','2026-10-16','2026-10-17'];
+ assert.deepEqual([...c.windowDates(have,168,now)],['2026-10-10','2026-10-15','2026-10-16']);
+ assert.deepEqual([...c.windowDates(have,24,now)],['2026-10-15','2026-10-16']);
+ assert.deepEqual([...c.windowDates(have,0,now)],['2026-10-08','2026-10-09','2026-10-10','2026-10-15','2026-10-16']);
+});
+test('Pacific date files become source-labelled observations; invalid and ambiguous rows are dropped',()=>{
+ assert.equal(typeof c.dayFilePoints,'function');
+ const r=c.dayFilePoints({date:'2026-11-01',buildings:{g:[['2026-11-01 00:45:00',5],['2026-11-01 01:30:00',6],['bad',7],['2026-11-01 03:00:00',null],['2026-11-01 03:15:00',0]],x:'nope'}},'u');
+ assert.deepEqual(r.g.map(p=>[p.ts,p.kw,p.source]),[['2026-11-01 00:45:00',5,'u'],['2026-11-01 03:15:00',0,'u']]);
+ assert.deepEqual([...r.x],[]);
+ assert.deepEqual({...c.dayFilePoints(null,'u')},{});
+});
+test('snapshot generation time (naive UTC) is shown as an instant',()=>{
+ assert.equal(typeof c.utcInstant,'function');
+ assert.equal(c.utcInstant('2026-10-16 20:05:11'),Date.parse('2026-10-16T20:05:11Z'));
+ assert.equal(c.utcInstant('nope'),null);assert.equal(c.utcInstant(undefined),null);
+});

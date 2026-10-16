@@ -174,6 +174,56 @@ class BackfillTests(CampusBase):
         self.assertEqual((b["kw"], b["timestamp"], b["status"]), (15.0, "2026-10-14 02:15:00", "online"))
 
 
+class PacificDayFileTests(CampusBase):
+    """data/history/<Pacific date>.json keeps every observation past the 24 h history."""
+
+    def day(self, date):
+        return json.loads((self.d / "history" / f"{date}.json").read_text())
+
+    def test_rows_are_filed_by_pacific_wall_date_not_utc_run_date(self):
+        # 22:00 PDT on Oct 13 is already Oct 14 in UTC; it belongs to the Oct 13 file.
+        (self.d / "campus_energy_history.json").write_text(json.dumps(
+            {"grimes": [{"kw": 12.0, "ts": "2026-10-13 22:00:00", "t": "05:00"}]}))
+        self.run_with(FakeSession(two_meter_rows(["2026-10-14 03:00:00"])))
+        self.assertEqual(self.day("2026-10-13")["buildings"]["grimes"], [["2026-10-13 22:00:00", 12.0]])
+        self.assertEqual(self.day("2026-10-14")["buildings"]["grimes"], [["2026-10-14 03:00:00", 15.0]])
+        self.assertEqual(self.day("2026-10-14")["timezone"], "America/Los_Angeles")
+        index = json.loads((self.d / "history" / "index.json").read_text())
+        self.assertEqual(index["dates"], ["2026-10-13", "2026-10-14"])
+        self.assertEqual(index["timezone"], "America/Los_Angeles")
+
+    def test_rows_older_than_24h_history_are_kept_and_reruns_do_not_duplicate(self):
+        (self.d / "history").mkdir()
+        (self.d / "history" / "2026-10-10.json").write_text(json.dumps(
+            {"date": "2026-10-10", "timezone": "America/Los_Angeles",
+             "buildings": {"grimes": [["2026-10-10 12:00:00", 9.0]]}}))
+        times = ["2026-10-14 02:45:00", "2026-10-14 03:00:00"]
+        self.run_with(FakeSession(two_meter_rows(times)))
+        self.run_with(FakeSession(two_meter_rows(times)))
+        self.assertEqual(self.day("2026-10-10")["buildings"]["grimes"], [["2026-10-10 12:00:00", 9.0]])
+        self.assertEqual([r[0] for r in self.day("2026-10-14")["buildings"]["grimes"]], times)
+        index = json.loads((self.d / "history" / "index.json").read_text())
+        self.assertEqual(index["dates"], ["2026-10-10", "2026-10-14"])
+
+    def test_stale_rows_of_removed_buildings_are_not_filed(self):
+        # A building dropped from BUILDINGS keeps old rows in the history file; they must
+        # not create old date files that would misstate where retained history starts.
+        (self.d / "campus_energy_history.json").write_text(json.dumps(
+            {"stanley": [{"kw": 5.0, "ts": "2026-07-05 14:45:00", "t": "x"}]}))
+        self.run_with(FakeSession(two_meter_rows(["2026-10-14 03:00:00"])))
+        index = json.loads((self.d / "history" / "index.json").read_text())
+        self.assertEqual(index["dates"], ["2026-10-14"])
+        self.assertNotIn("stanley", self.day("2026-10-14")["buildings"])
+
+    def test_ambiguous_fall_back_hour_is_not_filed(self):
+        now = datetime(2026, 11, 1, 10, 30, tzinfo=timezone.utc)  # 02:30 PST
+        rows = two_meter_rows(["2026-11-01 00:45:00", "2026-11-01 01:15:00", "2026-11-01 02:00:00"])
+        with mock.patch.object(m, "now_utc", lambda: now):
+            self.run_with(FakeSession(rows))
+        self.assertEqual([r[0] for r in self.day("2026-11-01")["buildings"]["grimes"]],
+                         ["2026-11-01 00:45:00", "2026-11-01 02:00:00"])
+
+
 class OutageTests(CampusBase):
     def seed(self):
         for name in ("campus_energy.json",):
@@ -185,6 +235,7 @@ class OutageTests(CampusBase):
         self.assertEqual((self.d / "campus_energy.json").read_text(), '{"sentinel": 1}')
         self.assertEqual((self.d / "daily" / "2026-10-14.json").read_text(), '{"sentinel": 2}')
         self.assertFalse((self.d / "campus_energy_history.json").exists())
+        self.assertFalse((self.d / "history").exists())
 
     def test_login_503_aborts_without_writing(self):
         self.seed()

@@ -7,7 +7,8 @@ BMO Campus-Wide Energy Fetcher v2
 - CO2 + cost estimation
 - Prediction (weighted rolling average)
 
-Output: data/campus_energy.json + data/campus_energy_history.json
+Output: data/campus_energy.json + data/campus_energy_history.json (24 h)
+        + data/history/<Pacific date>.json (every observation, by Pacific date)
 """
 
 import os, csv, io, json, re, sys, statistics, requests
@@ -255,6 +256,53 @@ def merge_history(existing, new_rows, now_pt, run_t):
     cutoff = now_pt - timedelta(hours=HISTORY_HOURS)
     keep = [(parse_pt(ts), e) for ts, e in by_ts.items()]
     return [e for t, e in sorted(((t, e) for t, e in keep if t and t >= cutoff), key=lambda x: x[0])]
+
+
+def write_json_atomic(path, obj):
+    """Write via a temp file + rename so an interrupted run never leaves truncated JSON."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(obj, separators=(",", ":")))
+    os.replace(tmp, path)
+
+
+def save_pacific_days(history, out_dir, now_str, now_pt):
+    """Merge retained rows into data/history/<Pacific date>.json and refresh its index.
+
+    The 24 h campus_energy_history.json stays small because the campus map loads it;
+    these per-date files keep every observation for multi-day dashboard periods.
+    Dates are BMO's naive Pacific wall dates (America/Los_Angeles), never UTC run
+    dates. Existing rows are kept; a re-run only adds timestamps it has not seen.
+    Only configured buildings' rows inside the HISTORY_HOURS window are filed, so
+    stale rows of a building removed from BUILDINGS never create old date files.
+    """
+    active = {b["id"] for b in BUILDINGS}
+    cutoff = now_pt - timedelta(hours=HISTORY_HOURS)
+    by_date = {}
+    for bid, rows in history.items():
+        if bid not in active:
+            continue
+        for e in rows or []:
+            ts, kw = e.get("ts"), e.get("kw")
+            t = parse_pt(ts)
+            if t is None or t < cutoff or isinstance(kw, bool) or not isinstance(kw, (int, float)):
+                continue
+            by_date.setdefault(ts[:10], {}).setdefault(bid, {})[ts] = kw
+    day_dir = out_dir / "history"
+    day_dir.mkdir(parents=True, exist_ok=True)
+    for date, buildings in by_date.items():
+        path = day_dir / f"{date}.json"
+        try:
+            stored = json.loads(path.read_text()).get("buildings") or {}
+        except (OSError, ValueError, AttributeError):
+            stored = {}
+        for bid, rows in buildings.items():
+            merged = {r[0]: r[1] for r in stored.get(bid, []) if isinstance(r, list) and len(r) == 2 and parse_pt(r[0])}
+            merged.update(rows)
+            stored[bid] = [[ts, merged[ts]] for ts in sorted(merged, key=parse_pt)]
+        write_json_atomic(path, {"date": date, "timezone": "America/Los_Angeles", "buildings": stored})
+    dates = sorted(p.stem for p in day_dir.glob("????-??-??.json"))
+    write_json_atomic(day_dir / "index.json",
+                      {"dates": dates, "timezone": "America/Los_Angeles", "updated_utc": now_str})
 
 
 def observed_interval_min(history):
@@ -561,6 +609,7 @@ def run():
         json.dump(output, f, indent=2)
     with open(HISTORY_FILE, "w") as f:
         json.dump(history, f)
+    save_pacific_days(history, OUTPUT_DIR, now_str, now_pt)
 
     # ── Save daily snapshot (append to today's file) ──
     daily_dir = OUTPUT_DIR / "daily"
