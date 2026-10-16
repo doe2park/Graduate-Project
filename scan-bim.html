@@ -2850,6 +2850,20 @@ let mobileSearchTimer;document.getElementById('mobileElementSearch').oninput=()=
 document.getElementById('mobileElementClose').onclick=()=>{document.getElementById('mobileElementBrowser').hidden=true;};
 
 let _lastT = 0, _lastWalkRender = -Infinity;
+// Draw only when something can have changed: the camera/viewport moved, an input or parent message arrived,
+// or as a slow heartbeat (async layer loads, highlights). An idle page no longer redraws every frame.
+const _viewSig = new Float64Array(34); let _lastDraw = -Infinity, _kickUntil = 0;
+const _kick = () => { _kickUntil = (typeof performance !== 'undefined' ? performance.now() : 0) + 300; };
+if (typeof window !== 'undefined') for (const type of ['pointerdown', 'pointermove', 'pointerup', 'wheel', 'keydown', 'keyup', 'message', 'resize', 'focus']) window.addEventListener(type, _kick, { passive: true });
+function _viewChanged() {
+  if (!camera.updateMatrixWorld || !camera.projectionMatrix || !renderer.domElement) return true;
+  camera.updateMatrixWorld();
+  const m = camera.matrixWorld.elements, p = camera.projectionMatrix.elements; let changed = false;
+  for (let i = 0; i < 16; i++) { if (_viewSig[i] !== m[i]) { _viewSig[i] = m[i]; changed = true; } if (_viewSig[16 + i] !== p[i]) { _viewSig[16 + i] = p[i]; changed = true; } }
+  const w = renderer.domElement.width, h = renderer.domElement.height;
+  if (_viewSig[32] !== w || _viewSig[33] !== h) { _viewSig[32] = w; _viewSig[33] = h; changed = true; }
+  return changed;
+}
 renderer.setAnimationLoop((t) => {
   const dt = Math.min(0.1, (t - _lastT) / 1000) || 0.016;
   _lastT = t;
@@ -2866,7 +2880,11 @@ renderer.setAnimationLoop((t) => {
   // Standalone orbit keeps its existing loading policy.
   const layerBusy = interiorState.loading || Object.values(layerState).some(st => st.loading);
   if (!layerBusy || ((walkMode || splitPane==='bim') && t - _lastWalkRender >= (mobileMq.matches ? 400 : 250))) {
-    renderer.render(scene, camera);
+    const moved = _viewChanged();
+    if (moved || t < _kickUntil || t - _lastDraw >= 250) {
+      renderer.render(scene, camera);
+      _lastDraw = t;
+    }
     _lastWalkRender = t;
   }
 });

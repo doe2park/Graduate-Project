@@ -122,11 +122,17 @@ window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==
 });
 window.addEventListener('resize',()=>{if(!innerWidth||!innerHeight)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);edgeTarget?.setSize(innerWidth*renderer.getPixelRatio(),innerHeight*renderer.getPixelRatio());if(edgeQuad)edgeQuad.material.uniforms.texel.value.set(1/(innerWidth*renderer.getPixelRatio()),1/(innerHeight*renderer.getPixelRatio()));});
 renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();label.textContent='Graphics paused · reload this page';});
+/* Draw only when the view can have changed (camera, sphere, texture, input, transition) or on a slow heartbeat. */
+const viewSig=new Array(40).fill(NaN);let lastDraw=-Infinity,kickUntil=0;const kick=()=>{kickUntil=performance.now()+300;};
+for(const type of ['pointerdown','pointermove','pointerup','wheel','keydown','keyup','message','resize','focus'])window.addEventListener(type,kick,{passive:true});
+function viewChanged(){camera.updateMatrixWorld();const v=[...camera.matrixWorld.elements,...camera.projectionMatrix.elements,...sphere.quaternion.toArray(),material.map?.id??-1,material.opacity,renderer.domElement.width,renderer.domElement.height];let c=false;for(let i=0;i<v.length;i++)if(viewSig[i]!==v[i]){viewSig[i]=v[i];c=true;}return c;}
 renderer.setAnimationLoop(t=>{
+ const animating=!!transition;
  if(transition){const a=transition,f=a.duration?Math.min(1,(t-a.start)/a.duration):1,e=f*f*(3-2*f);camera.position.copy(a.from).lerp(a.to,a.interpolate?e:1);sphere.position.copy(camera.position);a.ghost.position.copy(camera.position);material.opacity=e;publish();
   if(f===1){scene.remove(a.ghost);a.ghost.material.map.dispose();a.ghost.material.dispose();material.transparent=false;material.opacity=1;material.depthTest=true;material.depthWrite=true;transition=null;send({type:'grimes-photo-transition',moving:false});label.textContent=`${active+1}/${stations.length} · Captured photo`;a.resolve();}
  }
  if(!loading&&!transition&&held.size&&t-lastMove>220){lastMove=t;walkDirection(held.values().next().value);}
+ if(!(viewChanged()||animating||t<kickUntil||t-lastDraw>=250))return;lastDraw=t;
  if(edgesOnly)renderEdges();else renderer.render(scene,camera);
 });
 /* Sobel edge post-process: scene -> render target -> luminance gradient -> transparent gold/white edge alpha. */
