@@ -4,26 +4,13 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
-  --paper:#f6f8f7; --card:#ffffff; --ink:#1c2b29; --ink2:#51625f; --mute:#7d8c89;
-  --line:#dde5e3; --grid:#e8eeec;
-  --teal:#0d9488; --indigo:#6366f1; --amber:#b45309;
+  /* Same Berkeley navy + gold palette as the campus energy dashboard (one look across the shared pages). */
+  --paper:#0a1020; --card:#0f172a; --ink:#e2e8f0; --ink2:#94a3b8; --mute:#64748b;
+  --line:rgba(253,181,21,.14); --grid:#1e293b;
+  --teal:#FDB515; --indigo:#60a5fa; --amber:#2dd4bf;
   --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
-  --ref:#8a9794; --band:rgba(13,148,136,.06);
-}
-:root:not([data-theme="light"]){}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --paper:#0f1514; --card:#161d1c; --ink:#e5edeb; --ink2:#a8b6b3; --mute:#7d8c89;
-    --line:#26302e; --grid:#1e2826;
-    --teal:#0fa396; --indigo:#7b82f5; --amber:#c97b1a;
-    --ref:#5f6f6c; --band:rgba(15,163,150,.08);
-  }
-}
-:root[data-theme="dark"]{
-  --paper:#0f1514; --card:#161d1c; --ink:#e5edeb; --ink2:#a8b6b3; --mute:#7d8c89;
-  --line:#26302e; --grid:#1e2826;
-  --teal:#0fa396; --indigo:#7b82f5; --amber:#c97b1a;
-  --ref:#5f6f6c; --band:rgba(15,163,150,.08);
+  --ref:#64748b; --band:rgba(253,181,21,.07);
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
@@ -309,7 +296,7 @@ function splitChart(){
       const x0 = L + (W-L-R) * acc/100, w = (W-L-R) * pct/100 - 2;
       const kwhd = Math.round(pct/100 * (ri === 0 ? (DATA.daily.reduce((a,r)=>a+r.t,0)/DATA.daily.length) : DATA.design_daily));
       out += `<rect class="sg" data-lab="${lab}" data-kwh="${kwhd}" data-row="${ri}" x="${x0}" y="${yy}" width="${Math.max(w,2)}" height="${rowH}" rx="4" fill="${c[col]}"></rect>`;
-      if (pct >= 10) out += `<text x="${x0 + w/2}" y="${yy + rowH/2 + 4}" text-anchor="middle" fill="#ffffff" font-size="12" font-family="JetBrains Mono,ui-monospace,monospace">${pct}%</text>`;
+      if (pct >= 10) out += `<text x="${x0 + w/2}" y="${yy + rowH/2 + 4}" text-anchor="middle" fill="#0a1020" font-size="12" font-family="JetBrains Mono,ui-monospace,monospace">${pct}%</text>`;
       acc += pct;
     });
   });
