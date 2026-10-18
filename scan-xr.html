@@ -1,0 +1,398 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grimes · Scan↔BIM XR overlay</title><link rel="icon" href="data:,">
+<!-- Quest WebXR version of the scan-compare Overlay: stand inside a captured 360° photo, BIM services placed with the same
+     registration as the web overlay, X-ray flashlight cone on the controller ray, trigger for info cards, neighbour-station jumps.
+     Docs: docs/QUEST_XR_OVERLAY.md. Pure maths: twin/xr-core.js. Render tier: twin/xr-spatial-tier.mjs. -->
+<style>
+:root{--bg:rgba(10,20,32,.82);--bd:rgba(255,255,255,.2);--gold:#FDB515;--navy:#003262;--f:600 12px/1.2 Arial,Helvetica,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#05080d;color:#fff;font:var(--f)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#bar{position:fixed;top:8px;left:8px;right:8px;z-index:5;display:flex;flex-wrap:wrap;gap:4px;align-items:center;pointer-events:none}
+#bar>*{pointer-events:auto}
+.b,#bar select{height:32px;min-width:32px;padding:0 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:#fff;font:var(--f);cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.b:hover{background:rgba(36,69,98,.9)}.b:focus-visible,#bar select:focus-visible{outline:2px solid #ffd479;outline-offset:1px}.b:disabled{opacity:.45;cursor:default}
+.b[aria-pressed="true"]{background:var(--gold);color:#0b1020;border-color:var(--gold)}
+.b input[type=range]{width:84px;accent-color:var(--gold)}
+#enterVR{background:var(--navy);border-color:#6d8fb0}#enterVR[hidden]{display:none}
+#station{max-width:118px}
+.pill{position:fixed;left:8px;z-index:5;max-width:calc(100% - 16px);padding:6px 11px;border-radius:999px;background:var(--bg);border:1px solid var(--bd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+#align{bottom:8px;color:#ffe495;white-space:normal;border-radius:14px}#align.prov{color:#ffb4a8;border-color:#e2725b}
+#status{bottom:44px;color:#cfe3f5}
+#xrNote{bottom:80px;color:#b8c7d6;font-weight:400}#xrNote:empty{display:none}
+#stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
+@media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
+</style>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+</head><body>
+<div id="bar" role="toolbar" aria-label="XR overlay controls">
+ <select id="capture" aria-label="Capture date"><option value="2026-05-06">May 6 · registered</option><option value="2026-09-17">Sep 17 · provisional</option></select>
+ <button id="prev" class="b" aria-label="Previous captured position">&#8249;</button><select id="station" aria-label="Captured position"></select><button id="next" class="b" aria-label="Next captured position">&#8250;</button>
+ <button id="styleLens" class="b" aria-pressed="true" title="Services only inside the flashlight cone">Lens</button><button id="styleAll" class="b" aria-pressed="false" title="All nearby services, semi-transparent">All</button>
+ <label class="b" title="Service opacity">Opacity <input id="opacity" type="range" min="10" max="100" step="5" value="85"></label>
+ <label class="b" title="Flashlight cone half-angle">Cone <input id="cone" type="range" min="4" max="30" step="1" value="12"></label>
+ <button id="hires" class="b" aria-pressed="false" title="Full 4096×2048 photo instead of the 2048×1024 derivative">4K photo</button>
+ <button id="fire" class="b" aria-pressed="false" title="Fire piping Level 1 chunks, ~42 MB">Fire piping</button>
+ <button id="statsBtn" class="b" aria-pressed="false">Stats</button>
+ <button id="enterVR" class="b" hidden>Enter VR</button>
+</div>
+<span id="xrNote" class="pill" role="note"></span><span id="status" class="pill" role="status">Loading…</span><span id="align" class="pill" role="note"></span>
+<pre id="stats" hidden aria-label="Render statistics"></pre>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight,applyRadius} from './twin/xr-spatial-tier.mjs';
+const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,$=id=>document.getElementById(id);
+const T0=performance.now(),q=new URLSearchParams(location.search);
+/* ── Configuration ── service layers = scan-bim OVERLAY_LAYER_KEYS (same GLBs + sidecars). Only Level 1 is kept by default. */
+const LAYERS={
+ equipment:{glb:'buildings/grimes/grimes-equipment.glb',json:'buildings/grimes/elements.json',label:'Equipment',mb:1.5},
+ lighting:{glb:'buildings/grimes/grimes-lighting.glb',json:'buildings/grimes/lighting.elements.json',label:'Lighting',mb:2.3},
+ conduit:{glb:'buildings/grimes/grimes-conduit.glb',json:'buildings/grimes/conduit.elements.json',label:'Conduit',mb:11.0},
+ duct:{glb:'buildings/grimes/grimes-duct.glb',json:'buildings/grimes/duct.elements.json',label:'Ductwork',mb:21.1},
+ hydronic:{glb:'buildings/grimes/grimes-hydronic.glb',json:'buildings/grimes/hydronic.elements.json',label:'Mech piping',mb:20.4},
+ plumbing:{glb:'buildings/grimes/grimes-plumbing.glb',json:'buildings/grimes/plumbing.elements.json',label:'Plumbing',mb:20.9},
+ lifesafety:{glb:'buildings/grimes/grimes-lifesafety.glb',json:'buildings/grimes/lifesafety.elements.json',label:'Life safety',mb:.5},
+ fire:{partsManifest:'buildings/grimes/grimes-fire.chunks.json',json:'buildings/grimes/fire.elements.json',label:'Fire piping',mb:41.8},
+};
+const OVERLAY_LAYER_KEYS=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety','fire'];
+// Placement of every element layer into the BIM viewer world (scan-bim.html toggleLayer: rotY(pi) + EQUIP_OFFSET).
+const EQUIP_OFFSET={x:-35.28,y:-97.16,z:28.60};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const P={
+ radius:clamp(Number(q.get('radius'))||12,4,60),cell:clamp(Number(q.get('cell'))||6,2,40),instanceReuse:clamp(Number(q.get('instance'))||32,2,100000),
+ levels:new Set((q.get('levels')||'L1').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean)),
+ layers:(q.get('layers')==='all'?OVERLAY_LAYER_KEYS:q.get('layers')?q.get('layers').split(',').filter(k=>OVERLAY_LAYER_KEYS.includes(k)):OVERLAY_LAYER_KEYS.filter(k=>k!=='fire')),
+ xrScale:clamp(Number(q.get('xrscale'))||.85,.5,1),foveation:clamp(q.has('foveation')?Number(q.get('foveation')):.7,0,1),
+};
+const XR_SNAP=Math.PI/6;
+/* ── Renderer / scene ── no shadows, no lights, no tone mapping; capped pixel ratio; XR framebuffer scale + fixed foveation. */
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=false;
+renderer.xr.enabled=true;renderer.xr.setReferenceSpaceType('local');renderer.xr.setFramebufferScaleFactor(P.xrScale);
+document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene(),rig=new THREE.Group(),camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,200);
+rig.name='rig';rig.add(camera);scene.add(rig);
+// Photo sphere: drawn first, never depth-tested, so services are always overlaid (as the web overlay stacks BIM over the photo).
+const sphereGeo=new THREE.SphereGeometry(50,64,32);sphereGeo.scale(-1,1,1);
+const sphereMat=new THREE.MeshBasicMaterial({toneMapped:false,depthTest:false,depthWrite:false}),sphere=new THREE.Mesh(sphereGeo,sphereMat);
+sphere.renderOrder=-10;sphere.visible=false;sphere.frustumCulled=false;scene.add(sphere);
+const bimRoot=new THREE.Group();bimRoot.name='bim (registration inverse)';scene.add(bimRoot);
+/* ── X-ray flashlight shader ── one shared uniform set for every service batch. */
+const U={coneOrigin:{value:new THREE.Vector3()},coneDir:{value:new THREE.Vector3(0,0,-1)},coneCos:{value:X.coneCos(12)},coneSoft:{value:.01},mode:{value:0},opacity:{value:.85},fade:{value:1},hard:{value:0}};
+const VERT=`varying vec3 vWorld;varying vec3 vCol;varying float vShade;
+void main(){vec4 p=vec4(position,1.);
+#ifndef XR_LINE
+vec3 n=normal;
+#endif
+#ifdef USE_INSTANCING
+p=instanceMatrix*p;
+#ifndef XR_LINE
+n=mat3(instanceMatrix)*n;
+#endif
+#endif
+vec4 w=modelMatrix*p;vWorld=w.xyz;vCol=vec3(1.);
+#ifdef USE_COLOR
+vCol*=color;
+#endif
+#ifdef USE_INSTANCING_COLOR
+vCol*=instanceColor;
+#endif
+#ifdef XR_LINE
+vShade=1.;
+#else
+vec3 wn=normalize(mat3(modelMatrix)*n);vShade=.58+.42*abs(dot(wn,normalize(vec3(.35,.85,.4))));
+#endif
+gl_Position=projectionMatrix*viewMatrix*w;}`;
+const FRAG=`uniform vec3 coneOrigin;uniform vec3 coneDir;uniform float coneCos,coneSoft,mode,opacity,fade,hard;varying vec3 vWorld;varying vec3 vCol;varying float vShade;
+void main(){float w=smoothstep(coneCos-coneSoft,coneCos,dot(normalize(vWorld-coneOrigin),coneDir));
+if(hard>.5)w=step(.5,w);
+float a=mode>.5?opacity:opacity*w;if(a<.02)discard;
+vec3 c=vCol*vShade;if(mode>.5)c=mix(c,min(c*1.25+.05,vec3(1.)),w);
+gl_FragColor=vec4(c*fade,a);
+#include <colorspace_fragment>
+}`;
+const materials=new Map();
+function materialFor({isLine,instanced,side}){
+ const key=[isLine,instanced,side].join('|');if(materials.has(key))return materials.get(key);
+ const m=new THREE.ShaderMaterial({uniforms:U,vertexShader:VERT,fragmentShader:FRAG,vertexColors:!instanced,transparent:true,depthWrite:true,side:side==='double'?THREE.DoubleSide:THREE.FrontSide,defines:isLine?{XR_LINE:''}:{}});
+ m.name='xr-overlay-'+key;materials.set(key,m);return m;
+}
+const state={mode:q.get('style')==='all'?'all':'lens',opacity:{lens:.85,all:.35},coneDeg:12,hiRes:null,snap:true,menu:false};
+function applyShaderState(){
+ const o=state.opacity[state.mode];U.mode.value=state.mode==='all'?1:0;U.opacity.value=o;U.coneCos.value=X.coneCos(state.coneDeg);U.coneSoft.value=U.coneCos.value-X.coneCos(state.coneDeg+2);
+ // Fully opaque lens: render opaque with a hard cone edge (no blending, no transparent sorting / overdraw).
+ const opaque=state.mode==='lens'&&o>=.99;U.hard.value=opaque?1:0;for(const m of materials.values())m.transparent=!opaque;
+ $('styleLens').setAttribute('aria-pressed',String(state.mode==='lens'));$('styleAll').setAttribute('aria-pressed',String(state.mode==='all'));$('opacity').value=Math.round(o*100);$('cone').value=state.coneDeg;
+ if(state.menu)drawMenu();invalidate();
+}
+/* ── Loaders ── DRACOLoader decodes in Web Workers (WorkerPool); same pinned decoder as scan-bim. */
+const draco=new DRACOLoader();draco.setWorkerLimit(2);draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+const gltfLoader=new GLTFLoader();gltfLoader.setDRACOLoader(draco);
+const texLoader=new THREE.TextureLoader();
+const fetchJson=u=>fetch(u,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(u+' '+r.status);return r.json();});
+/* ── Render gating ── outside XR draw only after a change; in XR every frame (the compositor requires it). */
+let needsRender=true,renderCount=0,lastInfo={calls:0,triangles:0,lines:0,points:0};const invalidate=()=>{needsRender=true;};
+let statusTimer=0;function status(text,sticky=false){$('status').textContent=text;$('status').hidden=false;clearTimeout(statusTimer);if(!sticky)statusTimer=setTimeout(()=>$('status').hidden=true,5000);}
+/* ── Capture / station state ── */
+let capture=null,reg=null,stations=[],manifestURL=null,active=-1,stationBim=[0,0,0],busyStation=false,pendingStation=null,captureEpoch=0;
+const timing={firstPhotoMs:null,layersDoneMs:null};
+let yaw=0,pitch=0;const axisQ=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
+function setDesktopLook(){camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));invalidate();}
+const photoURL=s=>new URL((state.hiRes?'':'mobile/')+s.file,manifestURL).href;
+function updateAlign(){const a=$('align');a.textContent='Grimes L1 · '+capture.label+' · '+capture.alignmentText+' · Design (BIM) positions';a.classList.toggle('prov',capture.provisional);}
+async function loadCapture(date){
+ const epoch=++captureEpoch,cfg=X.captureConfig(date);status('Loading '+cfg.label+' capture…',true);
+ const [m,r]=await Promise.all([fetchJson(cfg.photo),fetchJson(cfg.registration)]);
+ if(epoch!==captureEpoch)return;
+ if(!X.validRegistration(r))throw new Error('Registration unavailable for '+cfg.label);
+ capture=cfg;reg=r;manifestURL=new URL(cfg.photo,location.href);stations=m.stations;$('capture').value=cfg.date;
+ const tf=X.bimRootTransform(reg);bimRoot.rotation.set(0,tf.rotationY,0);bimRoot.position.fromArray(tf.position);bimRoot.updateMatrixWorld(true);
+ const sel=$('station');sel.innerHTML='';stations.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent='Capture '+(i+1);sel.appendChild(o);});
+ const want=q.get('station'),byId=stations.findIndex(s=>s.id===want),byIndex=want!=null&&want!==''&&Number.isInteger(Number(want))?Number(want):-1;
+ const start=byId>=0?byId:byIndex>=0&&byIndex<stations.length?byIndex:Math.max(0,stations.findIndex(s=>s.id===m.defaultStation));
+ active=-1;updateAlign();await openStation(start,{instant:true,initialLook:true,force:true});if(state.menu)drawMenu();
+}
+const prefetched=new Set();
+function prefetchNeighbors(i){for(const n of (stations[i]?.neighbors||[]).slice(0,3)){const u=photoURL(stations[n]);if(prefetched.has(u))continue;prefetched.add(u);fetch(u,{cache:'force-cache'}).then(r=>{if(!r.ok)throw 0;return r.arrayBuffer();}).catch(()=>prefetched.delete(u));}}
+async function openStation(index,{instant=false,initialLook=false,force=false}={}){
+ if(!stations.length)return;const i=clamp(index,0,stations.length-1);
+ if(busyStation){pendingStation={index:i,opts:{instant,initialLook,force}};return;}
+ if(i===active&&!force)return;
+ busyStation=true;const epoch=captureEpoch,doFade=active>=0&&!instant;
+ try{
+  const s=stations[i];status('Loading photo '+(i+1)+'/'+stations.length+'…',true);
+  const tex=await texLoader.loadAsync(photoURL(s));tex.colorSpace=THREE.SRGBColorSpace;
+  if(epoch!==captureEpoch){tex.dispose();return;}
+  if(doFade)await fade(0,140);
+  hideCard();
+  const old=sphereMat.map;sphereMat.map=tex;sphereMat.needsUpdate=true;if(old)old.dispose();
+  active=i;sphere.position.fromArray(s.position);sphere.quaternion.fromArray(X.stationQuaternion(s.e57Quaternion,0));sphere.visible=true;
+  if(initialLook&&!xrSession){const f=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().fromArray(s.e57Quaternion)).applyQuaternion(axisQ);yaw=Math.atan2(-f.x,-f.z);pitch=0;setDesktopLook();}
+  placeRig();stationBim=X.applyReg(reg,s.position);updateRadius();
+  $('station').value=String(i);$('prev').disabled=i===0;$('next').disabled=i===stations.length-1;
+  if(timing.firstPhotoMs==null)timing.firstPhotoMs=Math.round(performance.now()-T0);
+  if(xrSession)placeTag();
+  status((i+1)+'/'+stations.length+' · '+capture.label+(capture.provisional?' · provisional alignment':''));
+  if(doFade)await fade(1,200);else{U.fade.value=1;sphereMat.color.setScalar(1);}
+  prefetchNeighbors(i);if(state.menu)drawMenu();
+ }catch(e){console.error(e);status('Photo unavailable · choose another capture');}
+ finally{busyStation=false;invalidate();if(pendingStation){const n=pendingStation;pendingStation=null;openStation(n.index,n.opts);}}
+}
+/* Put the tracked head exactly on the capture station (photo centre). Desktop: camera at the rig origin. */
+function placeRig(){if(active<0)return;const head=xrSession?camera.position.toArray():[0,0,0];rig.position.fromArray(X.rigForStation(stations[active].position,rig.rotation.y,head));rig.updateMatrixWorld(true);invalidate();}
+function walk(dirVec){if(active<0||busyStation)return false;const d=dirVec.clone();d.y=0;if(d.lengthSq()<1e-8)return false;d.normalize();const n=X.chooseNeighbor(stations,active,d.toArray());if(n<0){status('No captured neighbour that way · turn to follow the route');return false;}openStation(n);return true;}
+let fadeAnim=null;
+function fade(to,ms){return new Promise(resolve=>{fadeAnim={from:U.fade.value,to,start:performance.now(),ms:matchMedia('(prefers-reduced-motion:reduce)').matches?0:ms,resolve};invalidate();});}
+function stepFade(now){if(!fadeAnim)return false;const a=fadeAnim,f=a.ms?Math.min(1,(now-a.start)/a.ms):1,v=a.from+(a.to-a.from)*f;U.fade.value=v;sphereMat.color.setScalar(v);if(f>=1){fadeAnim=null;a.resolve();}return true;}
+/* ── Service layers ── sequential, smallest first; Level-1 fragments only; radius visibility per station. */
+const layerState={};
+function elementLevel(info){if(info.levelKey&&info.levelKey!=='UNKNOWN')return info.levelKey;const n=String(info.level||'').toUpperCase();if(/MEZZ/.test(n))return'MEZZ';if(/LOWER|B1/.test(n))return'LOWER';if(/ROOF/.test(n))return'ROOF';const m=n.match(/^LEVEL 0?([1-4])$/);return m?'L'+m[1]:null;}
+async function loadLayer(key){
+ const L=LAYERS[key];if(layerState[key])return layerState[key].pending;
+ const st=layerState[key]={key,loading:true,loaded:false,meshes:[],meta:null,stats:{},bytes:0,group:new THREE.Group()};
+ st.group.name='xr-layer:'+key;st.group.visible=true;bimRoot.add(st.group);
+ st.pending=(async()=>{const t0=performance.now();
+  try{
+   const metaJson=await fetchJson(L.json),meta=metaJson.elements||{};
+   for(const [id,info] of Object.entries(meta)){info.layer=key;info.levelKey=elementLevel(info)||'UNKNOWN';}
+   st.meta=meta;
+   let paths=[L.glb];
+   if(L.partsManifest){const man=await fetchJson(L.partsManifest);const parts=man.chunks.filter(c=>P.levels.has(c.levelKey));paths=parts.map(c=>'buildings/grimes/'+c.file);st.bytes=parts.reduce((a,c)=>a+c.bytes,0);}
+   for(const path of paths){
+    status(L.label+' · loading…',true);
+    const gltf=await gltfLoader.loadAsync(path,p=>{if(p.total)status(L.label+' · '+(p.loaded/1e6).toFixed(1)+' / '+(p.total/1e6).toFixed(1)+' MB',true);});
+    try{
+     const root=gltf.scene;root.rotation.y=Math.PI;root.position.set(EQUIP_OFFSET.x,EQUIP_OFFSET.y,EQUIP_OFFSET.z);root.updateMatrixWorld(true);
+     const bind=bindElementSourceIds(gltf);status(L.label+' · building Level '+[...P.levels].join('+')+' batches…',true);
+     const r=await buildSpatialTier(THREE,root,meta,key,{levels:P.levels,cellSize:P.cell,instanceReuse:P.instanceReuse,materialFor});
+     for(const m of r.meshes)st.group.add(m);st.meshes.push(...r.meshes);
+     for(const [k,v] of Object.entries({...r.stats,boundNodes:bind.boundNodes}))st.stats[k]=(st.stats[k]||0)+v;
+    }finally{releaseSource(gltf);}
+   }
+   st.loaded=true;st.loadMs=Math.round(performance.now()-t0);applyShaderState();updateRadius();
+   console.log(`[xr-layer:${key}] ${st.stats.drawCalls} batches · ${st.stats.elements} L1 elements · ${st.stats.renderTriangles} tris · ${st.loadMs} ms`);
+  }catch(e){st.error=String(e.message||e);console.error('[xr-layer:'+key+']',e);status(L.label+' failed to load');}
+  finally{st.loading=false;invalidate();updateStats();if(state.menu)drawMenu();}
+ })();
+ return st.pending;
+}
+async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);for(const k of order)await loadLayer(k);timing.layersDoneMs=Math.round(performance.now()-T0);status('Services ready · Level '+[...P.levels].join('+')+' within '+P.radius+' m');updateStats();}
+function updateRadius(){let n=0;for(const st of Object.values(layerState))n+=applyRadius(st.meshes,stationBim,P.radius);invalidate();return n;}
+function setFire(on){const st=layerState.fire;if(on&&!st){loadLayer('fire');}else if(st)st.group.visible=on;$('fire').setAttribute('aria-pressed',String(on));if(state.menu)drawMenu();invalidate();}
+const fireOn=()=>!!layerState.fire&&layerState.fire.group.visible;
+/* ── Picking + info card ── ray = controller (XR) or mouse (desktop); only visible, in-radius batches are tested. */
+const raycaster=new THREE.Raycaster();raycaster.params.Line.threshold=.04;
+function pickables(){const out=[];for(const st of Object.values(layerState))if(st.group.visible)for(const m of st.meshes)if(m.visible)out.push(m);return out;}
+let cardData=null,cardDataP=null;
+function loadCardData(){if(cardData&&Date.now()-cardData.at<60000)return Promise.resolve(cardData);return cardDataP=cardDataP||Promise.all([fetchJson('buildings/grimes/element-feeds.json').catch(()=>null),fetchJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json').catch(()=>null)]).then(([feeds,bd])=>{cardData={feeds,meters:bd?.meters||{},at:Date.now()};cardDataP=null;return cardData;});}
+loadCardData();
+const card=makeSurface(1024,560,.56,.306,60),marker=new THREE.Mesh(new THREE.SphereGeometry(.018,12,8),new THREE.MeshBasicMaterial({color:0xfbbf24,depthTest:false,depthWrite:false,transparent:true}));
+marker.renderOrder=59;marker.visible=false;scene.add(card.mesh,marker);
+let picked=null,pickEpoch=0;
+function makeSurface(w,h,mw,mh,order){const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.minFilter=THREE.LinearMipmapLinearFilter;texture.anisotropy=4;
+ const mesh=new THREE.Mesh(new THREE.PlaneGeometry(mw,mh),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}));mesh.renderOrder=order;mesh.visible=false;mesh.frustumCulled=false;return {canvas,texture,mesh,ctx:canvas.getContext('2d')};}
+const TIER_COLOR={live:'#34d399',latest:'#94a3b8',mod:'#fbbf24',ctx:'#60a5fa',none:'#64748b'};
+function wrap(ctx,text,width,max=2){const words=String(text).split(' '),lines=[];let line='';for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width>width&&line){lines.push(line);line=w;if(lines.length===max)break;}else line=t;}if(lines.length<max&&line)lines.push(line);return lines;}
+/* shrink the font until the whole line fits: alignment caveats are never cut */
+function fitText(ctx,text,x,y,width,size,family){let s=size;do{ctx.font=s+'px '+family;}while(ctx.measureText(text).width>width&&--s>12);ctx.fillText(text,x,y,width);}
+function drawCard(lines){const {ctx,canvas}=card,W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);
+ ctx.fillStyle='rgba(8,16,28,.94)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,28);ctx.fill();ctx.strokeStyle='rgba(253,181,21,.85)';ctx.lineWidth=4;ctx.stroke();
+ ctx.fillStyle='#FDB515';ctx.fillRect(4,40,10,H-80);
+ ctx.font='700 46px Arial';const bw=ctx.measureText(lines.badge).width+40;ctx.fillStyle=TIER_COLOR[lines.cls]||'#64748b';ctx.beginPath();ctx.roundRect(W-bw-34,34,bw,62,31);ctx.fill();ctx.fillStyle='#0b1020';ctx.fillText(lines.badge,W-bw-14,82);
+ ctx.fillStyle='#fff';ctx.font='700 50px Arial';let y=88;for(const t of wrap(ctx,lines.title,W-bw-110,2)){ctx.fillText(t,44,y);y+=58;}
+ ctx.font='34px Arial';ctx.fillStyle='#a9c1d6';if(lines.sub){ctx.fillText(wrap(ctx,lines.sub,W-90,1)[0]||'',44,y+4);y+=52;}
+ ctx.font='600 40px Arial';ctx.fillStyle='#e8f1f8';for(const [k,r] of lines.rows.entries()){ctx.font=k?'32px Arial':'600 40px Arial';for(const t of wrap(ctx,r,W-90,k?2:1)){if(y>H-120)break;ctx.fillText(t,44,y+10);y+=k?40:52;}}
+ ctx.fillStyle='#8aa2b8';fitText(ctx,lines.footer[0],44,H-70,W-90,28,'Arial');fitText(ctx,lines.footer[1],44,H-34,W-90,26,'Arial');
+ card.texture.needsUpdate=true;}
+function hideCard(){pickEpoch++;if(picked){for(const st of Object.values(layerState))for(const m of st.meshes)highlight(THREE,m,picked.id,false);picked=null;}card.mesh.visible=false;marker.visible=false;invalidate();}
+const _head=new THREE.Vector3(),_v=new THREE.Vector3();
+async function pickAlong(origin,dir){
+ raycaster.set(origin,dir);raycaster.far=P.radius+6;
+ const hit=raycaster.intersectObjects(pickables(),false)[0];
+ const id=hit&&resolveHit(hit.object,hit.instanceId,hit.faceIndex,hit.index),layer=hit?.object.userData.layer,info=id&&layerState[layer]?.meta?.[id];
+ hideCard();if(!info){status('No service element on that ray');return null;}
+ const epoch=pickEpoch;picked={id,layer};for(const m of layerState[layer].meshes)highlight(THREE,m,id,true);
+ const data=await loadCardData();if(epoch!==pickEpoch)return null;
+ const tier=EC.elementFeedTier(id,info,data.feeds,data.meters),lines=X.cardLines(id,info,tier,capture);drawCard(lines);
+ camera.getWorldPosition(_head);const toHit=_v.copy(hit.point).sub(_head),dist=clamp(toHit.length()*.7,.8,1.8);
+ card.mesh.position.copy(_head).addScaledVector(toHit.normalize(),dist);card.mesh.position.y-=.1*dist;card.mesh.scale.setScalar(dist/1.4);card.mesh.lookAt(_head);card.mesh.visible=true;
+ marker.position.copy(hit.point);marker.visible=true;picked.tier=tier.tier;picked.lines=lines;invalidate();
+ return {id,layer,tier:tier.tier,lines,distance:hit.distance};
+}
+/* ── XR menu panel (world-locked; B/Y toggles; trigger presses buttons) ── */
+const menu=makeSurface(1280,666,1.0,.52,70);scene.add(menu.mesh);
+const tag=makeSurface(640,96,.5,.075,65);scene.add(tag.mesh);
+function menuLabels(){return [`Style: ${state.mode==='lens'?'Lens':'All'}`,'Opacity −','Opacity +','Cone −','Cone +',`Capture: ${capture?.date==='2026-09-17'?'Sep 17':'May 6'}`,`Photo: ${state.hiRes?'4K':'2K'}`,`Snap turn: ${state.snap?'on':'off'}`,`Fire: ${fireOn()?'on':layerState.fire?.loading?'loading':'off'}`,'Close'];}
+function drawMenu(){const {ctx,canvas}=menu,W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.95)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,30);ctx.fill();ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,86);ctx.fillStyle='#FDB515';ctx.fillRect(4,86,W-8,5);
+ ctx.fillStyle='#fff';ctx.font='700 44px Arial';ctx.fillText('Grimes L1 · Scan↔BIM overlay',36,62);
+ const loaded=Object.values(layerState).filter(s=>s.loaded).length,total=Object.keys(layerState).length;
+ const rows=[[`${capture?.label||''} · station ${active+1}/${stations.length}`,'#e8f1f8'],[`Alignment: ${capture?.alignmentText||''}`,capture?.provisional?'#ffb4a8':'#ffe495'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · ${loaded}/${total} layers · opacity ${Math.round(state.opacity[state.mode]*100)}% · cone ${state.coneDeg}°`,'#a9c1d6'],['Trigger: info / buttons · Stick ↑↓: next station · Stick ←→: snap turn · A/X: Lens/All','#8aa2b8']];
+ let y=142;for(const [t,c] of rows){ctx.fillStyle=c;ctx.font=y===142?'600 34px Arial':'30px Arial';ctx.fillText(wrap(ctx,t,W-72,1)[0]||'',36,y);y+=50;}
+ menuLabels().forEach((label,i)=>{const r=X.menuRect(i),x=r.x*W,yy=r.y*H,w=r.w*W,h=r.h*H;ctx.fillStyle=i===9?'#7a2633':'#123a5c';ctx.beginPath();ctx.roundRect(x,yy,w,h,16);ctx.fill();ctx.strokeStyle='#5d82a3';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#fff';ctx.font='600 30px Arial';ctx.textAlign='center';ctx.fillText(label,x+w/2,yy+h/2+10,w-16);ctx.textAlign='left';});
+ menu.texture.needsUpdate=true;invalidate();}
+function placeInFront(mesh,dist,drop){camera.getWorldPosition(_head);const f=camera.getWorldDirection(_v);f.y=0;if(f.lengthSq()<1e-6)f.set(0,0,-1);f.normalize();mesh.position.copy(_head).addScaledVector(f,dist);mesh.position.y-=drop;mesh.lookAt(_head.x,mesh.position.y+drop*.35,_head.z);}
+function setMenu(on){state.menu=on;if(on){drawMenu();placeInFront(menu.mesh,1.1,.28);}menu.mesh.visible=on;invalidate();}
+function placeTag(){const {ctx,canvas}=tag;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,canvas.width-4,canvas.height-4,40);ctx.fill();ctx.font='600 34px Arial';ctx.fillStyle=capture.provisional?'#ffb4a8':'#ffe495';ctx.textAlign='center';ctx.fillText(wrap(ctx,capture.label+' · '+(capture.provisional?'PROVISIONAL alignment':'registered, not surveyed')+' · B/Y menu',canvas.width-40,1)[0]||'',canvas.width/2,60);ctx.textAlign='left';tag.texture.needsUpdate=true;placeInFront(tag.mesh,1.3,.75);tag.mesh.visible=true;}
+async function menuAction(i){
+ if(i===0)setStyle(state.mode==='lens'?'all':'lens');
+ else if(i===1||i===2){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],i===1?-1:1);applyShaderState();}
+ else if(i===3||i===4){state.coneDeg=X.stepCone(state.coneDeg,i===3?-1:1);applyShaderState();}
+ else if(i===5){await switchCapture(capture.date==='2026-09-17'?'2026-05-06':'2026-09-17');}
+ else if(i===6)setHiRes(!state.hiRes);
+ else if(i===7){state.snap=!state.snap;}
+ else if(i===8)setFire(!fireOn());
+ else if(i===9){setMenu(false);return;}
+ if(state.menu)drawMenu();
+}
+/* Trigger / click: menu buttons first, then service elements. */
+async function selectRay(origin,dir){
+ if(menu.mesh.visible){raycaster.set(origin,dir);raycaster.far=10;const h=raycaster.intersectObject(menu.mesh,false)[0];if(h){const b=X.menuHit(h.uv.x,h.uv.y);if(b>=0)await menuAction(b);return {menu:b};}}
+ return pickAlong(origin,dir);
+}
+function setStyle(mode){state.mode=mode;applyShaderState();}
+function setHiRes(on){state.hiRes=on;$('hires').setAttribute('aria-pressed',String(on));if(active>=0)openStation(active,{instant:true,force:true});}
+async function switchCapture(date){hideCard();try{await loadCapture(date);}catch(e){console.error(e);status(String(e.message||e));}}
+/* ── Desktop input (testing without a headset): drag look, wheel zoom, click = trigger, mouse = flashlight, WASD walk ── */
+const ndc=new THREE.Vector2();let drag=null,pointerInside=false;
+function coneFromPointer(x,y){if(xrSession)return;ndc.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(ndc,camera);U.coneOrigin.value.copy(raycaster.ray.origin);U.coneDir.value.copy(raycaster.ray.direction);invalidate();}
+function coneFromView(){camera.getWorldPosition(U.coneOrigin.value);camera.getWorldDirection(U.coneDir.value);invalidate();}
+const cvs=renderer.domElement;
+cvs.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY};cvs.setPointerCapture(e.pointerId);});
+cvs.addEventListener('pointermove',e=>{pointerInside=e.pointerType==='mouse';if(drag&&drag.id===e.pointerId){yaw-=(e.clientX-drag.x)*.004;pitch=clamp(pitch-(e.clientY-drag.y)*.004,-1.45,1.45);drag.x=e.clientX;drag.y=e.clientY;setDesktopLook();}
+ if(e.pointerType==='mouse')coneFromPointer(e.clientX,e.clientY);else coneFromView();});
+cvs.addEventListener('pointerup',e=>{if(drag&&drag.id===e.pointerId&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<5){ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);raycaster.setFromCamera(ndc,camera);selectRay(raycaster.ray.origin.clone(),raycaster.ray.direction.clone());}drag=null;});
+cvs.addEventListener('pointercancel',()=>drag=null);cvs.addEventListener('pointerleave',()=>{pointerInside=false;coneFromView();});
+cvs.addEventListener('wheel',e=>{e.preventDefault();camera.fov=clamp(camera.fov+e.deltaY*.025,40,95);camera.updateProjectionMatrix();invalidate();},{passive:false});
+const KEYDIR={KeyW:'f',ArrowUp:'f',KeyS:'b',ArrowDown:'b',KeyA:'l',ArrowLeft:'l',KeyD:'r',ArrowRight:'r'};
+addEventListener('keydown',e=>{if(['SELECT','INPUT'].includes(e.target.tagName))return;
+ if(KEYDIR[e.code]){e.preventDefault();const f=camera.getWorldDirection(new THREE.Vector3());f.y=0;f.normalize();const r=new THREE.Vector3().crossVectors(f,new THREE.Vector3(0,1,0)),k=KEYDIR[e.code];walk(k==='f'?f:k==='b'?f.negate():k==='l'?r.negate():r);}
+ else if(e.code==='KeyL')setStyle(state.mode==='lens'?'all':'lens');else if(e.code==='KeyM')setMenu(!state.menu);else if(e.code==='Escape')hideCard();});
+$('prev').onclick=()=>openStation(active-1);$('next').onclick=()=>openStation(active+1);$('station').onchange=e=>openStation(Number(e.target.value));
+$('capture').onchange=e=>switchCapture(e.target.value);
+$('styleLens').onclick=()=>setStyle('lens');$('styleAll').onclick=()=>setStyle('all');
+$('opacity').oninput=e=>{state.opacity[state.mode]=Number(e.target.value)/100;applyShaderState();};
+$('cone').oninput=e=>{state.coneDeg=Number(e.target.value);applyShaderState();};
+$('hires').onclick=()=>setHiRes(!state.hiRes);$('fire').onclick=()=>setFire(!fireOn());
+$('statsBtn').onclick=()=>{const s=$('stats');s.hidden=!s.hidden;$('statsBtn').setAttribute('aria-pressed',String(!s.hidden));updateStats();};
+addEventListener('resize',()=>{if(renderer.xr.isPresenting)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);invalidate();});
+cvs.addEventListener('webglcontextlost',e=>{e.preventDefault();status('Graphics paused · reload this page',true);});
+/* ── WebXR (Quest Browser) ── immersive-vr, 'local' reference space, controllers in the rig, snap turn, no smooth locomotion. */
+let xrSession=null,xrSupported=false,activeController=null,pendingPlace=0;
+const controllers=[0,1].map(i=>{const c=renderer.xr.getController(i);c.userData={source:null,stick:{armed:true},adjust:{armed:true}};
+ const ray=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,0,-1)]),new THREE.LineBasicMaterial({color:0xffd479,transparent:true,opacity:.55,depthTest:false}));ray.scale.z=3;ray.renderOrder=55;ray.visible=false;c.add(ray);c.userData.ray=ray;
+ c.addEventListener('connected',e=>{c.userData.source=e.data;ray.visible=e.data.targetRayMode==='tracked-pointer';if(!activeController||e.data.handedness==='right')activeController=c;});
+ c.addEventListener('disconnected',()=>{c.userData.source=null;ray.visible=false;if(activeController===c)activeController=controllers.find(o=>o!==c&&o.userData.source)||null;});
+ c.addEventListener('selectstart',()=>{activeController=c;});
+ c.addEventListener('select',()=>{c.updateMatrixWorld(true);const o=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld);selectRay(o,d);});
+ rig.add(c);return c;});
+async function detectXR(){
+ if(!navigator.xr||!isSecureContext){$('xrNote').textContent=isSecureContext?'Desktop preview · WebXR not available in this browser':'Desktop preview · open over HTTPS in Quest Browser for VR (see docs/QUEST_XR_OVERLAY.md)';return false;}
+ xrSupported=await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);$('enterVR').hidden=!xrSupported;$('xrNote').textContent=xrSupported?'':'Desktop preview · no immersive-vr device detected';return xrSupported;}
+$('enterVR').onclick=async()=>{if(xrSession)return xrSession.end();try{
+ renderer.xr.setFramebufferScaleFactor(P.xrScale);
+ const session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['hand-tracking']});
+ await renderer.xr.setSession(session);renderer.xr.setFoveation(P.foveation);xrSession=session;
+ rig.rotation.set(0,yaw,0);camera.position.set(0,0,0);camera.quaternion.identity();pendingPlace=3;hideCard();coneFromView();
+ session.addEventListener('end',()=>{xrSession=null;rig.rotation.set(0,0,0);camera.position.set(0,0,0);setDesktopLook();setMenu(false);tag.mesh.visible=false;for(const c of controllers)c.userData.ray.visible=false;placeRig();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);$('enterVR').textContent='Enter VR';invalidate();});
+ $('enterVR').textContent='Exit VR';
+}catch(e){console.error(e);status('Could not start VR: '+(e.message||e));}};
+const prevButtons=new Map();
+function xrInput(){
+ for(const c of controllers){const src=c.userData.source,gp=src?.gamepad;if(!gp||gp.mapping!=='xr-standard')continue;
+  const was=prevButtons.get(c)||[],now=gp.buttons.map(b=>b.pressed),edge=k=>now[k]&&!was[k];prevButtons.set(c,now);
+  if(edge(4))setStyle(state.mode==='lens'?'all':'lens');               // A / X
+  if(edge(5))setMenu(!state.menu);                                        // B / Y
+  const x=gp.axes[2]||0,y=gp.axes[3]||0;
+  if(now[1]){const a=X.stickStep(c.userData.adjust,x,y);c.userData.stick.armed=false;   // grip held: stick adjusts the lens
+   if(a==='forward'||a==='back'){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],a==='forward'?1:-1);applyShaderState();}
+   else if(a){state.coneDeg=X.stepCone(state.coneDeg,a==='turn-right'?1:-1);applyShaderState();}
+   continue;}
+  const a=X.stickStep(c.userData.stick,x,y);if(!a)continue;
+  if(a==='forward'||a==='back'){c.updateMatrixWorld(true);const d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld);if(a==='back')d.negate();walk(d);}
+  else if(state.snap){camera.getWorldPosition(_head);const r=X.snapTurn(rig.position.toArray(),rig.rotation.y,_head.toArray(),a==='turn-left'?XR_SNAP:-XR_SNAP);rig.position.fromArray(r.position);rig.rotation.y=r.yaw;rig.updateMatrixWorld(true);}
+ }
+ const c=activeController&&activeController.userData.source?.targetRayMode==='tracked-pointer'?activeController:null;
+ if(c){c.updateMatrixWorld(true);U.coneOrigin.value.setFromMatrixPosition(c.matrixWorld);U.coneDir.value.set(0,0,-1).transformDirection(c.matrixWorld);}else coneFromView();
+}
+/* ── Loop ── */
+renderer.setAnimationLoop((t)=>{
+ const xr=renderer.xr.isPresenting;
+ if(xr){if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}
+ else if(!pointerInside&&!drag)coneFromViewIfIdle();
+ const anim=stepFade(performance.now());
+ if(!xr&&!needsRender&&!anim)return;needsRender=false;
+ renderer.render(scene,camera);renderCount++;const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};
+});
+let lastIdleCone='';function coneFromViewIfIdle(){const s=camera.quaternion.toArray().join();if(s!==lastIdleCone){lastIdleCone=s;coneFromView();}}
+/* ── Measurements / inspection (desktop) ── */
+function totals(){const o={drawCalls:0,visibleDrawCalls:0,triangles:0,visibleTriangles:0,elements:0};for(const st of Object.values(layerState)){for(const m of st.meshes){const tri=m.userData.isLine?0:(m.geometry.index?m.geometry.index.count/3:m.geometry.attributes.position.count/3)*(m.isInstancedMesh?m.count:1);o.drawCalls++;o.triangles+=tri;if(m.visible&&st.group.visible){o.visibleDrawCalls++;o.visibleTriangles+=tri;}}o.elements+=st.stats.elements||0;}return o;}
+function inspection(){const heap=performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576):null;
+ return {ready:active>=0,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
+  style:state.mode,opacity:state.opacity[state.mode],coneDeg:state.coneDeg,radius:P.radius,levels:[...P.levels],hiRes:state.hiRes,texture:sphereMat.map?.image?{width:sphereMat.map.image.width,height:sphereMat.map.image.height}:null,
+  layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{loaded:s.loaded,loading:s.loading,error:s.error||null,visible:s.group.visible,loadMs:s.loadMs??null,...s.stats,visibleBatches:s.meshes.filter(m=>m.visible).length}])),
+  totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation},
+  card:picked?{id:picked.id,layer:picked.layer,tier:picked.tier,lines:picked.lines}:null,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()},rig:{position:rig.position.toArray(),yaw:rig.rotation.y},camera:{world:camera.getWorldPosition(new THREE.Vector3()).toArray()}};}
+window.xrInspection=inspection;
+window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};return lastInfo;},
+ openStation:i=>openStation(i),walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,
+ pickNdc:(x,y)=>{ndc.set(x,y);raycaster.setFromCamera(ndc,camera);return selectRay(raycaster.ray.origin.clone(),raycaster.ray.direction.clone());},
+ lookAtBim:p=>{const s=new THREE.Vector3().fromArray(X.invertReg(reg,p)),c=camera.getWorldPosition(new THREE.Vector3()),d=s.sub(c).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();return d.toArray();},
+ elementsNearStation:(n=5)=>{const out=[];const c=new THREE.Vector3().fromArray(stationBim);for(const st of Object.values(layerState))for(const m of st.meshes){if(!m.visible||m.userData.isLine||m.isInstancedMesh)continue;const pos=m.geometry.attributes.position;for(const r of m.userData.ranges){const v=new THREE.Vector3().fromBufferAttribute(pos,r.vertexStart);const d=v.distanceTo(c);if(d>1.5&&d<6)out.push({id:r.id,layer:m.userData.layer,point:v.toArray(),d});if(out.length>400)break;}}return out.sort((a,b)=>a.d-b.d).slice(0,n);}};
+function updateStats(){const s=$('stats');if(s.hidden)return;const i=inspection(),t=i.totals;
+ s.textContent=[`capture ${i.capture?.date} ${i.capture?.provisional?'(provisional)':'(registered)'} · station ${i.station.index+1}/${i.station.count}`,`photo ${i.texture?i.texture.width+'×'+i.texture.height:'-'} · style ${i.style} · opacity ${Math.round(i.opacity*100)}% · cone ${i.coneDeg}°`,
+  `batches ${t.visibleDrawCalls}/${t.drawCalls} visible (radius ${i.radius} m) · tris ${(t.visibleTriangles/1e3).toFixed(0)}k/${(t.triangles/1e3).toFixed(0)}k`,`last frame: ${i.lastRender.calls} calls · ${(i.lastRender.triangles/1e3).toFixed(0)}k tris · ${i.lastRender.lines} lines`,
+  `L${i.levels.join('+')} elements ${t.elements} · JS heap ${i.heapMB??'n/a'} MB`,`first photo ${i.timing.firstPhotoMs??'-'} ms · services ${i.timing.layersDoneMs??'-'} ms`,
+  ...Object.entries(i.layers).map(([k,l])=>`  ${k.padEnd(10)} ${l.loaded?'ok':l.loading?'…':'×'} ${String(l.drawCalls??0).padStart(4)} batches ${String(l.elements??0).padStart(5)} el ${String(l.loadMs??'-').padStart(6)} ms`)].join('\n');}
+setInterval(updateStats,1000);
+/* ── Boot ── XR support first (decides the default photo resolution), then the capture, then services. */
+(async()=>{
+ const supported=await detectXR();
+ state.hiRes=q.get('hires')==='1'?true:q.get('hires')==='0'?false:!supported;$('hires').setAttribute('aria-pressed',String(state.hiRes));
+ applyShaderState();
+ try{await loadCapture(q.get('capture')==='2026-09-17'?'2026-09-17':'2026-05-06');}catch(e){console.error(e);status(String(e.message||e),true);return;}
+ $('fire').setAttribute('aria-pressed',String(P.layers.includes('fire')));
+ await loadLayers(P.layers);
+})();
+</script></body></html>
