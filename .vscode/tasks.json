@@ -103,7 +103,7 @@
       }
     },
     {
-      "label": "Gaussian: train zone\u2026",
+      "label": "Gaussian: train zone…",
       "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
       "type": "shell",
       "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZone}",
@@ -144,6 +144,90 @@
         "reveal": "always",
         "panel": "dedicated"
       }
+    },
+    {
+      "label": "Gaussian: list zones (Oct 18)",
+      "detail": "Show the Sep 17 training zones: stations, owner and status (reads scripts/gaussian_zones.json).",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --list-zones",
+      "windows": {
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --list-zones"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Gaussian: train zone… (Oct 18)",
+      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone ${input:gaussianZone}",
+      "windows": {
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZone}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Gaussian: train Oct 18 (mask nadir, whole floor)",
+      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir",
+      "windows": {
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZone}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Gaussian: train zone… (Oct 18, Level 3)",
+      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18-L3 --mask-nadir --zone ${input:gaussianZone}",
+      "windows": {
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZone}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Colleague: train Level 1 Zone B (Oct 18)",
+      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone l1-b",
+      "windows": {
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZone}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Gaussian: update progress map",
+      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "type": "shell",
+      "command": "python3 scripts/gaussian_progress_map.py --out \"${env:HOME}/Desktop/Research stuff/Gaussian_Progress_20261019\"",
+      "windows": {
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZone}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
     }
   ],
   "inputs": [
@@ -165,7 +249,10 @@
         "l1-a",
         "l1-b",
         "l1-c",
-        "l1-d"
+        "l1-d",
+        "l3-a",
+        "l3-b",
+        "l3-c"
       ],
       "default": "l1-a"
     }

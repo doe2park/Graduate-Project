@@ -43,8 +43,9 @@ def validate_zones(doc, station_ids_by_capture=None):
         raise ZoneError('Zones file needs a "captures" object')
     for capture, entry in captures.items():
         where = f'capture {capture}'
-        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', capture):
-            raise ZoneError(f'{where}: key must be a YYYY-MM-DD capture date')
+        # A date, optionally with a floor suffix when one day's capture spans floors (e.g. 2026-10-18-L3).
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}(-[A-Za-z0-9]+)?', capture):
+            raise ZoneError(f'{where}: key must be a YYYY-MM-DD capture date, optionally with a -FLOOR suffix')
         if not isinstance(entry.get('building'), str) or not entry['building']:
             raise ZoneError(f'{where}: missing "building"')
         if not isinstance(entry.get('floor'), str) or not FLOOR.match(entry['floor']):
