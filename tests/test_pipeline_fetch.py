@@ -125,3 +125,27 @@ class FetchTests(FetchBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WaterUsage(unittest.TestCase):
+    def rows(self, pairs):
+        return [{"timestamp": t, "water1_total_cf": a, "water2_total_cf": b} for t, a, b in pairs]
+
+    def test_counter_differences_in_gallons(self):
+        u = m.water_usage(self.rows([("2026-10-15 07:00:01", 100, 50), ("2026-10-15 07:15:01", 120, 60),
+                                     ("2026-10-15 08:15:01", 130, 60)]), today="2026-10-15")
+        self.assertAlmostEqual(u["today_gal"], 40 * 7.481, places=1)
+        self.assertEqual([h["t"] for h in u["hourly_gal"]], ["2026-10-15 07:00", "2026-10-15 08:00"])
+        self.assertEqual(u["night_gal_today"], 0.0)
+
+    def test_reset_and_missing_rows_are_not_counted(self):
+        r = self.rows([("2026-10-15 01:00:01", 100, 50), ("2026-10-15 01:15:01", 90, 50), ("2026-10-15 01:30:01", 100, 50)])
+        r.insert(1, {"timestamp": "2026-10-15 01:05:00", "water1_total_cf": None, "water2_total_cf": 50})
+        u = m.water_usage(r, today="2026-10-15")
+        self.assertAlmostEqual(u["today_gal"], 10 * 7.481, places=1)
+        self.assertAlmostEqual(u["night_gal_today"], 10 * 7.481, places=1)
+
+    def test_no_intervals_is_unavailable_not_zero(self):
+        u = m.water_usage(self.rows([("2026-10-15 07:00:01", 100, 50)]), today="2026-10-15")
+        self.assertIsNone(u["today_gal"])
+        self.assertIsNone(u["window_gal"])

@@ -314,6 +314,49 @@ def get_timeseries(readings, key="kw", limit=96):
     return pairs
 
 
+CF_TO_GAL = 7.481
+WATER_COUNTERS = ("water1_total_cf", "water2_total_cf")
+
+
+def water_usage(readings, today=None, limit=96):
+    """Domestic water use from the two cumulative counters (pulse meters, ~10 ft³ per step).
+
+    Volume is a counter difference, never an instantaneous rate. A step that goes backwards
+    (reset/rollover) or a row missing either counter is left out, not counted as zero.
+    Returns counter rows, hourly gallons (Pacific hour of the later row), today's and the
+    window's gallons, and the night (00-05 h) gallons today as a leak indicator."""
+    rows = []
+    for r in readings:
+        vals = [r.get(k) for k in WATER_COUNTERS]
+        if all(isinstance(v, (int, float)) for v in vals):
+            rows.append((r["timestamp"], vals))
+    today = today or pacific_now().strftime("%Y-%m-%d")
+    hourly, today_gal, night_gal, window_gal, steps = {}, 0.0, 0.0, 0.0, 0
+    for (t0, a), (t1, b) in zip(rows, rows[1:]):
+        d = [y - x for x, y in zip(a, b)]
+        if any(v < 0 for v in d):
+            continue
+        gal = sum(d) * CF_TO_GAL
+        steps += 1
+        window_gal += gal
+        hour = t1[:13] + ":00"
+        hourly[hour] = hourly.get(hour, 0.0) + gal
+        if t1.startswith(today) and t0.startswith(today):
+            today_gal += gal
+            if t1[11:13] < "05":
+                night_gal += gal
+    return {
+        "unit": "gal",
+        "source": "counter differences of Water 70313686 + 70313687 (ft³ × 7.481)",
+        "counters": [{"t": t, "w1": v[0], "w2": v[1]} for t, v in rows[-limit:]],
+        "hourly_gal": [{"t": h, "gal": round(g, 1)} for h, g in sorted(hourly.items())][-24:],
+        "today_gal": round(today_gal, 1) if steps else None,
+        "night_gal_today": round(night_gal, 1) if steps else None,
+        "window_gal": round(window_gal, 1) if steps else None,
+        "intervals": steps,
+    }
+
+
 # ── Main Pipeline ─────────────────────────────────────
 def observed_interval_min(readings):
     """Median spacing of BMO rows in minutes (gaps over 3 h ignored); None if undeterminable."""
@@ -426,6 +469,7 @@ def run(hours=24):
                 "steam_rate": compute_stats(today_water, "steam_rate_gpm") if today_water else {},
             },
             "timeseries_water": get_timeseries(water_readings, "water1_rate_cfm"),
+            "usage": water_usage(water_readings),
         }
         print(f"    ✓ {len(water_readings)} readings")
     else:
