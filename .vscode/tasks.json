@@ -104,11 +104,11 @@
     },
     {
       "label": "Gaussian: train zone…",
-      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Nadir masked. Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
       "type": "shell",
-      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZone}",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZoneL1}",
       "windows": {
-        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZone}"
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-09-17 --mask-nadir --zone ${input:gaussianZoneL1}"
       },
       "problemMatcher": [],
       "presentation": {
@@ -147,7 +147,7 @@
     },
     {
       "label": "Gaussian: list zones (Oct 18)",
-      "detail": "Show the Sep 17 training zones: stations, owner and status (reads scripts/gaussian_zones.json).",
+      "detail": "List the Oct 18 (Level 1) training zones: stations, owner and status (reads scripts/gaussian_zones.json).",
       "type": "shell",
       "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --list-zones",
       "windows": {
@@ -161,11 +161,11 @@
     },
     {
       "label": "Gaussian: train zone… (Oct 18)",
-      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "detail": "Train ONE zone of the Oct 18 (Level 1) capture (pick the id; claim it first in scripts/gaussian_zones.json). Nadir masked. Output in work/gaussian/2026-10-18/<zone>/. Does not publish.",
       "type": "shell",
-      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone ${input:gaussianZone}",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone ${input:gaussianZoneL1}",
       "windows": {
-        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone ${input:gaussianZone}"
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone ${input:gaussianZoneL1}"
       },
       "problemMatcher": [],
       "presentation": {
@@ -175,12 +175,41 @@
     },
     {
       "label": "Gaussian: train Oct 18 (mask nadir, whole floor)",
-      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "detail": "Train the whole Oct 18 Level 1 capture as ONE scene (nadir masked), not per zone. Output in work/gaussian/2026-10-18/. Does not publish.",
       "type": "shell",
       "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir",
       "windows": {
         "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir"
       },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Gaussian: show trained zone on local web (Oct 18)",
+      "detail": "Copy the newest finished (non-quick) run of the chosen Oct 18 zone to scan-assets/gaussian/2026-10-18/zones/ (local-only, not published to the site), refresh work/local-test.html and print the viewer URL (http://127.0.0.1:8790/scan-compare.html?capture=2026-10-18&mode=splat). Keeps the existing alignment label.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/publish_local_zone.py --capture 2026-10-18 --zone ${input:gaussianZoneL1}",
+      "windows": {
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\publish_local_zone.py --capture 2026-10-18 --zone ${input:gaussianZoneL1}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Gaussian: train zone + show on local web (Oct 18)",
+      "detail": "Train the chosen Oct 18 zone (full run, saturates the GPU), then put it on the local web viewer. Local-only; nothing is pushed.",
+      "type": "shell",
+      "dependsOn": [
+        "Gaussian: train zone… (Oct 18)",
+        "Gaussian: show trained zone on local web (Oct 18)"
+      ],
+      "dependsOrder": "sequence",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -217,7 +246,7 @@
     },
     {
       "label": "Gaussian: update progress map",
-      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "detail": "Regenerate the Gaussian zone progress map (scripts/gaussian_progress_map.py) into the Desktop 'Research stuff' folder on Mac, Desktop\\Gaussian_Progress on Windows. Read-only for the repo.",
       "type": "shell",
       "command": "python3 scripts/gaussian_progress_map.py --out \"${env:HOME}/Desktop/Research stuff/Gaussian_Progress_20261019\"",
       "windows": {
@@ -328,14 +357,22 @@
     {
       "id": "gaussianZone",
       "type": "pickString",
-      "description": "Zone to train (see Gaussian: list zones)",
+      "description": "Zone to train (Level 3 preset only; superseded, see Gaussian: list zones)",
+      "options": [
+        "l3-a",
+        "l3-b"
+      ],
+      "default": "l3-a"
+    },
+    {
+      "id": "gaussianZoneL1",
+      "type": "pickString",
+      "description": "Level 1 zone (Sep 17 / Oct 18); see Gaussian: list zones",
       "options": [
         "l1-a",
         "l1-b",
         "l1-c",
-        "l1-d",
-        "l3-a",
-        "l3-b"
+        "l1-d"
       ],
       "default": "l1-a"
     }
