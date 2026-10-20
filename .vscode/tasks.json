@@ -189,7 +189,7 @@
     },
     {
       "label": "Gaussian: train zone… (Oct 18, Level 3)",
-      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "detail": "SUPERSEDED 2026-10-20: Level 3 will be re-scanned; do not train this preset. Kept for provenance.",
       "type": "shell",
       "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18-L3 --mask-nadir --zone ${input:gaussianZone}",
       "windows": {
@@ -203,7 +203,7 @@
     },
     {
       "label": "Colleague: train Level 1 Zone B (Oct 18)",
-      "detail": "Train ONE zone of the Sep 17 capture (pick the id; claim it first in scripts/gaussian_zones.json). Output in work/gaussian/2026-09-17/<zone>/. Does not publish.",
+      "detail": "Train zone l1-b of the Oct 18 capture with the preset's full 50,000 steps (growth stop 30,000, 1M splats, 768 px, nadir masked); do not shorten with --steps. Output in work/gaussian/2026-10-18/l1-b/. Does not publish. If the GPU runs out of memory, re-run from a terminal with --max-splats 500000.",
       "type": "shell",
       "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone l1-b",
       "windows": {
@@ -222,6 +222,90 @@
       "command": "python3 scripts/gaussian_progress_map.py --out \"${env:HOME}/Desktop/Research stuff/Gaussian_Progress_20261019\"",
       "windows": {
         "command": "python scripts\\gaussian_progress_map.py --out \"${env:USERPROFILE}\\Desktop\\Gaussian_Progress\""
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Local: serve site (8790) + open test hub",
+      "detail": "Starts python http.server 8790 if nothing listens, regenerates work/local-test.html, opens it.",
+      "type": "shell",
+      "command": "python3 scripts/local_test_hub.py --serve",
+      "windows": {
+        "command": "python scripts\\local_test_hub.py --serve"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Review: Oct 18 Level 1 privacy contact sheets",
+      "detail": "Opens capture-local/grimes-L1-2026-10-18-review/contact-sheet-*.jpg and prints the checklist (faces, screens, documents, restroom photo). Read-only.",
+      "type": "shell",
+      "command": "python3 scripts/review_open.py privacy",
+      "windows": {
+        "command": "python scripts\\review_open.py privacy"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Review: Gaussian before/after (Level 1 corridors)",
+      "detail": "Opens work/web-matrix/quality/before-after.png and the live Oct 18 Gaussian compare page (needs the 8790 server).",
+      "type": "shell",
+      "command": "python3 scripts/review_open.py gaussian",
+      "windows": {
+        "command": "python scripts\\review_open.py gaussian"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Review: multifloor walk (local)",
+      "detail": "Opens the localhost-only Levels 1-3 overlay walk (data in capture-local/grimes-oct18-floors, provisional, never published). Needs the 8790 server.",
+      "type": "shell",
+      "command": "python3 scripts/review_open.py floors",
+      "windows": {
+        "command": "python scripts\\review_open.py floors"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Test: all unit tests",
+      "detail": "Runs every node tests/*.test.cjs/.mjs and the Python unittest suite, prints a summary. No browser, no GPU.",
+      "type": "shell",
+      "command": "python3 scripts/run_all_tests.py",
+      "windows": {
+        "command": "python scripts\\run_all_tests.py"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Test: web matrix smoke (headless, ~3 min, Mac lags)",
+      "detail": "Headless Chrome across captures/modes/styles. Takes about 3 minutes and lags the Mac; close other heavy apps first. Writes evidence under work/web-matrix/.",
+      "type": "shell",
+      "command": "PLAYWRIGHT_MODULE=/Users/yschung/Graduate-Project-media/tools/node_modules/playwright-core node tests/scan-compare-matrix-smoke.cjs",
+      "windows": {
+        "command": "node tests\\scan-compare-matrix-smoke.cjs"
       },
       "problemMatcher": [],
       "presentation": {
@@ -251,8 +335,7 @@
         "l1-c",
         "l1-d",
         "l3-a",
-        "l3-b",
-        "l3-c"
+        "l3-b"
       ],
       "default": "l1-a"
     }
