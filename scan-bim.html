@@ -422,7 +422,7 @@ body[data-pane="bim"] #twinPanel{top:calc(8px + var(--tb-h) + 6px)}
   <div class="hint">Calibration auto-loads from <b>data/cupix_calib.json</b> (same registration grimes-xr uses: yaw −135°, swap+flip, camMat). Local tweaks persist in this browser.</div>
 </div>
 
-<div id="scanQuickActions"><button id="scanObjects" type="button">Objects</button><button type="button" onclick="document.getElementById('layersBtn').click()">Layers</button><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate" aria-label="Walk or look around the BIM" title="Walk or look around the BIM">Walk</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><details id="interiorTools" aria-label="View settings"><summary>View settings</summary><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></details><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script>
+<div id="scanQuickActions"><button id="scanObjects" type="button">Objects</button><button type="button" onclick="document.getElementById('layersBtn').click()">Layers</button><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate" aria-label="Walk or look around the BIM" title="Walk or look around the BIM">Walk</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><details id="interiorTools" aria-label="View settings"><summary>View settings</summary><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></details><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script src="twin/overlay-visibility.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -1515,6 +1515,7 @@ window.toggleLayer = (key, {bulk=false}={}) => {
         return {...built, identityBinding};
       }, releaseElementSource);
     st.meshes = tier.meshes; st.renderStats = tier.stats; st.identityBinding = tier.identityBinding;
+    for (const im of tier.meshes) ovPatchMaterial(im.material);   // Overlay distance fade + wall occlusion (inactive outside Overlay)
     equipMeshes.push(...tier.meshes);
     queueMicrotask(asBuiltLayerLoaded);   // re-apply as-built adjustments waiting for this layer (render-time only)
     st.group = new THREE.Group(); st.group.name = 'layer:' + key;   // world-space container (matrices already baked)
@@ -2641,6 +2642,72 @@ window.setAllElementContext=show=>{for(const key of Object.keys(interiorVisible)
 /* ══════════ X-RAY OVERLAY (scan-compare ?view=overlay) ══════════
    Transparent canvas + only MEP/service layers. The parent stacks this iframe over the scan pane
    and sets the iframe opacity, so alpha here is the full-strength BIM image. Architecture/furniture stay hidden. */
+/* ══════════ OVERLAY REALISTIC VISIBILITY (2026-10-20; twin/overlay-visibility.js) ══════════
+   Distance fade (per fragment, Range preset from the parent: near / room / all) and wall occlusion from a depth-only
+   pre-pass of the Level 1 BIM Walls (interior/enclosure-l1.glb, Walls category only), in this pane's own BIM frame, so the
+   occluder is aligned with the services by construction for every capture. Active only while the Overlay is on.
+   Upper floors have no wall geometry here (Level 1 interior only): there the fade applies without occlusion. */
+const OV=globalThis.OverlayVisibility;
+const OV_UNIFORMS={ovOn:{value:0},ovFade:{value:new THREE.Vector2(OV.FAR_NONE,OV.FAR_NONE*2)},ovOcc:{value:0},ovDepth:{value:null},ovRes:{value:new THREE.Vector2(1,1)},ovClip:{value:new THREE.Vector2(.05,2000)},ovOccK:{value:new THREE.Vector3(OV.OCCLUSION.marginM,OV.OCCLUSION.hidden,OV.OCCLUSION.lens)},ovLens:{value:new THREE.Vector4(0,0,0,0)}};
+let ovPreset=OV.preset(OV.DEFAULT_RANGE),ovLensCss={on:false,x:0,y:0,r:0},ovPatched=0;
+const ovOcc={state:'idle',mesh:null,scene:new THREE.Scene(),rt:null,triangles:0,elements:0,error:null};
+function ovPatchMaterial(material){
+ if(!material||material.userData?.ovPatched)return;material.userData.ovPatched=true;ovPatched++;
+ const prev=material.onBeforeCompile,prevKey=material.customProgramCacheKey.bind(material);
+ material.onBeforeCompile=(shader,r)=>{if(prev)prev.call(material,shader,r);OV.patchShader(shader,OV_UNIFORMS,{premultiply:!material.transparent});};
+ material.customProgramCacheKey=()=>prevKey()+'|ov'+(material.transparent?'t':'o');material.needsUpdate=true;
+}
+function ovSetRange(key){
+ ovPreset=OV.preset(key);const u=OV.uniformValues(ovPreset);OV_UNIFORMS.ovFade.value.set(u.fade[0],u.fade[1]);
+ if(overlayOn&&ovPreset.occlude)loadWallOccluder();lensPickCache.sig='';_kick();
+}
+/* walls exist for Level 1 only; on L2/L3 (multi-floor preview) the L1 walls would only add wrong occlusion */
+function ovOccluderFloorOk(){return !equipLevelFilter||equipLevelFilter==='L1';}
+async function loadWallOccluder(){
+ if(ovOcc.state!=='idle'&&ovOcc.state!=='failed')return;ovOcc.state='loading';ovOcc.error=null;let gltf=null;
+ try{
+  const manifest=await cachedJson('interior/manifest.json'),entry=manifest.groups.enclosure;
+  const [metadata,loaded]=await Promise.all([cachedJson(entry.json),loader.loadAsync(entry.glb)]);gltf=loaded;const meta=metadata.elements||{};
+  gltf.scene.rotation.y=Math.PI;gltf.scene.position.set(EQUIP_OFFSET.x,EQUIP_OFFSET.y,EQUIP_OFFSET.z);gltf.scene.updateMatrixWorld(true);
+  bindElementSourceIds(gltf);
+  const parts=[],ids=new Set(),v=new THREE.Vector3();let total=0;
+  const idOf=o=>{for(let p=o;p;p=p.parent){const id=p.userData.elementId??p.name;if(id&&Object.prototype.hasOwnProperty.call(meta,id))return id;}return null;};
+  gltf.scene.traverse(o=>{
+   if(!o.isMesh||!o.geometry?.attributes.position)return;const id=idOf(o);if(!OV.isWallOccluder(meta[id]))return;ids.add(id);
+   const g=o.geometry,pos=g.attributes.position,idx=g.index,count=idx?idx.count:pos.count,out=new Float32Array(count*3);
+   for(let i=0;i<count;i++){v.fromBufferAttribute(pos,idx?idx.getX(i):i).applyMatrix4(o.matrixWorld);out[i*3]=v.x;out[i*3+1]=v.y;out[i*3+2]=v.z;}
+   parts.push(out);total+=out.length;
+  });
+  const all=new Float32Array(total);let at=0;for(const p of parts){all.set(p,at);at+=p.length;}
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(all,3));geometry.computeBoundingBox();geometry.computeBoundingSphere();
+  const material=new THREE.MeshBasicMaterial({colorWrite:false,side:THREE.DoubleSide});
+  material.onBeforeCompile=shader=>OV.patchOccluderShader(shader);material.customProgramCacheKey=()=>'ov-occluder';
+  ovOcc.mesh=new THREE.Mesh(geometry,material);ovOcc.mesh.name='overlay-wall-occluder';ovOcc.mesh.matrixAutoUpdate=false;ovOcc.scene.add(ovOcc.mesh);
+  ovOcc.triangles=total/9;ovOcc.elements=ids.size;ovOcc.state='ready';lensPickCache.sig='';_kick();
+ }catch(e){ovOcc.state='failed';ovOcc.error=String(e?.message||e);console.warn('[overlay] wall occluder unavailable, distance fade only',e);}
+ finally{releaseElementSource(gltf);}
+}
+const _ovSize=new THREE.Vector2();
+function ovBeforeRender(){
+ OV_UNIFORMS.ovOn.value=overlayOn?1:0;
+ const l=OV.lensToFragCoord(ovLensCss,renderer.domElement.clientHeight,renderer.getPixelRatio());OV_UNIFORMS.ovLens.value.set(l[0],l[1],l[2],l[3]);
+ const active=overlayOn&&ovPreset.occlude&&ovOcc.state==='ready'&&ovOccluderFloorOk();
+ OV_UNIFORMS.ovOcc.value=active?1:0;if(!active)return;
+ renderer.getDrawingBufferSize(_ovSize);const s=mobileQuality?.5:1,w=Math.max(1,Math.round(_ovSize.x*s)),h=Math.max(1,Math.round(_ovSize.y*s));
+ if(!ovOcc.rt||ovOcc.rt.width!==w||ovOcc.rt.height!==h){ovOcc.rt?.dispose();ovOcc.rt=new THREE.WebGLRenderTarget(w,h,{depthBuffer:true,depthTexture:new THREE.DepthTexture(w,h)});}
+ const prev=renderer.getRenderTarget();renderer.setRenderTarget(ovOcc.rt);renderer.render(ovOcc.scene,camera);renderer.setRenderTarget(prev);
+ OV_UNIFORMS.ovDepth.value=ovOcc.rt.depthTexture;OV_UNIFORMS.ovRes.value.copy(_ovSize);OV_UNIFORMS.ovClip.value.set(camera.near,camera.far);
+}
+/* the same rule on the CPU for picking: distance along the ray to the first counted wall surface */
+const _ovRay=new THREE.Raycaster();
+function ovWallDistance(ray){
+ if(!(overlayOn&&ovPreset.occlude&&ovOcc.state==='ready'&&ovOccluderFloorOk()))return Infinity;
+ _ovRay.ray.copy(ray);_ovRay.near=0;_ovRay.far=Infinity;
+ for(const h of _ovRay.intersectObject(ovOcc.mesh,false))if(h.distance>=OV.OCCLUSION.nearIgnoreM)return h.distance;
+ return Infinity;
+}
+window.overlayVisibilityInspection=()=>({on:overlayOn,range:ovPreset.key,fade:[ovPreset.fadeStart,ovPreset.fadeEnd],occlude:ovPreset.occlude,patchedMaterials:ovPatched,
+ occluder:{state:ovOcc.state,source:'interior/enclosure-l1.glb (Walls)',elements:ovOcc.elements,triangles:ovOcc.triangles,active:OV_UNIFORMS.ovOcc.value===1,floorOk:ovOccluderFloorOk(),error:ovOcc.error},lens:{...ovLensCss}});
 const OVERLAY_LAYER_KEYS=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety','fire'];
 const overlayAtLoad=splitPane==='bim'&&new URLSearchParams(location.search).get('overlay')==='1';
 const normalBackground=scene.background;let overlayOn=false,overlayRun=0;
@@ -2654,6 +2721,7 @@ async function setOverlay(enabled){
   return;
  }
  scene.background=null;renderer.setClearColor(0,0);
+ if(ovPreset.occlude)loadWallOccluder();
  for(const key of Object.keys(interiorVisible))interiorVisible[key]=false;interiorState.mode='custom';applyInteriorVisibility();
  if(mepModel)mepModel.visible=false;
  for(const key of Object.keys(LAYERS)){const st=layerState[key];if(!OVERLAY_LAYER_KEYS.includes(key)&&st?.group?.visible){st.group.visible=false;st.desiredVisible=false;document.getElementById('layerBtn-'+key)?.classList.remove('active');}}
@@ -2693,14 +2761,20 @@ let lensPickCache={sig:'',hit:null};
 function lensPick(x,y){
  if(!anyLayerVisible())return null;
  /* raycasting every merged batch is not free: reuse the last answer while camera, lens and geometry are unchanged */
- const sig=[x.toFixed(4),y.toFixed(4),...camera.position.toArray().map(v=>v.toFixed(3)),...camera.quaternion.toArray().map(v=>v.toFixed(4)),camera.fov,equipMeshes.length,asBuilt.adjuster.keys().join(','),asBuiltRevision,equipLevelFilter,equipTypeFilter,Object.values(layerState).map(st=>st?.group?.visible?1:0).join('')].join('|');
+ const sig=[x.toFixed(4),y.toFixed(4),...camera.position.toArray().map(v=>v.toFixed(3)),...camera.quaternion.toArray().map(v=>v.toFixed(4)),camera.fov,equipMeshes.length,asBuilt.adjuster.keys().join(','),asBuiltRevision,equipLevelFilter,equipTypeFilter,Object.values(layerState).map(st=>st?.group?.visible?1:0).join(''),overlayOn,ovPreset.key,ovOcc.state,ovLensCss.on].join('|');
  if(sig===lensPickCache.sig)return lensPickCache.hit;
  const hit=lensPickRay(x,y);lensPickCache={sig,hit};return hit;
 }
 function lensPickRay(x,y){
  camera.updateMatrixWorld();_lensPtr.set(x*2-1,-(y*2-1));raycaster.setFromCamera(_lensPtr,camera);
- const hit=raycaster.intersectObjects(visibleEquip(),false)[0];
- if(!hit||interiorBlocksRay(hit.distance))return null;
+ /* Overlay: skip what is drawn faded or hidden (distance fade x wall occlusion); the probe sits at the lens centre */
+ let hit=null;const wall=overlayOn?ovWallDistance(raycaster.ray):Infinity;
+ for(const h of raycaster.intersectObjects(visibleEquip(),false)){
+  if(interiorBlocksRay(h.distance))break;
+  if(!overlayOn||OV.isPickable({distance:h.distance,wallDistance:wall,lensW:ovLensCss.on?1:0},ovPreset)){hit=h;break;}
+  if(OV.rangeFade(h.distance,ovPreset)<OV.PICK_MIN)break;   // everything further is fainter still
+ }
+ if(!hit)return null;
  const id=resolveElementHit(hit.object,hit.instanceId,hit.faceIndex,hit.index),layer=hit.object.userData.layer,info=id&&elementInfo(layer,id);
  return info?{id,layer,info,point:hit.point.toArray()}:null;
 }
@@ -2797,6 +2871,8 @@ function applyLinkedPose(p){
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin||e.source!==window.parent)return;const d=e.data;
  if(d?.type==='grimes-overlay'){setOverlay(d.enabled);return;}
+ if(d?.type==='grimes-overlay-range'&&splitPane==='bim'){ovSetRange(d.range);return;}
+ if(d?.type==='grimes-overlay-lens'&&splitPane==='bim'){ovLensCss={on:!!d.on&&[d.x,d.y,d.r].every(Number.isFinite),x:+d.x||0,y:+d.y||0,r:+d.r||0};return;}
  /* scan-compare multi-floor preview: the element floor filter follows the photo station's floor */
  if(d?.type==='grimes-floor'&&splitPane==='bim'&&['L1','L2','L3'].includes(d.level)){setElementFloor(d.level);document.getElementById('elementFloor').value=d.level;return;}
  if(d?.type==='grimes-photo-mode'&&splitPane==='bim'){
@@ -2884,6 +2960,7 @@ renderer.setAnimationLoop((t) => {
   if (!layerBusy || ((walkMode || splitPane==='bim') && t - _lastWalkRender >= (mobileMq.matches ? 400 : 250))) {
     const moved = _viewChanged();
     if (moved || t < _kickUntil || t - _lastDraw >= 250) {
+      if (typeof ovBeforeRender === 'function') ovBeforeRender();   // Overlay wall-depth pre-pass (no-op outside Overlay)
       renderer.render(scene, camera);
       _lastDraw = t;
     }
