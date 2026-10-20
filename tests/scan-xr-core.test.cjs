@@ -6,14 +6,14 @@ const {pathToFileURL} = require('node:url');
 const X = require('../twin/xr-core.js'), RC = require('../registration-core.js'), EC = require('../twin/element-cards.js');
 const root = path.join(__dirname, '..'), read = f => fs.readFileSync(path.join(root, f), 'utf8'), json = f => JSON.parse(read(f));
 const near = (a, b, eps = 1e-9) => a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) < eps, `${a} vs ${b}`));
-const MAY = json('alignment-analysis/accepted-registration.json'), SEP = json('scan-assets/captures/2026-09-17/registration.json');
+const MAY = json('alignment-analysis/accepted-registration.json'), SEP = json('scan-assets/captures/2026-09-17/registration.json'), OCT = json('scan-assets/captures/2026-10-18/registration.json');
 const MANIFESTS = {may: json('scan-assets/panoramas/manifest.json'), sep: json('scan-assets/captures/2026-09-17/panoramas/manifest.json')};
 
 test('captures: May 6 default + accepted registration, Sep 17 provisional; paths match scan-compare captureSelection', () => {
   const html = read('scan-compare.html'), fn = html.match(/function captureSelection\(search\)\{[\s\S]*?\n\}/);
   assert.ok(fn, 'scan-compare captureSelection exists');
   const sel = vm.runInNewContext(fn[0] + ';captureSelection', {URLSearchParams});
-  for (const date of ['2026-05-06', '2026-09-17']) {
+  for (const date of ['2026-05-06', '2026-09-17', '2026-10-18']) {
     const a = X.captureConfig(date), b = sel('?capture=' + date);
     assert.equal(a.photo, b.photo); assert.equal(a.registration, b.registration); assert.equal(a.provisional, b.provisional);
   }
@@ -23,6 +23,16 @@ test('captures: May 6 default + accepted registration, Sep 17 provisional; paths
   assert.match(X.captureConfig('2026-05-06').alignmentText, /not surveyed/);
   assert.ok(X.validRegistration(MAY) && X.validRegistration(SEP));
   assert.equal(MAY.status, 'geometry-registered'); assert.equal(SEP.status, 'project-frame-provisional');
+  assert.equal(X.captureConfig('2026-10-18').provisional, true);
+  assert.match(X.captureConfig('2026-10-18').alignmentText, /PROVISIONAL/);
+  assert.ok(X.validRegistration(OCT)); assert.equal(OCT.status, 'project-frame-provisional');
+  // Oct borrows the May transform (provisional), exactly like Sep
+  assert.equal(OCT.rotationYDegrees, MAY.rotationYDegrees); assert.deepEqual(OCT.translation, MAY.translation);
+  // menu cycle May → Sep → Oct → May; unknown values restart at May
+  assert.deepEqual(X.CAPTURE_ORDER, ['2026-05-06', '2026-09-17', '2026-10-18']);
+  assert.equal(X.nextCapture('2026-05-06'), '2026-09-17'); assert.equal(X.nextCapture('2026-09-17'), '2026-10-18');
+  assert.equal(X.nextCapture('2026-10-18'), '2026-05-06'); assert.equal(X.nextCapture('bogus'), '2026-05-06');
+  assert.deepEqual(Object.keys(X.CAPTURES).sort(), [...X.CAPTURE_ORDER].sort());
   assert.equal(X.validRegistration({rotationYDegrees: 1, translation: [0, 0], scale: 1}), false);
   assert.equal(X.validRegistration({rotationYDegrees: 1, translation: [0, 0, 0], scale: 1.01}), false);
 });
@@ -107,7 +117,8 @@ test('flashlight cone: inside, soft edge, outside, behind; Lens vs All alpha', (
 });
 
 test('XR menu: every button centre hits its own index, gaps and header miss', () => {
-  for (let i = 0; i < 10; i++) { const r = X.menuRect(i); assert.equal(X.menuHit(r.x + r.w / 2, 1 - (r.y + r.h / 2)), i); }
+  for (let i = 0; i < X.MENU.cols * X.MENU.rows; i++) { const r = X.menuRect(i); assert.equal(X.menuHit(r.x + r.w / 2, 1 - (r.y + r.h / 2)), i); }
+  assert.equal(X.MENU.cols * X.MENU.rows, 12, '12 buttons: … Fire, Scene, Nearest station, Close');
   assert.equal(X.menuHit(.5, .9), -1, 'header'); assert.equal(X.menuHit(.01, .2), -1, 'margin');
   const a = X.menuRect(0), b = X.menuRect(1); assert.equal(X.menuHit((a.x + a.w + b.x) / 2, 1 - (a.y + a.h / 2)), -1, 'gap');
 });
@@ -138,4 +149,107 @@ test('scan-xr.html wiring: shared scripts, pinned three, overlay layer set, no e
   assert.ok(html.includes("const EQUIP_OFFSET={x:-35.28,y:-97.16,z:28.60}") && /EQUIP_OFFSET = \{ x: -35\.28, y: -97\.16, z: 28\.60 \}/.test(bim), 'same layer placement as scan-bim');
   assert.ok(html.includes("renderer.shadowMap.enabled=false") && html.includes('setFramebufferScaleFactor') && html.includes('setFoveation'));
   assert.ok(!/accepted-registration\.json['"]?\s*,\s*\{\s*method:\s*['"]PUT/.test(html) && !/localStorage\.setItem/.test(html));
+});
+
+/* ── Gaussian scene mode (2026-10-19) ── */
+const MAY_G = json('scan-assets/gaussian/2026-05-06/viewer.json');
+const OCT_G_PATH = 'work/gaussian/2026-10-18/l1-a/20261019T074640Z/package/viewer.json';
+
+test('Gaussian manifest: frame/status checks, mobile file in XR, full on desktop, SH0 in XR, budgets', () => {
+  const xr = X.gaussianAsset(MAY_G, {xr: true}), desk = X.gaussianAsset(MAY_G, {xr: false});
+  assert.deepEqual([xr.ok, xr.file, xr.count, xr.mobile, xr.shDegree], [true, 'mobile.ply', 350000, true, 0]);
+  assert.deepEqual([desk.ok, desk.file, desk.count, desk.mobile, desk.shDegree], [true, 'trained.ksplat', 1000000, false, 2]);
+  assert.equal(X.gaussianAsset(MAY_G, {xr: false, prefer: 'mobile'}).file, 'mobile.ply', '?splat=mobile on desktop (smoke test)');
+  assert.equal(X.gaussianAsset(MAY_G, {xr: true, prefer: 'full'}).file, 'trained.ksplat', 'full file in XR only when forced, within the 1M headset budget');
+  assert.equal(X.gaussianAsset({...MAY_G, splatCount: 2e6}, {xr: true, prefer: 'full'}).ok, false, 'headset budget 1M');
+  assert.equal(X.gaussianAsset({...MAY_G, frame: 'bim'}).ok, false);
+  assert.equal(X.gaussianAsset({...MAY_G, status: 'draft'}).ok, false);
+  assert.equal(X.gaussianAsset({...MAY_G, capture: undefined}).ok, false);
+  for (const file of ['../trained.ksplat', 'sub/x.ply', '.hidden.ply', 'x.glb', 'https://evil.example/x.ply']) assert.equal(X.gaussianAsset({...MAY_G, file}).ok, false, file);
+  assert.equal(MAY_G.capture, '2026-05-06'); assert.equal(X.PUBLISHED_GAUSSIANS['2026-05-06'], 'scan-assets/gaussian/2026-05-06/viewer.json');
+  if (fs.existsSync(path.join(root, OCT_G_PATH))) {   // local, unpublished Oct 18 zone l1-a package (ignored work/)
+    const oct = json(OCT_G_PATH), a = X.gaussianAsset(oct, {xr: true});
+    assert.deepEqual([a.ok, a.file, oct.capture, oct.zone.id], [true, 'mobile.ply', '2026-10-18', 'l1-a']);
+  }
+});
+
+test('?gaussian= override: dev hosts only (loopback + RFC1918), never the public host; no traversal or absolute paths', () => {
+  for (const h of ['localhost', '127.0.0.1', '[::1]', '::1', 'app.localhost', '192.168.68.53', '10.0.0.4', '172.16.0.1', '172.31.255.254']) assert.ok(X.isDevHost(h), h);
+  for (const h of ['doe2park.github.io', 'github.io', '8.8.8.8', '172.32.0.1', '172.15.0.1', '192.169.1.1', '192.168.1.1.evil.example', '0.0.0.0', '256.1.1.1', '', null, undefined]) assert.equal(X.isDevHost(h), false, String(h));
+  assert.equal(X.gaussianOverride('192.168.68.53', OCT_G_PATH), OCT_G_PATH);
+  assert.equal(X.gaussianOverride('127.0.0.1', 'scan-assets/gaussian/2026-05-06/viewer.json'), 'scan-assets/gaussian/2026-05-06/viewer.json');
+  assert.equal(X.gaussianOverride('doe2park.github.io', OCT_G_PATH), null, 'public GitHub Pages host');
+  for (const v of ['../secret.json', 'work/../../etc/x.json', 'work/gaussian/..%2f/x.json', '/abs/viewer.json', '//evil.example/x.json', 'https://evil.example/x.json',
+    'work/.hidden/viewer.json', '.git/config.json', 'work//viewer.json', 'viewer.js', 'a\\b.json', 'a b.json', '', null, 'x'.repeat(400) + '.json']) assert.equal(X.gaussianOverride('localhost', v), null, String(v));
+  // the page wires exactly this helper and never trusts the raw parameter
+  const html = read('scan-xr.html');
+  assert.ok(html.includes("X.gaussianOverride(location.hostname,q.get('gaussian'))") && html.includes("if(url.origin!==location.origin)throw Error('Use a same-origin Gaussian manifest')"));
+});
+
+test('scene mode toggling: May published, Sep none (stays Photo with a reason), Oct only via a local override', () => {
+  assert.equal(X.sceneRequest('gaussian'), 'gaussian'); assert.equal(X.sceneRequest('GAUSSIAN'), 'photo'); assert.equal(X.sceneRequest(null), 'photo');
+  assert.equal(X.toggleScene('photo'), 'gaussian'); assert.equal(X.toggleScene('gaussian'), 'photo');
+  const may = X.gaussianFor('2026-05-06', null), sep = X.gaussianFor('2026-09-17', null), oct = X.gaussianFor('2026-10-18', null);
+  assert.deepEqual(may, {path: 'scan-assets/gaussian/2026-05-06/viewer.json', local: false}); assert.equal(sep, null); assert.equal(oct, null);
+  const ov = {path: OCT_G_PATH, capture: '2026-10-18'};
+  assert.deepEqual(X.gaussianFor('2026-10-18', ov), {path: OCT_G_PATH, local: true});
+  assert.deepEqual(X.gaussianFor('2026-05-06', ov), may, 'an Oct override never replaces May');
+  assert.deepEqual(X.gaussianFor('2026-05-06', {path: 'x/viewer.json', capture: '2026-05-06'}), {path: 'x/viewer.json', local: true});
+  assert.deepEqual(X.resolveScene('gaussian', 'May 6, 2026', may), {scene: 'gaussian', note: null});
+  const r = X.resolveScene('gaussian', 'Sep 17, 2026', sep);
+  assert.equal(r.scene, 'photo'); assert.match(r.note, /No Gaussian scene for Sep 17, 2026 · staying in Photo/);
+  assert.deepEqual(X.resolveScene('photo', 'May 6, 2026', may), {scene: 'photo', note: null});
+});
+
+test('Gaussian labels: date, zone, experimental appearance not surveyed, provisional for Oct, local preview', () => {
+  const may = X.gaussianLabel(MAY_G, X.captureConfig('2026-05-06'));
+  assert.equal(may, 'Gaussian · May 6, 2026 · whole capture · experimental appearance, not surveyed');
+  const oct = X.gaussianLabel({capture: '2026-10-18', zone: {id: 'l1-a', name: 'Zone A'}}, X.captureConfig('2026-10-18'), {local: true});
+  assert.equal(oct, 'Gaussian · Oct 18, 2026 · zone l1-a (Zone A) · experimental appearance, not surveyed · provisional alignment · local preview, unpublished');
+  const st = [{id: 'a'}, {id: 'b'}, {id: 'c'}];
+  assert.deepEqual(X.gaussianStations({zone: {stations: ['c', 'a']}}, st), [0, 2]); assert.deepEqual(X.gaussianStations(MAY_G, st), [0, 1, 2]);
+});
+
+test('teleport: floor-plane hit below the eye, distance / station / zone limits, landing keeps eye height', () => {
+  const eye = [0, 6, 0], down = d => { const a = d * Math.PI / 180; return [0, -Math.sin(a), -Math.cos(a)]; };
+  near(X.floorHit(eye, [0, -1, 0], 4.5), [0, 4.5, 0]);
+  const h = X.floorHit(eye, down(30), 4.5); near(h, [0, 4.5, -1.5 / Math.tan(Math.PI / 6)], 1e-9);
+  assert.equal(X.floorHit(eye, [0, 0, -1], 4.5), null, 'horizontal ray');
+  assert.equal(X.floorHit(eye, [0, .2, -1], 4.5), null, 'upward ray');
+  assert.equal(X.floorHit(eye, down(5), 4.5, 8), null, 'beyond 8 m');
+  assert.equal(X.floorHit([0, 4, 0], [0, -1, 0], 4.5), null, 'floor above the controller');
+  const stations = [{position: [0, 6, 0]}, {position: [0, 6, -4]}, {position: [20, 6, 0]}];
+  const t = X.teleportTarget(eye, down(30), {viewY: 6, eyeHeight: 1.5, stations});
+  assert.equal(t.ok, true); near(t.landing, [0, 6, -2.598076211353316], 1e-9); assert.equal(t.nearest, 1);
+  assert.match(X.teleportTarget(eye, [0, 0, -1], {viewY: 6, stations}).reason, /Point at the floor/);
+  const far = X.teleportTarget([12, 6, 0], down(25), {viewY: 6, stations, stationRadius: 2});
+  assert.equal(far.ok, false); assert.ok(far.point); assert.match(far.reason, /from any captured position/);
+  const zone = {min: [-1, 0, -1], max: [1, 9, 1]};
+  assert.match(X.teleportTarget(eye, down(30), {viewY: 6, stations, bounds: zone}).reason, /Outside the trained Gaussian zone/);
+  assert.equal(X.teleportTarget(eye, down(30), {viewY: 6, stations, bounds: zone, boundsPad: 1.7}).ok, true, 'zone padding');
+  assert.equal(X.teleportTarget(eye, down(30), {viewY: 6, stations, indices: [2], stationRadius: 6}).ok, false, 'only zone stations count');
+  // real May manifest: from the default station, 35° down in every heading lands on the floor near the route
+  const m = MANIFESTS.may, i = m.stations.findIndex(s => s.id === m.defaultStation), s = m.stations[i];
+  let ok = 0;
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, d = [Math.sin(a) * Math.cos(.61), -Math.sin(.61), Math.cos(a) * Math.cos(.61)], r = X.teleportTarget(s.position, d, {viewY: s.position[1], stations: m.stations}); if (r.ok) { ok++; assert.equal(r.landing[1], s.position[1]); } }
+  assert.ok(ok >= 6, 'teleport targets near a recorded station: ' + ok);
+});
+
+test('scan-xr.html Gaussian wiring: pinned GaussianSplats3D 0.4.7 DropInViewer, worker sort without SharedArrayBuffer, SH0/mobile in XR, no photo sphere', () => {
+  const html = read('scan-xr.html');
+  assert.ok(html.includes('"@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"'));
+  assert.ok(html.includes('new GS.DropInViewer({sharedMemoryForWorkers:false,gpuAcceleratedSort:false'));
+  assert.ok(html.includes('sphericalHarmonicsDegree:a.shDegree') && html.includes('X.gaussianAsset(m,{xr:xrSupported||renderer.xr.isPresenting,prefer:SPLAT_PREF})'));
+  assert.ok(html.includes('setActiveSphericalHarmonicsDegrees(0)'), 'SH0 once in XR');
+  assert.ok(html.includes('sphere.visible=false') && html.includes('setFramebufferScaleFactor(P.xrScale)') && html.includes('setFoveation(P.foveation)'));
+  assert.ok(html.includes("const opaque=state.mode==='lens'&&o>=.99&&gauss.scene!=='gaussian'"), 'services stay after the transparent splat pass');
+  assert.ok(!/new SharedArrayBuffer|crossOriginIsolated|sharedMemoryForWorkers:true/.test(html), "no SharedArrayBuffer / COOP-COEP requirement");
+  // the pinned package really exports DropInViewer with the API used here (local copy in tools/node_modules)
+  const mod = path.join(root, 'tools/node_modules/@mkkellogg/gaussian-splats-3d');
+  if (fs.existsSync(mod)) {
+    assert.equal(JSON.parse(fs.readFileSync(path.join(mod, 'package.json'), 'utf8')).version, '0.4.7');
+    const src = fs.readFileSync(path.join(mod, 'build/gaussian-splats-3d.module.js'), 'utf8');
+    for (const k of ['class DropInViewer extends THREE.Group', 'addSplatScene(path, options = {})', 'setActiveSphericalHarmonicsDegrees(', 'static onBeforeRender(viewer, renderer, threeScene, camera)', 'runSplatSort = function']) assert.ok(src.includes(k), k);
+    assert.match(src, /export \{[^}]*\bDropInViewer\b/);
+  }
 });

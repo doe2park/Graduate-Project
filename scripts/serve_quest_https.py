@@ -9,8 +9,13 @@ secure context). Modelled on the workshop kit's https/start_https.py.
   .github-token ...), work/, capture-local/, node_modules/, tools/, target/, logs/ and private exports are refused,
   and every path must resolve inside the repository (symlink escapes refused).
 
+- Opt-in (2026-10-19): --gaussian-package work/gaussian/<capture>/<zone>/<run>/package additionally serves exactly that one
+  local, unpublished Gaussian package (viewer.json, *.ksplat, *.ply directly inside it) for scan-xr.html?gaussian=...
+  Nothing else under work/ (certificate, key, other runs) becomes reachable.
+
 Usage:  python3 scripts/serve_quest_https.py            # prints https://<private-ip>:8929/scan-xr.html
         python3 scripts/serve_quest_https.py --dry-run  # address + certificate only, no server
+        python3 scripts/serve_quest_https.py --gaussian-package work/gaussian/2026-10-18/l1-a/<run>/package
 Ctrl+C stops the server.
 """
 import argparse
@@ -33,6 +38,21 @@ ALLOWED_SUFFIXES = {'.html', '.js', '.mjs', '.css', '.json', '.glb', '.bin', '.j
 DENIED_TOP = {'work', 'capture-local', 'node_modules', 'tools', 'target', 'logs', 'raw_csv', 'Claude outputs', 'legacy',
               'worker', 'scripts', 'tests', 'scans'}
 DENIED_NAMES = {'.env', '.github-token'}
+GAUSSIAN_PACKAGE_ROOT = ('work', 'gaussian')
+GAUSSIAN_PACKAGE_SUFFIXES = {'.json', '.ksplat', '.ply'}
+
+
+def gaussian_package(root, value):
+    """Resolve an opt-in local Gaussian package directory: must be a real directory under work/gaussian/ with a viewer.json."""
+    root = Path(root).resolve()
+    candidate = Path(value)
+    target = (candidate if candidate.is_absolute() else root / candidate).resolve()
+    base = root.joinpath(*GAUSSIAN_PACKAGE_ROOT)
+    if not target.is_relative_to(base) or target == base or not target.is_dir() or not (target / 'viewer.json').is_file():
+        raise ValueError('--gaussian-package must be a package directory with viewer.json under work/gaussian/')
+    if any(p.startswith('.') for p in target.relative_to(root).parts):
+        raise ValueError('--gaussian-package must not contain dot-directories')
+    return target
 
 
 def is_private(address):
@@ -43,8 +63,9 @@ def is_private(address):
     return ip.version == 4 and any(ip in n for n in PRIVATE_NETWORKS)
 
 
-def servable(root, url_path):
-    """Return the resolved file for a URL path, or None when it must not be served."""
+def servable(root, url_path, packages=()):
+    """Return the resolved file for a URL path, or None when it must not be served.
+    `packages`: resolved opt-in Gaussian package directories (see gaussian_package); only files directly inside them."""
     path = unquote(urlsplit(url_path).path)
     if not path.startswith('/') or '\x00' in path or '\\' in path:
         return None
@@ -53,8 +74,10 @@ def servable(root, url_path):
     parts = [p for p in path.split('/') if p]
     if not parts or any(p in ('.', '..') or p.startswith('.') for p in parts):
         return None
-    if parts[0] in DENIED_TOP or parts[-1] in DENIED_NAMES:
+    if parts[-1] in DENIED_NAMES:
         return None
+    if parts[0] in DENIED_TOP:
+        return _package_file(root, parts, packages)
     name = parts[-1].lower()
     if name.endswith(('.patch', '.lock', '.pem', '.key')) or name.startswith('claude-inbox'):
         return None
@@ -69,7 +92,17 @@ def servable(root, url_path):
     return target
 
 
-def handler_for(root):
+def _package_file(root, parts, packages):
+    if not packages or tuple(parts[:2]) != GAUSSIAN_PACKAGE_ROOT or Path(parts[-1]).suffix.lower() not in GAUSSIAN_PACKAGE_SUFFIXES:
+        return None
+    root = Path(root).resolve()
+    target = (root / Path(*parts)).resolve()
+    if not target.is_file() or target.parent not in {Path(p).resolve() for p in packages}:
+        return None
+    return target
+
+
+def handler_for(root, packages=()):
     class Handler(SimpleHTTPRequestHandler):
         extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.mjs': 'text/javascript', '.js': 'text/javascript',
                           '.glb': 'model/gltf-binary', '.wasm': 'application/wasm', '.ksplat': 'application/octet-stream',
@@ -80,7 +113,7 @@ def handler_for(root):
             if path in ('/', '/index.html'):
                 self.send_response(302); self.send_header('Location', '/scan-xr.html'); self.send_header('Content-Length', '0'); self.end_headers()
                 return None
-            target = servable(root, self.path)
+            target = servable(root, self.path, packages)
             if target is None:
                 self.send_error(404, 'Not available')
                 return None
@@ -146,7 +179,13 @@ def main(argv=None):
     p.add_argument('--port', type=int, default=PORT)
     p.add_argument('--local', action='store_true', help='bind 127.0.0.1 instead of the private LAN address (desktop check)')
     p.add_argument('--dry-run', action='store_true', help='resolve the address and certificate, then exit')
+    p.add_argument('--gaussian-package', action='append', default=[], metavar='DIR',
+                   help='also serve this one local Gaussian package (work/gaussian/.../package) for scan-xr.html?gaussian=')
     a = p.parse_args(argv)
+    try:
+        packages = tuple(gaussian_package(REPO, v) for v in a.gaussian_package)
+    except ValueError as e:
+        raise SystemExit(str(e))
     address = '127.0.0.1' if a.local else private_ip()
     if not a.local and not is_private(address):
         raise SystemExit('Refusing to bind a non-private address: ' + address)
@@ -154,9 +193,12 @@ def main(argv=None):
     fingerprint = hashlib.sha256(ssl.PEM_cert_to_DER_cert(cert.read_text())).hexdigest()
     url = f'https://{address}:{a.port}/scan-xr.html'
     print(f'Quest XR overlay: {url}\nCertificate (self-signed, dev only): {cert.relative_to(REPO)} sha256 {fingerprint[:16]}…', flush=True)
+    for pkg in packages:
+        rel = pkg.relative_to(REPO).as_posix()
+        print(f'Local Gaussian (unpublished, experimental appearance): {url}?scene=gaussian&gaussian={rel}/viewer.json', flush=True)
     if a.dry_run:
         return 0
-    server = ThreadingHTTPServer((address, a.port), handler_for(REPO))
+    server = ThreadingHTTPServer((address, a.port), handler_for(REPO, packages))
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.load_cert_chain(cert, key)

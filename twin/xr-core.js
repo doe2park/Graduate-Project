@@ -8,7 +8,7 @@
      scan-compare converts the photo camera into the BIM frame with exactly this map. scan-xr instead keeps the
      viewer in the scan frame and places the BIM under one group carrying the INVERSE map; the relative geometry
      between eye, photo pixels and BIM services is identical (tests check this against registration-core.js).
-   Honesty: May 6 = accepted registration (internal residual, not surveyed); Sep 17 = provisional alignment. */
+   Honesty: May 6 = accepted registration (internal residual, not surveyed); Sep 17 / Oct 18 = provisional alignment. */
 (function (root, factory) {
   const api = factory();
   if (root) root.ScanXRCore = api;
@@ -17,7 +17,7 @@
 'use strict';
 const D2R = Math.PI / 180;
 
-/* ── Captures ── default May 6 (accepted registration); Sep 17 is selectable and always labelled provisional. */
+/* ── Captures ── default May 6 (accepted registration); Sep 17 and Oct 18 are selectable and always labelled provisional. */
 const CAPTURES = {
   '2026-05-06': {date: '2026-05-06', label: 'May 6, 2026', provisional: false,
     photo: 'scan-assets/panoramas/manifest.json', registration: 'alignment-analysis/accepted-registration.json',
@@ -25,11 +25,20 @@ const CAPTURES = {
   '2026-09-17': {date: '2026-09-17', label: 'Sep 17, 2026', provisional: true,
     photo: 'scan-assets/captures/2026-09-17/panoramas/manifest.json', registration: 'scan-assets/captures/2026-09-17/registration.json',
     alignmentText: 'PROVISIONAL alignment (not surveyed)'},
+  '2026-10-18': {date: '2026-10-18', label: 'Oct 18, 2026', provisional: true,
+    photo: 'scan-assets/captures/2026-10-18/panoramas/manifest.json', registration: 'scan-assets/captures/2026-10-18/registration.json',
+    alignmentText: 'PROVISIONAL alignment (not surveyed)'},
 };
 const DEFAULT_CAPTURE = '2026-05-06';
+/* Menu order: May 6 → Sep 17 → Oct 18 → May 6. */
+const CAPTURE_ORDER = ['2026-05-06', '2026-09-17', '2026-10-18'];
 function captureConfig(date) {
   const c = CAPTURES[Object.prototype.hasOwnProperty.call(CAPTURES, date) ? date : DEFAULT_CAPTURE];
   return {...c};
+}
+function nextCapture(date) {
+  const i = CAPTURE_ORDER.indexOf(date);
+  return CAPTURE_ORDER[(i + 1) % CAPTURE_ORDER.length];
 }
 /* A registration file must be a finite yaw + 3-vector, scale 1 (the only model registration-core supports). */
 function validRegistration(reg) {
@@ -124,8 +133,8 @@ function withinRadius(center, sphereCenter, sphereRadius, radius) {
 }
 function cellKey(x, z, size) { return Math.floor(x / size) + ',' + Math.floor(z / size); }
 
-/* ── XR menu panel ── canvas fractions (y down). Buttons are a 5x2 grid in the lower part of the panel. */
-const MENU = {cols: 5, rows: 2, left: .025, right: .975, top: .56, bottom: .965, gap: .012};
+/* ── XR menu panel ── canvas fractions (y down). Buttons are a 6x2 grid in the lower part of the panel (12 buttons since the Gaussian scene toggle). */
+const MENU = {cols: 6, rows: 2, left: .025, right: .975, top: .6, bottom: .965, gap: .012};
 function menuRect(i) {
   const w = (MENU.right - MENU.left - MENU.gap * (MENU.cols - 1)) / MENU.cols, h = (MENU.bottom - MENU.top - MENU.gap * (MENU.rows - 1)) / MENU.rows;
   const c = i % MENU.cols, r = Math.floor(i / MENU.cols);
@@ -154,7 +163,104 @@ function cardLines(id, meta, tier, capture) {
   return {title, sub: clip(sub, 70), badge: tier.label, tier: tier.tier, cls: tier.cls, rows, footer};
 }
 
-return {CAPTURES, DEFAULT_CAPTURE, captureConfig, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
+/* ── Gaussian scene mode (2026-10-19) ──
+   The splat scene lives in the capture's SCAN frame (manifest frame 'scan-y-up-metres'), exactly like the photo stations,
+   so it is added to the scene root untransformed and the BIM keeps the same inverse-registration group.
+   Gaussian = trained appearance, not surveyed geometry. Only the May 6 scene is published. */
+const PUBLISHED_GAUSSIANS = {'2026-05-06': 'scan-assets/gaussian/2026-05-06/viewer.json'};
+const SCENES = ['photo', 'gaussian'];
+function sceneRequest(value) { return value === 'gaussian' ? 'gaussian' : 'photo'; }
+/* Dev hosts that may preview unpublished local packages: loopback and private RFC1918 IPv4 (the Quest dev server binds one). */
+function isDevHost(hostname) {
+  const h = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h.endsWith('.localhost')) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const o = m.slice(1).map(Number);
+  if (o.some(v => v > 255)) return false;
+  return o[0] === 10 || (o[0] === 172 && o[1] >= 16 && o[1] <= 31) || (o[0] === 192 && o[1] === 168);
+}
+/* ?gaussian=<manifest path>: honoured only on dev hosts; a relative same-origin .json path, no traversal, no dot-segments. */
+function gaussianOverride(hostname, value) {
+  if (!isDevHost(hostname) || typeof value !== 'string' || value.length > 300) return null;
+  if (!/^[\w.\/-]+\.json$/.test(value) || value.startsWith('/') || value.includes('//') || value.includes('..')) return null;
+  if (value.split('/').some(s => !s || s.startsWith('.'))) return null;
+  return value;
+}
+const SPLAT_BUDGET = {mobile: 1000000, full: 3000000};
+/* Manifest check (same rules as scan-splat.html readManifest) + file choice: XR uses mobileFile unless forced 'full'. */
+function gaussianAsset(m, {xr = false, prefer = null} = {}) {
+  if (!m || typeof m !== 'object') return {ok: false, error: 'Gaussian manifest unreadable'};
+  if (m.frame !== 'scan-y-up-metres') return {ok: false, error: 'Unsupported Gaussian frame · expected scan-y-up-metres'};
+  if (m.status !== 'experimental-trained') return {ok: false, error: 'Gaussian manifest is not an experimental-trained scene'};
+  if (typeof m.capture !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(m.capture)) return {ok: false, error: 'Gaussian manifest has no capture date'};
+  const useMobile = prefer === 'mobile' ? !!m.mobileFile : prefer === 'full' ? false : xr && !!m.mobileFile;
+  const file = useMobile ? m.mobileFile : m.file, count = useMobile ? m.mobileSplatCount : m.splatCount;
+  if (typeof file !== 'string' || !/^[\w.-]+\.(ply|ksplat)$/i.test(file) || file.startsWith('.')) return {ok: false, error: 'Gaussian asset must be a sibling .ply or .ksplat file'};
+  if (!Number.isSafeInteger(count) || count < 1) return {ok: false, error: 'Gaussian manifest needs a positive splat count'};
+  const budget = xr || useMobile ? SPLAT_BUDGET.mobile : SPLAT_BUDGET.full;
+  if (count > budget) return {ok: false, error: 'Gaussian scene exceeds the ' + (xr ? 'headset' : 'device') + ' splat budget'};
+  return {ok: true, file, count, mobile: useMobile, shDegree: xr || useMobile ? 0 : 2};
+}
+/* Which Gaussian (if any) belongs to this capture: the published one, or a validated local override for the same capture date. */
+function gaussianFor(captureDate, override) {
+  if (override && override.capture === captureDate) return {path: override.path, local: true};
+  if (Object.prototype.hasOwnProperty.call(PUBLISHED_GAUSSIANS, captureDate)) return {path: PUBLISHED_GAUSSIANS[captureDate], local: false};
+  return null;
+}
+/* Toggle logic: a request for 'gaussian' without a scene for this capture stays in Photo and explains why. */
+function resolveScene(requested, captureLabel, source) {
+  if (sceneRequest(requested) !== 'gaussian') return {scene: 'photo', note: null};
+  if (!source) return {scene: 'photo', note: 'No Gaussian scene for ' + (captureLabel || 'this capture') + ' · staying in Photo (published Gaussian: May 6 only)'};
+  return {scene: 'gaussian', note: null};
+}
+function toggleScene(current) { return current === 'gaussian' ? 'photo' : 'gaussian'; }
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function dateLabel(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); return m ? MONTHS[Number(m[2]) - 1] + ' ' + Number(m[3]) + ', ' + m[1] : String(iso || ''); }
+/* Honest caption: capture date, zone, 'experimental appearance, not surveyed', provisional alignment where it applies, local preview. */
+function gaussianLabel(m, capture, {local = false} = {}) {
+  const zone = m?.zone && typeof m.zone.id === 'string' ? 'zone ' + m.zone.id + (m.zone.name ? ' (' + m.zone.name + ')' : '') : 'whole capture';
+  const parts = ['Gaussian · ' + dateLabel(m?.capture), zone, 'experimental appearance, not surveyed'];
+  if (capture?.provisional) parts.push('provisional alignment');
+  if (local) parts.push('local preview, unpublished');
+  return parts.join(' · ');
+}
+/* Stations in a zoned Gaussian: the trained stations, else every station. */
+function gaussianStations(m, stations) {
+  const ids = Array.isArray(m?.zone?.stations) ? new Set(m.zone.stations) : null;
+  return stations.map((s, i) => i).filter(i => !ids || ids.has(stations[i].id));
+}
+
+/* ── Point-and-teleport (Gaussian mode only; a photo has one optical centre) ──
+   The floor is an invisible horizontal plane `eyeHeight` below the current view height (assumed capture-camera height,
+   not measured). Landing keeps the current eye height. The target must be within maxDistance of the eye, within
+   stationRadius of a recorded station (trained coverage proxy) and, for a zoned scene, inside the zone bounds (XZ). */
+function floorHit(origin, dir, floorY, maxDistance = 8) {
+  const dy = dir[1];
+  if (!(dy < -1e-4) || !Number.isFinite(floorY)) return null;
+  const t = (floorY - origin[1]) / dy;
+  if (!(t > 0)) return null;
+  const p = [origin[0] + dir[0] * t, floorY, origin[2] + dir[2] * t];
+  return Math.hypot(p[0] - origin[0], p[2] - origin[2]) <= maxDistance ? p : null;
+}
+function nearestStation(stations, p, indices = null) {
+  let best = -1, bd = Infinity;
+  for (const i of indices || stations.map((_, k) => k)) { const s = stations[i].position, d = Math.hypot(s[0] - p[0], s[2] - p[2]); if (d < bd) { bd = d; best = i; } }
+  return {index: best, distance: bd};
+}
+function teleportTarget(origin, dir, {viewY, eyeHeight = 1.5, maxDistance = 8, stations = [], indices = null, stationRadius = 6, bounds = null, boundsPad = 0} = {}) {
+  const floorY = viewY - eyeHeight, hit = floorHit(origin, dir, floorY, maxDistance);
+  if (!hit) return {ok: false, reason: 'Point at the floor within ' + maxDistance + ' m'};
+  if (bounds && Array.isArray(bounds.min) && Array.isArray(bounds.max)
+      && (hit[0] < bounds.min[0] - boundsPad || hit[0] > bounds.max[0] + boundsPad || hit[2] < bounds.min[2] - boundsPad || hit[2] > bounds.max[2] + boundsPad)) return {ok: false, point: hit, reason: 'Outside the trained Gaussian zone'};
+  const near = nearestStation(stations, hit, indices);
+  if (near.index < 0 || near.distance > stationRadius) return {ok: false, point: hit, reason: 'More than ' + stationRadius + ' m from any captured position'};
+  return {ok: true, point: hit, landing: [hit[0], viewY, hit[2]], nearest: near.index};
+}
+
+return {CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
-  chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, MENU, menuRect, menuHit, cardLines};
+  chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, MENU, menuRect, menuHit, cardLines,
+  PUBLISHED_GAUSSIANS, SCENES, sceneRequest, isDevHost, gaussianOverride, SPLAT_BUDGET, gaussianAsset, gaussianFor, resolveScene, toggleScene,
+  dateLabel, gaussianLabel, gaussianStations, floorHit, nearestStation, teleportTarget};
 });

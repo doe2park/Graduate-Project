@@ -2,6 +2,8 @@
 <title>Grimes · Scan↔BIM XR overlay</title><link rel="icon" href="data:,">
 <!-- Quest WebXR version of the scan-compare Overlay: stand inside a captured 360° photo, BIM services placed with the same
      registration as the web overlay, X-ray flashlight cone on the controller ray, trigger for info cards, neighbour-station jumps.
+     Scene mode Photo | Gaussian (?scene=gaussian): the trained splat scene (GaussianSplats3D 0.4.7 DropInViewer) in the same scan frame
+     as the stations; experimental appearance, not surveyed geometry; point-and-teleport on an assumed floor plane.
      Docs: docs/QUEST_XR_OVERLAY.md. Pure maths: twin/xr-core.js. Render tier: twin/xr-spatial-tier.mjs. -->
 <style>
 :root{--bg:rgba(10,20,32,.82);--bd:rgba(255,255,255,.2);--gold:#FDB515;--navy:#003262;--f:600 12px/1.2 Arial,Helvetica,sans-serif}
@@ -23,16 +25,17 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
 <script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js"></script>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
- <select id="capture" aria-label="Capture date"><option value="2026-05-06">May 6 · registered</option><option value="2026-09-17">Sep 17 · provisional</option></select>
+ <select id="capture" aria-label="Capture date"><option value="2026-05-06">May 6 · registered</option><option value="2026-09-17">Sep 17 · provisional</option><option value="2026-10-18">Oct 18 · provisional</option></select>
  <button id="prev" class="b" aria-label="Previous captured position">&#8249;</button><select id="station" aria-label="Captured position"></select><button id="next" class="b" aria-label="Next captured position">&#8250;</button>
  <button id="styleLens" class="b" aria-pressed="true" title="Services only inside the flashlight cone">Lens</button><button id="styleAll" class="b" aria-pressed="false" title="All nearby services, semi-transparent">All</button>
  <label class="b" title="Service opacity">Opacity <input id="opacity" type="range" min="10" max="100" step="5" value="85"></label>
  <label class="b" title="Flashlight cone half-angle">Cone <input id="cone" type="range" min="4" max="30" step="1" value="12"></label>
  <button id="hires" class="b" aria-pressed="false" title="Full 4096×2048 photo instead of the 2048×1024 derivative">4K photo</button>
  <button id="fire" class="b" aria-pressed="false" title="Fire piping Level 1 chunks, ~42 MB">Fire piping</button>
+ <button id="scene" class="b" aria-pressed="false" title="Scene: 360° photo or trained Gaussian splats (experimental appearance, not surveyed)">Gaussian</button>
  <button id="statsBtn" class="b" aria-pressed="false">Stats</button>
  <button id="enterVR" class="b" hidden>Enter VR</button>
 </div>
@@ -79,6 +82,18 @@ const sphereGeo=new THREE.SphereGeometry(50,64,32);sphereGeo.scale(-1,1,1);
 const sphereMat=new THREE.MeshBasicMaterial({toneMapped:false,depthTest:false,depthWrite:false}),sphere=new THREE.Mesh(sphereGeo,sphereMat);
 sphere.renderOrder=-10;sphere.visible=false;sphere.frustumCulled=false;scene.add(sphere);
 const bimRoot=new THREE.Group();bimRoot.name='bim (registration inverse)';scene.add(bimRoot);
+/* ── Gaussian scene mode ── the splat scene is in the capture's scan frame (same as the stations), so it sits at the scene root,
+   untransformed; BIM keeps the inverse-registration group. Only one scene is resident; it is hidden (no sort, no draw) in Photo mode. */
+const GS_OVERRIDE_PATH=X.gaussianOverride(location.hostname,q.get('gaussian'));
+const SPLAT_PREF=['mobile','full'].includes(q.get('splat'))?q.get('splat'):null;
+const EYE_H=clamp(Number(q.get('eye'))||1.5,.8,2.2),TELEPORT_MAX=8,TELEPORT_STATION_RADIUS=6,ZONE_PAD=1.5;
+const gauss={scene:'photo',override:null,overrideNote:null,source:null,dropIn:null,module:null,manifest:null,asset:null,label:'',loading:false,error:null,loadMs:null,count:0,key:null,stationIdx:null,pendingSort:false,busyFrames:0,epoch:0,teleports:0};
+let viewPos=[0,0,0];   // eye position in the scan frame: the station in Photo mode, a teleport landing in Gaussian mode
+// Full-view fade (child of the camera) for Gaussian jumps/teleports; the photo path keeps its own sphere/service fade.
+const fader=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0,depthTest:false,depthWrite:false,toneMapped:false}));
+fader.position.z=-.12;fader.renderOrder=100;fader.visible=false;fader.frustumCulled=false;camera.add(fader);
+const ring=new THREE.Mesh(new THREE.RingGeometry(.2,.26,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.9,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
+ring.renderOrder=57;ring.visible=false;ring.frustumCulled=false;scene.add(ring);
 /* ── X-ray flashlight shader ── one shared uniform set for every service batch. */
 const U={coneOrigin:{value:new THREE.Vector3()},coneDir:{value:new THREE.Vector3(0,0,-1)},coneCos:{value:X.coneCos(12)},coneSoft:{value:.01},mode:{value:0},opacity:{value:.85},fade:{value:1},hard:{value:0}};
 const VERT=`varying vec3 vWorld;varying vec3 vCol;varying float vShade;
@@ -122,8 +137,9 @@ function materialFor({isLine,instanced,side}){
 const state={mode:q.get('style')==='all'?'all':'lens',opacity:{lens:.85,all:.35},coneDeg:12,hiRes:null,snap:true,menu:false};
 function applyShaderState(){
  const o=state.opacity[state.mode];U.mode.value=state.mode==='all'?1:0;U.opacity.value=o;U.coneCos.value=X.coneCos(state.coneDeg);U.coneSoft.value=U.coneCos.value-X.coneCos(state.coneDeg+2);
- // Fully opaque lens: render opaque with a hard cone edge (no blending, no transparent sorting / overdraw).
- const opaque=state.mode==='lens'&&o>=.99;U.hard.value=opaque?1:0;for(const m of materials.values())m.transparent=!opaque;
+ // Fully opaque lens: render opaque with a hard cone edge (no blending, no transparent sorting / overdraw). Not in Gaussian mode:
+ // splats are a transparent, non-depth-tested pass, so services must stay in the transparent list after them (renderOrder -10).
+ const opaque=state.mode==='lens'&&o>=.99&&gauss.scene!=='gaussian';U.hard.value=opaque?1:0;for(const m of materials.values())m.transparent=!opaque;
  $('styleLens').setAttribute('aria-pressed',String(state.mode==='lens'));$('styleAll').setAttribute('aria-pressed',String(state.mode==='all'));$('opacity').value=Math.round(o*100);$('cone').value=state.coneDeg;
  if(state.menu)drawMenu();invalidate();
 }
@@ -141,7 +157,7 @@ const timing={firstPhotoMs:null,layersDoneMs:null};
 let yaw=0,pitch=0;const axisQ=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
 function setDesktopLook(){camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));invalidate();}
 const photoURL=s=>new URL((state.hiRes?'':'mobile/')+s.file,manifestURL).href;
-function updateAlign(){const a=$('align');a.textContent='Grimes L1 · '+capture.label+' · '+capture.alignmentText+' · Design (BIM) positions';a.classList.toggle('prov',capture.provisional);}
+function updateAlign(){const a=$('align');a.textContent=(gauss.scene==='gaussian'&&gauss.label?gauss.label+' · ':'')+'Grimes L1 · '+capture.label+' · '+capture.alignmentText+' · Design (BIM) positions';a.classList.toggle('prov',capture.provisional);updateSceneUI();}
 async function loadCapture(date){
  const epoch=++captureEpoch,cfg=X.captureConfig(date);status('Loading '+cfg.label+' capture…',true);
  const [m,r]=await Promise.all([fetchJson(cfg.photo),fetchJson(cfg.registration)]);
@@ -162,30 +178,33 @@ async function openStation(index,{instant=false,initialLook=false,force=false}={
  if(i===active&&!force)return;
  busyStation=true;const epoch=captureEpoch,doFade=active>=0&&!instant;
  try{
-  const s=stations[i];status('Loading photo '+(i+1)+'/'+stations.length+'…',true);
-  const tex=await texLoader.loadAsync(photoURL(s));tex.colorSpace=THREE.SRGBColorSpace;
-  if(epoch!==captureEpoch){tex.dispose();return;}
+  const s=stations[i],gMode=gauss.scene==='gaussian';let tex=null;
+  if(!gMode){status('Loading photo '+(i+1)+'/'+stations.length+'…',true);
+   tex=await texLoader.loadAsync(photoURL(s));tex.colorSpace=THREE.SRGBColorSpace;
+   if(epoch!==captureEpoch||gauss.scene==='gaussian'){tex.dispose();return;}}
   if(doFade)await fade(0,140);
   hideCard();
-  const old=sphereMat.map;sphereMat.map=tex;sphereMat.needsUpdate=true;if(old)old.dispose();
-  active=i;sphere.position.fromArray(s.position);sphere.quaternion.fromArray(X.stationQuaternion(s.e57Quaternion,0));sphere.visible=true;
+  if(tex){const old=sphereMat.map;sphereMat.map=tex;sphereMat.needsUpdate=true;if(old)old.dispose();}
+  active=i;viewPos=s.position.slice();sphere.position.fromArray(s.position);sphere.quaternion.fromArray(X.stationQuaternion(s.e57Quaternion,0));sphere.visible=!gMode&&!!sphereMat.map;
   if(initialLook&&!xrSession){const f=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().fromArray(s.e57Quaternion)).applyQuaternion(axisQ);yaw=Math.atan2(-f.x,-f.z);pitch=0;setDesktopLook();}
-  placeRig();stationBim=X.applyReg(reg,s.position);updateRadius();
+  placeRig();stationBim=X.applyReg(reg,viewPos);updateRadius();
   $('station').value=String(i);$('prev').disabled=i===0;$('next').disabled=i===stations.length-1;
   if(timing.firstPhotoMs==null)timing.firstPhotoMs=Math.round(performance.now()-T0);
   if(xrSession)placeTag();
-  status((i+1)+'/'+stations.length+' · '+capture.label+(capture.provisional?' · provisional alignment':''));
-  if(doFade)await fade(1,200);else{U.fade.value=1;sphereMat.color.setScalar(1);}
-  prefetchNeighbors(i);if(state.menu)drawMenu();
+  const outside=gMode&&gauss.stationIdx&&!gauss.stationIdx.includes(i);
+  status((i+1)+'/'+stations.length+' · '+capture.label+(gMode?' · Gaussian'+(outside?' · outside the trained zone, appearance missing':''):'')+(capture.provisional?' · provisional alignment':''));
+  if(doFade)await fade(1,200);else{U.fade.value=1;sphereMat.color.setScalar(1);fader.visible=false;}
+  if(!gMode)prefetchNeighbors(i);if(state.menu)drawMenu();
  }catch(e){console.error(e);status('Photo unavailable · choose another capture');}
  finally{busyStation=false;invalidate();if(pendingStation){const n=pendingStation;pendingStation=null;openStation(n.index,n.opts);}}
 }
 /* Put the tracked head exactly on the capture station (photo centre). Desktop: camera at the rig origin. */
-function placeRig(){if(active<0)return;const head=xrSession?camera.position.toArray():[0,0,0];rig.position.fromArray(X.rigForStation(stations[active].position,rig.rotation.y,head));rig.updateMatrixWorld(true);invalidate();}
+function placeRig(){if(active<0)return;const head=xrSession?camera.position.toArray():[0,0,0];rig.position.fromArray(X.rigForStation(viewPos,rig.rotation.y,head));rig.updateMatrixWorld(true);gauss.pendingSort=true;invalidate();}
 function walk(dirVec){if(active<0||busyStation)return false;const d=dirVec.clone();d.y=0;if(d.lengthSq()<1e-8)return false;d.normalize();const n=X.chooseNeighbor(stations,active,d.toArray());if(n<0){status('No captured neighbour that way · turn to follow the route');return false;}openStation(n);return true;}
 let fadeAnim=null;
 function fade(to,ms){return new Promise(resolve=>{fadeAnim={from:U.fade.value,to,start:performance.now(),ms:matchMedia('(prefers-reduced-motion:reduce)').matches?0:ms,resolve};invalidate();});}
-function stepFade(now){if(!fadeAnim)return false;const a=fadeAnim,f=a.ms?Math.min(1,(now-a.start)/a.ms):1,v=a.from+(a.to-a.from)*f;U.fade.value=v;sphereMat.color.setScalar(v);if(f>=1){fadeAnim=null;a.resolve();}return true;}
+function stepFade(now){if(!fadeAnim)return false;const a=fadeAnim,f=a.ms?Math.min(1,(now-a.start)/a.ms):1,v=a.from+(a.to-a.from)*f;U.fade.value=v;sphereMat.color.setScalar(v);
+ fader.material.opacity=1-v;fader.visible=gauss.scene==='gaussian'&&v<.999;if(f>=1){fadeAnim=null;a.resolve();}return true;}
 /* ── Service layers ── sequential, smallest first; Level-1 fragments only; radius visibility per station. */
 const layerState={};
 function elementLevel(info){if(info.levelKey&&info.levelKey!=='UNKNOWN')return info.levelKey;const n=String(info.level||'').toUpperCase();if(/MEZZ/.test(n))return'MEZZ';if(/LOWER|B1/.test(n))return'LOWER';if(/ROOF/.test(n))return'ROOF';const m=n.match(/^LEVEL 0?([1-4])$/);return m?'L'+m[1]:null;}
@@ -263,27 +282,33 @@ async function pickAlong(origin,dir){
 }
 /* ── XR menu panel (world-locked; B/Y toggles; trigger presses buttons) ── */
 const menu=makeSurface(1280,666,1.0,.52,70);scene.add(menu.mesh);
-const tag=makeSurface(640,96,.5,.075,65);scene.add(tag.mesh);
-function menuLabels(){return [`Style: ${state.mode==='lens'?'Lens':'All'}`,'Opacity −','Opacity +','Cone −','Cone +',`Capture: ${capture?.date==='2026-09-17'?'Sep 17':'May 6'}`,`Photo: ${state.hiRes?'4K':'2K'}`,`Snap turn: ${state.snap?'on':'off'}`,`Fire: ${fireOn()?'on':layerState.fire?.loading?'loading':'off'}`,'Close'];}
+const tag=makeSurface(1024,160,.6,.094,65);scene.add(tag.mesh);
+function menuLabels(){return [`Style: ${state.mode==='lens'?'Lens':'All'}`,'Opacity −','Opacity +','Cone −','Cone +',`Capture: ${capture?capture.label.replace(/, \d{4}$/,''):'May 6'}`,`Photo: ${state.hiRes?'4K':'2K'}`,`Snap turn: ${state.snap?'on':'off'}`,`Fire: ${fireOn()?'on':layerState.fire?.loading?'loading':'off'}`,`Scene: ${gauss.loading?'loading…':gauss.scene==='gaussian'?'Gaussian':'Photo'}`,'Nearest station','Close'];}
 function drawMenu(){const {ctx,canvas}=menu,W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.95)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,30);ctx.fill();ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,86);ctx.fillStyle='#FDB515';ctx.fillRect(4,86,W-8,5);
  ctx.fillStyle='#fff';ctx.font='700 44px Arial';ctx.fillText('Grimes L1 · Scan↔BIM overlay',36,62);
  const loaded=Object.values(layerState).filter(s=>s.loaded).length,total=Object.keys(layerState).length;
- const rows=[[`${capture?.label||''} · station ${active+1}/${stations.length}`,'#e8f1f8'],[`Alignment: ${capture?.alignmentText||''}`,capture?.provisional?'#ffb4a8':'#ffe495'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · ${loaded}/${total} layers · opacity ${Math.round(state.opacity[state.mode]*100)}% · cone ${state.coneDeg}°`,'#a9c1d6'],['Trigger: info / buttons · Stick ↑↓: next station · Stick ←→: snap turn · A/X: Lens/All','#8aa2b8']];
- let y=142;for(const [t,c] of rows){ctx.fillStyle=c;ctx.font=y===142?'600 34px Arial':'30px Arial';ctx.fillText(wrap(ctx,t,W-72,1)[0]||'',36,y);y+=50;}
- menuLabels().forEach((label,i)=>{const r=X.menuRect(i),x=r.x*W,yy=r.y*H,w=r.w*W,h=r.h*H;ctx.fillStyle=i===9?'#7a2633':'#123a5c';ctx.beginPath();ctx.roundRect(x,yy,w,h,16);ctx.fill();ctx.strokeStyle='#5d82a3';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#fff';ctx.font='600 30px Arial';ctx.textAlign='center';ctx.fillText(label,x+w/2,yy+h/2+10,w-16);ctx.textAlign='left';});
+ const rows=[[`${capture?.label||''} · station ${active+1}/${stations.length}`,'#e8f1f8'],[`Alignment: ${capture?.alignmentText||''}`,capture?.provisional?'#ffb4a8':'#ffe495'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · ${loaded}/${total} layers · opacity ${Math.round(state.opacity[state.mode]*100)}% · cone ${state.coneDeg}°`,'#a9c1d6'],[gauss.scene==='gaussian'?gauss.label:`Scene: 360° photo · Gaussian ${gaussianSource()?'available':'not available for this capture'}`,gauss.scene==='gaussian'?'#ffd9a0':'#cfe3f5'],
+  [gauss.scene==='gaussian'?'Trigger: info · Stick ↑ at floor, release: teleport · ↑ at horizon: next station · ←→: snap turn':'Trigger: info / buttons · Stick ↑↓: next station · Stick ←→: snap turn · A/X: Lens/All','#8aa2b8']];
+ let y=142;for(const [t,c] of rows){ctx.fillStyle=c;if(y===142){ctx.font='600 34px Arial';ctx.fillText(wrap(ctx,t,W-72,1)[0]||'',36,y);}else fitText(ctx,t,36,y,W-72,30,'Arial');y+=50;}
+ menuLabels().forEach((label,i)=>{const r=X.menuRect(i),x=r.x*W,yy=r.y*H,w=r.w*W,h=r.h*H;ctx.fillStyle=i===11?'#7a2633':i===9&&gauss.scene==='gaussian'?'#6a4a10':'#123a5c';ctx.beginPath();ctx.roundRect(x,yy,w,h,16);ctx.fill();ctx.strokeStyle='#5d82a3';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#fff';ctx.font='600 28px Arial';ctx.textAlign='center';ctx.fillText(label,x+w/2,yy+h/2+10,w-16);ctx.textAlign='left';});
  menu.texture.needsUpdate=true;invalidate();}
 function placeInFront(mesh,dist,drop){camera.getWorldPosition(_head);const f=camera.getWorldDirection(_v);f.y=0;if(f.lengthSq()<1e-6)f.set(0,0,-1);f.normalize();mesh.position.copy(_head).addScaledVector(f,dist);mesh.position.y-=drop;mesh.lookAt(_head.x,mesh.position.y+drop*.35,_head.z);}
 function setMenu(on){state.menu=on;if(on){drawMenu();placeInFront(menu.mesh,1.1,.28);}menu.mesh.visible=on;invalidate();}
-function placeTag(){const {ctx,canvas}=tag;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,canvas.width-4,canvas.height-4,40);ctx.fill();ctx.font='600 34px Arial';ctx.fillStyle=capture.provisional?'#ffb4a8':'#ffe495';ctx.textAlign='center';ctx.fillText(wrap(ctx,capture.label+' · '+(capture.provisional?'PROVISIONAL alignment':'registered, not surveyed')+' · B/Y menu',canvas.width-40,1)[0]||'',canvas.width/2,60);ctx.textAlign='left';tag.texture.needsUpdate=true;placeInFront(tag.mesh,1.3,.75);tag.mesh.visible=true;}
+function placeTag(){const {ctx,canvas}=tag,W=canvas.width,H=canvas.height,g=gauss.scene==='gaussian';ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,W-4,H-4,40);ctx.fill();ctx.textAlign='center';
+ ctx.fillStyle=capture.provisional?'#ffb4a8':'#ffe495';fitText(ctx,capture.label+' · '+(capture.provisional?'PROVISIONAL alignment':'registered, not surveyed')+' · B/Y menu',W/2,g?62:96,W-60,40,'Arial');
+ if(g){ctx.fillStyle='#ffd9a0';fitText(ctx,'Gaussian · experimental appearance, not surveyed geometry',W/2,124,W-60,36,'Arial');}
+ ctx.textAlign='left';tag.texture.needsUpdate=true;placeInFront(tag.mesh,1.3,.75);tag.mesh.visible=true;}
 async function menuAction(i){
  if(i===0)setStyle(state.mode==='lens'?'all':'lens');
  else if(i===1||i===2){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],i===1?-1:1);applyShaderState();}
  else if(i===3||i===4){state.coneDeg=X.stepCone(state.coneDeg,i===3?-1:1);applyShaderState();}
- else if(i===5){await switchCapture(capture.date==='2026-09-17'?'2026-05-06':'2026-09-17');}
+ else if(i===5){await switchCapture(X.nextCapture(capture.date));}
  else if(i===6)setHiRes(!state.hiRes);
  else if(i===7){state.snap=!state.snap;}
  else if(i===8)setFire(!fireOn());
- else if(i===9){setMenu(false);return;}
+ else if(i===9)await setScene(X.toggleScene(gauss.scene));
+ else if(i===10)await recenter();
+ else if(i===11){setMenu(false);return;}
  if(state.menu)drawMenu();
 }
 /* Trigger / click: menu buttons first, then service elements. */
@@ -293,7 +318,83 @@ async function selectRay(origin,dir){
 }
 function setStyle(mode){state.mode=mode;applyShaderState();}
 function setHiRes(on){state.hiRes=on;$('hires').setAttribute('aria-pressed',String(on));if(active>=0)openStation(active,{instant:true,force:true});}
-async function switchCapture(date){hideCard();try{await loadCapture(date);}catch(e){console.error(e);status(String(e.message||e));}}
+async function switchCapture(date){hideCard();const wasG=gauss.scene==='gaussian';if(wasG)hideGaussian();
+ try{await loadCapture(date);}catch(e){console.error(e);status(String(e.message||e));return;}
+ if(wasG)await setScene('gaussian');else if(gauss.dropIn&&gauss.manifest?.capture!==capture.date)await disposeGaussian();}
+/* ── Gaussian scene ── */
+const gaussianSource=()=>capture?X.gaussianFor(capture.date,gauss.override):null;
+function updateSceneUI(){const b=$('scene');if(!b)return;const src=gaussianSource(),on=gauss.scene==='gaussian';b.setAttribute('aria-pressed',String(on));b.textContent=gauss.loading?'Gaussian…':'Gaussian';
+ b.title=on?gauss.label:src?'Switch to the trained Gaussian scene ('+(src.local?'local preview':'published May 6')+') · experimental appearance, not surveyed':'No Gaussian scene for '+(capture?.label||'this capture')+' (published: May 6 only)';
+ $('hires').disabled=on;   // no photo is shown in Gaussian mode
+ if(state.menu)drawMenu();}
+/* Validated ?gaussian= override (dev hosts only): fetched once to learn which capture it belongs to. */
+async function readOverride(){
+ if(q.has('gaussian')&&!GS_OVERRIDE_PATH){gauss.overrideNote='?gaussian= ignored · only a relative .json path on a local or private-LAN dev host';return null;}
+ if(!GS_OVERRIDE_PATH)return null;
+ try{const url=new URL(GS_OVERRIDE_PATH,location.href);if(url.origin!==location.origin)throw Error('not same-origin');
+  const m=await fetchJson(url.href),a=X.gaussianAsset(m,{xr:false});if(!a.ok)throw Error(a.error);
+  return {path:GS_OVERRIDE_PATH,capture:m.capture};
+ }catch(e){gauss.overrideNote='Local Gaussian override unavailable · '+(e.message||e);return null;}}
+async function disposeGaussian(){const d=gauss.dropIn;gauss.dropIn=null;gauss.key=null;gauss.manifest=null;gauss.asset=null;gauss.count=0;gauss.stationIdx=null;gauss.label='';ring.visible=false;
+ if(d){scene.remove(d);try{await d.dispose();}catch(e){console.warn('[gaussian] dispose',e);}}invalidate();}
+async function loadGaussian(src){
+ const key=src.path+'|'+(SPLAT_PREF||'auto')+'|'+capture.date;if(gauss.dropIn&&gauss.key===key)return true;
+ await disposeGaussian();const epoch=++gauss.epoch,t0=performance.now();gauss.loading=true;gauss.error=null;updateSceneUI();
+ try{
+  const url=new URL(src.path,location.href);if(url.origin!==location.origin)throw Error('Use a same-origin Gaussian manifest');
+  const m=await fetchJson(url.href);if(m.capture!==capture.date)throw Error('scene is for '+m.capture+', not '+capture.date);
+  if(m.building&&m.building!=='grimes')throw Error('scene is for another building');
+  const a=X.gaussianAsset(m,{xr:xrSupported||renderer.xr.isPresenting,prefer:SPLAT_PREF});if(!a.ok)throw Error(a.error);
+  const assetURL=new URL(a.file,url);if(assetURL.origin!==location.origin)throw Error('Use a same-origin Gaussian asset');
+  status('Gaussian · loading '+a.file+' ('+a.count.toLocaleString()+' splats)…',true);
+  const GS=gauss.module||(gauss.module=await import('@mkkellogg/gaussian-splats-3d'));
+  // Sort in a Web Worker without SharedArrayBuffer (GitHub Pages has no COOP/COEP); CPU sort (no GPU distance pass); SH0 in XR / mobile file.
+  const d=new GS.DropInViewer({sharedMemoryForWorkers:false,gpuAcceleratedSort:false,integerBasedSort:false,halfPrecisionCovariancesOnGPU:true,sphericalHarmonicsDegree:a.shDegree,
+   inMemoryCompressionLevel:1,freeIntermediateSplatData:true,dynamicScene:false,sceneRevealMode:GS.SceneRevealMode.Instant,sceneFadeInRateMultiplier:1/.003,logLevel:GS.LogLevel.None});
+  d.name='gaussian (scan frame, untransformed)';d.renderOrder=-10;d.visible=false;
+  await d.addSplatScene(assetURL.href,{showLoadingUI:false,progressiveLoad:false,splatAlphaRemovalThreshold:1,onProgress:p=>{if(Number.isFinite(p))status('Gaussian · '+a.file+' · '+Math.round(p)+'%',true);}});
+  if(epoch!==gauss.epoch||gauss.scene!=='gaussian'){d.dispose().catch(()=>{});return false;}
+  const n=d.viewer.splatMesh?.getSplatCount()||0;if(!n){d.dispose().catch(()=>{});throw Error('scene contains no visible splats');}
+  if(d.splatMesh)d.splatMesh.renderOrder=-10;scene.add(d);
+  Object.assign(gauss,{dropIn:d,manifest:m,asset:{...a,url:assetURL.pathname},count:n,key,source:src,loadMs:Math.round(performance.now()-t0),label:X.gaussianLabel(m,capture,{local:src.local}),stationIdx:X.gaussianStations(m,stations)});
+  if(timing.gaussianMs==null)timing.gaussianMs=Math.round(performance.now()-T0);
+  console.log(`[gaussian] ${a.file} · ${n} splats · SH${a.shDegree} · ${gauss.loadMs} ms`);
+  return true;
+ }catch(e){gauss.error=String(e.message||e);console.warn('[gaussian]',e);return false;}
+ finally{if(epoch===gauss.epoch){gauss.loading=false;updateSceneUI();}}}
+function hideGaussian(){gauss.scene='photo';if(gauss.dropIn)gauss.dropIn.visible=false;ring.visible=false;fader.visible=false;}
+/* Photo <-> Gaussian. A capture without a Gaussian explains and stays in Photo. Leaving Gaussian returns to the nearest station's photo. */
+async function setScene(want,{boot=false}={}){
+ if(!capture)return gauss.scene;
+ const src=gaussianSource(),r=X.resolveScene(want,capture.label,src);
+ if(r.scene==='photo'){
+  if(r.note)status(r.note);
+  if(gauss.scene==='gaussian'){hideGaussian();applyShaderState();const n=X.nearestStation(stations,viewPos).index;await openStation(n<0?active:n,{instant:true,force:true});}
+  if(gauss.dropIn&&gauss.manifest?.capture!==capture.date)await disposeGaussian();
+  updateAlign();if(xrSession&&active>=0)placeTag();return 'photo';}
+ if(gauss.scene==='gaussian'&&gauss.dropIn&&gauss.source?.path===src.path&&gauss.manifest?.capture===capture.date)return 'gaussian';
+ gauss.scene='gaussian';updateSceneUI();
+ const ok=await loadGaussian(src);
+ if(!ok){if(gauss.scene!=='gaussian')return gauss.scene;hideGaussian();applyShaderState();await openStation(active,{instant:true,force:true});updateAlign();status('Gaussian unavailable · '+(gauss.error||'load failed')+' · staying in Photo');return 'photo';}
+ sphere.visible=false;const old=sphereMat.map;sphereMat.map=null;sphereMat.needsUpdate=true;if(old)old.dispose();   // free the photo texture on the headset
+ gauss.dropIn.visible=true;applyShaderState();
+ const ids=gauss.stationIdx,init=gauss.manifest.provenance?.initialStation,initIdx=stations.findIndex(s=>s.id===init);
+ if((boot&&!q.get('station')&&initIdx>=0)||(ids&&!ids.includes(active)))await openStation(initIdx>=0&&(!ids||ids.includes(initIdx))?initIdx:ids[0],{instant:true,force:true});
+ else{viewPos=stations[active].position.slice();placeRig();}
+ gauss.pendingSort=true;updateAlign();if(xrSession)placeTag();status(gauss.label+' · '+gauss.count.toLocaleString()+' splats',false);invalidate();return 'gaussian';}
+async function recenter(){if(active<0)return;const n=X.nearestStation(stations,viewPos,gauss.scene==='gaussian'?gauss.stationIdx:null).index;await openStation(n<0?active:n,{force:true});}
+/* Teleport: controller (or mouse) ray against an invisible floor plane EYE_H below the eye; short fade; eye height kept. */
+function teleportPreview(origin,dir){return X.teleportTarget(origin.toArray(),dir.toArray(),{viewY:viewPos[1],eyeHeight:EYE_H,maxDistance:TELEPORT_MAX,stations,indices:gauss.stationIdx,stationRadius:TELEPORT_STATION_RADIUS,bounds:gauss.manifest?.zone?.bounds||null,boundsPad:ZONE_PAD});}
+async function teleport(origin,dir){
+ if(gauss.scene!=='gaussian'||!gauss.dropIn||active<0||busyStation)return null;
+ const t=teleportPreview(origin,dir);if(!t.ok){status(t.reason);return t;}
+ busyStation=true;
+ try{await fade(0,120);hideCard();viewPos=t.landing;active=t.nearest;placeRig();stationBim=X.applyReg(reg,viewPos);updateRadius();gauss.teleports++;
+  $('station').value=String(active);$('prev').disabled=active===0;$('next').disabled=active===stations.length-1;
+  if(xrSession)placeTag();status('Teleported · nearest capture '+(active+1)+'/'+stations.length+' · '+gauss.label);await fade(1,180);}
+ finally{busyStation=false;invalidate();if(state.menu)drawMenu();}
+ return t;}
+function showRing(t){if(!t||!t.point){ring.visible=false;return;}ring.position.fromArray(t.point);ring.material.color.set(t.ok?0xffd479:0xe2725b);ring.visible=true;}
 /* ── Desktop input (testing without a headset): drag look, wheel zoom, click = trigger, mouse = flashlight, WASD walk ── */
 const ndc=new THREE.Vector2();let drag=null,pointerInside=false;
 function coneFromPointer(x,y){if(xrSession)return;ndc.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(ndc,camera);U.coneOrigin.value.copy(raycaster.ray.origin);U.coneDir.value.copy(raycaster.ray.direction);invalidate();}
@@ -302,19 +403,21 @@ const cvs=renderer.domElement;
 cvs.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY};cvs.setPointerCapture(e.pointerId);});
 cvs.addEventListener('pointermove',e=>{pointerInside=e.pointerType==='mouse';if(drag&&drag.id===e.pointerId){yaw-=(e.clientX-drag.x)*.004;pitch=clamp(pitch-(e.clientY-drag.y)*.004,-1.45,1.45);drag.x=e.clientX;drag.y=e.clientY;setDesktopLook();}
  if(e.pointerType==='mouse')coneFromPointer(e.clientX,e.clientY);else coneFromView();});
-cvs.addEventListener('pointerup',e=>{if(drag&&drag.id===e.pointerId&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<5){ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);raycaster.setFromCamera(ndc,camera);selectRay(raycaster.ray.origin.clone(),raycaster.ray.direction.clone());}drag=null;});
+cvs.addEventListener('pointerup',e=>{if(drag&&drag.id===e.pointerId&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<5){ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);raycaster.setFromCamera(ndc,camera);
+ const o=raycaster.ray.origin.clone(),d=raycaster.ray.direction.clone();if(e.shiftKey&&gauss.scene==='gaussian')teleport(o,d);else selectRay(o,d);}drag=null;});
 cvs.addEventListener('pointercancel',()=>drag=null);cvs.addEventListener('pointerleave',()=>{pointerInside=false;coneFromView();});
 cvs.addEventListener('wheel',e=>{e.preventDefault();camera.fov=clamp(camera.fov+e.deltaY*.025,40,95);camera.updateProjectionMatrix();invalidate();},{passive:false});
 const KEYDIR={KeyW:'f',ArrowUp:'f',KeyS:'b',ArrowDown:'b',KeyA:'l',ArrowLeft:'l',KeyD:'r',ArrowRight:'r'};
 addEventListener('keydown',e=>{if(['SELECT','INPUT'].includes(e.target.tagName))return;
  if(KEYDIR[e.code]){e.preventDefault();const f=camera.getWorldDirection(new THREE.Vector3());f.y=0;f.normalize();const r=new THREE.Vector3().crossVectors(f,new THREE.Vector3(0,1,0)),k=KEYDIR[e.code];walk(k==='f'?f:k==='b'?f.negate():k==='l'?r.negate():r);}
- else if(e.code==='KeyL')setStyle(state.mode==='lens'?'all':'lens');else if(e.code==='KeyM')setMenu(!state.menu);else if(e.code==='Escape')hideCard();});
+ else if(e.code==='KeyL')setStyle(state.mode==='lens'?'all':'lens');else if(e.code==='KeyM')setMenu(!state.menu);else if(e.code==='Escape')hideCard();
+ else if(e.code==='KeyG')setScene(X.toggleScene(gauss.scene));});
 $('prev').onclick=()=>openStation(active-1);$('next').onclick=()=>openStation(active+1);$('station').onchange=e=>openStation(Number(e.target.value));
 $('capture').onchange=e=>switchCapture(e.target.value);
 $('styleLens').onclick=()=>setStyle('lens');$('styleAll').onclick=()=>setStyle('all');
 $('opacity').oninput=e=>{state.opacity[state.mode]=Number(e.target.value)/100;applyShaderState();};
 $('cone').oninput=e=>{state.coneDeg=Number(e.target.value);applyShaderState();};
-$('hires').onclick=()=>setHiRes(!state.hiRes);$('fire').onclick=()=>setFire(!fireOn());
+$('hires').onclick=()=>setHiRes(!state.hiRes);$('fire').onclick=()=>setFire(!fireOn());$('scene').onclick=()=>setScene(X.toggleScene(gauss.scene));
 $('statsBtn').onclick=()=>{const s=$('stats');s.hidden=!s.hidden;$('statsBtn').setAttribute('aria-pressed',String(!s.hidden));updateStats();};
 addEventListener('resize',()=>{if(renderer.xr.isPresenting)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);invalidate();});
 cvs.addEventListener('webglcontextlost',e=>{e.preventDefault();status('Graphics paused · reload this page',true);});
@@ -334,8 +437,9 @@ $('enterVR').onclick=async()=>{if(xrSession)return xrSession.end();try{
  renderer.xr.setFramebufferScaleFactor(P.xrScale);
  const session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['hand-tracking']});
  await renderer.xr.setSession(session);renderer.xr.setFoveation(P.foveation);xrSession=session;
+ if(gauss.dropIn&&gauss.asset?.shDegree>0)gauss.dropIn.setActiveSphericalHarmonicsDegrees(0);   // SH0 in XR even if the desktop loaded the full file
  rig.rotation.set(0,yaw,0);camera.position.set(0,0,0);camera.quaternion.identity();pendingPlace=3;hideCard();coneFromView();
- session.addEventListener('end',()=>{xrSession=null;rig.rotation.set(0,0,0);camera.position.set(0,0,0);setDesktopLook();setMenu(false);tag.mesh.visible=false;for(const c of controllers)c.userData.ray.visible=false;placeRig();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);$('enterVR').textContent='Enter VR';invalidate();});
+ session.addEventListener('end',()=>{xrSession=null;ring.visible=false;if(gauss.dropIn&&gauss.asset?.shDegree>0)gauss.dropIn.setActiveSphericalHarmonicsDegrees(gauss.asset.shDegree);rig.rotation.set(0,0,0);camera.position.set(0,0,0);setDesktopLook();setMenu(false);tag.mesh.visible=false;for(const c of controllers)c.userData.ray.visible=false;placeRig();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);$('enterVR').textContent='Enter VR';invalidate();});
  $('enterVR').textContent='Exit VR';
 }catch(e){console.error(e);status('Could not start VR: '+(e.message||e));}};
 const prevButtons=new Map();
@@ -349,9 +453,17 @@ function xrInput(){
    if(a==='forward'||a==='back'){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],a==='forward'?1:-1);applyShaderState();}
    else if(a){state.coneDeg=X.stepCone(state.coneDeg,a==='turn-right'?1:-1);applyShaderState();}
    continue;}
+  if(c.userData.aim){   // Gaussian teleport: stick ↑ held = aim (ring on the floor), release = go
+   c.updateMatrixWorld(true);const o=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld),t=teleportPreview(o,d);
+   if(Math.hypot(x,y)>=.3&&gauss.scene==='gaussian'){showRing(t);c.userData.ray.scale.z=t.point?Math.max(.3,o.distanceTo(new THREE.Vector3().fromArray(t.point))):3;continue;}
+   c.userData.aim=false;c.userData.stick.armed=true;ring.visible=false;c.userData.ray.scale.z=3;
+   if(gauss.scene!=='gaussian')continue;
+   if(t.ok)teleport(o,d);else if(!t.point)walk(d);else status(t.reason);   // pointing at the horizon keeps the neighbour-station jump
+   continue;}
   const a=X.stickStep(c.userData.stick,x,y);if(!a)continue;
+  if(a==='forward'&&gauss.scene==='gaussian'&&gauss.dropIn){c.userData.aim=true;continue;}
   if(a==='forward'||a==='back'){c.updateMatrixWorld(true);const d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld);if(a==='back')d.negate();walk(d);}
-  else if(state.snap){camera.getWorldPosition(_head);const r=X.snapTurn(rig.position.toArray(),rig.rotation.y,_head.toArray(),a==='turn-left'?XR_SNAP:-XR_SNAP);rig.position.fromArray(r.position);rig.rotation.y=r.yaw;rig.updateMatrixWorld(true);}
+  else if(state.snap){camera.getWorldPosition(_head);const r=X.snapTurn(rig.position.toArray(),rig.rotation.y,_head.toArray(),a==='turn-left'?XR_SNAP:-XR_SNAP);rig.position.fromArray(r.position);rig.rotation.y=r.yaw;rig.updateMatrixWorld(true);gauss.pendingSort=true;}
  }
  const c=activeController&&activeController.userData.source?.targetRayMode==='tracked-pointer'?activeController:null;
  if(c){c.updateMatrixWorld(true);U.coneOrigin.value.setFromMatrixPosition(c.matrixWorld);U.coneDir.value.set(0,0,-1).transformDirection(c.matrixWorld);}else coneFromView();
@@ -361,37 +473,54 @@ renderer.setAnimationLoop((t)=>{
  const xr=renderer.xr.isPresenting;
  if(xr){if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}
  else if(!pointerInside&&!drag)coneFromViewIfIdle();
- const anim=stepFade(performance.now());
- if(!xr&&!needsRender&&!anim)return;needsRender=false;
+ const anim=stepFade(performance.now()),splat=gaussBusy();
+ if(!xr&&!needsRender&&!anim&&!splat)return;needsRender=false;
  renderer.render(scene,camera);renderCount++;const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};
+ // The splat sort triggers on the camera's LOCAL pose; rig moves (jump, teleport, snap turn) do not change it, so force one sort.
+ const v=gauss.dropIn?.viewer;if(gauss.pendingSort&&v&&gauss.dropIn.visible&&v.initialized&&!v.sortRunning){gauss.pendingSort=false;v.runSplatSort(true);gauss.busyFrames=3;}
 });
+/* Outside XR the page renders on demand; while a splat sort is in flight (worker), keep drawing until it lands. */
+function gaussBusy(){const d=gauss.dropIn;if(!d||!d.visible)return false;if(d.viewer.sortRunning||gauss.pendingSort){gauss.busyFrames=3;return true;}if(gauss.busyFrames>0){gauss.busyFrames--;return true;}return false;}
 let lastIdleCone='';function coneFromViewIfIdle(){const s=camera.quaternion.toArray().join();if(s!==lastIdleCone){lastIdleCone=s;coneFromView();}}
 /* ── Measurements / inspection (desktop) ── */
 function totals(){const o={drawCalls:0,visibleDrawCalls:0,triangles:0,visibleTriangles:0,elements:0};for(const st of Object.values(layerState)){for(const m of st.meshes){const tri=m.userData.isLine?0:(m.geometry.index?m.geometry.index.count/3:m.geometry.attributes.position.count/3)*(m.isInstancedMesh?m.count:1);o.drawCalls++;o.triangles+=tri;if(m.visible&&st.group.visible){o.visibleDrawCalls++;o.visibleTriangles+=tri;}}o.elements+=st.stats.elements||0;}return o;}
 function inspection(){const heap=performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576):null;
- return {ready:active>=0,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
+ return {ready:active>=0&&!gauss.loading,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
   style:state.mode,opacity:state.opacity[state.mode],coneDeg:state.coneDeg,radius:P.radius,levels:[...P.levels],hiRes:state.hiRes,texture:sphereMat.map?.image?{width:sphereMat.map.image.width,height:sphereMat.map.image.height}:null,
   layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{loaded:s.loaded,loading:s.loading,error:s.error||null,visible:s.group.visible,loadMs:s.loadMs??null,...s.stats,visibleBatches:s.meshes.filter(m=>m.visible).length}])),
   totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation},
-  card:picked?{id:picked.id,layer:picked.layer,tier:picked.tier,lines:picked.lines}:null,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()},rig:{position:rig.position.toArray(),yaw:rig.rotation.y},camera:{world:camera.getWorldPosition(new THREE.Vector3()).toArray()}};}
+  card:picked?{id:picked.id,layer:picked.layer,tier:picked.tier,lines:picked.lines}:null,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()},rig:{position:rig.position.toArray(),yaw:rig.rotation.y},camera:{world:camera.getWorldPosition(new THREE.Vector3()).toArray()},
+  viewPos:viewPos.slice(),photoSphereVisible:sphere.visible,
+  scene:{mode:gauss.scene,available:!!gaussianSource(),manifest:gauss.source?.path??null,local:!!gauss.source?.local,label:gauss.label||null,file:gauss.asset?.file??null,mobile:gauss.asset?.mobile??null,shDegree:gauss.asset?.shDegree??null,
+   splats:gauss.count,loadMs:gauss.loadMs,loading:gauss.loading,error:gauss.error,overrideNote:gauss.overrideNote,override:gauss.override,zone:gauss.manifest?.zone?.id??null,zoneStations:gauss.stationIdx?.length??null,
+   sortRunning:!!gauss.dropIn?.viewer.sortRunning,splatVisible:!!gauss.dropIn?.visible,teleports:gauss.teleports,eyeHeight:EYE_H,sharedMemory:false,renderer:'GaussianSplats3D 0.4.7 DropInViewer'}};}
 window.xrInspection=inspection;
 window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};return lastInfo;},
- openStation:i=>openStation(i),walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,
+ openStation:i=>openStation(i),walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,setScene,recenter,
+ frameStats:()=>{renderer.render(scene,camera);const gl=renderer.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,px=new Uint8Array(4);let lit=0,n=0;
+  for(let i=1;i<24;i++)for(let j=1;j<16;j++){gl.readPixels(Math.floor(w*i/24),Math.floor(h*j/16),1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);n++;if(px[0]+px[1]+px[2]>45)lit++;}const r=renderer.info.render;return {litFraction:lit/n,calls:r.calls,triangles:r.triangles};},
+ look:(y,p)=>{yaw=y;pitch=p;setDesktopLook();camera.updateMatrixWorld(true);coneFromView();},
+ teleportNdc:(x,y,preview=false)=>{ndc.set(x,y);camera.updateMatrixWorld(true);raycaster.setFromCamera(ndc,camera);const o=raycaster.ray.origin.clone(),d=raycaster.ray.direction.clone();return preview?teleportPreview(o,d):teleport(o,d);},
  pickNdc:(x,y)=>{ndc.set(x,y);raycaster.setFromCamera(ndc,camera);return selectRay(raycaster.ray.origin.clone(),raycaster.ray.direction.clone());},
  lookAtBim:p=>{const s=new THREE.Vector3().fromArray(X.invertReg(reg,p)),c=camera.getWorldPosition(new THREE.Vector3()),d=s.sub(c).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();return d.toArray();},
  elementsNearStation:(n=5)=>{const out=[];const c=new THREE.Vector3().fromArray(stationBim);for(const st of Object.values(layerState))for(const m of st.meshes){if(!m.visible||m.userData.isLine||m.isInstancedMesh)continue;const pos=m.geometry.attributes.position;for(const r of m.userData.ranges){const v=new THREE.Vector3().fromBufferAttribute(pos,r.vertexStart);const d=v.distanceTo(c);if(d>1.5&&d<6)out.push({id:r.id,layer:m.userData.layer,point:v.toArray(),d});if(out.length>400)break;}}return out.sort((a,b)=>a.d-b.d).slice(0,n);}};
 function updateStats(){const s=$('stats');if(s.hidden)return;const i=inspection(),t=i.totals;
  s.textContent=[`capture ${i.capture?.date} ${i.capture?.provisional?'(provisional)':'(registered)'} · station ${i.station.index+1}/${i.station.count}`,`photo ${i.texture?i.texture.width+'×'+i.texture.height:'-'} · style ${i.style} · opacity ${Math.round(i.opacity*100)}% · cone ${i.coneDeg}°`,
   `batches ${t.visibleDrawCalls}/${t.drawCalls} visible (radius ${i.radius} m) · tris ${(t.visibleTriangles/1e3).toFixed(0)}k/${(t.triangles/1e3).toFixed(0)}k`,`last frame: ${i.lastRender.calls} calls · ${(i.lastRender.triangles/1e3).toFixed(0)}k tris · ${i.lastRender.lines} lines`,
-  `L${i.levels.join('+')} elements ${t.elements} · JS heap ${i.heapMB??'n/a'} MB`,`first photo ${i.timing.firstPhotoMs??'-'} ms · services ${i.timing.layersDoneMs??'-'} ms`,
+  `L${i.levels.join('+')} elements ${t.elements} · JS heap ${i.heapMB??'n/a'} MB`,`scene ${i.scene.mode}${i.scene.mode==='gaussian'?' · '+i.scene.file+' · '+i.scene.splats+' splats · SH'+i.scene.shDegree+' · '+i.scene.loadMs+' ms':i.scene.available?' (Gaussian available)':' (no Gaussian)'}`,`first photo ${i.timing.firstPhotoMs??'-'} ms · services ${i.timing.layersDoneMs??'-'} ms`,
   ...Object.entries(i.layers).map(([k,l])=>`  ${k.padEnd(10)} ${l.loaded?'ok':l.loading?'…':'×'} ${String(l.drawCalls??0).padStart(4)} batches ${String(l.elements??0).padStart(5)} el ${String(l.loadMs??'-').padStart(6)} ms`)].join('\n');}
 setInterval(updateStats,1000);
 /* ── Boot ── XR support first (decides the default photo resolution), then the capture, then services. */
 (async()=>{
  const supported=await detectXR();
  state.hiRes=q.get('hires')==='1'?true:q.get('hires')==='0'?false:!supported;$('hires').setAttribute('aria-pressed',String(state.hiRes));
+ gauss.override=await readOverride();if(gauss.overrideNote)$('xrNote').textContent=($('xrNote').textContent?$('xrNote').textContent+' · ':'')+gauss.overrideNote;
+ // ?scene=gaussian with a local override and no ?capture opens the override's capture (e.g. the Oct 18 zone package).
+ const wantScene=X.sceneRequest(q.get('scene')),date=!q.get('capture')&&wantScene==='gaussian'&&gauss.override&&X.CAPTURES[gauss.override.capture]?gauss.override.capture:X.captureConfig(q.get('capture')).date;
+ if(wantScene==='gaussian'&&X.gaussianFor(date,gauss.override))gauss.scene='gaussian';   // skip the photo download; setScene falls back if loading fails
  applyShaderState();
- try{await loadCapture(q.get('capture')==='2026-09-17'?'2026-09-17':'2026-05-06');}catch(e){console.error(e);status(String(e.message||e),true);return;}
+ try{await loadCapture(date);}catch(e){console.error(e);status(String(e.message||e),true);return;}
+ if(wantScene==='gaussian')await setScene('gaussian',{boot:true});
  $('fire').setAttribute('aria-pressed',String(P.layers.includes('fire')));
  await loadLayers(P.layers);
 })();
