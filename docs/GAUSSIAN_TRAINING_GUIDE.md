@@ -130,6 +130,18 @@ Nothing is published by default. `--publish` prints a checklist and refuses to c
 - **Encoder error:** re-run setup; `tools/package-lock.json` pins `@mkkellogg/gaussian-splats-3d 0.4.7`.
 - **Hash mismatch on download:** delete `tools/brush/` and retry; never use an unverified binary.
 
+## Reproducibility
+
+`--seed N` fixes the random choices of a run: the random point sampling of the initial scan seed and Brush's own
+training seed (default 42 for both, so runs without `--seed` are unchanged). The seed is stored in the run settings,
+`viewer.json` provenance and `dataset-provenance.json`, and different seeds never resume each other's run folders.
+Seeds do not make a run bit-identical: GPU floating-point non-determinism remains. To report a result, train the same
+zone with several seeds (for example `--seed 42`, `43`, `44`) and report PSNR/SSIM as mean ± sd over them.
+
+```bash
+.venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --zone l1-c --mask-nadir --seed 43
+```
+
 ## How results are compared
 
 Every 7th station (offset 3) is held out: the evaluation views come from stations never used in

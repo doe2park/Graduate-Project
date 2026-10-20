@@ -117,6 +117,20 @@
       }
     },
     {
+      "label": "Gaussian: train zone… (Oct 18, choose seed)",
+      "detail": "Train ONE zone of the Oct 18 capture with an explicit random seed (reproducibility experiments: run 42, 43, 44 and report mean ± sd). Nadir masked. Does not publish.",
+      "type": "shell",
+      "command": ".venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone ${input:gaussianZoneL1} --seed ${input:gaussianSeed}",
+      "windows": {
+        "command": ".venv-gaussian\\Scripts\\python.exe scripts\\run_gaussian_pipeline.py --capture 2026-10-18 --mask-nadir --zone ${input:gaussianZoneL1} --seed ${input:gaussianSeed}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
       "label": "Gaussian: train all zones (owner)",
       "detail": "Owner only: train every Sep 17 zone one after another (resumable; finished zones are skipped). Occupies the GPU for hours.",
       "type": "shell",
@@ -363,6 +377,12 @@
         "l3-b"
       ],
       "default": "l3-a"
+    },
+    {
+      "id": "gaussianSeed",
+      "type": "promptString",
+      "description": "Random seed (integer; default pipeline seed is 42; try 42 43 44)",
+      "default": "43"
     },
     {
       "id": "gaussianZoneL1",

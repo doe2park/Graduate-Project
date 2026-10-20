@@ -4,11 +4,17 @@
     python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --list-zones
     python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --zone l1-c      # train one zone (teammates)
     python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --all-zones      # every zone in turn (owner; resumable)
+    python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --zone l1-c --seed 43   # reproducibility experiment
 
 Stages: prepare dataset -> train (Brush v0.3.0) -> encode desktop .ksplat -> mobile .ply
 + viewer.json with provenance -> optional publish into scan-assets/gaussian/<capture>/.
 Output: work/gaussian/<capture>/<timestamp>/ (zones: work/gaussian/<capture>/<zone>/<timestamp>/), gitignored. Nothing is published unless
 --publish --yes is given, and existing published files are never replaced without --overwrite.
+
+--seed N sets the random seed of both the dataset's random point sampling and Brush training (default 42 for
+both, the long-standing behaviour). Without --seed the run settings carry no seed key, so existing run folders still
+resume; with it, settings['seed'] differs per seed so different seeds never resume each other. Seeds fix the random
+choices only; GPU floating-point non-determinism remains, so report mean +/- sd over several seeds.
 """
 import argparse
 import hashlib
@@ -80,7 +86,7 @@ def load_presets(path=PRESETS_PATH):
     return validate_presets(json.loads(Path(path).read_text()))
 
 
-def build_settings(preset, quick_preset=None, quick=False, steps=None, max_splats=None, resolution=None):
+def build_settings(preset, quick_preset=None, quick=False, steps=None, max_splats=None, resolution=None, seed=None):
     """Resolve prepare/train parameters. Pure: no I/O."""
     train = dict(preset['train'])
     prepare = {'size': preset['size'], 'pointCount': preset['pointCount'], 'maxStations': None,
@@ -102,7 +108,10 @@ def build_settings(preset, quick_preset=None, quick=False, steps=None, max_splat
         train['maxSplats'] = max_splats
     if resolution is not None:
         train['resolution'] = resolution
-    return {'prepare': prepare, 'train': train, 'mobileBudget': mobile_budget}
+    settings = {'prepare': prepare, 'train': train, 'mobileBudget': mobile_budget}
+    if seed is not None:  # only when requested: default settings stay byte-identical so --resume/find_run still match
+        settings['seed'] = prepare['seed'] = train['seed'] = seed
+    return settings
 
 
 # ---------------------------------------------------------------- CLI
@@ -117,6 +126,7 @@ def build_parser():
     p.add_argument('--steps', type=int, help='override training steps (growth stop scales with it)')
     p.add_argument('--max-splats', type=int, help='override the splat cap (lower it if memory runs out)')
     p.add_argument('--resolution', type=int, help='override Brush training resolution')
+    p.add_argument('--seed', type=int, help='random seed for dataset point sampling and Brush training (default 42 in both); for reproducibility experiments, e.g. 42 43 44')
     p.add_argument('--quick', action='store_true', help='smoke test: 4 stations, 300 steps, tiny model; never publishable')
     p.add_argument('--mask-nadir', action='store_true', help='drop downward-looking faces where the camera operator appears')
     p.add_argument('--watch', action='store_true', help="open Brush's live training window to watch the scene form")
@@ -156,6 +166,8 @@ def validate_args(args, presets, publish_root=PUBLISH_ROOT, zones_doc=None):
             raise CliError(str(error))
     if args.capture not in presets['captures']:
         raise CliError(f'Unknown capture {args.capture!r}; choose from {sorted(presets["captures"])}')
+    if getattr(args, 'seed', None) is not None and args.seed < 0:
+        raise CliError('--seed must be non-negative')
     for name in ('steps', 'max_splats', 'resolution'):
         value = getattr(args, name)
         if value is not None and value < 1:
@@ -460,7 +472,7 @@ def execute(args, argv, preset, settings, folder, zone=None, geometry=None):
                 shutil.rmtree(dataset)
             prepare_gaussian_dataset.build(manifest, dataset, p['centerId'], p['radius'], p['size'], seed_glbs,
                                            p['pointCount'], p['seedUpAxis'], args.mask_nadir, p['maxStations'],
-                                           p.get('stations'))
+                                           p.get('stations'), seed=p.get('seed', 42))
             timings['prepare'] = round(time.monotonic() - t, 1)
             run.mark('prepare', 'done', timings['prepare'])
 
@@ -475,7 +487,7 @@ def execute(args, argv, preset, settings, folder, zone=None, geometry=None):
             tr = settings['train']
             record = train_gaussian.train(brush, dataset, train_dir, tr['steps'], tr['maxSplats'], tr['resolution'],
                                           tr['checkpointEvery'], tr['refineEvery'], tr['growthStop'], tr['shDegree'], stream=True,
-                                          viewer=args.watch)
+                                          viewer=args.watch, seed=tr.get('seed'))
             timings['train'] = round(time.monotonic() - t, 1)
             if record['status'] != 'trained':
                 run.mark('train', 'failed', timings['train'])
@@ -568,7 +580,8 @@ def main(argv=None):
         print(f'error: {error}', file=sys.stderr)
         return 2
     preset = presets['captures'][args.capture]
-    base = build_settings(preset, presets['quick'], args.quick, args.steps, args.max_splats, args.resolution)
+    base = build_settings(preset, presets['quick'], args.quick, args.steps, args.max_splats, args.resolution,
+                          getattr(args, 'seed', None))
     base['maskNadir'] = args.mask_nadir
 
     zone_ids = gz.zone_ids(zones_doc, args.capture) if args.all_zones else [args.zone] if args.zone else [None]

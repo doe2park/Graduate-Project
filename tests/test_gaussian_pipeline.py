@@ -247,6 +247,49 @@ if __name__ == '__main__':
     unittest.main()
 
 
+class SeedTests(unittest.TestCase):
+    """--seed N: reproducibility experiments; default settings must stay unchanged."""
+
+    def setUp(self):
+        self.preset = pipe.load_presets()['captures']['2026-09-17']
+
+    def test_default_settings_have_no_seed_key_anywhere(self):
+        s = pipe.build_settings(self.preset)
+        self.assertNotIn('seed', s)
+        self.assertNotIn('seed', s['prepare'])
+        self.assertNotIn('seed', s['train'])
+        self.assertEqual(s, pipe.build_settings(self.preset, seed=None))
+
+    def test_seed_is_recorded_and_distinguishes_runs(self):
+        a, b, c = (pipe.build_settings(self.preset, seed=n) for n in (42, 43, 43))
+        self.assertEqual((a['seed'], a['prepare']['seed'], a['train']['seed']), (42, 42, 42))
+        self.assertNotEqual(a, b)
+        self.assertEqual(b, c)
+        self.assertNotEqual(a, pipe.build_settings(self.preset))
+
+    def test_parser_default_none_and_validation(self):
+        self.assertIsNone(pipe.build_parser().parse_args(['--capture', '2026-09-17']).seed)
+        self.assertEqual(pipe.build_parser().parse_args(['--capture', '2026-09-17', '--seed', '43']).seed, 43)
+        with self.assertRaises(pipe.CliError):
+            pipe.validate_args(args(seed=-1), pipe.load_presets())
+
+    def test_seed_reaches_brush_argv_only_when_given(self):
+        import train_gaussian
+        base = dict(steps=300, max_splats=1000, refine_every=400, growth_stop=0, sh_degree=1,
+                    resolution=256, checkpoint_every=100)
+        self.assertNotIn('--seed', train_gaussian.brush_args('/b', '/d', '/o', **base))
+        argv = train_gaussian.brush_args('/b', '/d', '/o', seed=43, **base)
+        self.assertEqual(argv[argv.index('--seed') + 1], '43')
+
+    def test_mesh_seed_default_and_build_signature(self):
+        import inspect
+        self.assertEqual(inspect.signature(prep.build).parameters['seed'].default, 42)
+        self.assertEqual(inspect.signature(prep.mesh_seed).parameters['seed'].default, 42)
+
+    def test_dry_run_accepts_seed(self):
+        self.assertEqual(pipe.main(['--capture', '2026-09-17', '--quick', '--seed', '43', '--dry-run']), 0)
+
+
 class WatchTests(unittest.TestCase):
     """--watch opens Brush's own live training window (brush_app --with-viewer)."""
 
