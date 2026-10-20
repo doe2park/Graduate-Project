@@ -491,5 +491,37 @@ class PipelineZoneHelperTests(unittest.TestCase):
             self.assertIsNone(preview_gaussian.latest_run(SEP, tmp))  # zone runs are not capture runs
 
 
+class ZoneIndexLabelTests(unittest.TestCase):
+    """Published zone indexes carry honesty labels (2026-10-19) without changing the schema."""
+
+    def test_publish_labels_index_and_manifest(self):
+        preset = pipe.load_presets()['captures'][SEP]
+        doc = gz.load_zones()
+        zone = dict(gz.get_zone(doc, SEP, 'l1-a'), floor='L1')
+        geometry = dict(gz.zone_geometry(zone, real_stations()), floor='L1')
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            pkg = tmp / 'pkg'
+            pkg.mkdir()
+            (pkg / 'trained.ksplat').write_bytes(b'k')
+            (pkg / 'mobile.ply').write_bytes(b'p')
+            (pkg / 'viewer.json').write_text(json.dumps({'file': 'trained.ksplat', 'mobileFile': 'mobile.ply', 'splatCount': 9}))
+            dest = pipe.publish(pkg, SEP, preset, tmp / 'g', False, True, False, zone=zone, geometry=geometry,
+                                alignment='project-frame-provisional')
+            index = json.loads((dest.parent / 'index.json').read_text())
+            self.assertEqual((index['schema'], index['frame'], index['status'], index['alignment']),
+                             (1, 'scan-y-up-metres', 'experimental-trained', 'project-frame-provisional'))
+            self.assertIn('not surveyed', index['scope'])
+            self.assertEqual([z['id'] for z in index['zones']], ['l1-a'])  # untrained zones are absent
+            self.assertEqual(json.loads((dest / 'viewer.json').read_text())['alignment'], 'project-frame-provisional')
+
+    def test_merge_keeps_alignment_of_existing_index(self):
+        first = pipe.merge_zone_index(None, SEP, 'grimes', 'L1', {'id': 'l1-b'}, 'project-frame-provisional')
+        second = pipe.merge_zone_index(first, SEP, 'grimes', 'L1', {'id': 'l1-a'})
+        self.assertEqual(second['alignment'], 'project-frame-provisional')
+        self.assertEqual([z['id'] for z in second['zones']], ['l1-a', 'l1-b'])
+        self.assertNotIn('alignment', pipe.merge_zone_index(None, SEP, 'grimes', 'L1', {'id': 'x'}))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -2797,6 +2797,8 @@ function applyLinkedPose(p){
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin||e.source!==window.parent)return;const d=e.data;
  if(d?.type==='grimes-overlay'){setOverlay(d.enabled);return;}
+ /* scan-compare multi-floor preview: the element floor filter follows the photo station's floor */
+ if(d?.type==='grimes-floor'&&splitPane==='bim'&&['L1','L2','L3'].includes(d.level)){setElementFloor(d.level);document.getElementById('elementFloor').value=d.level;return;}
  if(d?.type==='grimes-photo-mode'&&splitPane==='bim'){
   photoNavigationMode=!!d.enabled;controls.enableRotate=!photoNavigationMode;controls.enablePan=!photoNavigationMode;controls.enableZoom=!photoNavigationMode;
   document.getElementById('fitBimQuick').disabled=photoNavigationMode;

@@ -309,23 +309,38 @@ def resolve_brush(arg):
     return get_brush.ensure_brush()
 
 
-def merge_zone_index(existing, capture, building, floor, entry):
-    """zones/index.json content after publishing one zone. Pure: `entry` replaces the same id."""
+ZONE_INDEX_SCOPE = ('Experimental appearance layer; not surveyed geometry. Only the zones listed here are trained and '
+                    'published; areas of other planned zones have no Gaussian yet.')
+
+
+def merge_zone_index(existing, capture, building, floor, entry, alignment=None):
+    """zones/index.json content after publishing one zone. Pure: `entry` replaces the same id.
+    Honesty labels (status, alignment, scope) are top-level keys that viewers may show; they never change the schema."""
     zones = [z for z in (existing or {}).get('zones', []) if z.get('id') != entry['id']] + [entry]
     zones.sort(key=lambda z: z['id'])
-    return {'schema': 1, 'capture': capture, 'building': building, 'floor': floor,
-            'frame': 'scan-y-up-metres', 'defaultZone': (existing or {}).get('defaultZone') or zones[0]['id'], 'zones': zones}
+    out = {'schema': 1, 'capture': capture, 'building': building, 'floor': floor,
+           'frame': 'scan-y-up-metres', 'defaultZone': (existing or {}).get('defaultZone') or zones[0]['id'], 'zones': zones,
+           'status': 'experimental-trained', 'scope': ZONE_INDEX_SCOPE}
+    alignment = alignment or (existing or {}).get('alignment')
+    if alignment:
+        out['alignment'] = alignment
+    return out
 
 
-def publish(package_dir, capture, preset, destination_root, overwrite, mask_nadir, quick, zone=None, geometry=None):
+def publish(package_dir, capture, preset, destination_root, overwrite, mask_nadir, quick, zone=None, geometry=None,
+            alignment=None):
     """Copy a packaged run to scan-assets/gaussian/<capture>/ or, for a zone, <capture>/zones/<zone>/ and
-    refresh <capture>/zones/index.json."""
+    refresh <capture>/zones/index.json. `alignment` = scan-to-BIM registration status shown with the layer
+    (default: the preset's registration file)."""
+    alignment = alignment or registration_status(preset)
     destination = publish_target(destination_root, capture, zone['id'] if zone else None)
     if destination.exists() and not overwrite:
         raise CliError(f'{destination} already exists; add --overwrite')
     manifest = json.loads((package_dir / 'viewer.json').read_text())
     manifest['capture'] = capture
     manifest['building'] = preset['building']
+    if alignment:
+        manifest['alignment'] = alignment
     today = datetime.now(timezone.utc).date().isoformat()
     manifest['publication'] = (f'Published {today} from scripts/run_gaussian_pipeline.py'
                                f'{" with nadir faces masked" if mask_nadir else ""}'
@@ -342,7 +357,7 @@ def publish(package_dir, capture, preset, destination_root, overwrite, mask_nadi
                  'stationCount': len(zone['stations']), 'coreCount': len(zone['core']),
                  'bounds': geometry['bounds'], 'coreBounds': geometry['coreBounds'],
                  'corePositions': geometry['corePositions'], 'splatCount': manifest['splatCount'], 'publishedAt': today}
-        index = merge_zone_index(existing, capture, preset['building'], zone_floor(zone, geometry), entry)
+        index = merge_zone_index(existing, capture, preset['building'], zone_floor(zone, geometry), entry, alignment)
         index_path.write_text(json.dumps(index, indent=2))
     return destination
 

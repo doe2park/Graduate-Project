@@ -103,7 +103,7 @@
       "seedGlbs": [
         "capture-local/grimes-L3-2026-10-18/scan.glb"
       ],
-      "centerId": "pano_107294547",
+      "centerId": "pano_107294595",
       "radius": 60,
       "size": 768,
       "pointCount": 150000,
@@ -118,7 +118,7 @@
         "shDegree": 2
       },
       "mobileBudget": 350000,
-      "notes": "Local capture-local package; not published. Same settings as Sep 17. Consider --mask-nadir."
+      "notes": "SUPERSEDED 2026-10-20: Level 2 and Level 3 will be re-scanned; kept for provenance only, do not train or publish. Level 3 portion only (52 stations); the 35 Level 1 connector photos at the start of the walk were removed. Cupix heights for this level are not yet verified against the BIM (no floor plan in Cupix at capture time)."
     },
     "2026-10-18-L2": {
       "building": "grimes",
@@ -144,6 +144,29 @@
       },
       "mobileBudget": 350000,
       "notes": "PARTIAL Level 2 coverage (occupied study areas not captured on 2026-10-18); hold training until re-captured."
+    },
+    "2026-10-18-upper": {
+      "building": "grimes",
+      "label": "Levels 2-3 + atrium stairs, October 18 2026 second video only (photo-matched placement, local, unpublished)",
+      "manifest": "capture-local/grimes-UPPER-2026-10-18/panoramas/manifest.json",
+      "registration": "capture-local/grimes-UPPER-2026-10-18/registration.json",
+      "seedGlbs": [],
+      "centerId": "pano_107294802",
+      "radius": 60,
+      "size": 768,
+      "pointCount": 150000,
+      "seedUpAxis": "z",
+      "train": {
+        "steps": 30000,
+        "maxSplats": 1000000,
+        "resolution": 768,
+        "checkpointEvery": 5000,
+        "refineEvery": 400,
+        "growthStop": 15000,
+        "shDegree": 2
+      },
+      "mobileBudget": 350000,
+      "notes": "SUPERSEDED 2026-10-20: Level 2 and Level 3 will be re-scanned; kept for provenance only, do not train or publish. Only the 32 panoramas of video VID_20261018_153400 (19 Level 3 incl. 2 stair, 13 Level 2 incl. 2 stair). The old 2026-10-18-L3 preset mixed 33 Level 1 frames of the other video into 'L3' at overlapping Cupix coordinates (l3-a 20/36, l3-b 15/18 Level 1 images). No seed mesh: the Ground scan.glb mixes both videos. Unblurred originals: never publish without review. Use --mask-nadir."
     }
   }
 }

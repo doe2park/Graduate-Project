@@ -14,15 +14,15 @@ body.touch{--tb-h:44px}
 /* hints appear once as a small toast, then fade */
 #status{position:absolute;left:50%;bottom:calc(var(--tb-h) + 18px);transform:translateX(-50%);z-index:3;max-width:calc(100% - 24px);padding:7px 12px;border-radius:999px;background:var(--tb-bg);border:1px solid var(--tb-border);font:var(--tb-font);text-align:center;pointer-events:none;opacity:0;transition:opacity .6s}#status.show{opacity:1}
 body.controls-collapsed #tools>:not(#photoControlsToggle),body.controls-collapsed #movePad{display:none}
-/* EDGES-ONLY MODE (?edges=1): second instance used by scan-compare GHOST style. Transparent canvas, UI hidden. */
+/* EDGES-ONLY MODE (?edges=1): legacy mode, no longer used: the scan-compare Ghost style was removed 2026-10-19. Transparent canvas, UI hidden. */
 body.edges-only,body.edges-only canvas{background:transparent;pointer-events:none}body.edges-only #tools,body.edges-only #photoMenu,body.edges-only #loading,body.edges-only #movePad,body.edges-only #status{display:none!important}
 @media(max-height:420px){#status{display:none}}@media(prefers-reduced-motion:reduce){#status{transition:none}}
-</style><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script></head><body><div id="tools" class="tb" role="toolbar" aria-label="Capture controls"><button id="previous" class="tb-btn tb-icon" aria-label="Previous captured position">&#8249;</button><select id="station" aria-label="Captured position"></select><button id="next" class="tb-btn tb-icon" aria-label="Next captured position">&#8250;</button><button id="photoWalk" class="tb-btn" aria-pressed="true" title="Walk between captured positions">Walk on</button><button id="photoControlsToggle" class="tb-btn tb-icon" aria-haspopup="menu" aria-expanded="false" aria-controls="photoMenu" aria-label="More controls" title="More">&#8943;</button></div><div id="photoMenu" role="menu" aria-label="More controls" hidden><button id="padToggle" role="menuitemcheckbox" aria-checked="false">Move pad</button><button id="tipsBtn" role="menuitem">Show tips</button><button id="barToggle" role="menuitem">Hide toolbar</button></div><span id="loading" class="pill" role="status">Loading photos&hellip;</span><div id="movePad" hidden><button data-walk="left" aria-label="Walk left">&larr;</button><button data-walk="forward" aria-label="Walk forward">&uarr;</button><button data-walk="back" aria-label="Walk backward">&darr;</button><button data-walk="right" aria-label="Walk right">&rarr;</button></div><div id="status" role="status" aria-live="polite"></div><script type="module">
+</style><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}</script></head><body><div id="tools" class="tb" role="toolbar" aria-label="Capture controls"><button id="previous" class="tb-btn tb-icon" aria-label="Previous captured position">&#8249;</button><select id="station" aria-label="Captured position"></select><button id="next" class="tb-btn tb-icon" aria-label="Next captured position">&#8250;</button><button id="photoWalk" class="tb-btn" aria-pressed="true" title="Walk between captured positions">Walk on</button><button id="photoControlsToggle" class="tb-btn tb-icon" aria-haspopup="menu" aria-expanded="false" aria-controls="photoMenu" aria-label="More controls" title="More">&#8943;</button></div><div id="photoMenu" role="menu" aria-label="More controls" hidden><button id="padToggle" role="menuitemcheckbox" aria-checked="false">Move pad</button><button id="tipsBtn" role="menuitem">Show tips</button><button id="barToggle" role="menuitem">Hide toolbar</button></div><span id="loading" class="pill" role="status">Loading photos&hellip;</span><div id="movePad" hidden><button data-walk="left" aria-label="Walk left">&larr;</button><button data-walk="forward" aria-label="Walk forward">&uarr;</button><button data-walk="back" aria-label="Walk backward">&darr;</button><button data-walk="right" aria-label="Walk right">&rarr;</button><button data-walk="up" aria-label="Go up the stairs" title="Up the stairs (PgUp)" hidden>&#8679;</button><button data-walk="down" aria-label="Go down the stairs" title="Down the stairs (PgDn)" hidden>&#8681;</button></div><div id="status" role="status" aria-live="polite"></div><script type="module">
 import * as THREE from 'three';
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.01,2000);
 let deviceWindow=window;try{if(top.location.origin===location.origin)deviceWindow=top}catch{}
 const mobile=deviceWindow.matchMedia('(max-width:768px), (pointer:coarse)').matches;document.body.classList.toggle('touch',mobile);
-/* EDGES-ONLY MODE: X-ray 'edge-based ghosting' (Kalkofen et al. 2007; Avery/Sandor): the real occluder's edges are drawn on top of hidden content. */
+/* EDGES-ONLY MODE: legacy, unused since the Ghost overlay style was removed 2026-10-19. */
 const edgesOnly=new URLSearchParams(location.search).get('edges')==='1';document.body.classList.toggle('edges-only',edgesOnly);
 const renderer=new THREE.WebGLRenderer({antialias:false,alpha:edgesOnly,premultipliedAlpha:true});if(edgesOnly)renderer.setClearColor(0,0);renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1:2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.appendChild(renderer.domElement);
 const geometry=new THREE.SphereGeometry(100,64,40);geometry.scale(-1,1,1);
@@ -34,7 +34,7 @@ const assetURL=(file)=>new URL((mobile?'mobile/':'')+file,manifestURL).href;
 const loader=new THREE.TextureLoader(),label=document.getElementById('loading'),select=document.getElementById('station');
 let stations=[],active=-1,requested=-1,targetStation=-1,loading=false,epoch=0,driver='scan',linked=true,pendingClaim=false,yaw=0,pitch=0,drag=null,lastStep=0;
 const pose=()=>({position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov,zoom:camera.zoom});
-let transition=null,walking=true,lastMove=0;const held=new Set(),prefetched=new Set();
+let transition=null,walking=true,lastMove=0,navLimits=null;const held=new Set(),prefetched=new Set();
 const post=data=>parent.postMessage(data,location.origin),send=data=>{if(!edgesOnly)post(data);};
 function angles(){const e=new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ');yaw=e.y;pitch=e.x;}
 function claim(){if(edgesOnly)return;if(parent===window){pendingClaim=false;driver='scan';return;}pendingClaim=true;send({type:'grimes-claim-camera',pose:pose()});}
@@ -51,7 +51,7 @@ async function openStation(index){
   if(startLook){camera.quaternion.fromArray(startLook.quaternion).normalize();camera.fov=startLook.fov;camera.updateProjectionMatrix();angles();startLook=null;}
   if(edgesOnly&&old)old.dispose();
   if(edgesOnly&&edgePose)applyLinkedPose(edgePose);
-  active=i;sphere.visible=true;select.value=String(i);label.textContent=`${i+1}/${stations.length} · Captured photo`;
+  active=i;sphere.visible=true;select.value=String(i);label.textContent=stationLabel(i);updateStairButtons(i);
   document.getElementById('previous').disabled=i===0;document.getElementById('next').disabled=i===stations.length-1;document.body.dataset.ready='true';claim();send({type:'grimes-photo-station',index:i});await transitionTo(s.position,edgesOnly?null:old,oldOrientation);prefetchNeighbors(i);
  }}catch(e){label.textContent='Photo unavailable · choose another capture';console.error(e)}finally{loading=false;if(requested>=0){const queued=requested;requested=-1;queueMicrotask(()=>openStation(queued));}}
 }
@@ -86,23 +86,38 @@ function photoPick(cx,cy){if(active<0||transition||loading)return;camera.updateM
 renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')send({type:'grimes-pointer',x:e.clientX/innerWidth,y:e.clientY/innerHeight});});
 renderer.domElement.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')send({type:'grimes-pointer',x:null,y:null});});
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();camera.fov=Math.max(40,Math.min(95,camera.fov+e.deltaY*.025));camera.updateProjectionMatrix();claim();},{passive:false});
-const keyDirection={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
+const keyDirection={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',PageUp:'up',PageDown:'down'};
 window.addEventListener('keydown',e=>{if(['SELECT','INPUT'].includes(e.target.tagName)||!keyDirection[e.code])return;e.preventDefault();held.add(keyDirection[e.code]);});
 window.addEventListener('keyup',e=>held.delete(keyDirection[e.code]));window.addEventListener('blur',()=>held.clear());
 for(const button of document.querySelectorAll('[data-walk]')){button.onpointerdown=e=>{e.preventDefault();button.setPointerCapture(e.pointerId);held.add(button.dataset.walk);lastMove=performance.now();walkDirection(button.dataset.walk)};for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,()=>held.delete(button.dataset.walk));}
 document.getElementById('photoWalk').onclick=e=>{walking=!walking;held.clear();const b=document.getElementById('photoWalk');b.textContent=walking?'Walk on':'Walk off';b.setAttribute('aria-pressed',String(walking));};
-function chooseWalkNeighbor(nodes,index,direction){
+/* MULTI-FLOOR ROUTE: a manifest may flag some neighbours of a station as stairs (station.stairs) and widen the step limits
+   (manifest navigationLimits); stair edges then accept a larger rise. Without them the original 5.5 m / 1.5 m rule applies. */
+function chooseWalkNeighbor(nodes,index,direction,limits){
+ const L=limits||{},maxStep=L.maxStep||5.5,maxRise=L.maxRise||1.5,stairStep=L.stairStep||maxStep,stairRise=L.stairRise||maxRise,stairs=nodes[index]?.stairs||[];
  let best=-1,score=-Infinity;
- for(const i of nodes[index]?.neighbors||[]){const a=nodes[index].position,b=nodes[i].position,dx=b[0]-a[0],dz=b[2]-a[2],d=Math.hypot(dx,dz),length=Math.hypot(dx,b[1]-a[1],dz);if(d<.1||length>5.5||Math.abs(b[1]-a[1])>1.5)continue;const alignment=(dx*direction[0]+dz*direction[2])/d;if(alignment<.25)continue;const rank=alignment-.04*d;if(rank>score){score=rank;best=i;}}
+ for(const i of nodes[index]?.neighbors||[]){const a=nodes[index].position,b=nodes[i].position,dx=b[0]-a[0],dz=b[2]-a[2],d=Math.hypot(dx,dz),length=Math.hypot(dx,b[1]-a[1],dz),stair=stairs.includes(i);if(d<.1||length>(stair?stairStep:maxStep)||Math.abs(b[1]-a[1])>(stair?stairRise:maxRise))continue;const alignment=(dx*direction[0]+dz*direction[2])/d;if(alignment<.25)continue;const rank=alignment-.04*d;if(rank>score){score=rank;best=i;}}
  return best;
 }
+/* PgUp / PgDn (and the pad's stair buttons): the nearest stair neighbour that rises (sign 1) or falls (sign -1) at least 0.3 m. */
+function chooseStairNeighbor(nodes,index,sign){
+ const a=nodes[index]?.position;if(!a)return -1;let best=-1,score=Infinity;
+ for(const i of nodes[index].stairs||[]){const b=nodes[i]?.position;if(!b||(b[1]-a[1])*sign<.3)continue;const d=Math.hypot(b[0]-a[0],b[2]-a[2]);if(d<score){score=d;best=i;}}
+ return best;
+}
+
 function walkDirection(name){
  if(!walking||loading||transition||active<0)return;
  const forward=camera.getWorldDirection(new THREE.Vector3());forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0));
  const direction=name==='back'?forward.negate():name==='left'?right.negate():name==='right'?right:forward;
- const next=chooseWalkNeighbor(stations,active,direction.toArray());
+ if(name==='up'||name==='down'){const next=chooseStairNeighbor(stations,active,name==='up'?1:-1);if(next<0){label.textContent='No stairs '+name+' from here';return;}openStation(next);return;}
+ const next=chooseWalkNeighbor(stations,active,direction.toArray(),navLimits);
  if(next<0){label.textContent='Turn to follow the capture route';return;}openStation(next);
 }
+const LEVEL_TEXT={L1:'Level 1',L2:'Level 2',L3:'Level 3',stairs:'Stairs'};
+function stationLabel(i){const lv=LEVEL_TEXT[stations[i]?.level];return `${i+1}/${stations.length} · `+(lv?lv+' · ':'')+'Captured photo';}
+function updateStairButtons(i){const up=chooseStairNeighbor(stations,i,1),down=chooseStairNeighbor(stations,i,-1);document.querySelector('[data-walk=up]').hidden=up<0;document.querySelector('[data-walk=down]').hidden=down<0;if((up>=0||down>=0)&&typeof tip==='function')tip('Stairs here \u00b7 walk on, or PgUp / PgDn'+(mobile?' (pad \u21e7 \u21e9)':''));}
+function readNavLimits(v){if(!v||typeof v!=='object')return null;const out={};for(const k of ['maxStep','maxRise','stairStep','stairRise'])if(Number.isFinite(v[k])&&v[k]>0&&v[k]<=12)out[k]=v[k];return Object.keys(out).length?out:null;}
 function prefetchNeighbors(i){for(const n of (stations[i].neighbors||[]).slice(0,2)){const path=assetURL(stations[n].file);if(prefetched.has(path))continue;prefetched.add(path);fetch(path,{cache:'force-cache'}).then(r=>{if(!r.ok)throw Error();return r.arrayBuffer()}).catch(()=>prefetched.delete(path));}}
 function transitionTo(position,old,orientation){
  if(!old){camera.position.fromArray(position);sphere.position.copy(camera.position);publish();return Promise.resolve();}
@@ -129,7 +144,7 @@ function viewChanged(){camera.updateMatrixWorld();const v=[...camera.matrixWorld
 renderer.setAnimationLoop(t=>{
  const animating=!!transition;
  if(transition){const a=transition,f=a.duration?Math.min(1,(t-a.start)/a.duration):1,e=f*f*(3-2*f);camera.position.copy(a.from).lerp(a.to,a.interpolate?e:1);sphere.position.copy(camera.position);a.ghost.position.copy(camera.position);material.opacity=e;publish();
-  if(f===1){scene.remove(a.ghost);a.ghost.material.map.dispose();a.ghost.material.dispose();material.transparent=false;material.opacity=1;material.depthTest=true;material.depthWrite=true;transition=null;send({type:'grimes-photo-transition',moving:false});label.textContent=`${active+1}/${stations.length} · Captured photo`;a.resolve();}
+  if(f===1){scene.remove(a.ghost);a.ghost.material.map.dispose();a.ghost.material.dispose();material.transparent=false;material.opacity=1;material.depthTest=true;material.depthWrite=true;transition=null;send({type:'grimes-photo-transition',moving:false});label.textContent=stationLabel(active);a.resolve();}
  }
  if(!loading&&!transition&&held.size&&t-lastMove>220){lastMove=t;walkDirection(held.values().next().value);}
  if(!(viewChanged()||animating||t<kickUntil||t-lastDraw>=250))return;lastDraw=t;
@@ -147,7 +162,7 @@ if(edgesOnly){
 }
 function renderEdges(){renderer.setRenderTarget(edgeTarget);renderer.setClearColor(0x000000,1);renderer.render(scene,camera);renderer.setRenderTarget(null);renderer.setClearColor(0,0);renderer.render(edgeScene,edgeCamera);}
 window.photoInspection=()=>({pickMode,headingOffset:active>=0?(headingOffsets[stations[active]?.id]||0):0,active,station:stations[active],count:stations.length,loading,transitioning:!!transition,walking,mobile,camera:pose(),texture:material.map?{width:material.map.image.width,height:material.map.image.height}:null});
-fetch(manifestURL).then(r=>{if(!r.ok)throw Error('Photo manifest unavailable');return r.json()}).then(m=>{stations=m.stations;if(m.building&&!stations.some(s=>s.neighbors?.length)){walking=false;document.getElementById('photoWalk').disabled=true;document.getElementById('photoWalk').textContent='Route pending';document.getElementById('photoWalk').setAttribute('aria-pressed','false');document.getElementById('movePad').hidden=true;document.getElementById('padToggle').disabled=true;tip('Drag to look \u00b7 use the capture picker \u00b7 walk route needs verified connections');}if(m.building)document.title=m.building+' · '+m.level+' · Captured photos';for(const [i,s]of stations.entries()){const option=document.createElement('option');option.value=i;option.textContent=`Capture ${i+1}`;select.appendChild(option);}post({type:'grimes-camera-ready'});if(edgesOnly){label.textContent='';return;}return openStation(Math.max(0,stations.findIndex(s=>s.id===m.defaultStation)))}).catch(e=>label.textContent=e.message);
+fetch(manifestURL).then(r=>{if(!r.ok)throw Error('Photo manifest unavailable');return r.json()}).then(m=>{stations=m.stations;navLimits=readNavLimits(m.navigationLimits);if(m.building&&!stations.some(s=>s.neighbors?.length)){walking=false;document.getElementById('photoWalk').disabled=true;document.getElementById('photoWalk').textContent='Route pending';document.getElementById('photoWalk').setAttribute('aria-pressed','false');document.getElementById('movePad').hidden=true;document.getElementById('padToggle').disabled=true;tip('Drag to look \u00b7 use the capture picker \u00b7 walk route needs verified connections');}if(m.building)document.title=m.building+' · '+m.level+' · Captured photos';for(const [i,s]of stations.entries()){const option=document.createElement('option');option.value=i;option.textContent=`Capture ${i+1}`;select.appendChild(option);}post({type:'grimes-camera-ready'});if(edgesOnly){label.textContent='';return;}return openStation(Math.max(0,stations.findIndex(s=>s.id===m.defaultStation)))}).catch(e=>label.textContent=e.message);
 </script><script>(()=>{
 const bar=document.getElementById('tools'),toggle=document.getElementById('photoControlsToggle'),menu=document.getElementById('photoMenu'),pad=document.getElementById('movePad'),padBtn=document.getElementById('padToggle'),status=document.getElementById('status'),touch=document.body.classList.contains('touch')||matchMedia('(pointer:coarse)').matches;
 let timer=0;

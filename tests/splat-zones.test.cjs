@@ -40,3 +40,10 @@ test('single-scene behaviour stays the default and the viewer shows a zone label
  assert.match(src,/id="zoneLabel"/);assert.match(src,/Zone: \$\{z\.name\}/);
  assert.match(src,/params\.get\('zones'\)/);assert.match(src,/old\.dispose\(\)/);
  assert.match(src,/if\(!explicit&&params\.get\('manifest'\)\)return null/)});
+test('zone index scope is passed through (bounded) and shown; the published Oct 18 index validates if present',()=>{const {normalizeZoneIndex}=logic();
+ const idx={schema:1,frame:'scan-y-up-metres',scope:'x'.repeat(500),zones:[entry('a')]};assert.equal(normalizeZoneIndex(idx,'http://h/z/index.json').scope.length,300);
+ assert.equal(normalizeZoneIndex({...idx,scope:undefined},'http://h/z/index.json').scope,'');
+ assert.match(src,/if\(zoneIndex\.scope\)/);
+ const f=path.join(__dirname,'../scan-assets/gaussian/2026-10-18/zones/index.json');if(!fs.existsSync(f))return;
+ const n=normalizeZoneIndex(JSON.parse(fs.readFileSync(f,'utf8')),'http://127.0.0.1:8790/scan-assets/gaussian/2026-10-18/zones/index.json');
+ assert.equal(n.capture,'2026-10-18');assert.ok(n.zones.some(z=>z.id==='l1-a'));assert.equal(n.zones[0].manifestURL,'http://127.0.0.1:8790/scan-assets/gaussian/2026-10-18/zones/l1-a/viewer.json');assert.match(n.scope,/not surveyed/)});

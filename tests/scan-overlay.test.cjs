@@ -39,37 +39,53 @@ test('shared toolbar sizing is the same in both panes (32px desktop, 44px touch)
  for(const s of [photo,bim]){assert.match(s,/--tb-h:32px/);assert.match(s,/--tb-h:44px/);assert.match(s,/--tb-radius:8px/)}});
 test('Building Shell is not reintroduced',()=>{assert.doesNotMatch(src+photo,/Building Shell/)});
 
-test('Gaussian is enabled only from the public May manifest and never for Sep 17',()=>{
+test('Gaussian is enabled only from each capture\'s own public manifest/zone index and never for Sep 17',()=>{
  const splat=fs.readFileSync(path.join(__dirname,'../scan-splat.html'),'utf8');
- assert.match(src,/GAUSSIAN_MANIFEST='scan-assets\/gaussian\/2026-05-06\/viewer\.json'/);
+ assert.match(src,/'2026-05-06':\{kind:'manifest',path:'scan-assets\/gaussian\/2026-05-06\/viewer\.json'\}/);
+ assert.match(src,/'2026-10-18':\{kind:'zones',path:'scan-assets\/gaussian\/2026-10-18\/zones\/index\.json'\}/);
  assert.doesNotMatch(src+splat,/capture-local\/gaussian/);
  assert.match(splat,/get\('manifest'\)\|\|'scan-assets\/gaussian\/2026-05-06\/viewer\.json'/);
  assert.doesNotMatch(splat,/train the local pilot/);
  const m=src.match(/\/\* CAPTURE SELECTION \*\/([\s\S]*?)\/\* END CAPTURE SELECTION \*\//)[1],c={URLSearchParams};vm.createContext(c);vm.runInContext(m,c);
- assert.equal(c.captureSelection('?mode=splat&capture=2026-09-17').date,'2026-05-06');
+ const sep=c.captureSelection('?mode=splat&capture=2026-09-17');assert.equal(sep.date,'2026-09-17');assert.equal(sep.gaussian,null);assert.equal(sep.display,'photo');
  assert.equal(c.captureSelection('').date,'2026-09-17');
  assert.match(src,/value="splat" disabled/);
  assert.match(logic().splatSource('scan-assets/gaussian/2026-05-06/viewer.json'),/^scan-splat\.html\?manifest=scan-assets%2Fgaussian%2F2026-05-06%2Fviewer\.json/)});
 
-/* ── Overlay styles: lens / ghost / plain (AR X-ray vision) ── */
-test('?style= selects lens (default) / ghost / plain and rejects anything else',()=>{const c=logic();
+/* ── Overlay styles: lens / plain; Ghost removed 2026-10-19 (AR X-ray vision) ── */
+test('?style= selects lens (default) / plain, maps old ghost links to plain, and rejects anything else',()=>{const c=logic();
  assert.equal(c.OVERLAY_DEFAULT_STYLE,'lens');assert.equal(c.parseStyle(''),'lens');
- for(const s of ['lens','ghost','plain'])assert.equal(c.parseStyle('?view=overlay&style='+s),s);
+ for(const s of ['lens','plain'])assert.equal(c.parseStyle('?view=overlay&style='+s),s);
+ assert.equal(c.parseStyle('?view=overlay&style=ghost'),'plain');assert.match(src,/OVERLAY_STYLES=\['lens','plain'\]/);
  for(const bad of ['?style=GHOST','?style=','?style=xray','?style=javascript:1'])assert.equal(c.parseStyle(bad),'lens')});
 test('lens radius is 22% of the shorter side, centre follows a clamped pointer or stays centred',()=>{const c=logic();
  assert.equal(c.LENS_RADIUS_FRACTION,.22);assert.equal(c.lensRadius(1600,900),198);assert.ok(Math.abs(c.lensRadius(390,844)-85.8)<1e-9);assert.equal(c.lensRadius(0,0),0);
  assert.deepEqual({...c.lensCenter(null,1600,900)},{x:800,y:450});assert.deepEqual({...c.lensCenter({x:NaN,y:.5},1600,900)},{x:800,y:450});
  assert.deepEqual({...c.lensCenter({x:.25,y:.5},1600,900)},{x:400,y:450});assert.deepEqual({...c.lensCenter({x:-3,y:9},1600,900)},{x:0,y:900})});
+test('touch lens drag: centre is clamped to margins and the usable band; invalid drags return null',()=>{const c=logic();
+ assert.equal(c.lensDragCenter(null,390,700,56,520),null);assert.equal(c.lensDragCenter({x:NaN,y:10},390,700,56,520),null);
+ assert.deepEqual({...c.lensDragCenter({x:200,y:300},390,700,56,520)},{x:200,y:300});
+ assert.deepEqual({...c.lensDragCenter({x:-50,y:300},390,700,56,520)},{x:24,y:300});
+ assert.deepEqual({...c.lensDragCenter({x:5000,y:300},390,700,56,520)},{x:366,y:300});
+ assert.deepEqual({...c.lensDragCenter({x:200,y:-100},390,700,56,520)},{x:200,y:66});
+ assert.deepEqual({...c.lensDragCenter({x:200,y:5000},390,700,56,520)},{x:200,y:510});
+ const tiny=c.lensDragCenter({x:0,y:0},30,700,56,520);assert.equal(tiny.x,15);
+ const squeezed=c.lensDragCenter({x:200,y:0},390,700,600,520);assert.ok(squeezed.y>=0&&Number.isFinite(squeezed.y))});
+test('touch lens drag: a ⠿ handle exists on the ring, 44px+ touch target, pointer events on the handle only',()=>{
+ assert.match(src,/id="lensHandle"/);
+ assert.match(src,/#lensHandle\{[^}]*min-width:44px/);
+ assert.match(src,/#lensHandle\{[^}]*pointer-events:auto/);
+ assert.match(src,/#lensHandle\{[^}]*touch-action:none/);
+ assert.match(src,/@media\(pointer:coarse\)\{body\[data-focus="overlay"\]\[data-style="lens"\] #lensHandle\{display:block\}/);
+ assert.match(src,/lensHandle\.setPointerCapture/);
+ assert.match(src,/#lensRing\{[^}]*pointer-events:none/)});
 test('lens opacities: ~85% inside, ~8% outside',()=>{const c=logic();assert.equal(c.LENS_INSIDE,.85);assert.equal(c.LENS_OUTSIDE,.08);
  const m=c.lensMask(100,50,80);assert.match(m,/radial-gradient\(circle 80px at 100px 50px/);assert.match(m,/rgba\(0,0,0,0\.85\)/);assert.match(m,/rgba\(0,0,0,0\.08\)/)});
-test('GHOST edge layer is enabled only for 360° photos on wide, non-touch devices; otherwise falls back to plain',()=>{const c=logic();
- assert.equal(c.ghostAvailable({display:'photo',narrowOrTouch:false}),true);
- assert.equal(c.ghostAvailable({display:'photo',narrowOrTouch:true}),false);
- assert.equal(c.ghostAvailable({display:'mesh',narrowOrTouch:false}),false);assert.equal(c.ghostAvailable({display:'splat',narrowOrTouch:false}),false);
- assert.equal(c.effectiveStyle('ghost',{display:'photo',narrowOrTouch:true}),'plain');assert.equal(c.effectiveStyle('ghost',{display:'photo',narrowOrTouch:false}),'ghost');
+test('Ghost style is removed: no ghost API, button, edge layer or iframe in scan-compare',()=>{const c=logic();
+ assert.equal(c.ghostAvailable,undefined);assert.doesNotMatch(src,/data-style="ghost"|id="edgeLayer"|edges=1|edgeFrame/);
  assert.equal(c.effectiveStyle('lens',{display:'mesh',narrowOrTouch:true}),'lens');assert.equal(c.effectiveStyle('plain',{display:'photo',narrowOrTouch:false}),'plain')});
 test('compare page offers the Style picker (44px touch targets) and cites the X-ray techniques',()=>{
- for(const v of ['lens','ghost','plain'])assert.match(src,new RegExp('data-style="'+v+'"'));
+ for(const v of ['lens','plain'])assert.match(src,new RegExp('data-style="'+v+'"'));
  assert.match(src,/Schall et al\. 2009/);assert.match(src,/Kalkofen et al\. 2007/);assert.match(src,/Zollmann et al\. 2014/);
  assert.match(src,/#styleBar button\{flex:1;min-height:44px/)});
 test('scan panes post normalised pointer coordinates; photo pane has an edges-only mode',()=>{
@@ -83,3 +99,19 @@ test('opacity slider drives the lens too (no fixed opacity:1, no greyed label)',
  assert.doesNotMatch(src,/label\[for="xrayOpacity"\]\{opacity:\.45\}/);
  assert.match(src,/function syncXray\(\)/);assert.match(src,/layoutLens\(true\);syncXray\(\);/);
 });
+
+/* ── Overlay × Gaussian (2026-10-19): every style works or says why not ── */
+test('splat source: May uses its manifest, Oct 18 uses its zone index with the capture date',()=>{const c=logic();
+ assert.match(c.splatSource({kind:'manifest',path:'scan-assets/gaussian/2026-05-06/viewer.json'}),/^scan-splat\.html\?manifest=scan-assets%2Fgaussian%2F2026-05-06%2Fviewer\.json&revision=/);
+ const z=c.splatSource({kind:'zones',path:'scan-assets/gaussian/2026-10-18/zones/index.json'},'2026-10-18');
+ assert.match(z,/^scan-splat\.html\?zones=scan-assets%2Fgaussian%2F2026-10-18%2Fzones%2Findex\.json&capture=2026-10-18&revision=/);assert.doesNotMatch(z,/manifest=/)});
+test('Lens and Plain stay available on the Gaussian; ghost maps to plain',()=>{const c=logic();
+ const env={display:'splat',narrowOrTouch:false};assert.equal(c.effectiveStyle('lens',env),'lens');assert.equal(c.effectiveStyle('plain',env),'plain');assert.equal(c.parseStyle('?style=ghost'),'plain');
+ assert.doesNotMatch(src,/not available on the Gaussian/)});
+test('Gaussian overlay status keeps the experimental label and the capture alignment label',()=>{
+ assert.match(src,/Gaussian \\u00b7 experimental appearance, not surveyed/);assert.match(src,/function scanNoteText\(\)/);
+ assert.match(src,/No Gaussian for '\+CAPTURE_SHORT\[capture\.date\]/);assert.match(src,/const n=typeof scanNoteText==='function'\?scanNoteText\(\):''/)});
+test('a requested Gaussian loads only after validation, so the carried viewpoint reaches the Gaussian pane',()=>{
+ assert.match(src,/if\(capture\.display!=='splat'\)frames\[0\]\.src=photoSource/);
+ assert.match(src,/function startSplat\(\)\{mode\.value='splat';photoMode=false;scanReady=false;/);
+ assert.match(src,/send\('scan',\{type:photoMode\?'grimes-photo-goto':'grimes-start-pose'/)});

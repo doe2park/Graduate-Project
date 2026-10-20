@@ -51,7 +51,7 @@ function normalizeZoneIndex(index,base){
   return {id:z.id,name:z.name,manifestURL:manifestURL.href,bounds:z.bounds,coreBounds:z.coreBounds,corePositions:Array.isArray(z.corePositions)?z.corePositions.filter(q=>Array.isArray(q)&&q.length===2&&q.every(Number.isFinite)):null,stationCount:z.stationCount};
  });
  const first=zones.find(z=>z.id===index.defaultZone)||zones[0];
- return {capture:typeof index.capture==='string'?index.capture:'',defaultZone:first.id,zones};
+ return {capture:typeof index.capture==='string'?index.capture:'',defaultZone:first.id,zones,scope:typeof index.scope==='string'?index.scope.slice(0,300):''};
 }
 /* END ZONE LOGIC */
 try{
@@ -86,9 +86,10 @@ try{
  }
  const zoneIndex=await loadZoneIndex();
  let manifestURL,first;
- if(zoneIndex){zoneEntries=zoneIndex.zones;currentZoneId=zoneIndex.defaultZone;manifestURL=new URL(zoneEntries.find(z=>z.id===currentZoneId).manifestURL);document.body.dataset.zones='on';document.getElementById('experiment').textContent='EXPERIMENT · '+(zoneIndex.capture||'zoned')+' capture';}
+ if(zoneIndex){zoneEntries=zoneIndex.zones;currentZoneId=zoneIndex.defaultZone;manifestURL=new URL(zoneEntries.find(z=>z.id===currentZoneId).manifestURL);document.body.dataset.zones='on';document.getElementById('experiment').textContent='EXPERIMENT · '+(zoneIndex.capture||'zoned')+' capture';if(zoneIndex.scope){const st=document.getElementById('status');st.append(document.createElement('br'),zoneIndex.scope);}}
  else {let rel=params.get('manifest')||'scan-assets/gaussian/2026-05-06/viewer.json';if(!params.get('manifest')&&captureParam)rel=`scan-assets/gaussian/${captureParam}/viewer.json`;manifestURL=new URL(rel,location.href);}
  first=await readManifest(manifestURL);manifest=first.manifest;selectedFile=first.file;const assetURL=first.assetURL;
+ if(!zoneIndex&&typeof manifest.capture==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(manifest.capture))document.getElementById('experiment').textContent='EXPERIMENT · '+manifest.capture+' capture';
  const [THREE,GS]=await Promise.all([import('three'),import('@mkkellogg/gaussian-splats-3d')]);
  camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.03,Math.max(30,Math.min(2000,Number(manifest.maxDistance)||500)));
  renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:mobile?'default':'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.setClearColor(0x101923,1);document.body.appendChild(renderer.domElement);

@@ -9,7 +9,7 @@ body[data-focus="scan"] main,body[data-focus="bim"] main{grid-template-columns:1
 @media(max-width:768px){#overlayBar{padding:6px 8px;gap:6px}#overlayBar label{flex:1 0 100%}#overlayBar input[type=range]{flex:1;width:auto;height:44px}#overlayBar select{min-height:44px;font-size:13px}}
 body[data-focus="overlay"] main{display:block;position:relative;background:#101d2c}body[data-focus="overlay"] main>section{position:absolute;inset:0;background:transparent}body[data-focus="overlay"] main>section h2{display:none}
 body[data-focus="overlay"] section[aria-label="BIM model"]{z-index:2;pointer-events:none}body[data-focus="overlay"] section[aria-label="BIM model"] iframe{background:transparent;opacity:var(--xray,.3);pointer-events:none}
-/* OVERLAY STYLES: Style picker, lens ring, edge layer, legibility filter */
+/* OVERLAY STYLES: Style picker, lens ring, legibility filter */
 #styleBar{display:flex;align-items:center;gap:4px;padding:3px;background:#0d1826;border:1px solid #38506a;border-radius:10px}#styleBar>span{padding:0 6px 0 8px;color:#b4cbdc}#styleBar button{min-height:32px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:#cfe0ec;font:600 12px Arial;cursor:pointer}#styleBar button[aria-pressed="true"]{background:#315e7a;color:#fff}#styleBar button:disabled{opacity:.4;cursor:not-allowed}#styleBar button:focus-visible{outline:2px solid #ffd479;outline-offset:1px}#styleNote{color:#ffd479;font-size:11px}
 @media(max-width:768px){#styleBar{flex:1 0 100%;flex-wrap:wrap}#styleBar button{flex:1;min-height:44px;padding:0 4px}#styleBar>span:first-child{display:none}#styleNote{flex:1 0 100%;padding:0 6px 3px}}
 /* legibility in every style: slightly desaturated system colours + dark screen-space outline (outline pass) */
@@ -17,8 +17,8 @@ body[data-focus="overlay"] section[aria-label="BIM model"] iframe{filter:saturat
 /* LENS: cut-away mask on the BIM layer (services strong inside the hole, ghosted outside) */
 body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"]{-webkit-mask-image:var(--lens-mask,none);mask-image:var(--lens-mask,none)}body[data-focus="overlay"][data-style="lens"] section[aria-label="BIM model"] iframe{opacity:var(--lens-xray,1)}
 #lensRing{display:none;position:absolute;z-index:4;left:0;top:0;width:0;height:0;border-radius:50%;pointer-events:none;border:2px solid rgba(255,226,155,.95);box-shadow:0 0 0 1px rgba(5,10,18,.8),inset 0 0 0 1px rgba(5,10,18,.55);box-sizing:border-box}body[data-focus="overlay"][data-style="lens"] #lensRing{display:block}
-/* GHOST: second, edges-only scan instance above the BIM layer */
-#edgeLayer{display:none;position:absolute;inset:0;z-index:3;pointer-events:none}body[data-focus="overlay"][data-style="ghost"] #edgeLayer{display:block}#edgeLayer[data-moving="true"]{visibility:hidden}#edgeLayer iframe{position:absolute;inset:0;width:100%;height:100%;background:transparent;border:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(4,9,16,.7))}
+#lensHandle{display:none;position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);min-width:44px;height:30px;border-radius:15px;background:rgba(8,14,28,.82);border:1px solid rgba(255,226,155,.95);color:#ffe29b;font:600 13px/28px Arial,sans-serif;text-align:center;pointer-events:auto;touch-action:none;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+@media(pointer:coarse){body[data-focus="overlay"][data-style="lens"] #lensHandle{display:block}}
 
 /* LENS INFO CARD (glasses-style, same markup/classes as the viewer's Walk gaze card; twin/element-cards.js) */
 main{position:relative}
@@ -58,10 +58,10 @@ main{position:relative}
 @media(max-width:768px){#alignToggle{min-height:44px}#alignPanel{left:6px;right:6px;top:auto;bottom:6px;width:auto;max-height:58%}#alignPanel button,#alignPanel select{min-height:44px}}
 @media(max-width:768px),(pointer:coarse){#controlsToggle:not([hidden]){display:inline-flex;align-items:center;min-height:36px;padding:0 10px;border:1px solid #58708a;border-radius:8px;background:#132b40;color:#cfe0ec;font:600 12px Arial;margin-left:auto}
 body.ctl-min header p,body.ctl-min .rights-link,body.ctl-min #asBuiltToggle,body.ctl-min #alignToggle,body.ctl-min header>label,body.ctl-min #overlayBar{display:none!important}body.ctl-min header{min-height:0}}
-</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p><a class="rights-link" href="rights.html" target="_blank" rel="noopener">© 2026 Yoonsung Chung · Rights &amp; use</a></div><nav id="paneViews" aria-label="Comparison view"><button data-focus="both" aria-pressed="true">Compare</button><button data-focus="overlay" aria-pressed="false" title="BIM services drawn semi-transparently over the scan">Overlay</button><button data-focus="scan" aria-pressed="false">Scan</button><button data-focus="bim" aria-pressed="false">BIM</button></nav><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label><button id="asBuiltToggle" type="button" aria-expanded="false" aria-controls="asBuiltPanel" title="Nudge a BIM element onto the installed one seen in the scan (manual, not surveyed)">As-built…</button><button id="alignToggle" type="button" aria-expanded="false" aria-controls="alignPanel" title="Temporarily move the whole BIM onto the scan (preview: not saved, not surveyed)">Align…</button><button id="controlsToggle" type="button" aria-expanded="true" hidden>Hide controls ▴</button></header><div id="overlayBar" role="group" aria-label="X-ray overlay controls"><label for="xrayOpacity">BIM services opacity<input id="xrayOpacity" type="range" min="0" max="100" step="5" value="30" aria-describedby="xrayValue"><output id="xrayValue" for="xrayOpacity">30%</output></label><div id="styleBar" role="group" aria-label="Overlay style"><span>Style</span><button data-style="lens" aria-pressed="true" title="Cut-away: services visible through a soft circular hole">Lens</button><button data-style="ghost" aria-pressed="false" title="Services plus the real room's edges drawn on top (360° photos, desktop)">Ghost</button><button data-style="plain" aria-pressed="false" title="Uniform transparency">Plain</button><span id="styleNote" role="status"></span></div><button id="lensCardsToggle" type="button" aria-pressed="true" title="Info cards for the element under the lens (I)">Info cards: on</button></div><main><div id="lensRing" aria-hidden="true"></div><div id="lensCard" role="status" aria-live="off"></div><div id="asBuiltBadge" hidden>AS-BUILT ADJUSTED <small>· manual, not surveyed</small></div><aside id="asBuiltPanel" hidden tabindex="-1" aria-label="As-built position adjustment"><div class="ab-head"><b>As-built position</b><button id="abClose" type="button" aria-label="Close as-built panel">×</button></div><div class="ab-mode" role="group" aria-label="Geometry shown"><button type="button" data-ab-mode="design" aria-pressed="true">Design (BIM)</button><button type="button" data-ab-mode="asbuilt" aria-pressed="false">As-built adjusted</button></div><div class="ab-honest">Adjusted positions are a manual visual match to a captured photo or mesh: manual, not surveyed. Design geometry and GLBs are never changed.</div><div id="abTarget">No element selected.</div><button id="abSelect" type="button" style="width:100%">Select element under lens</button><label>Your initials (required) <input id="abAuthor" type="text" maxlength="4" autocomplete="off" spellcheck="false" placeholder="e.g. YC"></label><div class="ab-grid" role="group" aria-label="Nudge selected element"><span>X</span><button type="button" data-ab="x" data-step="-0.05" aria-label="X minus 5 cm">−5</button><button type="button" data-ab="x" data-step="-0.01" aria-label="X minus 1 cm">−1</button><button type="button" data-ab="x" data-step="0.01" aria-label="X plus 1 cm">+1</button><button type="button" data-ab="x" data-step="0.05" aria-label="X plus 5 cm">+5</button><span>Z</span><button type="button" data-ab="z" data-step="-0.05" aria-label="Z minus 5 cm">−5</button><button type="button" data-ab="z" data-step="-0.01" aria-label="Z minus 1 cm">−1</button><button type="button" data-ab="z" data-step="0.01" aria-label="Z plus 1 cm">+1</button><button type="button" data-ab="z" data-step="0.05" aria-label="Z plus 5 cm">+5</button><span>Y ↑</span><button type="button" data-ab="y" data-step="-0.05" aria-label="Height minus 5 cm">−5</button><button type="button" data-ab="y" data-step="-0.01" aria-label="Height minus 1 cm">−1</button><button type="button" data-ab="y" data-step="0.01" aria-label="Height plus 1 cm">+1</button><button type="button" data-ab="y" data-step="0.05" aria-label="Height plus 5 cm">+5</button><span>Yaw</span><button type="button" data-ab="yaw" data-step="-5" aria-label="Yaw minus 5 degrees">−5°</button><button type="button" data-ab="yaw" data-step="-1" aria-label="Yaw minus 1 degree">−1°</button><button type="button" data-ab="yaw" data-step="1" aria-label="Yaw plus 1 degree">+1°</button><button type="button" data-ab="yaw" data-step="5" aria-label="Yaw plus 5 degrees">+5°</button></div><div id="abReadout" aria-live="polite">Δ —</div><label>Note <input id="abNote" type="text" maxlength="500" autocomplete="off" placeholder="what was matched (optional)"></label><div class="ab-row"><button id="abReset" type="button">Reset element</button><button id="abExport" type="button">Export JSON</button><button id="abImportBtn" type="button">Load JSON</button><input id="abImport" type="file" accept="application/json,.json" hidden></div><div id="abStatus" role="status"></div><div id="abStats"></div><div id="abKeys" style="color:#8ea3b6;font-size:11px;margin-top:4px">Keys (panel focused): ←/→ X, ↑/↓ Z, PgUp/PgDn height, [ ] yaw, Shift = 5 cm. Commit the exported file to buildings/grimes/as-built-adjustments.json.</div></aside><div id="alignBadge" hidden>MANUAL ALIGNMENT PREVIEW · not saved · not surveyed</div><aside id="alignPanel" hidden tabindex="-1" aria-label="Manual alignment preview"><div class="ab-head"><b>Align BIM to scan</b><button id="alClose" type="button" aria-label="Close align panel">×</button></div><div class="ab-honest">Moves the whole BIM together (designed distances kept) through a temporary copy of the registration. Preview only: not saved, not surveyed. Accepted registrations are never changed.</div><div class="al-tabs" role="group" aria-label="Align mode"><button type="button" data-al-tab="move" aria-pressed="true">Move / rotate</button><button type="button" data-al-tab="match" aria-pressed="false">Match elements</button></div><div id="alMove"><label>Step <select id="alStep" aria-label="Move step"><option value="0.01">1 cm</option><option value="0.05" selected>5 cm</option><option value="0.2">20 cm</option></select></label><div class="al-pad" role="group" aria-label="Move BIM relative to the camera"><button type="button" data-al-move="up" aria-label="Move BIM up">Up ▲</button><button type="button" data-al-move="forward" aria-label="Move BIM away from the camera">Away ↑</button><button type="button" data-al-move="down" aria-label="Move BIM down">Down ▼</button><button type="button" data-al-move="left" aria-label="Move BIM left">← Left</button><button type="button" data-al-move="back" aria-label="Move BIM toward the camera">Near ↓</button><button type="button" data-al-move="right" aria-label="Move BIM right">Right →</button></div><div class="al-yaw" role="group" aria-label="Turn BIM about the camera's vertical axis"><button type="button" data-al-yaw="0.5" aria-label="Turn BIM 0.5 degrees counter-clockwise seen from above">↺ .5°</button><button type="button" data-al-yaw="0.1" aria-label="Turn BIM 0.1 degrees counter-clockwise seen from above">↺ .1°</button><button type="button" data-al-yaw="-0.1" aria-label="Turn BIM 0.1 degrees clockwise seen from above">↻ .1°</button><button type="button" data-al-yaw="-0.5" aria-label="Turn BIM 0.5 degrees clockwise seen from above">↻ .5°</button></div></div><div id="alMatch" hidden><div id="alMatchInfo">Pair = a BIM element and where it really is in the photo.</div><div class="ab-row"><button id="alAddPair" type="button">Add pair</button><button id="alLensPick" type="button" title="Use the element at the lens centre (touch: turn the photo until it is centred)">Use lens centre</button></div><div id="alPairs">0 pairs</div><div class="ab-row"><button id="alSolve" type="button">Solve</button><button id="alUndoPair" type="button">Undo last pair</button><button id="alClearPairs" type="button">Clear</button></div></div><div id="alReadout" aria-live="polite">Δ —</div><div class="ab-row"><button id="alReset" type="button">Reset to loaded registration</button><button id="alExport" type="button">Export candidate JSON</button></div><div id="alStatus" role="status"></div><div id="alHelp">Keys (click this panel first): Shift+←/→ left/right, Shift+↑/↓ away/near, Shift+PgUp/PgDn up/down, [ ] turn 0.1°, { } 0.5°. Turning pivots about the current camera. Kept in this browser per capture until Reset. Export, save the file under <span id="alFolder"></span> and preview with scan-compare.html?view=overlay&amp;registration=&lt;that path&gt;.</div></aside><div id="edgeLayer" aria-hidden="true"></div><section aria-label="Actual scan"><h2>Actual scan <select id="scanMode" aria-label="Scan display"><option value="photo">360° photos</option><option value="splat" disabled>Gaussian · May experiment (appearance only)</option></select><select id="captureDate" aria-label="Capture date"><option value="2026-09-17">Sep 17, 2026 · New</option><option value="2026-05-06">May 6, 2026</option></select></h2><iframe title="Captured scan" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section></main><script src="registration-core.js?v=1"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script>
+</style></head><body><header><div><h1>Grimes · Scan ↔ BIM</h1><p><span id="linkStatus">Reading registration…</span></p><a class="rights-link" href="rights.html" target="_blank" rel="noopener">© 2026 Yoonsung Chung · Rights &amp; use</a></div><nav id="paneViews" aria-label="Comparison view"><button data-focus="both" aria-pressed="true">Compare</button><button data-focus="overlay" aria-pressed="false" title="BIM services drawn semi-transparently over the scan">Overlay</button><button data-focus="scan" aria-pressed="false">Scan</button><button data-focus="bim" aria-pressed="false">BIM</button></nav><label style="white-space:nowrap;font-size:13px"><input id="linkCameras" type="checkbox" disabled>Keep views aligned</label><button id="asBuiltToggle" type="button" aria-expanded="false" aria-controls="asBuiltPanel" title="Nudge a BIM element onto the installed one seen in the scan (manual, not surveyed)">As-built…</button><button id="alignToggle" type="button" aria-expanded="false" aria-controls="alignPanel" title="Temporarily move the whole BIM onto the scan (preview: not saved, not surveyed)">Align…</button><button id="controlsToggle" type="button" aria-expanded="true" hidden>Hide controls ▴</button></header><div id="overlayBar" role="group" aria-label="X-ray overlay controls"><label for="xrayOpacity">BIM services opacity<input id="xrayOpacity" type="range" min="0" max="100" step="5" value="30" aria-describedby="xrayValue"><output id="xrayValue" for="xrayOpacity">30%</output></label><div id="styleBar" role="group" aria-label="Overlay style"><span>Style</span><button data-style="lens" aria-pressed="true" title="Cut-away: services visible through a soft circular hole">Lens</button><button data-style="plain" aria-pressed="false" title="Uniform transparency">Plain</button><span id="styleNote" role="status"></span></div><button id="lensCardsToggle" type="button" aria-pressed="true" title="Info cards for the element under the lens (I)">Info cards: on</button></div><main><div id="lensRing" aria-hidden="true"><div id="lensHandle" aria-hidden="true">⠿</div></div><div id="lensCard" role="status" aria-live="off"></div><div id="asBuiltBadge" hidden>AS-BUILT ADJUSTED <small>· manual, not surveyed</small></div><aside id="asBuiltPanel" hidden tabindex="-1" aria-label="As-built position adjustment"><div class="ab-head"><b>As-built position</b><button id="abClose" type="button" aria-label="Close as-built panel">×</button></div><div class="ab-mode" role="group" aria-label="Geometry shown"><button type="button" data-ab-mode="design" aria-pressed="true">Design (BIM)</button><button type="button" data-ab-mode="asbuilt" aria-pressed="false">As-built adjusted</button></div><div class="ab-honest">Adjusted positions are a manual visual match to a captured photo or mesh: manual, not surveyed. Design geometry and GLBs are never changed.</div><div id="abTarget">No element selected.</div><button id="abSelect" type="button" style="width:100%">Select element under lens</button><label>Your initials (required) <input id="abAuthor" type="text" maxlength="4" autocomplete="off" spellcheck="false" placeholder="e.g. YC"></label><div class="ab-grid" role="group" aria-label="Nudge selected element"><span>X</span><button type="button" data-ab="x" data-step="-0.05" aria-label="X minus 5 cm">−5</button><button type="button" data-ab="x" data-step="-0.01" aria-label="X minus 1 cm">−1</button><button type="button" data-ab="x" data-step="0.01" aria-label="X plus 1 cm">+1</button><button type="button" data-ab="x" data-step="0.05" aria-label="X plus 5 cm">+5</button><span>Z</span><button type="button" data-ab="z" data-step="-0.05" aria-label="Z minus 5 cm">−5</button><button type="button" data-ab="z" data-step="-0.01" aria-label="Z minus 1 cm">−1</button><button type="button" data-ab="z" data-step="0.01" aria-label="Z plus 1 cm">+1</button><button type="button" data-ab="z" data-step="0.05" aria-label="Z plus 5 cm">+5</button><span>Y ↑</span><button type="button" data-ab="y" data-step="-0.05" aria-label="Height minus 5 cm">−5</button><button type="button" data-ab="y" data-step="-0.01" aria-label="Height minus 1 cm">−1</button><button type="button" data-ab="y" data-step="0.01" aria-label="Height plus 1 cm">+1</button><button type="button" data-ab="y" data-step="0.05" aria-label="Height plus 5 cm">+5</button><span>Yaw</span><button type="button" data-ab="yaw" data-step="-5" aria-label="Yaw minus 5 degrees">−5°</button><button type="button" data-ab="yaw" data-step="-1" aria-label="Yaw minus 1 degree">−1°</button><button type="button" data-ab="yaw" data-step="1" aria-label="Yaw plus 1 degree">+1°</button><button type="button" data-ab="yaw" data-step="5" aria-label="Yaw plus 5 degrees">+5°</button></div><div id="abReadout" aria-live="polite">Δ —</div><label>Note <input id="abNote" type="text" maxlength="500" autocomplete="off" placeholder="what was matched (optional)"></label><div class="ab-row"><button id="abReset" type="button">Reset element</button><button id="abExport" type="button">Export JSON</button><button id="abImportBtn" type="button">Load JSON</button><input id="abImport" type="file" accept="application/json,.json" hidden></div><div id="abStatus" role="status"></div><div id="abStats"></div><div id="abKeys" style="color:#8ea3b6;font-size:11px;margin-top:4px">Keys (panel focused): ←/→ X, ↑/↓ Z, PgUp/PgDn height, [ ] yaw, Shift = 5 cm. Commit the exported file to buildings/grimes/as-built-adjustments.json.</div></aside><div id="alignBadge" hidden>MANUAL ALIGNMENT PREVIEW · not saved · not surveyed</div><aside id="alignPanel" hidden tabindex="-1" aria-label="Manual alignment preview"><div class="ab-head"><b>Align BIM to scan</b><button id="alClose" type="button" aria-label="Close align panel">×</button></div><div class="ab-honest">Moves the whole BIM together (designed distances kept) through a temporary copy of the registration. Preview only: not saved, not surveyed. Accepted registrations are never changed.</div><div class="al-tabs" role="group" aria-label="Align mode"><button type="button" data-al-tab="move" aria-pressed="true">Move / rotate</button><button type="button" data-al-tab="match" aria-pressed="false">Match elements</button></div><div id="alMove"><label>Step <select id="alStep" aria-label="Move step"><option value="0.01">1 cm</option><option value="0.05" selected>5 cm</option><option value="0.2">20 cm</option></select></label><div class="al-pad" role="group" aria-label="Move BIM relative to the camera"><button type="button" data-al-move="up" aria-label="Move BIM up">Up ▲</button><button type="button" data-al-move="forward" aria-label="Move BIM away from the camera">Away ↑</button><button type="button" data-al-move="down" aria-label="Move BIM down">Down ▼</button><button type="button" data-al-move="left" aria-label="Move BIM left">← Left</button><button type="button" data-al-move="back" aria-label="Move BIM toward the camera">Near ↓</button><button type="button" data-al-move="right" aria-label="Move BIM right">Right →</button></div><div class="al-yaw" role="group" aria-label="Turn BIM about the camera's vertical axis"><button type="button" data-al-yaw="0.5" aria-label="Turn BIM 0.5 degrees counter-clockwise seen from above">↺ .5°</button><button type="button" data-al-yaw="0.1" aria-label="Turn BIM 0.1 degrees counter-clockwise seen from above">↺ .1°</button><button type="button" data-al-yaw="-0.1" aria-label="Turn BIM 0.1 degrees clockwise seen from above">↻ .1°</button><button type="button" data-al-yaw="-0.5" aria-label="Turn BIM 0.5 degrees clockwise seen from above">↻ .5°</button></div></div><div id="alMatch" hidden><div id="alMatchInfo">Pair = a BIM element and where it really is in the photo.</div><div class="ab-row"><button id="alAddPair" type="button">Add pair</button><button id="alLensPick" type="button" title="Use the element at the lens centre (touch: turn the photo until it is centred)">Use lens centre</button></div><div id="alPairs">0 pairs</div><div class="ab-row"><button id="alSolve" type="button">Solve</button><button id="alUndoPair" type="button">Undo last pair</button><button id="alClearPairs" type="button">Clear</button></div></div><div id="alReadout" aria-live="polite">Δ —</div><div class="ab-row"><button id="alReset" type="button">Reset to loaded registration</button><button id="alExport" type="button">Export candidate JSON</button></div><div id="alStatus" role="status"></div><div id="alHelp">Keys (click this panel first): Shift+←/→ left/right, Shift+↑/↓ away/near, Shift+PgUp/PgDn up/down, [ ] turn 0.1°, { } 0.5°. Turning pivots about the current camera. Kept in this browser per capture until Reset. Export, save the file under <span id="alFolder"></span> and preview with scan-compare.html?view=overlay&amp;registration=&lt;that path&gt;.</div></aside><section aria-label="Actual scan"><h2>Actual scan <select id="scanMode" aria-label="Scan display"><option value="photo">360° photos</option><option value="splat" disabled title="Experimental appearance layer, not surveyed geometry">Gaussian · experimental (appearance only)</option></select><select id="captureDate" aria-label="Capture date"><option value="2026-10-18">Oct 18, 2026 · Provisional</option><option value="2026-09-17">Sep 17, 2026 · Provisional</option><option value="2026-05-06">May 6, 2026</option></select></h2><iframe title="Captured scan" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section><section aria-label="BIM model"><h2>BIM model <span>Level 1 · Interior and systems</span></h2><iframe title="BIM elements" src="about:blank" allow="fullscreen; pointer-lock"></iframe></section></main><script src="registration-core.js?v=1"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script>
 /* OVERLAY LOGIC */
 const OVERLAY_DEFAULT_OPACITY=.30,OVERLAY_LAYERS=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety','fire'];
-function splatSource(manifest){return 'scan-splat.html?manifest='+encodeURIComponent(manifest)+'&revision=gaussian2';}
+function splatSource(g,date){if(typeof g==='string')g={kind:'manifest',path:g};return 'scan-splat.html?'+(g.kind==='zones'?'zones='+encodeURIComponent(g.path)+(date?'&capture='+encodeURIComponent(date):''):'manifest='+encodeURIComponent(g.path))+'&revision=gaussian3';}
 function parseView(search){const v=new URLSearchParams(search).get('view');return ['overlay','scan','bim'].includes(v)?v:'compare';}
 function clampOpacity(v){if(v===null||v===undefined||v==='')return OVERLAY_DEFAULT_OPACITY;const n=Number(v);return Number.isFinite(n)?Math.min(1,Math.max(0,n)):OVERLAY_DEFAULT_OPACITY;}
 function parseOpacity(search){const raw=new URLSearchParams(search).get('opacity');if(raw===null||raw==='')return OVERLAY_DEFAULT_OPACITY;const n=Number(raw);return Number.isFinite(n)?clampOpacity(n/100):OVERLAY_DEFAULT_OPACITY;}
@@ -69,16 +69,22 @@ function overlayLabel(capture){return capture.provisional?'Overlay \u00b7 provis
 /* X-RAY STYLES. Established AR X-ray-vision techniques:
    LENS  = cut-away / virtual excavation (Schall et al. 2009, handheld AR for underground utilities) + focus+context (Kalkofen et al. 2007):
            services are shown strongly only through a virtual hole, faintly outside it.
-   GHOST = edge-based ghosting (Kalkofen et al. 2007; Avery/Sandor): the real occluder's edges stay drawn on top of the hidden content.
-   Both keep ordinal depth cues (real room in front, services behind) rather than absolute depth (Zollmann et al. 2014). */
-const OVERLAY_STYLES=['lens','ghost','plain'],OVERLAY_DEFAULT_STYLE='lens',LENS_RADIUS_FRACTION=.22,LENS_INSIDE=.85,LENS_OUTSIDE=.08;
-function parseStyle(search){const v=new URLSearchParams(search).get('style');return OVERLAY_STYLES.includes(v)?v:OVERLAY_DEFAULT_STYLE;}
+   (Ghost edge style removed 2026-10-19; old ?style=ghost links load Plain.)
+   Lens and Plain keep ordinal depth cues (real room in front, services behind) rather than absolute depth (Zollmann et al. 2014). */
+const OVERLAY_STYLES=['lens','plain'],OVERLAY_DEFAULT_STYLE='lens',LENS_RADIUS_FRACTION=.22,LENS_INSIDE=.85,LENS_OUTSIDE=.08;
+function parseStyle(search){const v=new URLSearchParams(search).get('style');if(v==='ghost')return 'plain';return OVERLAY_STYLES.includes(v)?v:OVERLAY_DEFAULT_STYLE;}
 function lensRadius(w,h){return LENS_RADIUS_FRACTION*Math.min(w,h);}
 function lensCenter(pointer,w,h){if(!pointer||!Number.isFinite(pointer.x)||!Number.isFinite(pointer.y))return {x:w/2,y:h/2};return {x:Math.min(1,Math.max(0,pointer.x))*w,y:Math.min(1,Math.max(0,pointer.y))*h};}
 function lensMask(cx,cy,r){return 'radial-gradient(circle '+r+'px at '+cx+'px '+cy+'px, rgba(0,0,0,'+LENS_INSIDE+') 0, rgba(0,0,0,'+LENS_INSIDE+') 72%, rgba(0,0,0,'+LENS_OUTSIDE+') 100%)';}
-/* GHOST needs a second panorama instance: 360° photos only, and not on phones/touch (memory and GPU cost) */
-function ghostAvailable(env){return env.display==='photo'&&!env.narrowOrTouch;}
-function effectiveStyle(style,env){return style==='ghost'&&!ghostAvailable(env)?'plain':style;}
+/* Touch: a dragged lens centre stays reachable — x keeps a 24px margin (or centres when too narrow),
+   y stays inside the usable band between the toolbars (top) and the docked card (bottom). */
+function lensDragCenter(drag,w,h,top,bottom){
+ if(!drag||![drag.x,drag.y,w,h,top,bottom].every(Number.isFinite))return null;
+ const mx=Math.min(24,w/2),x=Math.max(mx,Math.min(w-mx,drag.x));
+ const lo=Math.min(top+10,h),hi=Math.max(lo,Math.min(bottom-10,h));
+ return {x,y:Math.max(lo,Math.min(hi,drag.y))};
+}
+function effectiveStyle(style,env){return style==='ghost'?'plain':style;}
 /* END OVERLAY LOGIC */
 /* REGISTRATION OVERRIDE: ?registration=<same-origin candidate JSON> previews a workbench/ICP candidate (never the default) */
 function registrationOverride(search){const raw=new URLSearchParams(search).get('registration');if(raw===null)return null;return RegistrationCore.safeRegistrationPath(raw)||'invalid';}
@@ -87,34 +93,70 @@ function headingOffsets(reg){const h=reg&&reg.stationHeadingOffsetsDegrees;retur
 /* END REGISTRATION OVERRIDE */
 const frames=document.querySelectorAll('iframe'),link=document.getElementById('linkCameras'),status=document.getElementById('linkStatus');
 /* CAPTURE SELECTION */
+/* Gaussian scene per capture (experimental appearance, never surveyed geometry): May 6 = one public scene,
+   Oct 18 = a zone index listing only the trained zones, Sep 17 = none. ?mode=splat without a capture keeps meaning May. */
+const CAPTURE_SHORT={'2026-05-06':'May 6','2026-09-17':'Sep 17','2026-10-18':'Oct 18'};
 function captureSelection(search){
- const q=new URLSearchParams(search),old=q.get('mode')==='splat'||q.get('capture')==='2026-05-06';
- const date=old?'2026-05-06':'2026-09-17';
- return {date,provisional:!old,photo:old?'scan-assets/panoramas/manifest.json':'scan-assets/captures/2026-09-17/panoramas/manifest.json',registration:old?'alignment-analysis/accepted-registration.json':'scan-assets/captures/2026-09-17/registration.json',mesh:'scan-bim.html?pane=scan&capture='+date+'&revision=walk-cameras2'};
+ /* self-contained (scan-xr tests evaluate this function alone) */
+ const CAPTURE_DATES=['2026-10-18','2026-09-17','2026-05-06'],CAPTURE_GAUSSIAN={'2026-05-06':{kind:'manifest',path:'scan-assets/gaussian/2026-05-06/viewer.json'},'2026-10-18':{kind:'zones',path:'scan-assets/gaussian/2026-10-18/zones/index.json'}};
+ const q=new URLSearchParams(search),asked=q.get('capture'),wantsSplat=q.get('mode')==='splat';
+ /* later captures share the Sep 17 layout and its provisional (borrowed May) project-frame alignment */
+ const date=CAPTURE_DATES.includes(asked)?asked:wantsSplat?'2026-05-06':'2026-09-17',old=date==='2026-05-06',g=CAPTURE_GAUSSIAN[date]||null;
+ return {date,provisional:!old,gaussian:g?{kind:g.kind,path:g.path}:null,display:wantsSplat&&g?'splat':'photo',splatRefused:wantsSplat&&!g,photo:old?'scan-assets/panoramas/manifest.json':'scan-assets/captures/'+date+'/panoramas/manifest.json',registration:old?'alignment-analysis/accepted-registration.json':'scan-assets/captures/'+date+'/registration.json',mesh:'scan-bim.html?pane=scan&capture='+date+'&revision=walk-cameras2'};
+}
+function gaussianOptionLabel(c){if(!c.gaussian)return 'Gaussian · no Gaussian for this capture';return 'Gaussian · '+CAPTURE_SHORT[c.date]+(c.gaussian.kind==='zones'?' zones':'')+' (experimental)';}
+/* zones/index.json -> trained zones and an honest note; throws on anything the splat viewer would refuse */
+function gaussianZoneSummary(index){
+ if(!index||index.schema!==1||index.frame!=='scan-y-up-metres'||!Array.isArray(index.zones)||!index.zones.length)throw Error('unsupported zones index');
+ if(index.status!==undefined&&index.status!=='experimental-trained')throw Error('zones index is not an experimental-trained layer');
+ const zones=index.zones.filter(z=>z&&typeof z.id==='string'&&typeof z.manifest==='string').map(z=>({id:z.id,name:typeof z.name==='string'?z.name:z.id}));
+ if(zones.length!==index.zones.length)throw Error('invalid zone entry');
+ return {zones,note:(zones.length===1?'only '+zones[0].name+' trained':zones.length+' zones trained: '+zones.map(z=>z.name).join(', '))+' · other areas have no Gaussian'};
 }
 /* END CAPTURE SELECTION */
+/* MULTI-FLOOR PREVIEW (local only, 2026-10-20): ?capture=2026-10-18&floors=all opens one Oct 18 station graph (Level 1 +
+   atrium stairs + Level 3 + partial Level 2) from the ignored capture-local package built by scripts/multifloor_review.py.
+   Upper-floor stations are already in the Level 1 scan frame, so the provisional Oct 18 registration applies unchanged.
+   The BIM pane's element floor follows the camera height. Never offered off localhost; nothing here is published. */
+const FLOORS_MANIFEST='capture-local/grimes-oct18-floors/panoramas/manifest.json';
+function multiFloorSelection(search,host,c){const q=new URLSearchParams(search);return c&&c.date==='2026-10-18'&&q.get('floors')==='all'&&['localhost','127.0.0.1'].includes(host)?{photo:FLOORS_MANIFEST}:null;}
+function floorForHeight(y){return !Number.isFinite(y)?null:y>=14.3+.5?'L3':y>=9.4+.5?'L2':'L1';}
+/* END MULTI-FLOOR PREVIEW */
 const capture=captureSelection(location.search),capturePicker=document.getElementById('captureDate');capturePicker.value=capture.date;
+const floorsPreview=multiFloorSelection(location.search,location.hostname,capture);if(floorsPreview)capture.photo=floorsPreview.photo;
+let bimFloor=null;
+function followFloor(y){const f=floorForHeight(y);if(!f||f===bimFloor)return;bimFloor=f;send('bim',{type:'grimes-floor',level:f});const sp=document.querySelector('section[aria-label="BIM model"] h2 span');if(sp)sp.textContent=({L1:'Level 1',L2:'Level 2',L3:'Level 3'})[f]+' · elements follow the photo floor';}
+if(['localhost','127.0.0.1'].includes(location.hostname)&&capture.date==='2026-10-18'){
+ const b=document.createElement('button');b.type='button';b.id='floorsToggle';b.style.cssText='font:12px Arial;background:#244562;color:white;border:1px solid #8aa5bb;border-radius:4px;padding:3px 6px;white-space:nowrap;flex:none';
+ b.textContent=floorsPreview?'Level 1 only':'Levels 1\u20133 (local)';b.title=floorsPreview?'Back to the Level 1 capture':'Local preview: Level 1 + atrium stairs + Level 3 + partial Level 2 (upper floors placed by photo matching; provisional, not surveyed)';
+ b.onclick=()=>{const u=new URL(location.href);if(floorsPreview)u.searchParams.delete('floors');else u.searchParams.set('floors','all');u.searchParams.delete('at');const p=currentBimPose();if(p)u.searchParams.set('at',encodeAt(p));location.assign(u);};
+ const show=()=>capturePicker.after(b);if(floorsPreview)show();else fetch(FLOORS_MANIFEST,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)show();}).catch(()=>{});
+ if(floorsPreview){const n=document.createElement('span');n.id='floorsNote';n.textContent='L1\u2013L3 preview \u00b7 provisional';n.title='Local preview: Level 1 + atrium stairs + Level 3 + partial Level 2. Upper floors placed by photo matching to Level 1 + ICP to BIM; provisional, not surveyed. Stairs: walk on, or PgUp / PgDn.';n.style.cssText='white-space:nowrap;color:#ffe495';document.querySelector('section[aria-label="Actual scan"] h2').appendChild(n);}
+}
 /* Keep the viewpoint across a display/capture switch: the page reloads, so the current pose travels in ?at= in the
    BIM frame (shared by every capture) and is converted with the new capture's own registration once it loads. */
 function currentBimPose(){try{if(poses.bim&&valid(poses.bim))return poses.bim;if(registration&&poses.scan&&valid(poses.scan))return convert(poses.scan,'scan');}catch(e){}return null;}
 function encodeAt(p){const q=p.quaternion,n=Math.hypot(...q)||1;return [...p.position.map(v=>v.toFixed(3)),...q.map(v=>(v/n).toFixed(4)),Math.max(20,Math.min(110,p.fov)).toFixed(1)].join(',');}
 function decodeAt(s){const v=String(s||'').split(',').map(Number);if(v.length!==8||!v.every(Number.isFinite))return null;const q=v.slice(3,7),n=Math.hypot(...q);if(!(n>.5))return null;const p={position:v.slice(0,3),quaternion:q.map(x=>x/n),fov:v[7],zoom:1};return valid(p)?p:null;}
-function navigateCapture(date,display){const u=new URL(location.href);if(date!==capture.date)u.searchParams.delete('registration');u.searchParams.set('capture',date);u.searchParams.set('mode',display);u.searchParams.delete('at');const p=currentBimPose();if(p)u.searchParams.set('at',encodeAt(p));location.assign(u);}
+function navigateCapture(date,display){const u=new URL(location.href);if(date!==capture.date)u.searchParams.delete('registration');if(date!==capture.date)u.searchParams.delete('manifest');u.searchParams.set('capture',date);u.searchParams.set('mode',display);u.searchParams.delete('at');const p=currentBimPose();if(p)u.searchParams.set('at',encodeAt(p));location.assign(u);}
 let carryPose=decodeAt(new URLSearchParams(location.search).get('at')),scanReady=false;
 if(new URLSearchParams(location.search).has('at')){try{const u=new URL(location.href);u.searchParams.delete('at');history.replaceState(history.state,'',u);}catch(e){}}
 function tryCarry(){if(!carryPose||!scanReady||!registration)return;let p;try{p=convert(carryPose,'bim');}catch(e){carryPose=null;return;}carryPose=null;
  send('scan',{type:photoMode?'grimes-photo-goto':'grimes-start-pose',pose:{...p,fov:Math.max(20,Math.min(110,p.fov)),zoom:1}});}
-capturePicker.onchange=()=>navigateCapture(capturePicker.value,mode.value==='splat'?'photo':mode.value);
+/* a Gaussian request travels with the date: captures without one fall back to photos with a note */
+capturePicker.onchange=()=>navigateCapture(capturePicker.value,mode.value==='splat'||capture.splatRefused?'splat':'photo');
 let photoMode=true,photoAnchor=null,photoMoving=false;
 const mode=document.getElementById('scanMode');
-mode.onchange=()=>navigateCapture(mode.value==='splat'?'2026-05-06':capture.date,mode.value);
+mode.onchange=()=>navigateCapture(capture.date,mode.value);
 const requestedMode=new URLSearchParams(location.search).get('mode');
 // The 3D mesh view was retired (reconstruction too distorted to read); old ?mode=mesh links open the 360° photos.
-frames[0].src='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&revision=mobile-controls1';
+const photoSource='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&revision=mobile-controls1';
+/* a requested Gaussian loads only after its manifest/index validates (no photo first, so ?at= reaches the right pane) */
+if(capture.display!=='splat')frames[0].src=photoSource;
 
 /* VIEW SWITCHER + X-RAY OVERLAY */
 let view=parseView(location.search);const overlayBar=document.getElementById('overlayBar'),xray=document.getElementById('xrayOpacity'),xrayOut=document.getElementById('xrayValue'),scanTitle=document.querySelector('section[aria-label="Actual scan"] h2');
-/* The slider drives the active style: inside the Lens it sets how strong the services look (default 100%); in Plain/Ghost it sets the whole overlay (default 30%). Each style keeps its own value. */
+/* The slider drives the active style: inside the Lens it sets how strong the services look (default 100%); in Plain it sets the whole overlay (default 30%). Each style keeps its own value. */
 let lensOpacity=1,plainOpacity=parseOpacity(location.search);
 function showXray(f){xray.value=String(Math.round(f*100));xrayOut.textContent=Math.round(f*100)+'%';xray.setAttribute('aria-valuetext',Math.round(f*100)+' percent');}
 function setXray(fraction){const f=clampOpacity(fraction);if(document.body.dataset.style==='lens'){lensOpacity=f;document.documentElement.style.setProperty('--lens-xray',String(f));}else{plainOpacity=f;document.documentElement.style.setProperty('--xray',String(f));}showXray(f);}
@@ -132,8 +174,8 @@ function setView(next,{push=true}={}){
 }
 document.querySelectorAll('#paneViews button').forEach(button=>button.onclick=()=>setView(button.dataset.focus==='both'?'compare':button.dataset.focus));
 /* OVERLAY STYLES RUNTIME (techniques cited at OVERLAY LOGIC) */
-let overlayStyle=parseStyle(location.search),lensTarget=null,lensNow=null,lensRaf=0,edgeFrame=null,edgeReady=false,lastStation=null,lastScanPose=null;
-const styleBtns=document.querySelectorAll('#styleBar button'),styleNote=document.getElementById('styleNote'),lensRing=document.getElementById('lensRing'),edgeLayer=document.getElementById('edgeLayer'),mainEl=document.querySelector('main');
+let overlayStyle=parseStyle(location.search),lensTarget=null,lensDrag=null,lensNow=null,lensRaf=0,lastStation=null;
+const styleBtns=document.querySelectorAll('#styleBar button'),styleNote=document.getElementById('styleNote'),lensRing=document.getElementById('lensRing'),mainEl=document.querySelector('main');
 const touchMq=matchMedia('(max-width:768px), (pointer:coarse)'),reduceMotion=matchMedia('(prefers-reduced-motion:reduce)');
 const styleEnv=()=>({display:mode.value,narrowOrTouch:touchMq.matches});
 function setStyle(next,{push=true}={}){
@@ -142,13 +184,10 @@ function setStyle(next,{push=true}={}){
  applyStyle();
 }
 function applyStyle(){
- const env=styleEnv(),eff=effectiveStyle(overlayStyle,env),ghostOk=ghostAvailable(env);
+ const env=styleEnv(),eff=effectiveStyle(overlayStyle,env);
  document.body.dataset.style=eff;
- styleBtns.forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.style===eff));if(b.dataset.style==='ghost'){b.disabled=!ghostOk;}});
- styleNote.textContent=overlayStyle==='ghost'&&!ghostOk?'Ghost edges need 360\u00b0 photos on desktop \u00b7 showing Plain':!ghostOk?'Ghost edges: 360\u00b0 photos, desktop only':eff==='lens'?'Move the mouse to move the lens':'';
- const wantEdges=document.body.dataset.focus==='overlay'&&eff==='ghost';
- if(wantEdges&&!edgeFrame){edgeReady=false;edgeFrame=document.createElement('iframe');edgeFrame.title='Scan edges';edgeFrame.setAttribute('aria-hidden','true');edgeFrame.src='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&edges=1&revision=edges1';edgeLayer.appendChild(edgeFrame);}
- else if(!wantEdges&&edgeFrame){edgeFrame.remove();edgeFrame=null;edgeReady=false;}
+ styleBtns.forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.style===eff));});
+ styleNote.textContent=eff==='lens'?(touchMq.matches?'Drag the ⠿ handle to move the lens':'Move the mouse to move the lens'):'';
  layoutLens(true);syncXray();
 }
 /* Phones: the card docks at the bottom, so lift the lens into the space above it and keep the two apart. */
@@ -157,7 +196,8 @@ function lensGeom(w,h){
  if(!touchMq.matches)return {c:lensCenter(lensTarget,w,h),r:lensRadius(w,h)};
  let cover=0;try{const m=mainEl.getBoundingClientRect().top;for(const el of [document.querySelector('header'),overlayBar])if(el){const b=el.getBoundingClientRect().bottom-m;if(Number.isFinite(b)&&b>cover)cover=b;}}catch(e){}
  const top=Math.min(h-120,Math.max(0,cover)+LENS_TOOLBAR_RESERVE),bottom=Math.max(top+80,h-LENS_CARD_RESERVE),r=Math.max(36,Math.min(lensRadius(w,h),(bottom-top)/2-6));
- return {c:{x:w/2,y:top+(bottom-top)/2},r};
+ const dragged=lensDragCenter(lensDrag,w,h,top,bottom);
+ return {c:dragged||{x:w/2,y:top+(bottom-top)/2},r};
 }
 function layoutLens(snap){
  if(document.body.dataset.style!=='lens'||document.body.dataset.focus!=='overlay'){document.documentElement.style.removeProperty('--lens-mask');return;}
@@ -168,21 +208,22 @@ function layoutLens(snap){
  Object.assign(lensRing.style,{left:(lensNow.x-r)+'px',top:(lensNow.y-r)+'px',width:2*r+'px',height:2*r+'px'});
 }
 new ResizeObserver(()=>layoutLens(true)).observe(mainEl);touchMq.addEventListener?.('change',applyStyle);
+/* Touch: drag the lens by its ⠿ handle (pointer capture on the handle only, so rotating the photo elsewhere is unaffected). */
+{const lensHandle=document.getElementById('lensHandle');let dragOff=null;
+ lensHandle.addEventListener('pointerdown',e=>{if(!lensNow)return;dragOff={id:e.pointerId,dx:lensNow.x-e.clientX,dy:lensNow.y-e.clientY};try{lensHandle.setPointerCapture(e.pointerId);}catch(err){}e.preventDefault();});
+ lensHandle.addEventListener('pointermove',e=>{if(!dragOff||e.pointerId!==dragOff.id)return;lensDrag={x:e.clientX+dragOff.dx,y:e.clientY+dragOff.dy};layoutLens(false);});
+ const endDrag=e=>{if(dragOff&&e.pointerId===dragOff.id)dragOff=null;};
+ lensHandle.addEventListener('pointerup',endDrag);lensHandle.addEventListener('pointercancel',endDrag);}
 styleBtns.forEach(b=>b.onclick=()=>{if(!b.disabled)setStyle(b.dataset.style);});
 /* scan panes report the mouse position (normalised); touch devices keep the lens centred */
 function edgeFromScan(d){
  if(d?.type==='grimes-pointer'){lensTarget=Number.isFinite(d.x)&&Number.isFinite(d.y)&&!touchMq.matches?{x:d.x,y:d.y}:null;layoutLens(false);return;}
- if(d?.type==='grimes-photo-station'&&Number.isInteger(d.index)){lastStation=d.index;edgeSend({type:'grimes-photo-station',index:d.index});}
- if(d?.type==='grimes-camera-pose'&&d.pose&&valid(d.pose))edgeRelay({type:'grimes-linked-pose',epoch:0,pose:d.pose});
- if(d?.type==='grimes-photo-transition')edgeLayer.dataset.moving=String(!!d.moving);
+ if(d?.type==='grimes-photo-station'&&Number.isInteger(d.index)){lastStation=d.index;}
 }
-function edgeSend(data){if(edgeFrame&&edgeReady)edgeFrame.contentWindow.postMessage(data,location.origin);}
-function edgeRelay(data){if(data.type==='grimes-linked-pose')lastScanPose=data;edgeSend(data);}
-window.addEventListener('message',e=>{if(e.origin!==location.origin||!edgeFrame||e.source!==edgeFrame.contentWindow||e.data?.type!=='grimes-camera-ready')return;edgeReady=true;if(lastStation!==null)edgeSend({type:'grimes-photo-station',index:lastStation});if(lastScanPose)edgeSend(lastScanPose);});
 frames[1].src='scan-bim.html?pane=bim&revision=overlay1'+(view==='overlay'?'&overlay=1':'');
 let registration=null,registrationPreview=false,driver='scan',epoch=0;const poses={};
 const index=p=>p==='scan'?0:1,other=p=>p==='scan'?'bim':'scan';
-const send=(pane,data)=>{if(pane==='scan'&&data?.type==='grimes-linked-pose')edgeRelay({...data,epoch:0});frames[index(pane)].contentWindow.postMessage(data,location.origin);};
+const send=(pane,data)=>{frames[index(pane)].contentWindow.postMessage(data,location.origin);};
 function valid(p){return p&&Array.isArray(p.position)&&p.position.length===3&&Array.isArray(p.quaternion)&&p.quaternion.length===4&&[...p.position,...p.quaternion,p.fov,p.zoom].every(Number.isFinite)&&p.fov>0&&p.fov<180&&p.zoom>0;}
 function convert(p,from){
  const a=registration.rotationYDegrees*Math.PI/180,c=Math.cos(a),s=Math.sin(a),t=registration.translation;
@@ -193,8 +234,8 @@ function convert(p,from){
  return{position,quaternion:[w*qx+h*qz,w*qy+h*qw,w*qz-h*qx,w*qw-h*qy],fov:p.fov,zoom:p.zoom};
 }
 function acceptedPose(p,pane){if(photoMode){if(pane==='scan')photoAnchor=p.position.slice();else if(photoAnchor&&registration)p={...p,position:convert({...p,position:photoAnchor},'scan').position};}return p;}
-function sync(){if(!link.checked||!registration||!poses[driver])return;const target=other(driver),pose=convert(poses[driver],driver);poses[target]=pose;send(target,{type:'grimes-linked-pose',epoch,pose});}
-function roles(){send('bim',{type:'grimes-photo-mode',enabled:photoMode});send('bim',{type:'grimes-overlay',enabled:view==='overlay'});for(const pane of ['scan','bim'])send(pane,{type:'grimes-camera-role',epoch,driver,linked:link.checked});sendHeadingOffsets();status.textContent=view==='overlay'?(link.checked?(registrationPreview?previewLabel(registration):overlayLabel(capture))+' \u00b7 Drag the scan; BIM services follow':'Overlay unavailable \u00b7 Registration missing'):link.checked?photoMode?(registrationPreview?'Preview candidate · ':capture.provisional?'Provisional alignment · ':'Aligned photos · ')+'Drag either view · WASD follows capture route':(mode.value==='splat'?'Gaussian · experimental appearance, not surveyed geometry · ':(registrationPreview?'Preview candidate · ':capture.provisional?'Provisional alignment · ':'Aligned views · '))+'Move either pane · '+(driver==='scan'?'Scan':'BIM')+' controls both':'Independent cameras';if(typeof alignStatusText==='function'){const a=alignStatusText();if(a)status.textContent=a;}sync();}
+function sync(){if(!link.checked||!registration||!poses[driver])return;const target=other(driver),pose=convert(poses[driver],driver);poses[target]=pose;if(floorsPreview)followFloor((target==='bim'?pose:poses[driver]).position[1]);send(target,{type:'grimes-linked-pose',epoch,pose});}
+function roles(){send('bim',{type:'grimes-photo-mode',enabled:photoMode});if(floorsPreview&&bimFloor)send('bim',{type:'grimes-floor',level:bimFloor});send('bim',{type:'grimes-overlay',enabled:view==='overlay'});for(const pane of ['scan','bim'])send(pane,{type:'grimes-camera-role',epoch,driver,linked:link.checked});sendHeadingOffsets();status.textContent=view==='overlay'?(link.checked?(registrationPreview?previewLabel(registration):overlayLabel(capture))+' \u00b7 Drag the scan; BIM services follow':'Overlay unavailable \u00b7 Registration missing'):link.checked?photoMode?(registrationPreview?'Preview candidate · ':capture.provisional?'Provisional alignment · ':'Aligned photos · ')+'Drag either view · WASD follows capture route':(mode.value==='splat'?'Gaussian · experimental appearance, not surveyed geometry · ':(registrationPreview?'Preview candidate · ':capture.provisional?'Provisional alignment · ':'Aligned views · '))+'Move either pane · '+(driver==='scan'?'Scan':'BIM')+' controls both':'Independent cameras';{const n=typeof scanNoteText==='function'?scanNoteText():'';if(n)status.textContent=n+' \u00b7 '+status.textContent;}if(typeof alignStatusText==='function'){const a=alignStatusText();if(a)status.textContent=a;}sync();}
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;const pane=e.source===frames[0].contentWindow?'scan':e.source===frames[1].contentWindow?'bim':null;if(!pane)return;const d=e.data;if(pane==='scan')edgeFromScan(d);
  if(d?.type==='grimes-photo-transition'&&pane==='scan'&&photoMode){photoMoving=!!d.moving;if(!photoMoving)roles();return;}
@@ -207,10 +248,25 @@ window.addEventListener('message',e=>{
  if(link.checked&&pane!==driver)return;poses[pane]=acceptedPose(d.pose,pane);if(pane===driver)sync();
 });
 link.onchange=()=>{epoch++;roles()};
-let GAUSSIAN_MANIFEST='scan-assets/gaussian/2026-05-06/viewer.json';
-// A local run can be previewed with ?manifest=work/gaussian/...; the override is honoured on localhost only.
-{const o=['localhost','127.0.0.1'].includes(location.hostname)?new URLSearchParams(location.search).get('manifest'):null;if(o&&/^[\w.\/-]+\.json$/.test(o)&&!o.includes('..'))GAUSSIAN_MANIFEST=o;}
-fetch(GAUSSIAN_MANIFEST,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(m=>{if(m.status!=='experimental-trained'||m.frame!=='scan-y-up-metres')return;mode.querySelector('[value=splat]').disabled=false;if(new URLSearchParams(location.search).get('mode')==='splat'){mode.value='splat';photoMode=false;frames[0].src=splatSource(GAUSSIAN_MANIFEST);epoch++;roles();}}).catch(()=>{});
+/* GAUSSIAN PER CAPTURE: the option is enabled only when this capture's own manifest / zone index validates. */
+let gaussianSource=capture.gaussian,gaussianPreview=false,gaussianNote='',gaussianFailed=false;
+// A local run can be previewed with ?manifest=work/gaussian/...; the override is honoured on localhost only and labelled.
+{const o=['localhost','127.0.0.1'].includes(location.hostname)?new URLSearchParams(location.search).get('manifest'):null;if(o&&/^[\w.\/-]+\.json$/.test(o)&&!o.includes('..')){gaussianSource={kind:'manifest',path:o};gaussianPreview=true;}}
+const splatOption=mode.querySelector('[value=splat]');splatOption.textContent=gaussianOptionLabel({...capture,gaussian:gaussianSource});
+if(!gaussianSource)splatOption.title='No Gaussian for this capture (only May 6 and Oct 18 have one)';
+function scanNoteText(){
+ if(gaussianFailed)return 'Gaussian unavailable \u00b7 showing 360\u00b0 photos';
+ if(capture.splatRefused)return 'No Gaussian for '+CAPTURE_SHORT[capture.date]+' \u00b7 showing 360\u00b0 photos';
+ if(photoMode)return '';
+ return [view==='overlay'?'Gaussian \u00b7 experimental appearance, not surveyed':'',gaussianPreview?'local preview manifest':'',gaussianNote?CAPTURE_SHORT[capture.date]+' '+gaussianNote:''].filter(Boolean).join(' \u00b7 ');
+}
+function startSplat(){mode.value='splat';photoMode=false;scanReady=false;frames[0].src=splatSource(gaussianSource,capture.date);epoch++;applyStyle();roles();}
+if(gaussianSource)fetch(gaussianSource.path,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('missing');return r.json()}).then(m=>{
+ if(gaussianSource.kind==='zones')gaussianNote=gaussianZoneSummary(m).note;
+ else if(m.status!=='experimental-trained'||m.frame!=='scan-y-up-metres')throw Error('unsupported manifest');
+ splatOption.disabled=false;splatOption.title='Experimental appearance layer, not surveyed geometry'+(gaussianNote?' \u00b7 '+gaussianNote:'');
+ if(capture.display==='splat')startSplat();
+}).catch(()=>{splatOption.title='Gaussian unavailable for this capture';if(capture.display==='splat'){gaussianFailed=true;frames[0].src=photoSource;roles();}});
 if(view!=='compare')setView(view,{push:false});
 /* Phones: the control stack can take most of the screen; let it fold so the photo, lens and card have room. */
 {const btn=document.getElementById('controlsToggle');
@@ -222,7 +278,7 @@ if(view!=='compare')setView(view,{push:false});
  touchMq.addEventListener?.('change',sync);}
 
 /* per-station photo heading offsets from a previewed candidate (empty for accepted/provisional files) */
-function sendHeadingOffsets(){if(!photoMode)return;const data={type:'grimes-heading-offsets',offsets:registrationPreview?headingOffsets(registration):{}};frames[0].contentWindow?.postMessage(data,location.origin);edgeSend(data);}
+function sendHeadingOffsets(){if(!photoMode)return;const data={type:'grimes-heading-offsets',offsets:registrationPreview?headingOffsets(registration):{}};frames[0].contentWindow?.postMessage(data,location.origin);}
 function useRegistration(c,preview){registration=c;registrationPreview=preview;link.disabled=view==='overlay';link.checked=true;if(typeof alignOnRegistration==='function')alignOnRegistration(c,preview);epoch++;roles();tryCarry();}
 function loadDefaultRegistration(note){return fetch(capture.registration,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(c=>{if(c.status!==(capture.provisional?'project-frame-provisional':'geometry-registered')||!Number.isFinite(c.rotationYDegrees)||!Array.isArray(c.translation)||c.translation.length!==3||!c.translation.every(Number.isFinite))throw Error();useRegistration(c,false);if(note)status.textContent=note+' \u00b7 '+status.textContent;}).catch(()=>status.textContent='Independent cameras · Registration unavailable');}
 const candidatePath=registrationOverride(location.search);
@@ -270,8 +326,9 @@ function onLensPick(d){
  const k=pick.hit?AsBuilt.key(pick.hit.layer,pick.hit.id):null;lensHit=pick.hit;
  if(ElementCards.gazeDwell(lensDwell,k,performance.now()).show){
   clearTimeout(lensHideT);lensHideT=null;
-  lensCard.innerHTML=ElementCards.gazeCardHtml(pick.hit.id,pick.hit.meta,pick.hit.tier,{adjustment:abMode==='asbuilt'?pick.hit.adjustment:null});
-  try{lensCard.insertAdjacentHTML('beforeend',lensSparkHtml(pick.hit.tier));}catch(e){}
+  let tier=pick.hit.tier,water=false;try{const w=lensWaterTier(pick.hit,tier);if(w){tier=w;water=true;}}catch(e){}
+  lensCard.innerHTML=ElementCards.gazeCardHtml(pick.hit.id,pick.hit.meta,tier,{adjustment:abMode==='asbuilt'?pick.hit.adjustment:null});
+  try{lensCard.insertAdjacentHTML('beforeend',water?lensWaterSparkHtml():lensSparkHtml(tier));}catch(e){}
   lensCard.dataset.elementKey=k;lensShownKey=k;placeLensCard();lensCard.classList.add('show');
  }else if(!k)hideLensCard(false);
  if(!abPanel.hidden)abRender();
@@ -288,6 +345,29 @@ function lensSparkHtml(tier){
  const line=xy.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' '),last=xy[xy.length-1];
  return '<div class="gz-spark"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,'+H+' '+line+' '+W+','+H+'" fill="rgba(253,181,21,.18)"/><polyline points="'+line+'" fill="none" stroke="#FDB515" stroke-width="1.6"/><circle cx="'+last[0].toFixed(1)+'" cy="'+last[1].toFixed(1)+'" r="2.6" fill="#FDB515"/></svg>'
   +'<div class="gz-spark-cap">Grimes building · last 24 h · '+Math.round(v[v.length-1])+' kW now (BMO)</div></div>';
+}
+/* Domestic-water context for supply plumbing (copper pipe, fixtures): volume from Grimes' two BMO water counters
+   (pulse meters, ~75 gal per step), published as water.usage in building_data.json. Volume, never an
+   instantaneous rate; building meters, never this element's own reading. Drains and hydronic piping keep
+   NO FEED, and so does everything until the collector has published usage. */
+let lensWater=null;
+fetch((()=>{try{const o=['localhost','127.0.0.1'].includes(location.hostname)?new URLSearchParams(location.search).get('buildingData'):null;if(o&&/^[\w.\/-]+\.json$/.test(o)&&!o.includes('..'))return o;}catch(e){}return 'https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json';})(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+ const u=d&&d.water&&d.water.usage;if(!u||!Number.isFinite(u.today_gal)||!Array.isArray(u.hourly_gal))return;
+ const last=Array.isArray(u.counters)&&u.counters.length?String(u.counters[u.counters.length-1].t||''):'';
+ lensWater={today:u.today_gal,at:last,hours:u.hourly_gal.map(h=>Number(h&&h.gal)).filter(Number.isFinite).slice(-24)};}).catch(()=>{});
+function lensWaterTier(hit,tier){
+ if(!lensWater||!hit||hit.layer!=='plumbing'||!tier||tier.tier!=='NONE')return null;
+ const m=hit.meta||{},type=String(m.type||''),sys=String(m.system||'');
+ if(!/copper pipe/i.test(type)&&!/SANR-FIXT/i.test(sys))return null;
+ return {tier:'CONTEXT',label:'CONTEXT',cls:'ctx',valueText:'Today ≈ '+Math.round(lensWater.today).toLocaleString('en-US')+' gal',
+  detailText:'Building water meters 70313686/87 context · not this element’s own reading',sourceText:/^\d{4}-\d\d-\d\d \d\d:\d\d/.test(lensWater.at)?'to '+lensWater.at.slice(11,16)+' Pacific · 75-gal steps':''};
+}
+function lensWaterSparkHtml(){
+ const v=lensWater&&lensWater.hours;if(!v||v.length<3)return '';
+ const W=220,H=34,mx=Math.max(1,...v),bw=W/v.length;
+ const bars=v.map((g,i)=>{const h=Math.max(g>0?2:0,(g/mx)*(H-4));return '<rect x="'+(i*bw+.6).toFixed(1)+'" y="'+(H-h).toFixed(1)+'" width="'+Math.max(1,bw-1.2).toFixed(1)+'" height="'+h.toFixed(1)+'" fill="#60a5fa"/>';}).join('');
+ return '<div class="gz-spark"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>'
+  +'<div class="gz-spark-cap">Grimes domestic water · gallons per hour, last 24 h (BMO counters)</div></div>';
 }
 function setLensCards(on){lensCardsOn=!!on;lensCardsBtn.setAttribute('aria-pressed',String(lensCardsOn));lensCardsBtn.textContent='Info cards: '+(lensCardsOn?'on':'off');if(!lensCardsOn)hideLensCard(true);}
 lensCardsBtn.onclick=()=>setLensCards(!lensCardsOn);
