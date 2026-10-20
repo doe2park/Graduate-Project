@@ -19,7 +19,15 @@ TESTS = ROOT / "tests"
 
 
 def python_exe():
-    """The interpreter running this script (needs requests + numpy; the Gaussian venv has no requests)."""
+    """First interpreter that has numpy + requests (the Gaussian venv has no requests; a bare Homebrew python3,
+    which VS Code's login shell may pick, has neither). Falls back to the one running this script."""
+    import shutil
+    candidates = [sys.executable, str(Path.home() / "miniforge3/bin/python3"), shutil.which("python3.11"),
+                  "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3", shutil.which("python3")]
+    for exe in candidates:
+        if exe and Path(exe).exists() and subprocess.run(
+                [exe, "-c", "import numpy, requests"], capture_output=True).returncode == 0:
+            return exe
     return sys.executable
 
 
