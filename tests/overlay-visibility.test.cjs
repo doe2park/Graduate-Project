@@ -89,3 +89,66 @@ test('page wiring: Range control, ?range= persistence, BIM pane messages, render
  assert.match(bim,/interior\/enclosure-l1\.glb \(Walls\)/);
  /* capture/mode switches copy location.href, so ?range= travels with ?at= */
  assert.match(compare,/function navigateCapture\(date,display\)\{const u=new URL\(location\.href\)/)});
+
+/* ── distance culling (2026-10-20) ── */
+test('cull limit: fadeEnd padded by the recompute distance; All never culls',()=>{
+ const {moveM,padM}=OV.CULL;assert.equal(moveM,.5);assert.ok(padM>0&&padM<.2);
+ close(OV.cullLimit('near'),6+moveM+padM);close(OV.cullLimit('room'),14+moveM+padM);
+ assert.equal(OV.cullLimit('all'),Infinity);assert.equal(OV.cullLimit(OV.preset('bogus')),OV.cullLimit('room'));
+ /* anything culled at the last recompute is still beyond fadeEnd (fade exactly 0) anywhere within moveM of that point */
+ for(const k of ['near','room'])assert.equal(OV.rangeFade(OV.cullLimit(k)-moveM,k),0)});
+
+test('cull decision: the nearest point of the bounding sphere must be beyond the limit',()=>{
+ const L=OV.cullLimit('room');
+ assert.equal(OV.sphereBeyond(20,0,0,1,0,0,0,L),true);            // nearest point 19 m
+ assert.equal(OV.sphereBeyond(15,0,0,1,0,0,0,L),false,'nearest point 14 m: still drawn (fade boundary)');
+ assert.equal(OV.sphereBeyond(40,0,0,30,0,0,0,L),false,'a long pipe reaching back toward the camera is kept');
+ assert.equal(OV.sphereBeyond(1e4,0,0,1,0,0,0,Infinity),false,'All');
+ assert.equal(OV.sphereBeyond(NaN,0,0,1,0,0,0,L),false,'unknown bounds are never culled');
+ const s=new Float32Array([20,0,0,1, 15,0,0,1, 0,3,0,.5, NaN,0,0,0, 0,0,-30,10]),keep=new Uint8Array(5).fill(1);
+ let r=OV.cullSpheres(s,[0,0,0],L,keep);assert.deepEqual([...keep],[0,1,1,1,0]);assert.deepEqual(r,{kept:3,changed:2});
+ r=OV.cullSpheres(s,[0,0,0],L,keep);assert.deepEqual(r,{kept:3,changed:0},'unchanged set: nothing to re-upload');
+ r=OV.cullSpheres(s,[0,0,0],Infinity,keep);assert.deepEqual([...keep],[1,1,1,1,1]);assert.equal(r.kept,5);
+ /* squared fast path agrees with sphereBeyond */
+ const n=2000,sp=new Float32Array(n*4),k=new Uint8Array(n);let seed=7;const rnd=()=>((seed=(seed*16807)%2147483647)/2147483647);
+ for(let i=0;i<n;i++){sp[i*4]=rnd()*60-30;sp[i*4+1]=rnd()*10;sp[i*4+2]=rnd()*60-30;sp[i*4+3]=rnd()*4;}
+ OV.cullSpheres(sp,[1,2,3],L,k);for(let i=0;i<n;i++)assert.equal(k[i]===0,OV.sphereBeyond(sp[i*4],sp[i*4+1],sp[i*4+2],sp[i*4+3],1,2,3,L))});
+
+test('element bounds from a vertex range (AABB centre, half diagonal)',()=>{
+ const p=new Float32Array([9,9,9, 0,0,0, 2,0,0, 0,4,4, 9,9,9]),o=new Float32Array(8);
+ OV.rangeSphere(p,1,3,o,4);assert.deepEqual([...o.slice(4,7)],[1,2,2]);close(o[7],Math.hypot(2,4,4)/2,1e-6);
+ OV.rangeSphere(p,0,0,o,0);assert.ok(Number.isNaN(o[3]),'empty range has no bounds (never culled)')});
+
+test('merged batch compaction keeps draw order, merges adjacent runs and maps picks back',()=>{
+ const src=Uint16Array.from({length:18},(_,i)=>100+i);                 // 6 triangles, element ranges of 3/6/3/6 indices
+ const starts=Uint32Array.from([0,3,9,12]),counts=Uint32Array.from([3,6,3,6]),dst=new Uint16Array(18),map=new Uint32Array(8);
+ let r=OV.compactRanges(starts,counts,Uint8Array.from([1,0,1,1]),src,dst,map);
+ assert.deepEqual(r,{count:12,runs:2});assert.deepEqual([...dst.slice(0,12)],[100,101,102,109,110,111,112,113,114,115,116,117]);
+ assert.equal(OV.compactedToSource(0,map,r.runs),0);assert.equal(OV.compactedToSource(3,map,r.runs),9);assert.equal(OV.compactedToSource(11,map,r.runs),17);
+ r=OV.compactRanges(starts,counts,new Uint8Array(4),src,dst,map);assert.deepEqual(r,{count:0,runs:0});
+ r=OV.compactRanges(starts,counts,new Uint8Array(4).fill(1),src,dst,map);assert.deepEqual(r,{count:18,runs:1})});
+
+test('instanced batch compaction keeps order and records the source instance',()=>{
+ const m=Float32Array.from({length:4*16},(_,i)=>i),c=Float32Array.from({length:12},(_,i)=>i),dm=new Float32Array(64),dc=new Float32Array(12),order=new Uint32Array(4);
+ const k=OV.compactInstances(Uint8Array.from([0,1,0,1]),[[m,dm,16],[c,dc,3]],order);
+ assert.equal(k,2);assert.deepEqual([...order.slice(0,2)],[1,3]);assert.deepEqual([...dm.slice(0,16)],[...m.slice(16,32)]);assert.deepEqual([...dm.slice(16,32)],[...m.slice(48,64)]);
+ assert.deepEqual([...dc.slice(0,6)],[3,4,5,9,10,11])});
+
+test('recompute only after moving more than moveM, or when range / revision change',()=>{
+ const t=OV.createCullTracker();
+ assert.equal(t.needs([0,0,0],'room',1),true,'first frame');
+ assert.equal(t.needs([0.3,0,0],'room',1),false);assert.equal(t.needs([0.5,0,0],'room',1),false,'exactly moveM: still exact');
+ assert.equal(t.needs([0.51,0,0],'room',1),true);assert.equal(t.last.x,.51);
+ assert.equal(t.needs([0.6,0.1,0],'room',1),false,'measured from the last recompute, not the last frame');
+ assert.equal(t.needs([0.6,0.1,0],'near',1),true,'range change');assert.equal(t.needs([0.6,0.1,0],'near',2),true,'visibility / geometry revision');
+ t.reset();assert.equal(t.needs([0.6,0.1,0],'near',2),true)});
+
+test('page wiring: culling runs inside the gated draw, is swapped back after it, and picks skip culled elements',()=>{
+ assert.match(bim,/function ovBeforeRender\(\)\{\n ovCullUpdate\(\);ovCullApply\(\);/);
+ assert.match(bim,/finally \{ if \(typeof ovAfterRender === 'function'\) ovAfterRender\(\); \}/);
+ assert.match(bim,/ovCullApply\(\);hits=raycaster\.intersectObjects\(visibleEquip\(\),false\)\.map\(ovCullMapHit\);\}finally\{ovCullRestore\(\);\}/);
+ assert.match(bim,/m\.layers\.disable\(0\)/,'separate cull flag: layers, not .visible');
+ assert.doesNotMatch(bim.slice(bim.indexOf('function ovCullUpdate'),bim.indexOf('function ovCullCompactInstances')),/\.visible\s*=/,'cull never writes .visible');
+ assert.match(bim,/OV\.cullLimit\(ovPreset\)/);assert.match(bim,/get\('cull'\)!=='0'/);
+ /* the shared helper stays Three.js-free for scan-xr.html */
+ const src=fs.readFileSync(path.join(__dirname,'../twin/overlay-visibility.js'),'utf8');assert.doesNotMatch(src,/\bTHREE\b|require\(|import /)});

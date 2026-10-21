@@ -12,6 +12,7 @@
       Ceilings are NOT occluders: services above the ceiling (plenum) are what the X-ray is for.
    The parent page's opacity slider (iframe opacity / lens mask) multiplies on top of this.
 
+   3. DISTANCE CULLING  (below) skips submitting elements wholly beyond fadeEnd: less work, same image.
    Works as a browser global (window.OverlayVisibility) and as CommonJS (tests). Kept free of Three.js so scan-xr.html
    can adopt patchShader() later with its own uniforms (not wired into XR yet). */
 (function (root, factory) {
@@ -145,7 +146,96 @@ function patchOccluderShader(shader) {
 /* Interior element -> wall occluder? Walls only (doors may be open, mullions frame glass, ceilings hide the plenum). */
 function isWallOccluder(info) { return !!info && info.category === 'Walls'; }
 
+/* ── DISTANCE CULLING (2026-10-20): skip drawing what the fade already makes invisible. ──
+   An element whose bounding sphere lies entirely beyond fadeEnd has every fragment at distance >= fadeEnd, where the fade
+   is exactly 0 and the fragment is discarded, so not submitting it cannot change the image. The cull set is recomputed
+   only when the camera has moved more than CULL.moveM (or the range / geometry changed), so the cut-off is padded by
+   moveM: anything culled at the last recompute is still beyond fadeEnd anywhere within moveM of that point.
+   All (infinite fadeEnd) never culls. Plain typed arrays only (no Three.js), so scan-xr.html can reuse it. */
+const CULL = Object.freeze({ moveM: 0.5, padM: 0.05 });
+function cullLimit(p) {
+  p = typeof p === 'string' ? preset(p) : p;
+  return p && Number.isFinite(p.fadeEnd) ? p.fadeEnd + CULL.moveM + CULL.padM : Infinity;
+}
+/* true when no point of the sphere (centre c, radius r) is within limit of the camera e */
+function sphereBeyond(cx, cy, cz, r, ex, ey, ez, limit) {
+  if (!Number.isFinite(limit)) return false;
+  if (![cx, cy, cz, r].every(Number.isFinite)) return false;   // unknown bounds: never cull
+  return Math.hypot(cx - ex, cy - ey, cz - ez) - r > limit;
+}
+/* spheres: Float32Array [cx,cy,cz,r]*n; keep: Uint8Array(n) in/out (1 = draw). Returns {kept, changed}: changed = how many
+   entries flipped since the previous call, so unchanged batches need no re-compaction or GPU upload. */
+function cullSpheres(spheres, eye, limit, keep) {
+  const n = keep.length, ex = eye[0], ey = eye[1], ez = eye[2], cullAny = Number.isFinite(limit); let kept = 0, changed = 0;
+  for (let i = 0, j = 0; i < n; i++, j += 4) {
+    /* same rule as sphereBeyond, squared (no sqrt): |c - e| - r > limit  <=>  |c - e|^2 > (limit + r)^2; NaN bounds never cull */
+    const dx = spheres[j] - ex, dy = spheres[j + 1] - ey, dz = spheres[j + 2] - ez, lr = limit + spheres[j + 3];
+    const k = cullAny && dx * dx + dy * dy + dz * dz > lr * lr && lr >= 0 ? 0 : 1;
+    if (keep[i] !== k) { keep[i] = k; changed++; }
+    kept += k;
+  }
+  return { kept, changed };
+}
+/* bounding sphere (AABB centre, half diagonal) of vertices [start, start+count) of a flat xyz array */
+function rangeSphere(positions, start, count, out, at) {
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = start; i < start + count; i++) {
+    const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z;
+  }
+  if (!(x1 >= x0)) { out[at] = out[at + 1] = out[at + 2] = out[at + 3] = NaN; return out; }
+  out[at] = (x0 + x1) / 2; out[at + 1] = (y0 + y1) / 2; out[at + 2] = (z0 + z1) / 2; out[at + 3] = Math.hypot(x1 - x0, y1 - y0, z1 - z0) / 2;
+  return out;
+}
+/* Merged batch: copy the index slices of kept element ranges (original order kept, so draw order is unchanged) into dst.
+   starts/counts: index-buffer offsets per range. map (optional Uint32Array 2*n): [dstStart, srcStart] per copied run,
+   to translate a compacted face index back for picking. Returns {count, runs}. */
+function compactRanges(starts, counts, keep, src, dst, map) {
+  let w = 0, runs = 0;
+  for (let i = 0; i < keep.length;) {
+    if (!keep[i]) { i++; continue; }
+    const s = starts[i]; let e = s + counts[i], j = i + 1;
+    while (j < keep.length && keep[j] && starts[j] === e) { e += counts[j]; j++; }
+    dst.set(src.subarray(s, e), w);
+    if (map) { map[runs * 2] = w; map[runs * 2 + 1] = s; }
+    w += e - s; runs++; i = j;
+  }
+  return { count: w, runs };
+}
+/* compacted offset -> original index-buffer offset (binary search over the runs written by compactRanges) */
+function compactedToSource(offset, map, runs) {
+  let lo = 0, hi = runs - 1, at = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (map[mid * 2] <= offset) { at = mid; lo = mid + 1; } else hi = mid - 1; }
+  return at < 0 ? -1 : map[at * 2 + 1] + (offset - map[at * 2]);
+}
+/* Instanced batch: copy kept instances (order kept) of itemSize-wide attributes; order[] receives the source index of
+   each drawn instance (to translate a picked instanceId back). Returns the kept count. */
+function compactInstances(keep, pairs, order) {
+  let k = 0;
+  for (let i = 0; i < keep.length; i++) {
+    if (!keep[i]) continue;
+    for (const [src, dst, size] of pairs) for (let c = 0; c < size; c++) dst[k * size + c] = src[i * size + c];
+    if (order) order[k] = i;
+    k++;
+  }
+  return k;
+}
+/* Recompute only when needed: camera moved > moveM since the last recompute, range changed, or revision changed. */
+function createCullTracker({ moveM = CULL.moveM } = {}) {
+  let last = null;
+  return {
+    needs(eye, key, revision) {
+      const now = { x: +eye[0], y: +eye[1], z: +eye[2], key, revision };
+      if (last && last.key === key && last.revision === revision && Math.hypot(now.x - last.x, now.y - last.y, now.z - last.z) <= moveM) return false;
+      last = now; return true;
+    },
+    reset() { last = null; },
+    get last() { return last && { ...last }; },
+  };
+}
+
 return { RANGE_PRESETS, RANGE_KEYS, DEFAULT_RANGE, OCCLUSION, LENS_CORE, PICK_MIN, FAR_NONE,
   parseRange, preset, smoothstep, rangeFade, lensWeight, occlusionFactor, isOccluded, visibility, isPickable, uniformValues, lensToFragCoord,
-  VERTEX_DECL, VERTEX_MAIN, FRAGMENT_DECL, FRAGMENT_MAIN, patchShader, patchOccluderShader, isWallOccluder };
+  VERTEX_DECL, VERTEX_MAIN, FRAGMENT_DECL, FRAGMENT_MAIN, patchShader, patchOccluderShader, isWallOccluder,
+  CULL, cullLimit, sphereBeyond, cullSpheres, rangeSphere, compactRanges, compactedToSource, compactInstances, createCullTracker };
 });

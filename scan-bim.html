@@ -2689,6 +2689,7 @@ async function loadWallOccluder(){
 }
 const _ovSize=new THREE.Vector2();
 function ovBeforeRender(){
+ ovCullUpdate();ovCullApply();
  OV_UNIFORMS.ovOn.value=overlayOn?1:0;
  const l=OV.lensToFragCoord(ovLensCss,renderer.domElement.clientHeight,renderer.getPixelRatio());OV_UNIFORMS.ovLens.value.set(l[0],l[1],l[2],l[3]);
  const active=overlayOn&&ovPreset.occlude&&ovOcc.state==='ready'&&ovOccluderFloorOk();
@@ -2706,8 +2707,163 @@ function ovWallDistance(ray){
  for(const h of _ovRay.intersectObject(ovOcc.mesh,false))if(h.distance>=OV.OCCLUSION.nearIgnoreM)return h.distance;
  return Infinity;
 }
+/* ══ DISTANCE CULLING (2026-10-20; OV.cullLimit / cullSpheres / compactRanges / compactInstances) ══
+   With a finite Range, elements whose bounding sphere is wholly beyond fadeEnd are not submitted at all: their every
+   fragment is faded to 0 and discarded today, so the image is unchanged. Per element, not per batch:
+   - merged batches: the kept elements' index slices are copied (original order) into a second geometry that shares the
+     vertex attributes and bounding sphere; it is swapped in only around renderer.render (and the lens raycast, whose
+     face index is mapped back), so highlights, as-built edits and normal picking keep using the original geometry;
+   - instanced batches: kept instances' matrices/colours are compacted into their own buffers (order kept), swapped in
+     the same way (picked instanceId mapped back through `order`);
+   - a batch with nothing in reach leaves camera layer 0 (Object3D.layers), a cull flag separate from .visible (level /
+     type / layer filters), which renderer AND raycaster both honour.
+   The wall pre-pass stays ONE mesh: splitting it into 8 m tiles and skipping far tiles was measured (2026-10-20) and gave
+   no gain here (+20-40 draw calls for ~70k fewer depth-only triangles; the frame is draw-call bound).
+   The cull set is recomputed only when the camera moved > OV.CULL.moveM, the Range changed, or a batch's visibility /
+   geometry version changed (the cut-off is padded by moveM, so it stays exact in between). All = no culling. */
+const ovCull={enabled:new URLSearchParams(location.search).get('cull')!=='0',active:false,tracker:OV.createCullTracker(),partial:[],applied:false,limit:Infinity,
+ stats:{recomputes:0,lastMs:0,boundsMs:0}};
+const _ovV=new THREE.Vector3(),_ovM=new THREE.Matrix4(),_ovS=new THREE.Sphere();
+function ovCullState(m){
+ let st=m.userData.ovCull;if(st)return st;
+ const t0=performance.now();
+ if(m.isInstancedMesh){
+  const n=m.count;st={kind:'inst',n,spheres:new Float32Array(n*4),keep:new Uint8Array(n).fill(1),order:new Uint32Array(n),version:-1,colorVersion:-1,kept:n,
+   full:{matrix:m.instanceMatrix,color:m.instanceColor,count:n},drawMatrix:null,drawColor:null};
+ }else if(m.geometry.index&&m.userData.ranges?.length){
+  const r=m.userData.ranges,n=r.length,full=m.geometry,draw=new THREE.BufferGeometry();
+  for(const [name,a] of Object.entries(full.attributes))draw.setAttribute(name,a);
+  draw.setIndex(new THREE.BufferAttribute(new full.index.array.constructor(0),1));   // grown on demand (ovCullCapacity)
+  if(!full.boundingSphere)full.computeBoundingSphere();draw.boundingSphere=full.boundingSphere;draw.boundingBox=full.boundingBox;
+  st={kind:'merged',n,spheres:new Float32Array(n*4),keep:new Uint8Array(n).fill(1),starts:Uint32Array.from(r,x=>x.start),counts:Uint32Array.from(r,x=>x.count),
+   map:new Uint32Array(n*2),runs:0,version:-1,kept:n,full,draw};
+ }else st={kind:'whole',n:1,spheres:new Float32Array(4),keep:new Uint8Array(1).fill(1),version:-1,kept:1};
+ st.state='all';m.userData.ovCull=st;ovCull.stats.boundsMs+=performance.now()-t0;return st;
+}
+function ovCullVersion(m){return m.isInstancedMesh?m.userData.ovCull?.full.matrix.version??m.instanceMatrix.version:m.geometry.attributes.position.version;}
+/* (re)compute element bounding spheres in world space when the batch's geometry / instance matrices changed */
+function ovCullBounds(m,st){
+ const ver=ovCullVersion(m);if(st.version===ver)return;const t0=performance.now();st.version=ver;m.updateWorldMatrix(true,false);
+ if(st.kind==='inst'){
+  if(!m.geometry.boundingSphere)m.geometry.computeBoundingSphere();const local=m.geometry.boundingSphere,arr=st.full.matrix.array;
+  for(let i=0;i<st.n;i++){_ovM.fromArray(arr,i*16).premultiply(m.matrixWorld);_ovS.copy(local).applyMatrix4(_ovM);st.spheres.set([_ovS.center.x,_ovS.center.y,_ovS.center.z,_ovS.radius],i*4);}
+ }else if(st.kind==='merged'){
+  const pos=st.full.attributes.position.array,r=m.userData.ranges;
+  for(let i=0;i<st.n;i++)OV.rangeSphere(pos,r[i].vertexStart,r[i].vertexCount,st.spheres,i*4);
+  if(!m.matrixWorld.equals(_ovM.identity()))for(let i=0;i<st.n;i++){_ovS.center.fromArray(st.spheres,i*4);_ovS.radius=st.spheres[i*4+3];_ovS.applyMatrix4(m.matrixWorld);st.spheres.set([_ovS.center.x,_ovS.center.y,_ovS.center.z,_ovS.radius],i*4);}
+ }else{
+  if(!m.geometry.boundingSphere)m.geometry.computeBoundingSphere();_ovS.copy(m.geometry.boundingSphere).applyMatrix4(m.matrixWorld);st.spheres.set([_ovS.center.x,_ovS.center.y,_ovS.center.z,_ovS.radius]);
+ }
+ ovCull.stats.boundsMs+=performance.now()-t0;
+}
+function ovCullRevision(){
+ let h=equipMeshes.length*7+(ovOcc.state==='ready'?1:0)+(ovOccluderFloorOk()?2:0);
+ for(const m of equipMeshes)h=(Math.imul(h,31)+(m.visible&&layerOn(m)?1:0)+2*ovCullVersion(m))|0;
+ return h;
+}
+function ovCullClear(){
+ for(const m of equipMeshes){m.layers.enable(0);const st=m.userData.ovCull;if(st){st.state='all';st.kept=st.n;st.keep.fill(1);st.compacted=false;}}
+ ovCull.partial=[];ovCull.active=false;ovCull.limit=Infinity;ovCull.tracker.reset();
+}
+function ovCullUpdate(){
+ const limit=overlayOn&&ovCull.enabled?OV.cullLimit(ovPreset):Infinity;
+ if(!Number.isFinite(limit)){if(ovCull.active)ovCullClear();return;}
+ const eye=camera.getWorldPosition(_ovV).toArray();
+ if(!ovCull.tracker.needs(eye,ovPreset.key,ovCullRevision()))return;
+ const t0=performance.now();ovCull.active=true;ovCull.limit=limit;ovCull.partial=[];
+ for(const m of equipMeshes){
+  if(!m.visible||!layerOn(m))continue;   // filtered out anyway; the revision changes when that flips
+  const st=ovCullState(m),ver=st.version;ovCullBounds(m,st);const c=OV.cullSpheres(st.spheres,eye,limit,st.keep);st.kept=c.kept;
+  st.state=st.kept===st.n?'all':st.kept===0?'none':'some';
+  if(st.state==='none')m.layers.disable(0);else m.layers.enable(0);
+  if(st.state!=='some')continue;
+  ovCull.partial.push(m);
+  if(!c.changed&&st.compacted&&ver===st.version)continue;   // same kept set as last time: nothing to copy or upload
+  st.compacted=true;
+  ovCullCapacity(st);
+  if(st.kind==='merged'){
+   const res=OV.compactRanges(st.starts,st.counts,st.keep,st.full.index.array,st.draw.index.array,st.map);st.runs=res.runs;
+   st.draw.setDrawRange(0,res.count);st.draw.index.clearUpdateRanges();st.draw.index.addUpdateRange(0,res.count);st.draw.index.needsUpdate=true;
+  }else if(st.kind==='inst')ovCullCompactInstances(st);
+ }
+ ovCull.stats.recomputes++;ovCull.stats.lastMs=performance.now()-t0;lensPickCache.sig='';
+}
+/* The compacted buffers start empty and grow to 1.25x what is kept (capped at the full size), so the extra memory follows
+   the Range, not the whole floor. A grown buffer is a new attribute (WebGL buffers cannot be resized in place). */
+function ovCullCapacity(st){
+ const grow=(need,full)=>Math.min(full,Math.ceil(need*1.25));
+ if(st.kind==='merged'){
+  let need=0;for(let i=0;i<st.n;i++)if(st.keep[i])need+=st.counts[i];
+  if(st.draw.index.count<need){const a=new THREE.BufferAttribute(new st.full.index.array.constructor(grow(need,st.full.index.count)),1);a.setUsage(THREE.DynamicDrawUsage);st.draw.setIndex(a);}
+ }else if(st.kind==='inst'&&(!st.drawMatrix||st.drawMatrix.count<st.kept)){
+  const cap=grow(st.kept,st.n);st.drawMatrix=new THREE.InstancedBufferAttribute(new Float32Array(cap*16),16).setUsage(THREE.DynamicDrawUsage);
+  st.drawColor=st.full.color?new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3).setUsage(THREE.DynamicDrawUsage):null;
+ }
+}
+function ovCullCompactInstances(st){
+ const pairs=[[st.full.matrix.array,st.drawMatrix.array,16]];if(st.drawColor)pairs.push([st.full.color.array,st.drawColor.array,3]);
+ OV.compactInstances(st.keep,pairs,st.order);
+ for(const a of [st.drawMatrix,st.drawColor]){if(!a)continue;a.clearUpdateRanges();a.addUpdateRange(0,st.kept*a.itemSize);a.needsUpdate=true;}
+ st.colorVersion=st.full.color?.version??-1;
+}
+/* swap the compacted draw data in (render, lens raycast) and back out (everything else sees the original batch) */
+function ovCullApply(){
+ if(ovCull.applied||!ovCull.partial.length)return;
+ for(const m of ovCull.partial){const st=m.userData.ovCull;
+  if(st.kind==='merged')m.geometry=st.draw;
+  else{if(st.full.color&&st.full.color.version!==st.colorVersion)ovCullCompactInstances(st);   // highlight changed colours
+   m.instanceMatrix=st.drawMatrix;m.instanceColor=st.drawColor;m.count=st.kept;}}
+ ovCull.applied=true;
+}
+function ovCullRestore(){
+ if(!ovCull.applied)return;
+ for(const m of ovCull.partial){const st=m.userData.ovCull;if(st.kind==='merged')m.geometry=st.full;else{m.instanceMatrix=st.full.matrix;m.instanceColor=st.full.color;m.count=st.full.count;}}
+ ovCull.applied=false;
+}
+function ovAfterRender(){ovCullRestore();}
+/* a hit taken while the compacted data was swapped in -> original face index / instance id */
+function ovCullMapHit(h){
+ const st=h.object.userData.ovCull;if(!ovCull.applied||!st||st.state!=='some')return h;
+ if(st.kind==='inst'&&Number.isInteger(h.instanceId))h.instanceId=st.order[h.instanceId];
+ else if(st.kind==='merged'&&Number.isInteger(h.faceIndex)&&!h.object.isLine)h.faceIndex=OV.compactedToSource(h.faceIndex*3,st.map,st.runs)/3;
+ return h;
+}
+function ovCullCounts(m){
+ const st=m.userData.ovCull;if(!ovCull.active||!st)return null;
+ return {drawn:st.state!=='none',instances:st.kind==='inst'?st.kept:0,elements:st.kept};
+}
+window.overlayCulling=on=>{ovCull.enabled=!!on;ovCullClear();lensPickCache.sig='';_kick();return ovCull.enabled;};
+window.overlayCullInspection=()=>{
+ const o={enabled:ovCull.enabled,active:ovCull.active,limit:ovCull.limit,batches:{all:0,some:0,none:0,instanced:0,merged:0},elements:{kept:0,total:0},instances:{kept:0,total:0},
+  extraBytes:0,recomputes:ovCull.stats.recomputes,lastRecomputeMs:+ovCull.stats.lastMs.toFixed(2),boundsMs:+ovCull.stats.boundsMs.toFixed(1),last:ovCull.tracker.last};
+ for(const m of equipMeshes){if(!m.visible||!layerOn(m))continue;const st=m.userData.ovCull,n=st?st.n:(m.isInstancedMesh?m.count:m.userData.ranges?.length||1),kept=ovCull.active&&st?st.kept:n;
+  if(st)o.extraBytes+=(st.draw?.index.array.byteLength||0)+(st.drawMatrix?.array.byteLength||0)+(st.drawColor?.array.byteLength||0)+st.spheres.byteLength+st.keep.byteLength+(st.order?.byteLength||0)+(st.map?.byteLength||0);
+  o.batches[ovCull.active&&st?st.state:'all']++;o.batches[m.isInstancedMesh?'instanced':'merged']++;o.elements.kept+=kept;o.elements.total+=n;if(m.isInstancedMesh){o.instances.kept+=kept;o.instances.total+=n;}}
+ return o;
+};
 window.overlayVisibilityInspection=()=>({on:overlayOn,range:ovPreset.key,fade:[ovPreset.fadeStart,ovPreset.fadeEnd],occlude:ovPreset.occlude,patchedMaterials:ovPatched,
  occluder:{state:ovOcc.state,source:'interior/enclosure-l1.glb (Walls)',elements:ovOcc.elements,triangles:ovOcc.triangles,active:OV_UNIFORMS.ovOcc.value===1,floorOk:ovOccluderFloorOk(),error:ovOcc.error},lens:{...ovLensCss}});
+/* Test-only measurement hook (tests/overlay-culling-bench.cjs). Does nothing until called: renders synchronously at a
+   pose (wall pre-pass + scene), waits for the GPU with a 1-pixel readPixels and reports renderer.info for both passes. */
+window.overlayBench={
+ frame(pose,{png=false}={}){
+  if(pose){camera.position.fromArray(pose.position);camera.quaternion.fromArray(pose.quaternion).normalize();if(pose.fov)camera.fov=pose.fov;camera.updateProjectionMatrix();camera.updateMatrixWorld();}
+  const gl=renderer.getContext(),px=new Uint8Array(4),info=renderer.info;info.autoReset=false;info.reset();
+  const t0=performance.now();ovBeforeRender();renderer.render(scene,camera);ovAfterRender();const t1=performance.now();gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);const ms=performance.now()-t0;
+  info.autoReset=true;const out={ms,cpuMs:t1-t0,calls:info.render.calls,triangles:info.render.triangles,lines:info.render.lines,...ovSubmitted()};
+  if(png)out.png=renderer.domElement.toDataURL('image/png');
+  return out;
+ },
+ pose:()=>({position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov}),
+};
+/* what the scene submits (before three.js frustum culling): meshes, instances, element ranges */
+function ovSubmitted(){
+ let meshes=0,instances=0,elements=0;
+ for(const m of equipMeshes){if(!m.visible||!layerOn(m)||!m.layers.test(camera.layers))continue;const c=typeof ovCullCounts==='function'?ovCullCounts(m):null;
+  if(c){if(!c.drawn)continue;meshes++;instances+=c.instances;elements+=c.elements;continue;}
+  meshes++;if(m.isInstancedMesh){instances+=m.count;elements+=m.count;}else elements+=m.userData.ranges?.length||m.userData.ids.length;}
+ return {meshes,instances,elements};
+}
 const OVERLAY_LAYER_KEYS=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety','fire'];
 const overlayAtLoad=splitPane==='bim'&&new URLSearchParams(location.search).get('overlay')==='1';
 const normalBackground=scene.background;let overlayOn=false,overlayRun=0;
@@ -2769,7 +2925,9 @@ function lensPickRay(x,y){
  camera.updateMatrixWorld();_lensPtr.set(x*2-1,-(y*2-1));raycaster.setFromCamera(_lensPtr,camera);
  /* Overlay: skip what is drawn faded or hidden (distance fade x wall occlusion); the probe sits at the lens centre */
  let hit=null;const wall=overlayOn?ovWallDistance(raycaster.ray):Infinity;
- for(const h of raycaster.intersectObjects(visibleEquip(),false)){
+ /* distance culling: culled batches are off camera layer 0 (skipped); partly culled ones are raycast on their compacted data */
+ let hits;try{ovCullApply();hits=raycaster.intersectObjects(visibleEquip(),false).map(ovCullMapHit);}finally{ovCullRestore();}
+ for(const h of hits){
   if(interiorBlocksRay(h.distance))break;
   if(!overlayOn||OV.isPickable({distance:h.distance,wallDistance:wall,lensW:ovLensCss.on?1:0},ovPreset)){hit=h;break;}
   if(OV.rangeFade(h.distance,ovPreset)<OV.PICK_MIN)break;   // everything further is fainter still
@@ -2960,8 +3118,10 @@ renderer.setAnimationLoop((t) => {
   if (!layerBusy || ((walkMode || splitPane==='bim') && t - _lastWalkRender >= (mobileMq.matches ? 400 : 250))) {
     const moved = _viewChanged();
     if (moved || t < _kickUntil || t - _lastDraw >= 250) {
-      if (typeof ovBeforeRender === 'function') ovBeforeRender();   // Overlay wall-depth pre-pass (no-op outside Overlay)
-      renderer.render(scene, camera);
+      try {
+        if (typeof ovBeforeRender === 'function') ovBeforeRender();   // Overlay distance culling + wall-depth pre-pass (no-op outside Overlay)
+        renderer.render(scene, camera);
+      } finally { if (typeof ovAfterRender === 'function') ovAfterRender(); }   // swap culled batches back to their full data
       _lastDraw = t;
     }
     _lastWalkRender = t;
