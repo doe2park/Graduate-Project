@@ -36,9 +36,12 @@ function captureConfig(date) {
   const c = CAPTURES[Object.prototype.hasOwnProperty.call(CAPTURES, date) ? date : DEFAULT_CAPTURE];
   return {...c};
 }
-function nextCapture(date) {
-  const i = CAPTURE_ORDER.indexOf(date);
-  return CAPTURE_ORDER[(i + 1) % CAPTURE_ORDER.length];
+/* available: optional list of dates whose photo manifest loaded (the public site omits captures under review);
+   the cycle then skips the others. Without it, or if nothing else is available, the full order applies. */
+function nextCapture(date, available) {
+  const order = Array.isArray(available) ? CAPTURE_ORDER.filter(d => available.includes(d) || d === date) : CAPTURE_ORDER;
+  const list = order.length ? order : CAPTURE_ORDER, i = list.indexOf(date);
+  return list[(i + 1) % list.length];
 }
 /* A registration file must be a finite yaw + 3-vector, scale 1 (the only model registration-core supports). */
 function validRegistration(reg) {

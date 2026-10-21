@@ -32,6 +32,11 @@ test('captures: May 6 default + accepted registration, Sep 17 provisional; paths
   assert.deepEqual(X.CAPTURE_ORDER, ['2026-05-06', '2026-09-17', '2026-10-18']);
   assert.equal(X.nextCapture('2026-05-06'), '2026-09-17'); assert.equal(X.nextCapture('2026-09-17'), '2026-10-18');
   assert.equal(X.nextCapture('2026-10-18'), '2026-05-06'); assert.equal(X.nextCapture('bogus'), '2026-05-06');
+  // public site: only captures whose manifest loaded are cycled (Oct 18 is unpublished there)
+  const pub = ['2026-05-06', '2026-09-17'];
+  assert.equal(X.nextCapture('2026-05-06', pub), '2026-09-17'); assert.equal(X.nextCapture('2026-09-17', pub), '2026-05-06');
+  assert.equal(X.nextCapture('2026-05-06', ['2026-05-06']), '2026-05-06'); assert.equal(X.nextCapture('2026-05-06', []), '2026-05-06');
+  assert.equal(X.nextCapture('2026-09-17', X.CAPTURE_ORDER), '2026-10-18');
   assert.deepEqual(Object.keys(X.CAPTURES).sort(), [...X.CAPTURE_ORDER].sort());
   assert.equal(X.validRegistration({rotationYDegrees: 1, translation: [0, 0], scale: 1}), false);
   assert.equal(X.validRegistration({rotationYDegrees: 1, translation: [0, 0, 0], scale: 1.01}), false);

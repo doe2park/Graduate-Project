@@ -153,6 +153,10 @@ let needsRender=true,renderCount=0,lastInfo={calls:0,triangles:0,lines:0,points:
 let statusTimer=0;function status(text,sticky=false){$('status').textContent=text;$('status').hidden=false;clearTimeout(statusTimer);if(!sticky)statusTimer=setTimeout(()=>$('status').hidden=true,5000);}
 /* ── Capture / station state ── */
 let capture=null,reg=null,stations=[],manifestURL=null,active=-1,stationBim=[0,0,0],busyStation=false,pendingStation=null,captureEpoch=0;
+/* Published captures (2026-10-21): only dates whose photo manifest loads are listed and cycled; the public site omits captures under review. */
+let availableCaptures=null;
+async function probeCaptures(){const ok=await Promise.all(X.CAPTURE_ORDER.map(d=>fetch(X.captureConfig(d).photo,{method:'HEAD',cache:'no-store'}).then(r=>r.ok,()=>false)));
+ availableCaptures=X.CAPTURE_ORDER.filter((d,i)=>ok[i]);for(const o of [...$('capture').options])if(!availableCaptures.includes(o.value))o.remove();return availableCaptures;}
 const timing={firstPhotoMs:null,layersDoneMs:null};
 let yaw=0,pitch=0;const axisQ=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
 function setDesktopLook(){camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));invalidate();}
@@ -302,7 +306,7 @@ async function menuAction(i){
  if(i===0)setStyle(state.mode==='lens'?'all':'lens');
  else if(i===1||i===2){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],i===1?-1:1);applyShaderState();}
  else if(i===3||i===4){state.coneDeg=X.stepCone(state.coneDeg,i===3?-1:1);applyShaderState();}
- else if(i===5){await switchCapture(X.nextCapture(capture.date));}
+ else if(i===5){await switchCapture(X.nextCapture(capture.date,availableCaptures));}
  else if(i===6)setHiRes(!state.hiRes);
  else if(i===7){state.snap=!state.snap;}
  else if(i===8)setFire(!fireOn());
@@ -485,7 +489,7 @@ let lastIdleCone='';function coneFromViewIfIdle(){const s=camera.quaternion.toAr
 /* ── Measurements / inspection (desktop) ── */
 function totals(){const o={drawCalls:0,visibleDrawCalls:0,triangles:0,visibleTriangles:0,elements:0};for(const st of Object.values(layerState)){for(const m of st.meshes){const tri=m.userData.isLine?0:(m.geometry.index?m.geometry.index.count/3:m.geometry.attributes.position.count/3)*(m.isInstancedMesh?m.count:1);o.drawCalls++;o.triangles+=tri;if(m.visible&&st.group.visible){o.visibleDrawCalls++;o.visibleTriangles+=tri;}}o.elements+=st.stats.elements||0;}return o;}
 function inspection(){const heap=performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576):null;
- return {ready:active>=0&&!gauss.loading,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
+ return {ready:active>=0&&!gauss.loading,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},availableCaptures,station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
   style:state.mode,opacity:state.opacity[state.mode],coneDeg:state.coneDeg,radius:P.radius,levels:[...P.levels],hiRes:state.hiRes,texture:sphereMat.map?.image?{width:sphereMat.map.image.width,height:sphereMat.map.image.height}:null,
   layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{loaded:s.loaded,loading:s.loading,error:s.error||null,visible:s.group.visible,loadMs:s.loadMs??null,...s.stats,visibleBatches:s.meshes.filter(m=>m.visible).length}])),
   totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation},
@@ -516,7 +520,8 @@ setInterval(updateStats,1000);
  state.hiRes=q.get('hires')==='1'?true:q.get('hires')==='0'?false:!supported;$('hires').setAttribute('aria-pressed',String(state.hiRes));
  gauss.override=await readOverride();if(gauss.overrideNote)$('xrNote').textContent=($('xrNote').textContent?$('xrNote').textContent+' · ':'')+gauss.overrideNote;
  // ?scene=gaussian with a local override and no ?capture opens the override's capture (e.g. the Oct 18 zone package).
- const wantScene=X.sceneRequest(q.get('scene')),date=!q.get('capture')&&wantScene==='gaussian'&&gauss.override&&X.CAPTURES[gauss.override.capture]?gauss.override.capture:X.captureConfig(q.get('capture')).date;
+ const wantScene=X.sceneRequest(q.get('scene'));let date=!q.get('capture')&&wantScene==='gaussian'&&gauss.override&&X.CAPTURES[gauss.override.capture]?gauss.override.capture:X.captureConfig(q.get('capture')).date;
+ const avail=await probeCaptures();if(!avail.includes(date)&&avail.length){const fb=avail.includes(X.DEFAULT_CAPTURE)?X.DEFAULT_CAPTURE:avail[0];$('xrNote').textContent=($('xrNote').textContent?$('xrNote').textContent+' · ':'')+X.captureConfig(date).label+' capture not published · showing '+X.captureConfig(fb).label;date=fb;}
  if(wantScene==='gaussian'&&X.gaussianFor(date,gauss.override))gauss.scene='gaussian';   // skip the photo download; setScene falls back if loading fails
  applyShaderState();
  try{await loadCapture(date);}catch(e){console.error(e);status(String(e.message||e),true);return;}

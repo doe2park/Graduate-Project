@@ -135,6 +135,15 @@ if(['localhost','127.0.0.1'].includes(location.hostname)&&capture.date==='2026-1
  const show=()=>capturePicker.after(b);if(floorsPreview)show();else fetch(FLOORS_MANIFEST,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)show();}).catch(()=>{});
  if(floorsPreview){const n=document.createElement('span');n.id='floorsNote';n.textContent='L1\u2013L3 preview \u00b7 provisional';n.title='Local preview: Level 1 + atrium stairs + Level 3 + partial Level 2. Upper floors placed by photo matching to Level 1 + ICP to BIM; provisional, not surveyed. Stairs: walk on, or PgUp / PgDn.';n.style.cssText='white-space:nowrap;color:#ffe495';document.querySelector('section[aria-label="Actual scan"] h2').appendChild(n);}
 }
+/* PUBLISHED CAPTURES (2026-10-21): a date is offered only when its photo manifest loads. Captures still under review
+   are not published, so the public site never lists one it cannot open; a stale ?capture= link to one falls back to
+   the default capture with a note. Where every manifest exists (the owner's localhost) nothing changes. */
+function captureAvailable(date){return fetch(captureSelection('?capture='+encodeURIComponent(date)).photo,{method:'HEAD',cache:'no-store'}).then(r=>r.ok,()=>false);}
+{const missing=new URLSearchParams(location.search).get('missing');if(missing&&CAPTURE_SHORT[missing]){const n=document.createElement('span');n.id='captureMissingNote';n.textContent=CAPTURE_SHORT[missing]+' capture not published';n.title='This capture is not on the public site yet (privacy review pending); showing the default capture.';n.style.cssText='white-space:nowrap;color:#ffe495;font:12px Arial';capturePicker.after(n);const u=new URL(location.href);u.searchParams.delete('missing');history.replaceState(history.state,'',u);}}
+for(const o of [...capturePicker.options])captureAvailable(o.value).then(ok=>{if(ok)return;
+ if(o.value!==capture.date){o.remove();return;}
+ if(!new URLSearchParams(location.search).has('capture'))return;   /* already the default: never loop */
+ const u=new URL(location.href);u.searchParams.delete('capture');u.searchParams.delete('floors');u.searchParams.delete('registration');u.searchParams.set('missing',o.value);location.replace(u);});
 /* Keep the viewpoint across a display/capture switch: the page reloads, so the current pose travels in ?at= in the
    BIM frame (shared by every capture) and is converted with the new capture's own registration once it loads. */
 function currentBimPose(){try{if(poses.bim&&valid(poses.bim))return poses.bim;if(registration&&poses.scan&&valid(poses.scan))return convert(poses.scan,'scan');}catch(e){}return null;}
@@ -265,7 +274,7 @@ let gaussianSource=capture.gaussian,gaussianPreview=false,gaussianNote='',gaussi
 // A local run can be previewed with ?manifest=work/gaussian/...; the override is honoured on localhost only and labelled.
 {const o=['localhost','127.0.0.1'].includes(location.hostname)?new URLSearchParams(location.search).get('manifest'):null;if(o&&/^[\w.\/-]+\.json$/.test(o)&&!o.includes('..')){gaussianSource={kind:'manifest',path:o};gaussianPreview=true;}}
 const splatOption=mode.querySelector('[value=splat]');splatOption.textContent=gaussianOptionLabel({...capture,gaussian:gaussianSource});
-if(!gaussianSource)splatOption.title='No Gaussian for this capture (only May 6 and Oct 18 have one)';
+if(!gaussianSource)splatOption.title='No Gaussian for this capture';
 function scanNoteText(){
  if(gaussianFailed)return 'Gaussian unavailable \u00b7 showing 360\u00b0 photos';
  if(capture.splatRefused)return 'No Gaussian for '+CAPTURE_SHORT[capture.date]+' \u00b7 showing 360\u00b0 photos';
