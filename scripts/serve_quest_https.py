@@ -193,7 +193,6 @@ def main(argv=None):
     fingerprint = hashlib.sha256(ssl.PEM_cert_to_DER_cert(cert.read_text())).hexdigest()
     url = f'https://{address}:{a.port}/scan-xr.html'
     print(f'Quest XR overlay: {url}\nCertificate (self-signed, dev only): {cert.relative_to(REPO)} sha256 {fingerprint[:16]}…', flush=True)
-    print(f'Quest MR passthrough (manual alignment, not surveyed): {url}?mode=ar', flush=True)
     for pkg in packages:
         rel = pkg.relative_to(REPO).as_posix()
         print(f'Local Gaussian (unpublished, experimental appearance): {url}?scene=gaussian&gaussian={rel}/viewer.json', flush=True)

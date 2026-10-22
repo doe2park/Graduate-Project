@@ -16,11 +16,6 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 .b[aria-pressed="true"]{background:var(--gold);color:#0b1020;border-color:var(--gold)}
 .b input[type=range]{width:84px;accent-color:var(--gold)}
 #enterVR{background:var(--navy);border-color:#6d8fb0}#enterVR[hidden]{display:none}
-#enterMR{background:#14532d;border-color:#4ade80}#enterMR[hidden]{display:none}
-body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,body.mr #scene,body.mr #enterVR{display:none}
-#mr{position:fixed;left:8px;top:50px;z-index:6;width:min(430px,calc(100% - 16px));max-height:calc(100% - 160px);overflow:auto;padding:10px 12px;border-radius:10px;background:rgba(5,10,18,.9);border:1px solid var(--bd);font:500 12px/1.4 Arial,Helvetica,sans-serif;color:#cfe3f5}
-#mr[hidden]{display:none}#mr h2{font-size:14px;margin:0 0 4px;color:#fff}#mr .lab{color:#ffb4a8;margin:0 0 6px}#mr ol{margin:6px 0;padding-left:18px}#mr li.captured{color:#34d399}#mr li.skipped{color:#e2725b}#mr li.next{color:#FDB515;font-weight:700}
-#mr .row{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#mr select{max-width:100%;height:28px;border-radius:6px;background:var(--bg);color:#fff;border:1px solid var(--bd)}#mr .help{color:#8aa2b8;margin:6px 0 0}
 #station{max-width:118px}
 .pill{position:fixed;left:8px;z-index:5;max-width:calc(100% - 16px);padding:6px 11px;border-radius:999px;background:var(--bg);border:1px solid var(--bd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 #align{bottom:8px;color:#ffe495;white-space:normal;border-radius:14px}#align.prov{color:#ffb4a8;border-color:#e2725b}
@@ -29,7 +24,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js"></script><script src="twin/overlay-visibility.js"></script><script src="twin/mr-align.js"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -43,28 +38,16 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
  <button id="scene" class="b" aria-pressed="false" title="Scene: 360° photo or trained Gaussian splats (experimental appearance, not surveyed)">Gaussian</button>
  <button id="statsBtn" class="b" aria-pressed="false">Stats</button>
  <button id="enterVR" class="b" hidden>Enter VR</button>
- <button id="enterMR" class="b" hidden title="Mixed reality: BIM services over the passthrough, manual alignment (not surveyed)">Enter MR</button>
 </div>
 <span id="xrNote" class="pill" role="note"></span><span id="status" class="pill" role="status">Loading…</span><span id="align" class="pill" role="note"></span>
 <pre id="stats" hidden aria-label="Render statistics"></pre>
-<section id="mr" hidden aria-label="Mixed-reality alignment">
- <h2>MR passthrough · BIM services through ceilings and walls</h2>
- <p class="lab">Alignment: manual, not surveyed · Design (BIM) positions · landmarks BIM-derived, not verified on site</p>
- <label>Area <select id="mrArea" aria-label="Area"></select></label>
- <ol id="mrSteps"></ol>
- <p id="mrFit" role="status"></p>
- <div class="row"><button id="mrSim" class="b">Simulate alignment</button><button id="mrPanelBtn" class="b">World panel (M)</button><button id="mrForget" class="b">Forget saved</button><button id="mrLog" class="b">Check log</button></div>
- <p class="help">On Quest: Enter MR, put the gold tip ball on each real landmark, trigger. B/Y opens the panel. Steps and test protocol: docs/QUEST_XR_OVERLAY.md.</p>
-</section>
 <script type="module">
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
 import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight,applyRadius} from './twin/xr-spatial-tier.mjs';
-const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
+const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,$=id=>document.getElementById(id);
 const T0=performance.now(),q=new URLSearchParams(location.search);
-const MODE_AR=q.get('mode')==='ar';   // mixed-reality passthrough mode (immersive-ar, manual alignment); default = the 360° photo VR overlay
-const MR_DEFAULT_LAYERS=['fire','duct','plumbing'];   // Quest 2 budget: fire piping, ducts, plumbing on; the rest toggle from the MR panel
 /* ── Configuration ── service layers = scan-bim OVERLAY_LAYER_KEYS (same GLBs + sidecars). Only Level 1 is kept by default. */
 const LAYERS={
  equipment:{glb:'buildings/grimes/grimes-equipment.glb',json:'buildings/grimes/elements.json',label:'Equipment',mb:1.5},
@@ -83,7 +66,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const P={
  radius:clamp(Number(q.get('radius'))||12,4,60),cell:clamp(Number(q.get('cell'))||6,2,40),instanceReuse:clamp(Number(q.get('instance'))||32,2,100000),
  levels:new Set((q.get('levels')||'L1').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean)),
- layers:(q.get('layers')==='all'?OVERLAY_LAYER_KEYS:q.get('layers')?q.get('layers').split(',').filter(k=>OVERLAY_LAYER_KEYS.includes(k)):(MODE_AR?MR_DEFAULT_LAYERS:OVERLAY_LAYER_KEYS.filter(k=>k!=='fire'))),
+ layers:(q.get('layers')==='all'?OVERLAY_LAYER_KEYS:q.get('layers')?q.get('layers').split(',').filter(k=>OVERLAY_LAYER_KEYS.includes(k)):OVERLAY_LAYER_KEYS.filter(k=>k!=='fire')),
  xrScale:clamp(Number(q.get('xrscale'))||.85,.5,1),foveation:clamp(q.has('foveation')?Number(q.get('foveation')):.7,0,1),
 };
 const XR_SNAP=Math.PI/6;
@@ -112,8 +95,7 @@ fader.position.z=-.12;fader.renderOrder=100;fader.visible=false;fader.frustumCul
 const ring=new THREE.Mesh(new THREE.RingGeometry(.2,.26,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.9,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
 ring.renderOrder=57;ring.visible=false;ring.frustumCulled=false;scene.add(ring);
 /* ── X-ray flashlight shader ── one shared uniform set for every service batch. */
-const U={coneOrigin:{value:new THREE.Vector3()},coneDir:{value:new THREE.Vector3(0,0,-1)},coneCos:{value:X.coneCos(12)},coneSoft:{value:.01},mode:{value:0},opacity:{value:.85},fade:{value:1},hard:{value:0},
- outside:{value:0},fadeOn:{value:0},fadeRange:{value:new THREE.Vector2(1e7,2e7)}};   // MR only: lens floor outside the cone; distance fade (twin/overlay-visibility.js presets)
+const U={coneOrigin:{value:new THREE.Vector3()},coneDir:{value:new THREE.Vector3(0,0,-1)},coneCos:{value:X.coneCos(12)},coneSoft:{value:.01},mode:{value:0},opacity:{value:.85},fade:{value:1},hard:{value:0}};
 const VERT=`varying vec3 vWorld;varying vec3 vCol;varying float vShade;
 void main(){vec4 p=vec4(position,1.);
 #ifndef XR_LINE
@@ -138,10 +120,10 @@ vShade=1.;
 vec3 wn=normalize(mat3(modelMatrix)*n);vShade=.58+.42*abs(dot(wn,normalize(vec3(.35,.85,.4))));
 #endif
 gl_Position=projectionMatrix*viewMatrix*w;}`;
-const FRAG=`uniform vec3 coneOrigin;uniform vec3 coneDir;uniform float coneCos,coneSoft,mode,opacity,fade,hard,outside,fadeOn;uniform vec2 fadeRange;varying vec3 vWorld;varying vec3 vCol;varying float vShade;
+const FRAG=`uniform vec3 coneOrigin;uniform vec3 coneDir;uniform float coneCos,coneSoft,mode,opacity,fade,hard;varying vec3 vWorld;varying vec3 vCol;varying float vShade;
 void main(){float w=smoothstep(coneCos-coneSoft,coneCos,dot(normalize(vWorld-coneOrigin),coneDir));
 if(hard>.5)w=step(.5,w);
-float a=mode>.5?opacity:opacity*mix(outside,1.,w);if(fadeOn>.5)a*=1.-smoothstep(fadeRange.x,fadeRange.y,length(vWorld-cameraPosition));if(a<.02)discard;
+float a=mode>.5?opacity:opacity*w;if(a<.02)discard;
 vec3 c=vCol*vShade;if(mode>.5)c=mix(c,min(c*1.25+.05,vec3(1.)),w);
 gl_FragColor=vec4(c*fade,a);
 #include <colorspace_fragment>
@@ -157,9 +139,9 @@ function applyShaderState(){
  const o=state.opacity[state.mode];U.mode.value=state.mode==='all'?1:0;U.opacity.value=o;U.coneCos.value=X.coneCos(state.coneDeg);U.coneSoft.value=U.coneCos.value-X.coneCos(state.coneDeg+2);
  // Fully opaque lens: render opaque with a hard cone edge (no blending, no transparent sorting / overdraw). Not in Gaussian mode:
  // splats are a transparent, non-depth-tested pass, so services must stay in the transparent list after them (renderOrder -10).
- const opaque=state.mode==='lens'&&o>=.99&&gauss.scene!=='gaussian'&&!MODE_AR;U.hard.value=opaque?1:0;U.outside.value=MODE_AR&&state.mode==='lens'?.12:0;   // MR: faint context outside the cone (needs blending)for(const m of materials.values())m.transparent=!opaque;
+ const opaque=state.mode==='lens'&&o>=.99&&gauss.scene!=='gaussian';U.hard.value=opaque?1:0;for(const m of materials.values())m.transparent=!opaque;
  $('styleLens').setAttribute('aria-pressed',String(state.mode==='lens'));$('styleAll').setAttribute('aria-pressed',String(state.mode==='all'));$('opacity').value=Math.round(o*100);$('cone').value=state.coneDeg;
- if(state.menu)drawMenu();if(MODE_AR&&mr?.panel)mrDrawPanel();invalidate();
+ if(state.menu)drawMenu();invalidate();
 }
 /* ── Loaders ── DRACOLoader decodes in Web Workers (WorkerPool); same pinned decoder as scan-bim. */
 const draco=new DRACOLoader();draco.setWorkerLimit(2);draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
@@ -260,7 +242,7 @@ async function loadLayer(key){
  return st.pending;
 }
 async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);for(const k of order)await loadLayer(k);timing.layersDoneMs=Math.round(performance.now()-T0);status('Services ready · Level '+[...P.levels].join('+')+' within '+P.radius+' m');updateStats();}
-function updateRadius(){let n=0;const r=MODE_AR?mrCullRadius():P.radius;for(const st of Object.values(layerState))n+=applyRadius(st.meshes,stationBim,r);invalidate();return n;}
+function updateRadius(){let n=0;for(const st of Object.values(layerState))n+=applyRadius(st.meshes,stationBim,P.radius);invalidate();return n;}
 function setFire(on){const st=layerState.fire;if(on&&!st){loadLayer('fire');}else if(st)st.group.visible=on;$('fire').setAttribute('aria-pressed',String(on));if(state.menu)drawMenu();invalidate();}
 const fireOn=()=>!!layerState.fire&&layerState.fire.group.visible;
 /* ── Picking + info card ── ray = controller (XR) or mouse (desktop); only visible, in-radius batches are tested. */
@@ -290,13 +272,13 @@ function drawCard(lines){const {ctx,canvas}=card,W=canvas.width,H=canvas.height;
 function hideCard(){pickEpoch++;if(picked){for(const st of Object.values(layerState))for(const m of st.meshes)highlight(THREE,m,picked.id,false);picked=null;}card.mesh.visible=false;marker.visible=false;invalidate();}
 const _head=new THREE.Vector3(),_v=new THREE.Vector3();
 async function pickAlong(origin,dir){
- raycaster.set(origin,dir);raycaster.far=(MODE_AR?Math.min(40,mrCullRadius()):P.radius)+6;
+ raycaster.set(origin,dir);raycaster.far=P.radius+6;
  const hit=raycaster.intersectObjects(pickables(),false)[0];
  const id=hit&&resolveHit(hit.object,hit.instanceId,hit.faceIndex,hit.index),layer=hit?.object.userData.layer,info=id&&layerState[layer]?.meta?.[id];
  hideCard();if(!info){status('No service element on that ray');return null;}
  const epoch=pickEpoch;picked={id,layer};for(const m of layerState[layer].meshes)highlight(THREE,m,id,true);
  const data=await loadCardData();if(epoch!==pickEpoch)return null;
- const tier=EC.elementFeedTier(id,info,data.feeds,data.meters),lines=X.cardLines(id,info,tier,MODE_AR?mrCardCapture():capture);drawCard(lines);
+ const tier=EC.elementFeedTier(id,info,data.feeds,data.meters),lines=X.cardLines(id,info,tier,capture);drawCard(lines);
  camera.getWorldPosition(_head);const toHit=_v.copy(hit.point).sub(_head),dist=clamp(toHit.length()*.7,.8,1.8);
  card.mesh.position.copy(_head).addScaledVector(toHit.normalize(),dist);card.mesh.position.y-=.1*dist;card.mesh.scale.setScalar(dist/1.4);card.mesh.lookAt(_head);card.mesh.visible=true;
  marker.position.copy(hit.point);marker.visible=true;picked.tier=tier.tier;picked.lines=lines;invalidate();
@@ -335,7 +317,6 @@ async function menuAction(i){
 }
 /* Trigger / click: menu buttons first, then service elements. */
 async function selectRay(origin,dir){
- if(MODE_AR)return mrSelectDesktop(origin,dir);
  if(menu.mesh.visible){raycaster.set(origin,dir);raycaster.far=10;const h=raycaster.intersectObject(menu.mesh,false)[0];if(h){const b=X.menuHit(h.uv.x,h.uv.y);if(b>=0)await menuAction(b);return {menu:b};}}
  return pickAlong(origin,dir);
 }
@@ -433,7 +414,7 @@ cvs.addEventListener('wheel',e=>{e.preventDefault();camera.fov=clamp(camera.fov+
 const KEYDIR={KeyW:'f',ArrowUp:'f',KeyS:'b',ArrowDown:'b',KeyA:'l',ArrowLeft:'l',KeyD:'r',ArrowRight:'r'};
 addEventListener('keydown',e=>{if(['SELECT','INPUT'].includes(e.target.tagName))return;
  if(KEYDIR[e.code]){e.preventDefault();const f=camera.getWorldDirection(new THREE.Vector3());f.y=0;f.normalize();const r=new THREE.Vector3().crossVectors(f,new THREE.Vector3(0,1,0)),k=KEYDIR[e.code];walk(k==='f'?f:k==='b'?f.negate():k==='l'?r.negate():r);}
- else if(e.code==='KeyL')setStyle(state.mode==='lens'?'all':'lens');else if(e.code==='KeyM'){if(MODE_AR)mrSetPanel(!mr.panel);else setMenu(!state.menu);}else if(e.code==='Escape')hideCard();
+ else if(e.code==='KeyL')setStyle(state.mode==='lens'?'all':'lens');else if(e.code==='KeyM')setMenu(!state.menu);else if(e.code==='Escape')hideCard();
  else if(e.code==='KeyG')setScene(X.toggleScene(gauss.scene));});
 $('prev').onclick=()=>openStation(active-1);$('next').onclick=()=>openStation(active+1);$('station').onchange=e=>openStation(Number(e.target.value));
 $('capture').onchange=e=>switchCapture(e.target.value);
@@ -445,19 +426,17 @@ $('statsBtn').onclick=()=>{const s=$('stats');s.hidden=!s.hidden;$('statsBtn').s
 addEventListener('resize',()=>{if(renderer.xr.isPresenting)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);invalidate();});
 cvs.addEventListener('webglcontextlost',e=>{e.preventDefault();status('Graphics paused · reload this page',true);});
 /* ── WebXR (Quest Browser) ── immersive-vr, 'local' reference space, controllers in the rig, snap turn, no smooth locomotion. */
-let xrSession=null,xrSupported=false,xrARSupported=false,activeController=null,pendingPlace=0;
+let xrSession=null,xrSupported=false,activeController=null,pendingPlace=0;
 const controllers=[0,1].map(i=>{const c=renderer.xr.getController(i);c.userData={source:null,stick:{armed:true},adjust:{armed:true}};
  const ray=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,0,-1)]),new THREE.LineBasicMaterial({color:0xffd479,transparent:true,opacity:.55,depthTest:false}));ray.scale.z=3;ray.renderOrder=55;ray.visible=false;c.add(ray);c.userData.ray=ray;
  c.addEventListener('connected',e=>{c.userData.source=e.data;ray.visible=e.data.targetRayMode==='tracked-pointer';if(!activeController||e.data.handedness==='right')activeController=c;});
  c.addEventListener('disconnected',()=>{c.userData.source=null;ray.visible=false;if(activeController===c)activeController=controllers.find(o=>o!==c&&o.userData.source)||null;});
  c.addEventListener('selectstart',()=>{activeController=c;});
- c.addEventListener('select',()=>{c.updateMatrixWorld(true);const o=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld);if(MODE_AR)mrSelect(c,o,d);else selectRay(o,d);});
+ c.addEventListener('select',()=>{c.updateMatrixWorld(true);const o=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld);selectRay(o,d);});
  rig.add(c);return c;});
 async function detectXR(){
- if(!navigator.xr||!isSecureContext){if(MODE_AR){$('xrNote').textContent='Desktop MR simulation · passthrough needs Quest Browser over HTTPS (immersive-ar), see docs/QUEST_XR_OVERLAY.md';return false;}$('xrNote').textContent=isSecureContext?'Desktop preview · WebXR not available in this browser':'Desktop preview · open over HTTPS in Quest Browser for VR (see docs/QUEST_XR_OVERLAY.md)';return false;}
- xrSupported=await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);xrARSupported=await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
- if(MODE_AR){$('enterVR').hidden=true;$('enterMR').hidden=!xrARSupported;$('xrNote').textContent=xrARSupported?'':'Desktop MR simulation · this browser offers no immersive-ar (passthrough) session · use Quest Browser';return xrSupported;}
- $('enterVR').hidden=!xrSupported;$('enterMR').hidden=!xrARSupported;$('xrNote').textContent=xrSupported?'':'Desktop preview · no immersive-vr device detected';return xrSupported;}
+ if(!navigator.xr||!isSecureContext){$('xrNote').textContent=isSecureContext?'Desktop preview · WebXR not available in this browser':'Desktop preview · open over HTTPS in Quest Browser for VR (see docs/QUEST_XR_OVERLAY.md)';return false;}
+ xrSupported=await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);$('enterVR').hidden=!xrSupported;$('xrNote').textContent=xrSupported?'':'Desktop preview · no immersive-vr device detected';return xrSupported;}
 $('enterVR').onclick=async()=>{if(xrSession)return xrSession.end();try{
  renderer.xr.setFramebufferScaleFactor(P.xrScale);
  const session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['hand-tracking']});
@@ -493,194 +472,10 @@ function xrInput(){
  const c=activeController&&activeController.userData.source?.targetRayMode==='tracked-pointer'?activeController:null;
  if(c){c.updateMatrixWorld(true);U.coneOrigin.value.setFromMatrixPosition(c.matrixWorld);U.coneDir.value.set(0,0,-1).transformDirection(c.matrixWorld);}else coneFromView();
 }
-/* ══ Mixed reality (passthrough) mode: ?mode=ar ══ docs/QUEST_XR_OVERLAY.md "MR passthrough mode".
-   No photo and no capture registration: the BIM services are placed in the WebXR 'local-floor' space by a MANUAL
-   alignment (touched landmarks -> yaw + translation, twin/mr-align.js). Every label says: manual alignment, not surveyed.
-   Transparent background (alpha-blend) so the passthrough shows; services only, distance fade (Near/Room/All), Lens cone
-   = see-through window (full strength inside, faint outside). Landmarks: buildings/grimes/mr-landmarks.json (BIM-derived). */
-const mr={doc:null,area:null,session:null,fit:null,T:null,source:'none',record:null,rangeKey:OV.parseRange(location.search),panel:false,page:'main',nudge:false,step:'fine',
- checkIdx:-1,lastCheck:null,note:'',hitSources:new Map(),hitPending:new Set(),hitPoint:null,anchor:null,anchorA:null,anchorLocal:null,pendingAnchor:null,cull:OV.createCullTracker(),headBim:[0,0,0],sim:null,stale:false,features:[],nudged:false,events:[]};
-const mrLog=e=>{mr.events.push({t:Math.round(performance.now()-T0),e});if(mr.events.length>60)mr.events.shift();};
-const mrPanel=makeSurface(1280,720,1.0,.5625,72);scene.add(mrPanel.mesh);
-const tipGeo=new THREE.SphereGeometry(.009,16,10),tipMat=new THREE.MeshBasicMaterial({color:0xffd479,depthTest:false,depthWrite:false,transparent:true,toneMapped:false});
-const hitRing=new THREE.Mesh(new THREE.RingGeometry(.025,.035,32),new THREE.MeshBasicMaterial({color:0x5eead4,depthTest:false,depthWrite:false,transparent:true,side:THREE.DoubleSide,toneMapped:false}));
-hitRing.renderOrder=58;hitRing.visible=false;hitRing.frustumCulled=false;scene.add(hitRing);
-const checkRing=new THREE.Mesh(new THREE.RingGeometry(.09,.11,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xfbbf24,depthTest:false,depthWrite:false,transparent:true,opacity:.9,side:THREE.DoubleSide,toneMapped:false}));
-checkRing.renderOrder=57;checkRing.visible=false;checkRing.frustumCulled=false;bimRoot.add(checkRing);
-const MR_TIP=clamp(Number(q.get('tip'))||3,0,15)/100;   // gold tip ball this far (m) in front of the controller's target-ray origin
-for(const c of controllers){const t=new THREE.Mesh(tipGeo,tipMat);t.position.z=-MR_TIP;t.renderOrder=60;t.visible=false;t.frustumCulled=false;c.add(t);c.userData.tip=t;}
-const mrShort=()=>mr.area?mr.area.name.replace(/^Level 1 · /,'L1 · '):'MR';
-function mrCardCapture(){return {label:'MR · '+mrShort(),alignmentText:MR.LABEL+(mr.fit?.ok?' · RMS '+MR.cm(mr.fit.rmsM).toFixed(1)+' cm':'')+(mr.nudged?' · nudged':'')};}
-function mrCullRadius(){const l=OV.cullLimit(mr.rangeKey);return Number.isFinite(l)?l:1e6;}
-function mrApplyRange(key){mr.rangeKey=OV.RANGE_KEYS.includes(key)?key:OV.DEFAULT_RANGE;const u=OV.uniformValues(mr.rangeKey);U.fadeOn.value=mr.rangeKey==='all'?0:1;U.fadeRange.value.set(u.fade[0],u.fade[1]);mr.cull.reset();mrUpdateCull(true);mrRefresh();}
-function mrSetT(T,source){mr.T={yawDeg:T.yawDeg,t:T.t.slice()};mr.source=source;bimRoot.rotation.set(0,T.yawDeg*Math.PI/180,0);bimRoot.position.fromArray(T.t);bimRoot.updateMatrixWorld(true);bimRoot.visible=true;mr.cull.reset();mrUpdateCull(true);mrRefresh();}
-const meshRevision=()=>Object.values(layerState).reduce((n,s)=>n+s.meshes.length+(s.group.visible?1e6:0),0);
-function mrUpdateCull(force=false){if(!mr.T)return;camera.getWorldPosition(_head);const h=MR.applyT(MR.invertT(mr.T),_head.toArray());mr.headBim=h;
- if(force||mr.cull.needs(h,mr.rangeKey,meshRevision())){stationBim=h;updateRadius();}}
-function mrStatusLine(){if(!mr.area)return 'MR · loading landmarks…';const s=mr.session,p=s?MR.currentPoint(mr.area,s):null;
- if(p)return `Point ${p.id} (${mr.area.points.indexOf(p)+1}/${mr.area.points.length}) · ${p.label}`;
- if(s&&s.phase==='review')return 'Review · '+MR.summary(s.fit);
- if(mr.checkIdx>=0){const c=mr.area.checks[mr.checkIdx];return `Check ${c.id} · ${c.label}`;}
- return mr.T?'Aligned · '+(mr.fit?.ok?MR.summary(mr.fit):mr.source):'Not aligned';}
-function mrRefresh(){updateAlignMR();if(mr.panel)mrDrawPanel();mrRender2D();invalidate();}
-function updateAlignMR(){const a=$('align');a.textContent='MR passthrough · '+mrShort()+' · '+MR.LABEL+(mr.fit?.ok?' · RMS '+MR.cm(mr.fit.rmsM).toFixed(1)+' cm ('+mr.fit.n+' points)':mr.T?' · '+mr.source:' · not aligned yet')+' · Design (BIM) positions';a.classList.toggle('prov',true);}
-/* Alignment session (state machine in MRAlign). A live fit is shown as soon as two plan points are in. */
-function mrStartAlign(areaId){mr.area=MR.areaById(mr.doc,areaId||mr.area?.id);mr.session=MR.createSession(mr.area);mr.fit=null;mr.checkIdx=-1;checkRing.visible=false;if(!mr.T)bimRoot.visible=false;mr.note='Touch each landmark with the gold tip, then trigger. Skip what you cannot reach.';mrLog('align:start '+mr.area.id);mrRefresh();}
-function mrLiveFit(){const s=mr.session;if(!s)return;const f=s.phase==='review'?s.fit:MR.capturedPlanCount(mr.area,s)>=2?MR.solveSession(mr.area,s):null;if(f?.ok){mr.fit=f;mrSetT(f.T,'fit-preview');}else if(f)mr.note=f.error;}
-function mrCapture(point,method){const s=mr.session;if(!s||s.phase!=='capture')return;const p=MR.currentPoint(mr.area,s);MR.capture(mr.area,s,point);mrLog('capture '+p.id+' '+method);mr.note=`Point ${p.id} captured (${method==='hit'?'surface hit':'tip'})`;mrLiveFit();
- if(s.phase==='review'){mr.note=s.fit.ok?'All points in · '+MR.summary(s.fit)+(s.fit.warnings.length?' · '+s.fit.warnings[0]:''):s.fit.error;}mrRefresh();}
-function mrSkip(){const s=mr.session;if(!s||s.phase!=='capture')return;const p=MR.currentPoint(mr.area,s);MR.skip(mr.area,s);mr.note='Skipped '+p.id;mrLiveFit();if(s.phase==='review'&&!s.fit.ok)mr.note=s.fit.error;mrRefresh();}
-function mrRedo(){if(!mr.session){mrStartAlign();return;}MR.redo(mr.area,mr.session);mr.note='Redo point '+MR.currentPoint(mr.area,mr.session)?.id;mrLiveFit();mrRefresh();}
-function mrSolveNow(){const s=mr.session;if(!s)return;if(MR.capturedPlanCount(mr.area,s)<2){mr.note='Need 2 wall/column points first';mrRefresh();return;}MR.finishEarly(mr.area,s);mrLiveFit();mr.note=s.fit.ok?MR.summary(s.fit):s.fit.error;mrRefresh();}
-/* Accept: persist (localStorage via MRAlign; plus an XR anchor when the session has one, created inside the next frame). */
-function mrAccept(){const s=mr.session,f=s?.fit||mr.fit;if(!mr.T||!f?.ok){mr.note='Nothing to accept · capture at least 2 wall/column points';mrRefresh();return;}
- mr.fit=f;mr.session=null;mr.nudged=false;mr.stale=false;mrSave();if(xrSession&&mr.features.includes('anchors'))mr.pendingAnchor=mrPlanCentroid(s);mr.note='Saved · '+MR.summary(f)+(mr.pendingAnchor?' · creating anchor…':' · no XR anchor (valid this session only)');mrLog('accept');mrRefresh();}
-function mrPlanCentroid(s){const pts=s?Object.values(s.captures):[];if(!pts.length){camera.getWorldPosition(_head);return [_head.x,0,_head.z];}const c=[0,0,0];for(const p of pts)for(let k=0;k<3;k++)c[k]+=p[k]/pts.length;c[1]=0;return c;}
-function mrSave(handle=mr.record?.anchor?.handle||null){if(!mr.T)return;const local=mr.anchorA?MR.toAnchorFrame(mr.T,mr.anchorA):null;
- mr.record=MR.makeRecord({area:mr.area.id,level:mr.area.level,T:mr.T,fit:mr.fit,anchorHandle:local?handle:null,anchorLocal:local,nudged:mr.nudged});MR.saveRecord(localStorage,mr.record);if(local)mr.anchorLocal=local;}
-function mrForget(){const handle=mr.record?.anchor?.handle||MR.loadRecord(localStorage)?.anchor?.handle;MR.clearRecord(localStorage);mr.record=null;mr.note='Saved alignment forgotten (the current view keeps it until you re-align)';
- if(mr.anchor?.delete)try{mr.anchor.delete();}catch(e){}if(handle&&xrSession?.deletePersistentAnchor)xrSession.deletePersistentAnchor(handle).catch(()=>{});mr.anchor=null;mr.anchorA=null;mr.anchorLocal=null;mrRefresh();}
-function mrNudge(kind,dir){if(!mr.T)return;const st=MR.NUDGE_STEPS[mr.step];camera.getWorldPosition(_head);const q=camera.getWorldQuaternion(new THREE.Quaternion());const hy=MR.yawFromQuaternion(q.toArray());
- let T=mr.T;if(kind==='move')T=MR.nudge(T,{move:MR.headingStep(dir,hy,st.moveM)});else if(kind==='height')T=MR.nudge(T,{move:[0,dir*st.moveM,0]});else if(kind==='yaw')T=MR.nudge(T,{yawDeg:dir*st.yawDeg,pivot:_head.toArray()});
- mr.nudged=true;mrSetT(T,mr.source.replace(/ · nudged$/,'')+' · nudged');mrSave();}
-/* Check points: BIM device vs the installed one (plumb under it with the tip, or the ray hit on the ceiling with grip). */
-function mrNextCheck(){const n=mr.area.checks.length;if(!n)return;mr.checkIdx=(mr.checkIdx+1)%(n+1);if(mr.checkIdx===n){mr.checkIdx=-1;checkRing.visible=false;mr.note='Check mode off';mrRefresh();return;}
- const c=mr.area.checks[mr.checkIdx];if(c.source?.layer&&LAYERS[c.source.layer]&&!layerState[c.source.layer])loadLayer(c.source.layer).then(()=>{status(LAYERS[c.source.layer].label+' ready');mrUpdateCull(true);mrRefresh();});else if(c.source?.layer&&layerState[c.source.layer])layerState[c.source.layer].group.visible=true;
- checkRing.position.set(c.bim[0],c.bim[1]-.005,c.bim[2]);checkRing.visible=true;mr.note=c.text;mrRefresh();}
-function mrCheck(point,method){const c=mr.area.checks[mr.checkIdx];if(!c||!mr.T)return;const o=MR.checkOffset(mr.T,c.bim,point);
- const row={area:mr.area.id,check:c.id,element:c.source?.element||null,label:c.label,at:new Date().toISOString(),method,...o,alignment:{rmsCm:mr.fit?.ok?MR.cm(mr.fit.rmsM):null,points:mr.fit?.n??null,nudged:mr.nudged,source:mr.source},note:'design (BIM) vs installed; manual alignment, not surveyed'};
- mr.lastCheck=row;MR.appendCheck(localStorage,row);mrLog('check '+c.id);mr.note=`${c.id}: real is ${o.horizontalCm.toFixed(1)} cm from BIM (BIM x ${o.dxBimCm.toFixed(1)}, z ${o.dzBimCm.toFixed(1)} cm) · logged`;mrRefresh();}
-function mrLayerOn(k){return !!layerState[k]&&layerState[k].group.visible;}
-function mrToggleLayer(k){if(!layerState[k]){loadLayer(k).then(()=>{status(LAYERS[k].label+' ready');mrUpdateCull(true);mrRefresh();});mr.note=LAYERS[k].label+' loading'+(xrSession?' · frames may stutter':'');}else layerState[k].group.visible=!layerState[k].group.visible;if(k==='fire')$('fire').setAttribute('aria-pressed',String(mrLayerOn('fire')));mrUpdateCull(true);mrRefresh();}
-/* ── MR panel (world-locked canvas; B/Y toggles; trigger presses) ── */
-function mrButtons(){if(mr.page==='layers')return [...OVERLAY_LAYER_KEYS.map(k=>`${LAYERS[k].label}: ${layerState[k]?.loading?'…':mrLayerOn(k)?'on':'off'}`),'','','','','','','◂ Back'];
- const s=mr.session;return ['Capture: trigger','Skip point','Redo last','Solve now',s?'Restart align':'Re-align','Accept + save',`Nudge: ${mr.nudge?'on':'off'}`,`Step: ${mr.step==='fine'?'1 cm · 0.25°':'5 cm · 1°'}`,
-  mr.checkIdx>=0?`Check: ${mr.area.checks[mr.checkIdx].id} ▸`:'Check points',`Range: ${OV.preset(mr.rangeKey).label}`,`Style: ${state.mode==='lens'?'Lens':'All'}`,'Layers ▸',`Area: ${mr.area?.id.replace(/^l1-/,'')||'-'}`,'Forget saved','Close'];}
-async function mrButton(i){
- if(mr.page==='layers'){if(i<OVERLAY_LAYER_KEYS.length)mrToggleLayer(OVERLAY_LAYER_KEYS[i]);else if(i===14)mr.page='main';mrRefresh();return;}
- if(i===0){mrSetPanel(false);mr.note='Panel hidden · put the gold ball on the point and pull the trigger (B/Y brings the panel back)';}   // never capture at the panel itself
- else if(i===1)mrSkip();else if(i===2)mrRedo();else if(i===3)mrSolveNow();else if(i===4)mrStartAlign();
- else if(i===5)mrAccept();else if(i===6)mr.nudge=!mr.nudge;else if(i===7)mr.step=mr.step==='fine'?'coarse':'fine';else if(i===8)mrNextCheck();
- else if(i===9)mrApplyRange(OV.RANGE_KEYS[(OV.RANGE_KEYS.indexOf(mr.rangeKey)+1)%OV.RANGE_KEYS.length]);else if(i===10)setStyle(state.mode==='lens'?'all':'lens');
- else if(i===11)mr.page='layers';else if(i===12){const ids=mr.doc.areas.map(a=>a.id);mrStartAlign(ids[(ids.indexOf(mr.area.id)+1)%ids.length]);}
- else if(i===13)mrForget();else if(i===14){mrSetPanel(false);return;}
- mrRefresh();}
-function mrSetPanel(on){mr.panel=on;if(on){mrDrawPanel();placeInFront(mrPanel.mesh,1.0,.22);}mrPanel.mesh.visible=on;invalidate();}
-function mrDrawMap(ctx,x0,y0,w,h){const a=mr.area;if(!a)return;const pts=a.points.filter(p=>p.kind!=='y'),all=[...pts.map(p=>p.bim),...a.checks.map(c=>c.bim)];
- const xs=all.map(p=>p[0]),zs=all.map(p=>p[2]),mnx=Math.min(...xs),mxx=Math.max(...xs),mnz=Math.min(...zs),mxz=Math.max(...zs),sc=Math.min((w-60)/Math.max(.5,mxx-mnx),(h-60)/Math.max(.5,mxz-mnz));
- const P2=p=>[x0+30+(p[0]-mnx)*sc+((w-60)-(mxx-mnx)*sc)/2,y0+30+(p[2]-mnz)*sc+((h-60)-(mxz-mnz)*sc)/2];
- ctx.fillStyle='rgba(255,255,255,.06)';ctx.fillRect(x0,y0,w,h);ctx.strokeStyle='#33506b';ctx.strokeRect(x0,y0,w,h);
- ctx.font='22px Arial';ctx.fillStyle='#8aa2b8';ctx.fillText('BIM plan (not to your heading)',x0+10,y0+h-10);
- const cur=mr.session?MR.currentPoint(a,mr.session):null;
- for(const c of a.checks){const [x,y]=P2(c.bim);ctx.fillStyle=mr.checkIdx>=0&&a.checks[mr.checkIdx]===c?'#fbbf24':'#64748b';ctx.fillRect(x-6,y-6,12,12);ctx.fillText(c.id,x+9,y+7);}
- for(const p of pts){const [x,y]=P2(p.bim),done=mr.session?.captures[p.id],sk=mr.session?.skipped[p.id];ctx.beginPath();ctx.arc(x,y,cur===p?15:10,0,7);ctx.fillStyle=cur===p?'#FDB515':done?'#34d399':sk?'#7a2633':'#5d82a3';ctx.fill();ctx.fillStyle='#fff';ctx.font='700 26px Arial';ctx.fillText(p.id,x+16,y-10);}}
-function mrDrawPanel(){const {ctx,canvas}=mrPanel,W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.93)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,30);ctx.fill();
- ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,80);ctx.fillStyle='#FDB515';ctx.fillRect(4,80,W-8,5);ctx.fillStyle='#fff';ctx.font='700 40px Arial';ctx.fillText('Grimes MR · BIM services in passthrough',30,58);
- const top=H*MR.PANEL.top,tw=W*.6;let y=128;ctx.fillStyle='#ffb4a8';fitText(ctx,mrShort()+' · '+MR.LABEL,30,y,tw-20,28,'Arial');y+=44;
- ctx.fillStyle='#e8f1f8';fitText(ctx,mrStatusLine(),30,y,tw-20,30,'Arial');y+=46;
- const p=mr.session?MR.currentPoint(mr.area,mr.session):null,body=p?p.text:mr.note;ctx.fillStyle='#cfe3f5';ctx.font='26px Arial';for(const t of wrap(ctx,body||'',tw-30,3)){ctx.fillText(t,30,y);y+=34;}
- if(p&&mr.note){ctx.fillStyle='#8aa2b8';ctx.font='22px Arial';ctx.fillText(wrap(ctx,mr.note,tw-30,1)[0]||'',30,y);y+=30;}
- ctx.fillStyle='#8aa2b8';ctx.font='22px Arial';ctx.fillText(xrSession?'Trigger: capture/press · grip+trigger: surface hit · B/Y panel · A/X Lens/All'+(mr.nudge?' · stick: nudge (grip: turn/height)':''):'Desktop simulation · M panel · click buttons',30,top-14,tw-30);
- mrDrawMap(ctx,tw+10,100,W-tw-30,top-120);
- mrButtons().forEach((label,i)=>{if(!label)return;const r=MR.gridRect(MR.PANEL,i),x=r.x*W,yy=r.y*H,w=r.w*W,h=r.h*H;ctx.fillStyle=i===14?'#7a2633':(i===6&&mr.nudge)||(i===8&&mr.checkIdx>=0)?'#6a4a10':i===5?'#14532d':'#123a5c';ctx.beginPath();ctx.roundRect(x,yy,w,h,14);ctx.fill();ctx.strokeStyle='#5d82a3';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#fff';ctx.font='600 26px Arial';ctx.textAlign='center';ctx.fillText(label,x+w/2,yy+h/2+9,w-14);ctx.textAlign='left';});
- mrPanel.texture.needsUpdate=true;invalidate();}
-/* tip = a small gold ball MR_TIP in front of the controller's target-ray origin; that ball (seen over the passthrough) is the touch point */
-function mrTip(c){if(!c){camera.getWorldPosition(_head);return _head.toArray();}c.updateMatrixWorld(true);return c.userData.tip.getWorldPosition(new THREE.Vector3()).toArray();}
-function mrSelect(c,o,d){
- if(mrPanel.mesh.visible){raycaster.set(o,d);raycaster.far=10;const h=raycaster.intersectObject(mrPanel.mesh,false)[0];if(h){const b=MR.gridHit(MR.PANEL,h.uv.x,h.uv.y);if(b>=0)mrButton(b);return;}}
- const grip=!!c.userData.source?.gamepad?.buttons?.[1]?.pressed,useHit=grip&&mr.hitPoint,pt=useHit?mr.hitPoint.slice():mrTip(c),method=useHit?'hit':'tip';
- if(mr.session&&mr.session.phase==='capture')return mrCapture(pt,method);
- if(mr.checkIdx>=0&&mr.T)return mrCheck(pt,method);
- if(mr.T)pickAlong(o,d);}
-/* Per XR frame: hit-test, anchor pose, input, culling. */
-function mrFrame(){const frame=renderer.xr.getFrame(),ref=renderer.xr.getReferenceSpace();
- for(const c of controllers){const src=c.userData.source;if(!src||!xrSession)continue;
-  if(xrSession.requestHitTestSource&&mr.features.includes('hit-test')&&!mr.hitSources.has(src)&&!mr.hitPending.has(src)){mr.hitPending.add(src);xrSession.requestHitTestSource({space:src.targetRaySpace}).then(h=>mr.hitSources.set(src,h)).catch(()=>mr.hitSources.set(src,null)).finally(()=>mr.hitPending.delete(src));}}
- const ac=activeController,hs=ac&&mr.hitSources.get(ac.userData.source),grip=!!ac?.userData.source?.gamepad?.buttons?.[1]?.pressed;mr.hitPoint=null;
- if(frame&&ref&&hs&&grip){const r=frame.getHitTestResults(hs)[0],pose=r?.getPose(ref);if(pose){const p=pose.transform.position;mr.hitPoint=[p.x,p.y,p.z];hitRing.position.set(p.x,p.y,p.z);hitRing.quaternion.set(pose.transform.orientation.x,pose.transform.orientation.y,pose.transform.orientation.z,pose.transform.orientation.w);hitRing.rotateX(-Math.PI/2);}}
- hitRing.visible=!!mr.hitPoint;
- if(frame&&ref&&mr.pendingAnchor&&frame.createAnchor){const c=mr.pendingAnchor;mr.pendingAnchor=null;
-  frame.createAnchor(new XRRigidTransform({x:c[0],y:c[1],z:c[2]},{x:0,y:0,z:0,w:1}),ref).then(async a=>{mr.anchor=a;mr.anchorA={yawDeg:0,t:c.slice()};let h=null;
-   if(a.requestPersistentHandle)try{h=await a.requestPersistentHandle();}catch(e){mrLog('anchor:persist failed');}mrSave(h);mr.note=h?'Saved with a persistent XR anchor':'Anchor created (not persistent) · valid this session';mrLog('anchor '+(h?'persistent':'session'));mrRefresh();})
-   .catch(e=>{mr.note='Anchor not available · saved for this session only';mrLog('anchor:error');mrRefresh();});}
- if(frame&&ref&&mr.anchor&&mr.anchorLocal){const pose=frame.getPose(mr.anchor.anchorSpace,ref);if(pose){const p=pose.transform.position,o=pose.transform.orientation,A=MR.anchorT([p.x,p.y,p.z],[o.x,o.y,o.z,o.w]),T=MR.fromAnchorFrame(mr.anchorLocal,A);mr.anchorA=A;
-  if(!mr.T||Math.abs(T.yawDeg-mr.T.yawDeg)>.01||Math.hypot(T.t[0]-mr.T.t[0],T.t[1]-mr.T.t[1],T.t[2]-mr.T.t[2])>.001)mrSetT(T,mr.source.startsWith('anchor')?mr.source:'anchor'+(mr.nudged?' · nudged':''));}}
- for(const c of controllers){const gp=c.userData.source?.gamepad;if(!gp||gp.mapping!=='xr-standard')continue;
-  const was=prevButtons.get(c)||[],now=gp.buttons.map(b=>b.pressed),edge=k=>now[k]&&!was[k];prevButtons.set(c,now);
-  if(edge(4))setStyle(state.mode==='lens'?'all':'lens');if(edge(5))mrSetPanel(!mr.panel);
-  const x=gp.axes[2]||0,y=gp.axes[3]||0,a=X.stickStep(c.userData.stick,x,y);if(!a)continue;
-  if(mr.nudge&&mr.T){if(now[1]){if(a==='turn-left'||a==='turn-right')mrNudge('yaw',a==='turn-left'?1:-1);else mrNudge('height',a==='forward'?1:-1);}
-   else mrNudge('move',a==='turn-left'?'left':a==='turn-right'?'right':a);}
-  else if(now[1]){if(a==='forward'||a==='back'){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],a==='forward'?1:-1);applyShaderState();}else{state.coneDeg=X.stepCone(state.coneDeg,a==='turn-right'?1:-1);applyShaderState();}}}
- const c=activeController&&activeController.userData.source?.targetRayMode==='tracked-pointer'?activeController:null;
- if(c){c.updateMatrixWorld(true);U.coneOrigin.value.setFromMatrixPosition(c.matrixWorld);U.coneDir.value.set(0,0,-1).transformDirection(c.matrixWorld);}else coneFromView();
- mrUpdateCull();}
-function mrOnSessionStart(session){
- // enabledFeatures where the browser reports it; otherwise feature-detect (a refused request is caught where it is used)
- mr.features=session.enabledFeatures?[...session.enabledFeatures]:[session.requestHitTestSource&&'hit-test',typeof XRFrame!=='undefined'&&XRFrame.prototype.createAnchor&&'anchors'].filter(Boolean);
- mrLog('session features '+(session.enabledFeatures?'':'(guessed) ')+mr.features.join(','));mr.hitSources.clear();mr.anchor=null;mr.anchorA=null;mr.anchorLocal=null;
- for(const c of controllers){c.userData.tip.visible=true;}
- const ref=renderer.xr.getReferenceSpace();ref?.addEventListener?.('reset',()=>{mrLog('reference reset');if(!mr.anchor){mr.stale=true;mr.note='Tracking origin was reset (recenter) · alignment no longer valid · Re-align';mrRefresh();}});
- const rec=MR.loadRecord(localStorage);mr.T=null;bimRoot.visible=false;
- if(rec&&rec.area===mr.area.id&&rec.frame==='anchor'&&session.restorePersistentAnchor){mr.note='Restoring saved anchor…';session.restorePersistentAnchor(rec.anchor.handle).then(a=>{mr.anchor=a;mr.anchorLocal=rec.anchor.local;mr.record=rec;mr.fit=null;mr.source='anchor (restored '+rec.created.slice(0,10)+')';mr.note='Saved alignment restored from the XR anchor · check one landmark';mrLog('anchor restored');mrRefresh();})
-  .catch(()=>{mrLog('anchor restore failed');mrStartAlign(rec.area);mr.note='Saved anchor not found in this space · Re-align';mrRefresh();});}
- else if(rec&&rec.area===mr.area.id){mr.record=rec;mrSetT(rec,'saved, earlier session');mr.stale=true;mr.note='Saved alignment from an earlier session WITHOUT an anchor: valid only if MR started at the same spot and heading. Check a landmark or Re-align.';}
- else mrStartAlign();
- mrSetPanel(true);mrRefresh();}
-function mrOnSessionEnd(){xrSession=null;mr.hitSources.clear();mr.hitPending.clear();mr.anchor=null;mr.pendingAnchor=null;hitRing.visible=false;for(const c of controllers){c.userData.ray.visible=false;c.userData.tip.visible=false;}
- mrSetPanel(false);renderer.xr.setReferenceSpaceType('local');rig.position.set(0,1.6,0);rig.rotation.set(0,0,0);camera.position.set(0,0,0);setDesktopLook();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
- $('enterMR').textContent='Enter MR';mr.note='MR session ended · the alignment belonged to that session';mrRefresh();}
-$('enterMR').onclick=async()=>{if(xrSession)return xrSession.end();if(!mr.area){status('Landmarks not loaded yet');return;}try{
- renderer.xr.setReferenceSpaceType('local-floor');renderer.xr.setFramebufferScaleFactor(P.xrScale);
- const session=await navigator.xr.requestSession('immersive-ar',{requiredFeatures:['local-floor'],optionalFeatures:['hit-test','anchors','plane-detection','mesh-detection','dom-overlay'],domOverlay:{root:$('mr')}});
- await renderer.xr.setSession(session);renderer.xr.setFoveation(P.foveation);xrSession=session;
- try{if(session.updateTargetFrameRate&&session.supportedFrameRates&&[...session.supportedFrameRates].includes(72))await session.updateTargetFrameRate(72);}catch(e){}
- rig.position.set(0,0,0);rig.rotation.set(0,0,0);camera.position.set(0,0,0);camera.quaternion.identity();hideCard();coneFromView();
- session.addEventListener('end',mrOnSessionEnd);$('enterMR').textContent='Exit MR';mrOnSessionStart(session);
-}catch(e){console.error(e);renderer.xr.setReferenceSpaceType('local');status('Could not start MR: '+(e.message||e));}};
-/* 2D page panel (desktop / before entering) */
-function mrRender2D(){const box=$('mr');if(!box||box.hidden||!mr.area)return;
- const s=mr.session;$('mrSteps').innerHTML='';for(const p of mr.area.points){const li=document.createElement('li'),st=s?.captures[p.id]?'captured':s?.skipped[p.id]?'skipped':s&&MR.currentPoint(mr.area,s)===p?'next':'';li.className=st;li.textContent=`${p.id} · ${p.label}${st?' · '+st:''}`;li.title=p.text;$('mrSteps').appendChild(li);}
- $('mrFit').textContent=mrStatusLine()+(mr.note?' · '+mr.note:'');}
-function mrDownloadChecks(){const rows=MR.loadChecks(localStorage);const blob=new Blob([JSON.stringify({schema:'grimes-mr-checks/1',label:'design (BIM) vs installed; manual alignment, not surveyed',rows},null,1)],{type:'application/json'});
- const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='grimes-mr-checks-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
-/* Desktop simulation: synthetic touches from a hidden 'session' transform + 1 cm noise run through the same state machine. */
-function mrSimTruth(area){const pts=area.points.filter(p=>p.kind!=='y'),c=[0,0,0];for(const p of pts)for(const k of [0,2])c[k]+=p.bim[k]/pts.length;const yawDeg=37,r=MR.rotY(yawDeg*Math.PI/180,[c[0],0,c[2]]);return {yawDeg,t:[.4-r[0],-area.floorY,-3-r[2]]};}
-function mrSimulate({noiseM=.01,seed=7}={}){const area=mr.area,Tt=mrSimTruth(area),rand=MR.rng(seed);mrStartAlign(area.id);
- for(const p of area.points)mrCapture(MR.simulateTouch(area,p,Tt,{noiseM,random:rand}),'sim');
- const f=mr.session?.fit;mrAccept();
- const err=area.points.filter(p=>p.kind!=='y').map(p=>{const a=MR.applyT(f.T,p.bim),b=MR.applyT(Tt,p.bim);return Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);});
- mr.sim={truth:Tt,noiseM,seed,maxTruthErrorCm:MR.cm(Math.max(...err)),yawErrorDeg:Math.abs(MR.wrapDeg(f.T.yawDeg-Tt.yawDeg))};
- // desktop eye 1.6 m above the simulated Quest floor, looking at landmark A
- rig.position.set(0,1.6,0);const A=MR.applyT(Tt,area.points[0].bim),d=new THREE.Vector3(A[0],1.6,A[2]).sub(new THREE.Vector3(0,1.6,0)).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=.25;setDesktopLook();camera.updateMatrixWorld(true);coneFromView();mrUpdateCull(true);
- mr.note='Simulated alignment (desktop, synthetic touches, '+Math.round(noiseM*100)+' cm noise; truth error '+mr.sim.maxTruthErrorCm.toFixed(1)+' cm)';mrRefresh();return mr.sim;}
-function mrInspection(){return {area:mr.area?.id??null,areas:mr.doc?.areas.map(a=>a.id)??[],phase:mr.session?.phase??(mr.T?'aligned':'none'),current:mr.session?MR.currentPoint(mr.area,mr.session)?.id??null:null,
- captured:mr.session?Object.keys(mr.session.captures):[],fit:mr.fit?.ok?{rmsCm:MR.cm(mr.fit.rmsM),n:mr.fit.n,worst:mr.fit.worst,heightSource:mr.fit.heightSource,warnings:mr.fit.warnings,yawDeg:mr.fit.T.yawDeg,t:mr.fit.T.t}:null,
- T:mr.T,source:mr.source,record:mr.record,rangeKey:mr.rangeKey,fade:{on:U.fadeOn.value,range:U.fadeRange.value.toArray()},outside:U.outside.value,cullRadius:mrCullRadius(),headBim:mr.headBim,panel:mr.panel,page:mr.page,
- nudge:mr.nudge,step:mr.step,check:mr.checkIdx>=0?mr.area.checks[mr.checkIdx].id:null,lastCheck:mr.lastCheck,sim:mr.sim,stale:mr.stale,features:mr.features,note:mr.note,label:MR.LABEL,events:mr.events.slice(-12),
- arSupported:xrARSupported,bimVisible:bimRoot.visible,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()}};}
-async function bootMR(){
- document.body.classList.add('mr');$('mr').hidden=false;sphere.visible=false;
- try{mr.doc=MR.validateLandmarks(await fetchJson('buildings/grimes/mr-landmarks.json'));}catch(e){status('MR landmarks unavailable · '+(e.message||e),true);return;}
- const want=q.get('area'),sel=$('mrArea');for(const a of mr.doc.areas){const o=document.createElement('option');o.value=a.id;o.textContent=a.name;sel.appendChild(o);}
- mr.area=MR.areaById(mr.doc,want);sel.value=mr.area.id;sel.onchange=e=>{mrStartAlign(e.target.value);};
- P.levels=new Set([mr.area.level]);mrApplyRange(mr.rangeKey);applyShaderState();
- rig.position.set(0,1.6,0);setDesktopLook();bimRoot.visible=false;
- mrStartAlign(mr.area.id);
- const rec=MR.loadRecord(localStorage);
- if(rec&&rec.area===mr.area.id){mr.record=rec;mr.note='A saved alignment exists ('+rec.created.slice(0,16).replace('T',' ')+', '+(rec.frame==='anchor'?'XR anchor':'no anchor')+(rec.rmsCm!=null?', RMS '+rec.rmsCm+' cm':'')+') · it is applied when you enter MR';}
- else mr.note=xrARSupported?'Enter MR, then touch the landmarks in order.':'Desktop MR simulation · press "Simulate alignment" to run the alignment flow with synthetic touches.';
- $('mrSim').onclick=()=>mrSimulate();$('mrForget').onclick=()=>mrForget();$('mrLog').onclick=()=>mrDownloadChecks();$('mrPanelBtn').onclick=()=>mrSetPanel(!mr.panel);
- $('fire').setAttribute('aria-pressed',String(P.layers.includes('fire')));
- status('MR · '+mrShort()+' · loading services…',true);
- await loadLayers(P.layers);mrUpdateCull(true);status('Services ready · '+P.layers.map(k=>LAYERS[k].label).join(', ')+(xrARSupported?' · Enter MR':''),false);mrRefresh();}
-/* desktop click / trigger outside XR: panel buttons first, then info cards (touch capture needs a headset or the simulation) */
-function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycaster.far=10;const h=raycaster.intersectObject(mrPanel.mesh,false)[0];if(h){const b=MR.gridHit(MR.PANEL,h.uv.x,h.uv.y);if(b>=0)mrButton(b);return {menu:b};}}
- return mr.T?pickAlong(o,d):null;}
 /* ── Loop ── */
 renderer.setAnimationLoop((t)=>{
  const xr=renderer.xr.isPresenting;
- if(xr){if(MODE_AR)mrFrame();else{if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}}
+ if(xr){if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}
  else if(!pointerInside&&!drag)coneFromViewIfIdle();
  const anim=stepFade(performance.now()),splat=gaussBusy();
  if(!xr&&!needsRender&&!anim&&!splat)return;needsRender=false;
@@ -699,13 +494,13 @@ function inspection(){const heap=performance.memory?Math.round(performance.memor
   layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{loaded:s.loaded,loading:s.loading,error:s.error||null,visible:s.group.visible,loadMs:s.loadMs??null,...s.stats,visibleBatches:s.meshes.filter(m=>m.visible).length}])),
   totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation},
   card:picked?{id:picked.id,layer:picked.layer,tier:picked.tier,lines:picked.lines}:null,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()},rig:{position:rig.position.toArray(),yaw:rig.rotation.y},camera:{world:camera.getWorldPosition(new THREE.Vector3()).toArray()},
-  viewPos:viewPos.slice(),photoSphereVisible:sphere.visible,mode:MODE_AR?'ar':'vr',mr:MODE_AR?mrInspection():null,
+  viewPos:viewPos.slice(),photoSphereVisible:sphere.visible,
   scene:{mode:gauss.scene,available:!!gaussianSource(),manifest:gauss.source?.path??null,local:!!gauss.source?.local,label:gauss.label||null,file:gauss.asset?.file??null,mobile:gauss.asset?.mobile??null,shDegree:gauss.asset?.shDegree??null,
    splats:gauss.count,loadMs:gauss.loadMs,loading:gauss.loading,error:gauss.error,overrideNote:gauss.overrideNote,override:gauss.override,zone:gauss.manifest?.zone?.id??null,zoneStations:gauss.stationIdx?.length??null,
    sortRunning:!!gauss.dropIn?.viewer.sortRunning,splatVisible:!!gauss.dropIn?.visible,teleports:gauss.teleports,eyeHeight:EYE_H,sharedMemory:false,renderer:'GaussianSplats3D 0.4.7 DropInViewer'}};}
 window.xrInspection=inspection;
 window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};return lastInfo;},
- openStation:i=>openStation(i),mr:{simulate:o=>mrSimulate(o),button:i=>mrButton(i),panel:on=>mrSetPanel(on),range:k=>mrApplyRange(k),startAlign:id=>mrStartAlign(id),capture:p=>mrCapture(p,'debug'),skip:()=>mrSkip(),solve:()=>mrSolveNow(),accept:()=>mrAccept(),nudge:(k,d)=>mrNudge(k,d),nextCheck:()=>mrNextCheck(),check:p=>mrCheck(p,'debug'),toggleLayer:k=>mrToggleLayer(k),forget:()=>mrForget()},walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,setScene,recenter,
+ openStation:i=>openStation(i),walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,setScene,recenter,
  frameStats:()=>{renderer.render(scene,camera);const gl=renderer.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,px=new Uint8Array(4);let lit=0,n=0;
   for(let i=1;i<24;i++)for(let j=1;j<16;j++){gl.readPixels(Math.floor(w*i/24),Math.floor(h*j/16),1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);n++;if(px[0]+px[1]+px[2]>45)lit++;}const r=renderer.info.render;return {litFraction:lit/n,calls:r.calls,triangles:r.triangles};},
  look:(y,p)=>{yaw=y;pitch=p;setDesktopLook();camera.updateMatrixWorld(true);coneFromView();},
@@ -722,8 +517,6 @@ setInterval(updateStats,1000);
 /* ── Boot ── XR support first (decides the default photo resolution), then the capture, then services. */
 (async()=>{
  const supported=await detectXR();
- if(MODE_AR){await bootMR();return;}
- $('enterMR').onclick=()=>{location.search='?mode=ar';};   // the photo VR page offers MR only where immersive-ar exists
  state.hiRes=q.get('hires')==='1'?true:q.get('hires')==='0'?false:!supported;$('hires').setAttribute('aria-pressed',String(state.hiRes));
  gauss.override=await readOverride();if(gauss.overrideNote)$('xrNote').textContent=($('xrNote').textContent?$('xrNote').textContent+' · ':'')+gauss.overrideNote;
  // ?scene=gaussian with a local override and no ?capture opens the override's capture (e.g. the Oct 18 zone package).
