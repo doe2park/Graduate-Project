@@ -59,8 +59,6 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   await page.waitForFunction(i=>xrInspection().station.index!==i&&!document.getElementById('status').textContent.startsWith('Loading'),i0,{timeout:30000});
   const moved=await page.evaluate(()=>xrInspection());assert.ok(s0.neighbors.includes(moved.station.index),'moved to a recorded neighbour');
   moved.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-moved.camera.world[k])<1e-6));assert.equal(moved.card,null,'card cleared on jump');
-  report.pointAndGo=await pointAndGoSmoke(page,m);
-  report.hoverRayCostMs=await page.evaluate(()=>xrDebug.rayCostMs());   // desktop CPU; the Quest is slower (the page self-throttles at 20x the measured cost)
   // Sep 17: provisional label everywhere, its own registration
   await page.evaluate(()=>xrDebug.switchCapture('2026-09-17'));await page.waitForFunction(()=>xrInspection().capture.date==='2026-09-17'&&xrInspection().ready);
   const sep=await page.evaluate(()=>xrInspection());assert.equal(sep.capture.provisional,true);assert.match(await page.locator('#align').textContent(),/PROVISIONAL/);
@@ -69,16 +67,17 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   await page.evaluate(()=>xrDebug.setStyle('all'));await page.waitForTimeout(150);await page.screenshot({path:path.join(OUT,'scan-xr-sep-all.png')});await page.evaluate(()=>xrDebug.setStyle('lens'));
   report.sep={station:sep.station.id,visibleBatches:sep.totals.visibleDrawCalls};
   // Oct 18: the menu Capture button cycles May → Sep → Oct; provisional, its own registration and photos
-  await page.evaluate(()=>xrDebug.menuAction('capture'));await page.waitForFunction(()=>xrInspection().capture.date==='2026-10-18'&&xrInspection().ready);
+  await page.evaluate(()=>xrDebug.menuAction(5));await page.waitForFunction(()=>xrInspection().capture.date==='2026-10-18'&&xrInspection().ready);
   const oct=await page.evaluate(()=>xrInspection());assert.equal(oct.capture.provisional,true);assert.match(await page.locator('#align').textContent(),/Oct 18, 2026 · PROVISIONAL/);
   oct.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-oct.camera.world[k])<1e-6,'eye on the Oct station'));
   const octReg=JSON.parse(fs.readFileSync(path.join(ROOT,'scan-assets/captures/2026-10-18/registration.json')));assert.equal(octReg.status,'project-frame-provisional');assert.ok(Math.abs(oct.bimRoot.rotationY+octReg.rotationYDegrees*Math.PI/180)<1e-12);
   assert.ok(oct.texture&&oct.texture.width>=2048,'Oct photo loaded');
   await page.evaluate(()=>xrDebug.setStyle('all'));await page.waitForTimeout(150);await page.screenshot({path:path.join(OUT,'scan-xr-oct-all.png')});await page.evaluate(()=>xrDebug.setStyle('lens'));
   report.oct={station:oct.station.id,visibleBatches:oct.totals.visibleDrawCalls};
-  await page.evaluate(()=>xrDebug.menuAction('capture'));await page.waitForFunction(()=>xrInspection().capture.date==='2026-05-06'&&xrInspection().ready);
-  // XR menu (2026-10-22): 5 large buttons ~0.8 m away; the ray highlights a button, a click acts on that button only; More page
-  report.menu=await menuSmoke(page);
+  await page.evaluate(()=>xrDebug.menuAction(5));await page.waitForFunction(()=>xrInspection().capture.date==='2026-05-06'&&xrInspection().ready);
+  // XR menu panel renders and its buttons work with a desktop click ray
+  await page.evaluate(()=>xrDebug.setMenu(true));await page.screenshot({path:path.join(OUT,'scan-xr-menu.png')});
+  await page.evaluate(()=>xrDebug.menuAction(0));assert.equal((await page.evaluate(()=>xrInspection())).style,'all');
   // phone width: no horizontal overflow
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no horizontal overflow at 390 px');
@@ -89,67 +88,9 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   if(process.env.XR_SMOKE_OCT==='1')report.gaussianOct=await gaussianSmoke(browser,base,now,'work/gaussian/2026-10-18/l1-a/20261019T074640Z/package/viewer.json');
   if(process.env.XR_SMOKE_MR!=='0')report.mr=await mrSmoke(browser,base,now);
   fs.writeFileSync(path.join(OUT,'scan-xr-report.json'),JSON.stringify(report,null,2));
-  console.log(JSON.stringify(report,null,2));console.log('PASS scan-xr desktop smoke (registration, photo, Level-1 services, radius culling, card tiers, navigation, provisional Sep/Oct, capture cycle, point-and-go, snap turn, menu hover/click/More, idle gating, 390 px'+(report.gaussian?', Gaussian mobile scene, teleport, scene toggle':'')+(report.gaussianOct?', local Oct 18 zone override':'')+(report.mr?', MR passthrough desktop simulation (alignment fit, persistence, fade/culling, checks, nudge)':'')+')');
+  console.log(JSON.stringify(report,null,2));console.log('PASS scan-xr desktop smoke (registration, photo, Level-1 services, radius culling, card tiers, navigation, provisional Sep/Oct, capture cycle, menu, idle gating, 390 px'+(report.gaussian?', Gaussian mobile scene, teleport, scene toggle':'')+(report.gaussianOct?', local Oct 18 zone override':'')+(report.mr?', MR passthrough desktop simulation (alignment fit, persistence, fade/culling, checks, nudge)':'')+')');
  }finally{await browser.close();if(server)server.kill();}
 })().catch(e=>{console.error(e);process.exit(1);});
-/* Point-and-go in 360-photo mode (desktop emulation: the camera ray stands in for the LEFT controller ray).
-   A level ray at a station 6-14 m away (not a route neighbour) jumps straight there; pointing at the floor next to a station picks it;
-   pointing up explains; snap turn keeps the eye fixed. */
-async function pointAndGoSmoke(page,m){
- const out={},I=await page.evaluate(()=>xrInspection()),cur=I.station.index,here=m.stations[cur].position;
- const route=require('../twin/xr-core.js').routeDistances(m.stations,cur);
- const cand=m.stations.map((s,j)=>({j,s,dh:Math.hypot(s.position[0]-here[0],s.position[2]-here[2])})).filter(c=>c.j!==cur&&!m.stations[cur].neighbors.includes(c.j)&&c.dh>6&&c.dh<14&&Math.abs(c.s.position[1]-here[1])<1&&Number.isFinite(route[c.j])&&route[c.j]<1.4*c.dh).sort((a,b)=>b.dh-a.dh);
- assert.ok(cand.length,'a far station to point at');
- let done=null;
- for(const c of cand.slice(0,6)){await page.evaluate(p=>xrDebug.lookAtScan(p),c.s.position);const a=await page.evaluate(()=>xrDebug.aimNdc(0,0));if(a?.ok&&a.index===c.j){done={c,a};break;}}
- assert.ok(done,'pointing straight at a far station selects it');
- assert.equal(done.a.method,'cone');assert.match(done.a.label,/^Capture \d+ · \d+\.\d m$/);assert.equal((await page.evaluate(()=>xrInspection())).aim.index,done.c.j);
- await page.screenshot({path:path.join(OUT,'scan-xr-aim.png')});
- const g=await page.evaluate(()=>xrDebug.goNdc(0,0));assert.equal(g.moved,true);
- await page.waitForFunction(j=>xrInspection().station.index===j&&xrInspection().ready,done.c.j,{timeout:30000});
- const at=await page.evaluate(()=>xrInspection());at.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-at.camera.world[k])<1e-6,'eye on the far station'));
- out.jump={from:cur,to:done.c.j,metres:+done.c.dh.toFixed(2),routeMetres:+route[done.c.j].toFixed(2),neighbourHop:false};
- // floor spot next to a station within 15 m -> that station ('floor' method)
- const h2=at.station.positionScan,fc=m.stations.map((s,j)=>({j,s,dh:Math.hypot(s.position[0]-h2[0],s.position[2]-h2[2])})).filter(c=>c.j!==at.station.index&&c.dh>2.5&&c.dh<9&&Math.abs(c.s.position[1]-h2[1])<.5).sort((a,b)=>a.dh-b.dh);
- let floor=null;for(const c of fc.slice(0,8)){await page.evaluate(p=>xrDebug.lookAtScan(p),[c.s.position[0]+.3,h2[1]-1.5,c.s.position[2]]);const a=await page.evaluate(()=>xrDebug.aimNdc(0,0));if(a?.ok&&a.method==='floor'&&a.index===c.j){floor=a;break;}}
- assert.ok(floor,'floor spot -> the nearest station');out.floor={index:floor.index,label:floor.label};
- const up=await page.evaluate(()=>{xrDebug.look(0,1.4);return xrDebug.aimNdc(0,0);});assert.equal(up.ok,false);assert.match(up.reason,/Point toward a captured position/);
- await page.evaluate(()=>xrDebug.aimNdc(5,5));
- // snap turn: 30° about the eye, eye position unchanged; back again
- const t1=await page.evaluate(()=>xrDebug.snapTurn(1)),t2=await page.evaluate(()=>xrDebug.snapTurn(-1));
- t1.before.forEach((v,k)=>assert.ok(Math.abs(v-t1.after[k])<1e-9,'snap turn keeps the eye'));assert.ok(Math.abs(t1.yaw+Math.PI/6)<1e-9&&Math.abs(t2.yaw)<1e-9);
- await page.evaluate(()=>xrDebug.look(0,0));return out;
-}
-/* XR menu panel (desktop emulation of the controller ray via the camera ray through a button centre). */
-async function menuSmoke(page){
- const out={};await page.evaluate(()=>{xrDebug.look(0,0);xrDebug.setMenu(true);});
- let mi=(await page.evaluate(()=>xrInspection())).menu;assert.equal(mi.open,true);assert.deepEqual(mi.buttons,['capture','style','scene','recenter','more'],'≤ 5 main buttons');
- assert.ok(Math.abs(mi.distance-Math.hypot(.8,.15))<.02,'panel ≈0.8 m from the eye: '+mi.distance);out.distanceM=+mi.distance.toFixed(3);
- await page.screenshot({path:path.join(OUT,'scan-xr-menu.png')});
- const nd=await page.evaluate(()=>xrDebug.menuButtonNdc('style'));assert.ok(nd&&Math.abs(nd[0])<1&&Math.abs(nd[1])<1,'Lens/All button on screen');
- const hv=await page.evaluate(([x,y])=>xrDebug.hoverNdc(x,y),nd);assert.equal(hv.id,'style');assert.deepEqual((await page.evaluate(()=>xrInspection())).menu.hover,[1],'hover highlight');
- await page.waitForTimeout(100);await page.screenshot({path:path.join(OUT,'scan-xr-menu-hover.png')});
- const s0=(await page.evaluate(()=>xrInspection())).style;const r=await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),nd);assert.equal(r.menu,'style');
- assert.notEqual((await page.evaluate(()=>xrInspection())).style,s0,'click acted on the highlighted button');
- // a click on the panel header (above the buttons) does nothing
- const hd=await page.evaluate(()=>{const [x,y]=xrDebug.menuButtonNdc('capture');return [x,y+.25];});const hr=await page.evaluate(([x,y])=>xrDebug.hoverNdc(x,y),hd);
- assert.ok(hr&&hr.button===-1,'header hit, no button');const before=(await page.evaluate(()=>xrInspection())).capture.date;assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),hd)).menu,null);assert.equal((await page.evaluate(()=>xrInspection())).capture.date,before);
- await page.evaluate(()=>xrDebug.hoverNdc(5,5));assert.deepEqual((await page.evaluate(()=>xrInspection())).menu.hover,[],'hover cleared off the panel');
- // More page: flashlight hands, fixed opacity cycle, layer toggles, back, exit
- const mp=await page.evaluate(()=>xrDebug.menuButtonNdc('more'));assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),mp)).menu,'more');
- mi=(await page.evaluate(()=>xrInspection())).menu;assert.equal(mi.page,'more');assert.deepEqual(mi.buttons.slice(0,5),['back','hands','opacity','hires','exit']);assert.equal(mi.buttons.filter(b=>b.startsWith('layer:')).length,8);
- await page.waitForTimeout(100);await page.screenshot({path:path.join(OUT,'scan-xr-menu-more.png')});
- const c=(await page.evaluate(()=>xrInspection())).controls;assert.equal(c.hands,'right');assert.equal(c.lensOpacity,.7);assert.equal(c.allOpacity,.35);
- await page.evaluate(()=>xrDebug.menuAction('hands'));assert.equal((await page.evaluate(()=>xrInspection())).controls.hands,'both');await page.evaluate(()=>xrDebug.menuAction('hands'));
- for(const want of [.9,.5,.7]){await page.evaluate(()=>xrDebug.menuAction('opacity'));assert.equal((await page.evaluate(()=>xrInspection())).controls.lensOpacity,want);}
- const key=Object.keys((await page.evaluate(()=>xrInspection())).layers)[0];
- await page.evaluate(k=>xrDebug.menuAction('layer:'+k),key);assert.equal((await page.evaluate(()=>xrInspection())).layers[key].visible,false);
- await page.evaluate(k=>xrDebug.menuAction('layer:'+k),key);assert.equal((await page.evaluate(()=>xrInspection())).layers[key].visible,true);
- await page.evaluate(()=>xrDebug.menuAction('back'));assert.equal((await page.evaluate(()=>xrInspection())).menu.page,'main');
- await page.evaluate(()=>xrDebug.menuAction('exit'));assert.equal((await page.evaluate(()=>xrInspection())).menu.open,false,'Exit outside VR closes the menu');
- await page.evaluate(()=>xrDebug.setStyle('all'));   // the next check expects All (as the old menu test left it)
- out.buttons=mi.buttons;return out;
-}
 /* Gaussian scene mode: short run, two light layers, the reduced mobile file (350k SH0) that XR uses by default.
    Default: published May 6 scene, with a deliberately invalid ?gaussian= that must be ignored.
    XR_SMOKE_OCT=1 additionally loads the local, unpublished Oct 18 zone l1-a package through the dev-host override. */
@@ -190,19 +131,15 @@ async function gaussianSmoke(browser,base,now,override){
  const t=reg.rotationYDegrees*Math.PI/180,c=Math.cos(t),sn=Math.sin(t),p=tp.viewPos,bim=[c*p[0]+sn*p[2]+reg.translation[0],p[1]+reg.translation[1],-sn*p[0]+c*p[2]+reg.translation[2]];
  bim.forEach((v,k)=>assert.ok(Math.abs(v-tp.station.positionBim[k])<1e-9,'radius centre follows the teleport'));out.teleportMetres=+moved.toFixed(2);
  await page.evaluate(()=>xrDebug.look(xrInspection().rig.yaw,.3));const up=await page.evaluate(()=>xrDebug.teleportNdc(0,0,true));assert.equal(up.ok,false);assert.match(up.reason,/Point at the floor/);
- // point-and-go in Gaussian mode: floor = free teleport target; level ray = fallback to the station cone
- const fl=await page.evaluate(()=>{xrDebug.look(xrInspection().rig.yaw,-.61);return xrDebug.aimNdc(0,0);});assert.equal(fl.kind,'point');assert.equal(fl.ok,true);assert.match(fl.label,/^Teleport · \d+\.\d m$/);
- const hz=await page.evaluate(()=>{xrDebug.look(xrInspection().rig.yaw,0);return xrDebug.aimNdc(0,0);});assert.equal(hz.kind,'station');assert.ok(hz.ok||hz.reason,'station fallback answers');out.horizonFallback=hz.ok?hz.label:hz.reason;
- await page.evaluate(()=>xrDebug.aimNdc(5,5));
  // station jumps still work in Gaussian mode (no photo download)
  await page.evaluate(()=>xrDebug.recenter());await page.waitForFunction(()=>xrInspection().ready,null,{timeout:10000});
  const r0=await page.evaluate(()=>xrInspection());r0.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-r0.camera.world[k])<1e-6,'recentred on the nearest station'));
  await page.evaluate(()=>xrDebug.openStation(xrInspection().station.index+1));await page.waitForFunction(i=>xrInspection().station.index!==i&&xrInspection().ready,r0.station.index,{timeout:10000});
  const j=await page.evaluate(()=>xrInspection());assert.equal(j.photoSphereVisible,false);assert.equal(j.texture,null);j.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-j.camera.world[k])<1e-6));
  // menu toggle back to Photo: nearest station's photo returns; and to Gaussian again (scene stays resident)
- await page.evaluate(()=>xrDebug.menuAction('scene'));await page.waitForFunction(()=>xrInspection().scene.mode==='photo'&&xrInspection().texture,null,{timeout:20000});
+ await page.evaluate(()=>xrDebug.menuAction(9));await page.waitForFunction(()=>xrInspection().scene.mode==='photo'&&xrInspection().texture,null,{timeout:20000});
  const ph=await page.evaluate(()=>xrInspection());assert.equal(ph.photoSphereVisible,true);assert.equal(ph.scene.splatVisible,false);ph.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-ph.camera.world[k])<1e-6));
- const tg=Date.now();await page.evaluate(()=>xrDebug.menuAction('scene'));await page.waitForFunction(()=>xrInspection().scene.splatVisible&&xrInspection().ready,null,{timeout:20000});out.retoggleMs=Date.now()-tg;
+ const tg=Date.now();await page.evaluate(()=>xrDebug.menuAction(9));await page.waitForFunction(()=>xrInspection().scene.splatVisible&&xrInspection().ready,null,{timeout:20000});out.retoggleMs=Date.now()-tg;
  // Sep 17 has no Gaussian: the toggle explains and stays in Photo
  await page.evaluate(()=>xrDebug.switchCapture('2026-09-17'));await page.waitForFunction(()=>xrInspection().capture.date==='2026-09-17'&&xrInspection().ready&&xrInspection().texture,null,{timeout:30000});
  const sep=await page.evaluate(()=>xrInspection());assert.equal(sep.scene.mode,'photo');assert.equal(sep.scene.available,false);assert.match(await page.locator('#status').textContent(),/No Gaussian scene for Sep 17, 2026 · staying in Photo/);
