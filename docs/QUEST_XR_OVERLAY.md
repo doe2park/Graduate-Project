@@ -19,20 +19,65 @@ WebXR requires a secure context (HTTPS). There are two ways to open the page.
 
 URL options: `?capture=2026-09-17` or `?capture=2026-10-18` · `&station=<id or index>` · `&style=all` · `&radius=12` (m) · `&layers=all` (include fire piping) or a comma list · `&levels=L1` · `&hires=1|0` · `&xrscale=0.85` · `&foveation=0.7` · `&cell=6` · `&instance=32` · `&scene=gaussian` · `&splat=mobile|full` · `&eye=1.5` (assumed capture-camera height for the teleport floor, m) · `&gaussian=<manifest path>` (local/private dev hosts only).
 
-## Controls
+## Controls (redesigned 2026-10-22 after the owner's first headset test)
+
+The first test found the controls clumsy: the stick only stepped forward/back to the next route neighbour, the 6×2 menu had too many small buttons, the opacity steps were fiddly, and it was not visible where a controller pointed or where a click would land. The redesign gives each hand one job.
 
 | Quest (Touch controllers) | Action |
 |---|---|
-| Trigger at a service | World-space info card (canvas texture) + gold highlight; trigger on nothing clears |
-| Trigger at the menu | Press a menu button |
-| Thumbstick ↑ / ↓ | Jump to the recorded neighbour station in the pointed direction / behind (short fade) |
-| Gaussian: point at the floor, hold stick ↑, release | Teleport to the gold ring (red ring = not allowed, reason shown); pointing at the horizon instead keeps the neighbour-station jump |
-| Thumbstick ← / → | Snap turn 30° (toggle in menu); there is no smooth locomotion |
-| A / X | Lens ↔ All |
-| B / Y | Menu: style, opacity ±, cone ±, capture May 6 → Sep 17 → Oct 18 (cycles), photo 2K/4K, snap turn, fire piping, **Scene Photo ↔ Gaussian**, nearest station, close |
-| Grip + stick ↑↓ / ←→ | Opacity / cone angle |
+| **Left stick ↑, hold** | Aim: a dotted arc runs from the left controller to a target marker (ring on the floor, a pillar up to the photo centre) with a label, *Capture 37 · 9.4 m*. Red means not allowed, and the label gives the reason. |
+| **…release** | Go there with a short black fade. **Pull the stick back** instead to cancel. |
+| Left stick ↓ | Step back one recorded station along the route. |
+| **Left or right stick ← / →** | Snap turn 30° about your head. There is no smooth locomotion. |
+| **Right controller** | Flashlight. The X-ray cone follows its ray. |
+| **Right trigger** | Info card on the element the ray highlights. Trigger on nothing clears the card. |
+| Right stick ↑ / ↓ | Widen / narrow the flashlight cone, 3° per push (4–30°). |
+| Either trigger on the menu | Press the **highlighted** button. A click acts only on the button the ray is on, and the panel background does nothing. |
+| A / X | Lens ↔ All. |
+| B / Y | Open / close the menu. It also closes 1.5 s after every ray has left it. |
 
-Desktop (testing without a headset): drag = look, wheel = zoom, the mouse aims the flashlight cone, click = trigger, WASD/arrows = walk to a neighbour, `L` = Lens/All, `M` = XR menu panel, Esc = clear card, `G` = Photo ↔ Gaussian, Shift+click = teleport (Gaussian). The toolbar offers capture, station, Lens/All, opacity, cone, 4K photo, Fire piping, **Gaussian**, Stats and **Enter VR**. Enter VR appears only when `immersive-vr` is supported.
+**Where the target is (photo mode).** Movement stays discrete, between capture stations (`ScanXRCore.stationTarget`).
+1. If the left ray meets the assumed floor (eye height − 1.5 m) within 15 m, the target is the station nearest that floor spot, provided it is within 2.5 m. Pointing at your own feet says *You are here*.
+2. Otherwise the target is the station whose photo centre is within a 30° cone of the left ray, up to 15 m. Stations are ranked by angle. A level ray down a corridor therefore picks the far station, and a ray tipped down picks a nearer one. Stations more than 1.5 m above or below (other floors) are ignored. So are stations the route graph does not connect, and stations whose recorded route is much longer than the straight line, which are probably behind a wall (detour penalty).
+
+Gaussian mode: the target is a free teleport point on the floor (≤ 8 m, near the captured positions, inside the zone; unchanged rules). Pointing at the horizon falls back to the station cone. MR mode has no teleport: the BIM is aligned to the real building, and you walk.
+
+**Pointing feedback.** Each tracked controller draws a tapered laser ray and a reticle where it hits:
+- on a menu button: the ray and reticle turn gold, the button turns gold and grows, and a short haptic tick plays;
+- on a service element: an amber reticle. This uses a throttled raycast for the flashlight hand. The interval adapts to the cost, at 20× the measured cast time and between 120 and 800 ms. `&hover=0` turns it off if it costs frames. On the Mac, one cast measured 0.2 ms (median, seven layers, headless Chrome; `report.hoverRayCostMs`). This is not a Quest number;
+- on the assumed floor: a flat white ring.
+
+The haptics use `gamepad.hapticActuators[0].pulse()`, with `vibrationActuator.playEffect()` as a fallback. Whichever exists is used.
+
+**Menu (B/Y).** The panel is 0.64 × 0.40 m, about 0.8 m in front of you, 0.15 m below eye height and turned toward your head. It rides with you through jumps and snap turns.
+- Main page, five large buttons: **Capture** (cycles the published captures) · **Lens / All** · **Photo / Gaussian** · **Recenter** (nearest capture) · **More ▸**.
+- **More ▸:** Back · **Flashlight: right hand / both hands** (both: the left controller also carries a cone, as a second cone in the same shader) · **Opacity** (fixed at Lens 70 % and All 35 %; the button cycles Lens 50 → 70 → 90 %) · Photo 2K/4K · **Exit VR** · eight layer toggles (a layer that is not loaded loads on demand, and frames can stutter).
+
+A head-locked status line, about 15° below the view centre, shows messages in the headset, because the page's status pill is not visible in VR. The world-locked tag after each jump repeats the alignment caveat and a one-line control hint. `&hands=both` starts with both flashlights.
+
+**Single controller or hand tracking.** A lone controller does both jobs: its stick aims and turns, and its ray lights. With hand tracking (no sticks), pinch is the trigger. The laser, hover and menu work, but there is no point-and-go.
+
+**Desktop (testing without a headset).**
+- Looking and moving: drag = look, wheel = zoom, WASD/arrows = walk to a neighbour, `Q`/`E` = turn 30°.
+- Pointer: the mouse aims the flashlight cone. Hovering the menu highlights buttons like a controller ray, and click = trigger.
+- **Shift + move** previews point-and-go (arc, marker, label). **Shift + click** goes.
+- Keys: `L` = Lens/All, `M` = menu, `G` = Photo ↔ Gaussian, Esc = clear card.
+- The toolbar keeps capture, station, Lens/All, opacity and cone sliders, 4K photo, Fire piping, **Gaussian**, Stats and **Enter VR**. Enter VR appears only when `immersive-vr` is supported.
+
+MR mode keeps its alignment controls (below), and gains the same laser, reticle, panel hover highlight and haptics.
+
+### 5-minute headset checklist (LAN test, before anything is pushed)
+
+| min | Check | Pass if |
+|---|---|---|
+| 0–1 | Mac: `python3 scripts/serve_quest_https.py` → Quest Browser opens the printed `https://<mac-ip>:8929/scan-xr.html` → wait for *Services ready* → **Enter VR** | Both lasers are visible; the reticle sits on the floor or on services |
+| 1–2 | **Move far:** point the left controller down the corridor at a distant spot, hold stick ↑ | The arc and marker land on a station 6–15 m away, with the label *Capture N · x m*; releasing jumps there with a fade |
+| 2–3 | Point at the floor next to a nearby station, hold ↑, release; then pull ↑ and back to cancel | The floor ring snaps to that station; the cancel does nothing |
+| 3   | **Snap turn:** left stick ←/→, then right stick ←/→ | 30° per push; you stay on the photo centre |
+| 3–4 | **Flashlight:** sweep the right controller across the ceiling; right stick ↑/↓; **info card:** right trigger on a duct or light | Services appear only inside the cone and the cone width changes; the card opens on the element the amber reticle was on |
+| 4–5 | **Menu:** B/Y → hover each button (gold, haptic tick) → Lens/All → More ▸ → Flashlight: both hands (both cones light) → Back → point away | Every click acts on the highlighted button; the panel closes about 1.5 s after the rays leave it |
+
+Record any lag while sweeping the flashlight. If services stutter, retry with `&hover=0` and note the difference.
 
 ## How it lines up with the web overlay
 
@@ -75,12 +120,13 @@ Parameter sweep, same view, desktop draw calls / triangles: 8-instance threshold
 ## Verified vs unverified
 
 Verified on desktop:
-- `node --test tests/scan-xr-core.test.cjs` (10 tests) covers:
+- `node --test tests/scan-xr-core.test.cjs` (10 tests at the time; 19 since the 2026-10-22 controls) covers:
   - registration placement against `registration-core.js` and the extracted `scan-compare.html` `convert()`;
   - photo orientation against the scan-photo Three.js formula;
   - neighbour choice identical to `scan-photo.html` `chooseWalkNeighbor` on all 200 real stations × 16 directions;
   - stick hysteresis, snap turn that keeps the head fixed, and head-on-station rig placement;
   - the cone and opacity maths, and menu hit-testing;
+  - since 2026-10-22, the menu layout model (≤ 5 main buttons, at least 0.18 × 0.09 m each, ids, every centre hits its own button, gaps and header miss); controller roles (left moves, right lights, both hands, a lone controller); stick intents; hold/release/cancel aiming; 12 snap turns returning to the start; and `stationTarget` (floor spot, 30°/15 m cone, a level ray picking the far station, other floors, an unconnected station, the route-detour penalty, refusals, Gaussian zone indices, arc and labels). It also checks that, on the real May 6 manifest, pointing at each reachable station 1–15 m from the default station selects it, at least 60 % of the time and for at least one station more than 6 m away;
   - card honesty for CONTEXT, NO FEED, missing meters and provisional labels;
   - page wiring (pinned three, the same layer set and placement as scan-bim).
 - `node --test tests/xr-spatial-tier.test.mjs` (4 tests) covers:
@@ -103,13 +149,22 @@ Verified on desktop:
   - a neighbour jump that stays on the recorded route and clears the card;
   - the Sep 17 provisional label and its own registration;
   - the menu Capture button cycling to Oct 18, its provisional label, own registration and photo, then back to May 6;
-  - the XR menu panel and its buttons;
+  - the XR menu panel and its buttons. Since 2026-10-22 the test checks 5 main buttons about 0.81 m from the eye; hover highlight under the ray; a click acting on the highlighted button; a header click doing nothing; the More page (both-hands flashlight, opacity cycle 90/50/70 %, a layer off and on, Back, Exit);
+  - point-and-go (2026-10-22): a level centre ray at a non-neighbour station 6–14 m away selects it with *Capture N · x m*. The jump lands the eye on it; in the run on 2026-10-22, 88 → 93 covered 13.4 m in one jump. A floor spot picks the station beside it, pointing up is refused, and a snap turn keeps the eye fixed. In Gaussian mode, the floor gives *Teleport · x m*, and a level ray falls back to a station;
   - no idle redraws;
   - no overflow at 390 px, with the alignment caveat unclipped;
   - no page errors.
 
   Run it with:
   `PLAYWRIGHT_MODULE=<playwright or playwright-core> node tests/scan-xr-smoke.cjs`. `XR_SMOKE_LAYERS=equipment,lighting` gives a lighter run. It launches Chrome with `--use-angle=metal --ignore-gpu-blocklist`, because headless WebGL was otherwise disabled on this Mac.
+
+Unverified for the 2026-10-22 controls (desktop emulation only, no headset run):
+- How the left and right roles map to `handedness` on real Touch controllers, and the stick hold/release feel. The 0.3 release threshold may need tuning against stick drift.
+- Haptic pulses on Quest Browser.
+- The legibility of the laser (a tapered 2–4.5 mm cylinder), the reticle and the 0.64 m menu at 0.8 m.
+- The menu auto-close after 1.5 s.
+- The frame cost of the throttled element-hover raycast on the Quest CPU (`xrInspection().controls.hoverCastMs`).
+- Whether the floor-spot snap (2.5 m) and the 30° cone pick the intended station in real use.
 
 Unverified (no headset session was run):
 - Entering `immersive-vr` on Quest Browser: controller events, thumbstick/button mapping, snap turn, the fade, menu and card legibility, and the fixed-foveation effect.
@@ -153,14 +208,14 @@ python3 scripts/serve_quest_https.py --gaussian-package work/gaussian/2026-10-18
 
 ### Locomotion
 
-- Station jumps are unchanged (stick ↑/↓ toward a recorded neighbour; the *Nearest station* menu button). In Gaussian mode no photo is downloaded.
+- Since 2026-10-22, the left stick uses the same point-and-go as Photo mode (see *Controls*). The menu button is *Recenter* (nearest station). In Gaussian mode no photo is downloaded.
 - Point-and-teleport works in Gaussian mode only, because a 360° photo has one optical centre:
-  - Hold stick ↑ to aim: the controller ray meets an invisible horizontal floor plane `eye` (default 1.5 m) below the current eye height. A gold ring marks the target.
+  - Hold the left stick ↑ to aim: the controller ray meets an invisible horizontal floor plane `eye` (default 1.5 m) below the current eye height. A gold dotted arc and ring mark the target, with *Teleport · x m*.
   - Release to teleport with a short black fade. The eye height is kept, and no smooth locomotion is added.
   - A red ring means the target is not allowed, and the page shows the reason. Targets must be ≤ 8 m away, ≤ 6 m from a recorded station (a proxy for trained coverage) and, for a zoned scene, inside the zone bounds + 1.5 m.
-  - Pointing at or above the horizon falls back to the neighbour-station jump.
+  - Pointing at or above the horizon falls back to the station cone (`stationTarget`, zone stations only).
   - BIM radius culling re-centres on the landing point. The station picker shows the nearest station.
-- Snap turn is unchanged. Desktop: Shift+click on the floor.
+- Snap turn: either stick ←/→. Desktop: Shift+move previews, Shift+click goes.
 - The floor height is an **assumption** (capture-camera height), not a measured floor. On sloped floors (the auditorium rake) the ring can sit above or below the visible floor.
 
 ### Performance choices
@@ -229,7 +284,7 @@ Files: `scan-xr.html` (MR block, `MODE_AR`), `twin/mr-align.js` (pure maths, `wi
 
 - Default layers (to fit the Quest 2 budget): **fire piping, ductwork, plumbing**. The other five layers can be toggled from the panel (*Layers ▸*). Loading a layer while inside MR can stutter for a few seconds.
 - Distance fade per fragment, with the presets from `twin/overlay-visibility.js`: **Room** (default; full to 8 m, gone by 14 m), **Near** (3 → 6 m), **All** (no fade). Batches wholly beyond the fade are not drawn. The cull set is recomputed when you have walked more than 0.5 m. Ceilings are never occluders, because there is no BIM ceiling or wall geometry in this mode: the real ceiling is the passthrough. Wall occlusion is **not** implemented in MR (see Limits).
-- **Lens** (default) is the X-ray window: inside the controller cone, services are at full opacity; outside, they are faint (12 % of the opacity). **All** draws every service in range at a uniform opacity. A/X toggles between them. Grip + stick changes opacity / cone, as in VR.
+- **Lens** (default) is the X-ray window: inside the controller cone, services are at full opacity; outside, they are faint (12 % of the opacity). **All** draws every service in range at a uniform opacity. A/X toggles between them. Grip + stick changes opacity / cone (MR only; VR now has a fixed opacity and the right stick for the cone).
 - Trigger on a service (once aligned) opens the same honest info card as VR. Its caption is *MR · <area> · manual alignment, not surveyed · RMS x cm*.
 
 ### Alignment UX

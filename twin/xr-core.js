@@ -136,18 +136,140 @@ function withinRadius(center, sphereCenter, sphereRadius, radius) {
 }
 function cellKey(x, z, size) { return Math.floor(x / size) + ',' + Math.floor(z / size); }
 
-/* ── XR menu panel ── canvas fractions (y down). Buttons are a 6x2 grid in the lower part of the panel (12 buttons since the Gaussian scene toggle). */
-const MENU = {cols: 6, rows: 2, left: .025, right: .975, top: .6, bottom: .965, gap: .012};
-function menuRect(i) {
-  const w = (MENU.right - MENU.left - MENU.gap * (MENU.cols - 1)) / MENU.cols, h = (MENU.bottom - MENU.top - MENU.gap * (MENU.rows - 1)) / MENU.rows;
-  const c = i % MENU.cols, r = Math.floor(i / MENU.cols);
-  return {x: MENU.left + c * (w + MENU.gap), y: MENU.top + r * (h + MENU.gap), w, h};
+/* ── XR menu panel (2026-10-22 redesign after the first headset test) ──
+   Few, large buttons. Pages: 'main' = 5 buttons (Capture, Lens/All, Photo/Gaussian, Recenter, More), 'more' = settings + layer toggles.
+   Layout = rows of button counts inside the lower part of the canvas (fractions, y down). Buttons carry stable ids, so the
+   page dispatches by id, never by a grid index. */
+const MENU_PAGES = {main: [3, 2], more: [5, 4, 4]};
+const MENU_AREA = {left: .03, right: .97, top: .4, bottom: .965, gap: .022};
+function menuLayout(rows, area = MENU_AREA) {
+  const out = [], n = rows.length, h = (area.bottom - area.top - area.gap * (n - 1)) / n;
+  rows.forEach((count, r) => {
+    const w = (area.right - area.left - area.gap * (count - 1)) / count;
+    for (let c = 0; c < count; c++) out.push({x: area.left + c * (w + area.gap), y: area.top + r * (h + area.gap), w, h});
+  });
+  return out;
 }
-/* (u, v) are plane UVs (v up, Three.js PlaneGeometry convention). Returns button index or -1. */
-function menuHit(u, v) {
+/* (u, v) are plane UVs (v up, Three.js PlaneGeometry convention). Returns the button index or -1 (gap, header, margin). */
+function layoutHit(rects, u, v) {
   const x = u, y = 1 - v;
-  for (let i = 0; i < MENU.cols * MENU.rows; i++) { const r = menuRect(i); if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i; }
+  for (let i = 0; i < rects.length; i++) { const r = rects[i]; if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i; }
   return -1;
+}
+/* Button models from a plain state snapshot (no DOM): {id, label, value, tone}. tone: 'on' (active toggle), 'exit', 'nav' or ''. */
+const LENS_OPACITIES = [.5, .7, .9];
+const DEFAULT_LENS_OPACITY = .7, DEFAULT_ALL_OPACITY = .35;
+function nextLensOpacity(v) { const i = LENS_OPACITIES.findIndex(o => Math.abs(o - v) < .01); return LENS_OPACITIES[(i + 1) % LENS_OPACITIES.length]; }
+function menuButtons(page, s = {}) {
+  if (page === 'more') {
+    const layers = (s.layers || []).slice(0, 8).map(l => ({id: 'layer:' + l.key, label: l.label, value: l.loading ? 'loading…' : l.on ? 'on' : 'off', tone: l.on ? 'on' : ''}));
+    return [{id: 'back', label: '◂ Back', value: '', tone: 'nav'},
+      {id: 'hands', label: 'Flashlight', value: s.hands === 'both' ? 'both hands' : 'right hand', tone: s.hands === 'both' ? 'on' : ''},
+      {id: 'opacity', label: 'Opacity', value: Math.round((s.opacity ?? DEFAULT_LENS_OPACITY) * 100) + '%', tone: ''},
+      {id: 'hires', label: 'Photo', value: s.scene === 'gaussian' ? 'n/a' : s.hiRes ? '4K' : '2K', tone: s.hiRes ? 'on' : ''},
+      {id: 'exit', label: 'Exit VR', value: '', tone: 'exit'}, ...layers];
+  }
+  return [{id: 'capture', label: 'Capture', value: s.captureLabel || 'May 6', tone: ''},
+    {id: 'style', label: 'Lens / All', value: s.mode === 'all' ? 'All' : 'Lens', tone: s.mode === 'all' ? 'on' : ''},
+    {id: 'scene', label: 'Photo / Gaussian', value: s.gaussianLoading ? 'loading…' : s.scene === 'gaussian' ? 'Gaussian' : s.gaussianAvailable === false ? 'Photo (no Gaussian)' : 'Photo', tone: s.scene === 'gaussian' ? 'on' : ''},
+    {id: 'recenter', label: 'Recenter', value: 'nearest capture', tone: ''},
+    {id: 'more', label: 'More ▸', value: 'layers · settings', tone: 'nav'}];
+}
+
+/* ── Controller roles ── LEFT = move hand (point-and-go, snap turn), RIGHT = flashlight + info trigger.
+   hands 'both': the left also carries a flashlight cone. One tracked pointer alone does everything.
+   sources: [{handedness, pointer}] per controller slot. Returns slot indices. */
+function controllerRoles(sources, hands = 'right') {
+  const ptr = sources.map((s, i) => (s && s.pointer ? i : -1)).filter(i => i >= 0);
+  if (!ptr.length) return {move: -1, lens: []};
+  if (ptr.length === 1) return {move: ptr[0], lens: [ptr[0]]};
+  let left = ptr.find(i => sources[i].handedness === 'left'), right = ptr.find(i => sources[i].handedness === 'right');
+  if (left == null) left = ptr.find(i => i !== right);
+  if (right == null) right = ptr.find(i => i !== left);
+  return {move: left, lens: hands === 'both' ? [right, left] : [right]};
+}
+/* What a discrete stick push means for a role ('move' | 'lens' | 'both' for a lone controller). */
+function stickIntent(role, action) {
+  if (!action || !role) return null;
+  if (action === 'turn-left' || action === 'turn-right') return action;   // snap turn on either stick
+  if (role === 'lens') return action === 'forward' ? 'cone-wider' : 'cone-narrower';
+  return action === 'forward' ? 'aim' : 'step-back';
+}
+/* Hold-to-aim: while aiming, the stick held (|s| >= 0.3) keeps the preview; release goes; pulling back cancels. */
+function aimUpdate(x, y, {release = .3, cancel = .5} = {}) {
+  if ((y || 0) > cancel) return 'cancel';
+  return Math.hypot(x || 0, y || 0) < release ? 'go' : 'hold';
+}
+function stepConeHalf(deg, delta) { return Math.max(4, Math.min(30, Math.round(deg + 3 * Math.sign(delta)))); }
+
+/* ── Point-and-go target among capture stations (360-photo mode; also the Gaussian fallback at the horizon) ──
+   1. floor: the ray meets the assumed floor (floorY) within maxDistance -> the station nearest that spot, if within floorSnap.
+   2. cone: otherwise the station whose direction from the controller (to its camera centre) is within coneDeg of the ray,
+      up to maxDistance, ranked by angle (+ 0.05 deg/m tie-break) + a detour penalty when the recorded route is much longer than the
+      straight line (likely through a wall). Stations more than maxRise above/below refY (other floors) are ignored.
+   route: optional per-station route length from the current station (routeDistances); Infinity = not connected (skipped).
+   Result: {ok, index, method 'floor'|'cone', distance (horizontal, m), point (floor spot under the station), routeM} or {ok:false, reason, point?}. */
+function routeDistances(stations, start) {
+  const n = stations.length, dist = new Array(n).fill(Infinity), done = new Array(n).fill(false);
+  if (!(start >= 0 && start < n)) return dist;
+  dist[start] = 0;
+  for (;;) {
+    let u = -1, best = Infinity;
+    for (let i = 0; i < n; i++) if (!done[i] && dist[i] < best) { best = dist[i]; u = i; }
+    if (u < 0) break;
+    done[u] = true;
+    for (const v of stations[u].neighbors || []) {
+      if (!(v >= 0 && v < n)) continue;
+      const a = stations[u].position, b = stations[v].position, d = best + Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+      if (d < dist[v]) dist[v] = d;
+    }
+  }
+  return dist;
+}
+function stationTarget(stations, origin, dir, {current = -1, floorY = null, maxDistance = 15, coneDeg = 30, floorSnap = 2.5, maxRise = 1.5, refY = null, indices = null, route = null, from = null} = {}) {
+  const cands = (indices || stations.map((_, k) => k)).filter(i => stations[i] && (refY == null || Math.abs(stations[i].position[1] - refY) <= maxRise));
+  const here = from || stations[current]?.position || origin;   // distances are reported from here (Gaussian: the teleport landing)
+  const result = (i, method, extra) => { const s = stations[i].position; return {ok: true, index: i, method, distance: Math.hypot(s[0] - here[0], s[2] - here[2]), point: [s[0], Number.isFinite(floorY) ? floorY : s[1], s[2]], routeM: route && Number.isFinite(route[i]) ? route[i] : null, ...extra}; };
+  if (Number.isFinite(floorY)) {
+    const hit = floorHit(origin, dir, floorY, maxDistance);
+    if (hit) {
+      const near = nearestStation(stations, hit, cands.filter(i => !route || Number.isFinite(route[i]) || i === current));
+      if (near.index >= 0 && near.distance <= floorSnap) {
+        if (near.index === current) return {ok: false, point: hit, reason: 'You are here · point further away'};
+        return result(near.index, 'floor', {floorPoint: hit});
+      }
+    }
+  }
+  const h = Math.hypot(dir[0], dir[2]);
+  if (h < .2) return {ok: false, reason: 'Point toward a captured position'};
+  const dn = Math.hypot(dir[0], dir[1], dir[2]), cosMax = Math.cos(coneDeg * D2R);
+  let best = -1, score = Infinity, bestAngle = 0;
+  for (const i of cands) {
+    if (i === current) continue;
+    const s = stations[i].position, vx = s[0] - origin[0], vy = s[1] - origin[1], vz = s[2] - origin[2], d = Math.hypot(vx, vz);
+    if (d < .5 || d > maxDistance) continue;
+    // 3-D angle to the station's camera centre (eye height): along a straight corridor a level ray picks the far station,
+    // a ray tipped down picks a nearer one (or meets the floor first, step 1).
+    const c = (vx * dir[0] + vy * dir[1] + vz * dir[2]) / (Math.hypot(vx, vy, vz) * dn);
+    if (c < cosMax) continue;
+    let detour = 0;
+    if (route) { if (!Number.isFinite(route[i])) continue; const straight = Math.hypot(s[0] - here[0], s[2] - here[2]); detour = Math.max(0, route[i] / Math.max(straight, .5) - 1.5); }
+    const angle = Math.acos(Math.min(1, c)) / D2R, sc = angle + .05 * d + 8 * detour;
+    if (sc < score) { score = sc; best = i; bestAngle = angle; }
+  }
+  if (best < 0) return {ok: false, reason: 'No captured position within ' + coneDeg + '° and ' + maxDistance + ' m of where you point'};
+  return result(best, 'cone', {angle: bestAngle});
+}
+/* Arc for the aim preview: quadratic Bezier from the controller to the target, apex raised by lift * distance. */
+function arcPoints(a, b, n = 24, lift = .18) {
+  const d = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), c = [(a[0] + b[0]) / 2, Math.max(a[1], b[1]) + lift * d, (a[2] + b[2]) / 2], out = [];
+  for (let k = 0; k < n; k++) { const t = n === 1 ? 1 : k / (n - 1), u = 1 - t; out.push([0, 1, 2].map(j => u * u * a[j] + 2 * u * t * c[j] + t * t * b[j])); }
+  return out;
+}
+function targetLabel(t, stationName) {
+  if (!t || !t.ok) return t?.reason || '';
+  if (t.kind === 'point') return 'Teleport · ' + t.distance.toFixed(1) + ' m';
+  return stationName + ' · ' + t.distance.toFixed(1) + ' m' + (t.method === 'floor' ? ' · floor' : '');
 }
 
 /* ── Info card text ── tier comes from ElementCards.elementFeedTier (same honesty ladder as the web overlay).
@@ -263,7 +385,9 @@ function teleportTarget(origin, dir, {viewY, eyeHeight = 1.5, maxDistance = 8, s
 
 return {CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
-  chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, MENU, menuRect, menuHit, cardLines,
+  chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines,
+  MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,
+  controllerRoles, stickIntent, aimUpdate, stepConeHalf, routeDistances, stationTarget, arcPoints, targetLabel,
   PUBLISHED_GAUSSIANS, SCENES, sceneRequest, isDevHost, gaussianOverride, SPLAT_BUDGET, gaussianAsset, gaussianFor, resolveScene, toggleScene,
   dateLabel, gaussianLabel, gaussianStations, floorHit, nearestStation, teleportTarget};
 });

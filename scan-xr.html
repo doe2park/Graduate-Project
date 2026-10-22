@@ -4,6 +4,8 @@
      registration as the web overlay, X-ray flashlight cone on the controller ray, trigger for info cards, neighbour-station jumps.
      Scene mode Photo | Gaussian (?scene=gaussian): the trained splat scene (GaussianSplats3D 0.4.7 DropInViewer) in the same scan frame
      as the stations; experimental appearance, not surveyed geometry; point-and-teleport on an assumed floor plane.
+     Controls (2026-10-22, after the first headset test): LEFT controller = point-and-go (hold stick ↑ to aim, release to go; snap turn ←/→),
+     RIGHT controller = flashlight + trigger info card; laser + reticle + hover highlight + haptics; compact 5-button menu (B/Y).
      Docs: docs/QUEST_XR_OVERLAY.md. Pure maths: twin/xr-core.js. Render tier: twin/xr-spatial-tier.mjs. -->
 <style>
 :root{--bg:rgba(10,20,32,.82);--bd:rgba(255,255,255,.2);--gold:#FDB515;--navy:#003262;--f:600 12px/1.2 Arial,Helvetica,sans-serif}
@@ -36,7 +38,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
  <select id="capture" aria-label="Capture date"><option value="2026-05-06">May 6 · registered</option><option value="2026-09-17">Sep 17 · provisional</option><option value="2026-10-18">Oct 18 · provisional</option></select>
  <button id="prev" class="b" aria-label="Previous captured position">&#8249;</button><select id="station" aria-label="Captured position"></select><button id="next" class="b" aria-label="Next captured position">&#8250;</button>
  <button id="styleLens" class="b" aria-pressed="true" title="Services only inside the flashlight cone">Lens</button><button id="styleAll" class="b" aria-pressed="false" title="All nearby services, semi-transparent">All</button>
- <label class="b" title="Service opacity">Opacity <input id="opacity" type="range" min="10" max="100" step="5" value="85"></label>
+ <label class="b" title="Service opacity">Opacity <input id="opacity" type="range" min="10" max="100" step="5" value="70"></label>
  <label class="b" title="Flashlight cone half-angle">Cone <input id="cone" type="range" min="4" max="30" step="1" value="12"></label>
  <button id="hires" class="b" aria-pressed="false" title="Full 4096×2048 photo instead of the 2048×1024 derivative">4K photo</button>
  <button id="fire" class="b" aria-pressed="false" title="Fire piping Level 1 chunks, ~42 MB">Fire piping</button>
@@ -112,7 +114,7 @@ fader.position.z=-.12;fader.renderOrder=100;fader.visible=false;fader.frustumCul
 const ring=new THREE.Mesh(new THREE.RingGeometry(.2,.26,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.9,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
 ring.renderOrder=57;ring.visible=false;ring.frustumCulled=false;scene.add(ring);
 /* ── X-ray flashlight shader ── one shared uniform set for every service batch. */
-const U={coneOrigin:{value:new THREE.Vector3()},coneDir:{value:new THREE.Vector3(0,0,-1)},coneCos:{value:X.coneCos(12)},coneSoft:{value:.01},mode:{value:0},opacity:{value:.85},fade:{value:1},hard:{value:0},
+const U={coneOrigin:{value:new THREE.Vector3()},coneDir:{value:new THREE.Vector3(0,0,-1)},cone2Origin:{value:new THREE.Vector3()},cone2Dir:{value:new THREE.Vector3(0,0,-1)},cone2On:{value:0},coneCos:{value:X.coneCos(12)},coneSoft:{value:.01},mode:{value:0},opacity:{value:.85},fade:{value:1},hard:{value:0},
  outside:{value:0},fadeOn:{value:0},fadeRange:{value:new THREE.Vector2(1e7,2e7)}};   // MR only: lens floor outside the cone; distance fade (twin/overlay-visibility.js presets)
 const VERT=`varying vec3 vWorld;varying vec3 vCol;varying float vShade;
 void main(){vec4 p=vec4(position,1.);
@@ -138,8 +140,9 @@ vShade=1.;
 vec3 wn=normalize(mat3(modelMatrix)*n);vShade=.58+.42*abs(dot(wn,normalize(vec3(.35,.85,.4))));
 #endif
 gl_Position=projectionMatrix*viewMatrix*w;}`;
-const FRAG=`uniform vec3 coneOrigin;uniform vec3 coneDir;uniform float coneCos,coneSoft,mode,opacity,fade,hard,outside,fadeOn;uniform vec2 fadeRange;varying vec3 vWorld;varying vec3 vCol;varying float vShade;
+const FRAG=`uniform vec3 coneOrigin;uniform vec3 coneDir;uniform vec3 cone2Origin;uniform vec3 cone2Dir;uniform float coneCos,coneSoft,mode,opacity,fade,hard,outside,fadeOn,cone2On;uniform vec2 fadeRange;varying vec3 vWorld;varying vec3 vCol;varying float vShade;
 void main(){float w=smoothstep(coneCos-coneSoft,coneCos,dot(normalize(vWorld-coneOrigin),coneDir));
+if(cone2On>.5)w=max(w,smoothstep(coneCos-coneSoft,coneCos,dot(normalize(vWorld-cone2Origin),cone2Dir)));
 if(hard>.5)w=step(.5,w);
 float a=mode>.5?opacity:opacity*mix(outside,1.,w);if(fadeOn>.5)a*=1.-smoothstep(fadeRange.x,fadeRange.y,length(vWorld-cameraPosition));if(a<.02)discard;
 vec3 c=vCol*vShade;if(mode>.5)c=mix(c,min(c*1.25+.05,vec3(1.)),w);
@@ -152,12 +155,14 @@ function materialFor({isLine,instanced,side}){
  const m=new THREE.ShaderMaterial({uniforms:U,vertexShader:VERT,fragmentShader:FRAG,vertexColors:!instanced,transparent:true,depthWrite:true,side:side==='double'?THREE.DoubleSide:THREE.FrontSide,defines:isLine?{XR_LINE:''}:{}});
  m.name='xr-overlay-'+key;materials.set(key,m);return m;
 }
-const state={mode:q.get('style')==='all'?'all':'lens',opacity:{lens:.85,all:.35},coneDeg:12,hiRes:null,snap:true,menu:false};
+// Opacity is fixed (Lens 70 %, All 35 %); More ▸ Opacity cycles 50/70/90 % for Lens. hands: 'right' | 'both' flashlight controllers.
+const state={mode:q.get('style')==='all'?'all':'lens',opacity:{lens:X.DEFAULT_LENS_OPACITY,all:X.DEFAULT_ALL_OPACITY},coneDeg:12,hiRes:null,menu:false,page:'main',hands:q.get('hands')==='both'?'both':'right'};
 function applyShaderState(){
  const o=state.opacity[state.mode];U.mode.value=state.mode==='all'?1:0;U.opacity.value=o;U.coneCos.value=X.coneCos(state.coneDeg);U.coneSoft.value=U.coneCos.value-X.coneCos(state.coneDeg+2);
  // Fully opaque lens: render opaque with a hard cone edge (no blending, no transparent sorting / overdraw). Not in Gaussian mode:
  // splats are a transparent, non-depth-tested pass, so services must stay in the transparent list after them (renderOrder -10).
- const opaque=state.mode==='lens'&&o>=.99&&gauss.scene!=='gaussian'&&!MODE_AR;U.hard.value=opaque?1:0;U.outside.value=MODE_AR&&state.mode==='lens'?.12:0;   // MR: faint context outside the cone (needs blending)for(const m of materials.values())m.transparent=!opaque;
+ const opaque=state.mode==='lens'&&o>=.99&&gauss.scene!=='gaussian'&&!MODE_AR;U.hard.value=opaque?1:0;U.outside.value=MODE_AR&&state.mode==='lens'?.12:0;   // MR: faint context outside the cone (needs blending)
+ for(const m of materials.values())m.transparent=!opaque;
  $('styleLens').setAttribute('aria-pressed',String(state.mode==='lens'));$('styleAll').setAttribute('aria-pressed',String(state.mode==='all'));$('opacity').value=Math.round(o*100);$('cone').value=state.coneDeg;
  if(state.menu)drawMenu();if(MODE_AR&&mr?.panel)mrDrawPanel();invalidate();
 }
@@ -168,7 +173,7 @@ const texLoader=new THREE.TextureLoader();
 const fetchJson=u=>fetch(u,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(u+' '+r.status);return r.json();});
 /* ── Render gating ── outside XR draw only after a change; in XR every frame (the compositor requires it). */
 let needsRender=true,renderCount=0,lastInfo={calls:0,triangles:0,lines:0,points:0};const invalidate=()=>{needsRender=true;};
-let statusTimer=0;function status(text,sticky=false){$('status').textContent=text;$('status').hidden=false;clearTimeout(statusTimer);if(!sticky)statusTimer=setTimeout(()=>$('status').hidden=true,5000);}
+let statusTimer=0;function status(text,sticky=false){$('status').textContent=text;$('status').hidden=false;clearTimeout(statusTimer);if(!sticky)statusTimer=setTimeout(()=>$('status').hidden=true,5000);xrToast(text);}
 /* ── Capture / station state ── */
 let capture=null,reg=null,stations=[],manifestURL=null,active=-1,stationBim=[0,0,0],busyStation=false,pendingStation=null,captureEpoch=0;
 /* Published captures (2026-10-21): only dates whose photo manifest loads are listed and cycled; the public site omits captures under review. */
@@ -261,7 +266,7 @@ async function loadLayer(key){
 }
 async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);for(const k of order)await loadLayer(k);timing.layersDoneMs=Math.round(performance.now()-T0);status('Services ready · Level '+[...P.levels].join('+')+' within '+P.radius+' m');updateStats();}
 function updateRadius(){let n=0;const r=MODE_AR?mrCullRadius():P.radius;for(const st of Object.values(layerState))n+=applyRadius(st.meshes,stationBim,r);invalidate();return n;}
-function setFire(on){const st=layerState.fire;if(on&&!st){loadLayer('fire');}else if(st)st.group.visible=on;$('fire').setAttribute('aria-pressed',String(on));if(state.menu)drawMenu();invalidate();}
+function setFire(on){setLayer('fire',on);}
 const fireOn=()=>!!layerState.fire&&layerState.fire.group.visible;
 /* ── Picking + info card ── ray = controller (XR) or mouse (desktop); only visible, in-radius batches are tested. */
 const raycaster=new THREE.Raycaster();raycaster.params.Line.threshold=.04;
@@ -271,6 +276,10 @@ function loadCardData(){if(cardData&&Date.now()-cardData.at<60000)return Promise
 loadCardData();
 const card=makeSurface(1024,560,.56,.306,60),marker=new THREE.Mesh(new THREE.SphereGeometry(.018,12,8),new THREE.MeshBasicMaterial({color:0xfbbf24,depthTest:false,depthWrite:false,transparent:true}));
 marker.renderOrder=59;marker.visible=false;scene.add(card.mesh,marker);
+/* In-headset status line (the DOM pill is invisible in XR): head-locked, small, below the view centre, fades after 2.6 s. */
+const toast=makeSurface(1024,112,.42,.046,80);toast.mesh.position.set(0,-.2,-.75);camera.add(toast.mesh);let toastTimer=0;
+function xrToast(text){if(!renderer.xr.isPresenting)return;const {ctx,canvas}=toast,W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.88)';ctx.beginPath();ctx.roundRect(2,2,W-4,H-4,50);ctx.fill();
+ ctx.textAlign='center';ctx.fillStyle='#e8f1f8';fitText(ctx,String(text),W/2,72,W-60,44,'Arial');ctx.textAlign='left';toast.texture.needsUpdate=true;toast.mesh.visible=true;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast.mesh.visible=false;},2600);}
 let picked=null,pickEpoch=0;
 function makeSurface(w,h,mw,mh,order){const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.minFilter=THREE.LinearMipmapLinearFilter;texture.anisotropy=4;
  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(mw,mh),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}));mesh.renderOrder=order;mesh.visible=false;mesh.frustumCulled=false;return {canvas,texture,mesh,ctx:canvas.getContext('2d')};}
@@ -302,41 +311,71 @@ async function pickAlong(origin,dir){
  marker.position.copy(hit.point);marker.visible=true;picked.tier=tier.tier;picked.lines=lines;invalidate();
  return {id,layer,tier:tier.tier,lines,distance:hit.distance};
 }
-/* ── XR menu panel (world-locked; B/Y toggles; trigger presses buttons) ── */
-const menu=makeSurface(1280,666,1.0,.52,70);scene.add(menu.mesh);
-const tag=makeSurface(1024,160,.6,.094,65);scene.add(tag.mesh);
-function menuLabels(){return [`Style: ${state.mode==='lens'?'Lens':'All'}`,'Opacity −','Opacity +','Cone −','Cone +',`Capture: ${capture?capture.label.replace(/, \d{4}$/,''):'May 6'}`,`Photo: ${state.hiRes?'4K':'2K'}`,`Snap turn: ${state.snap?'on':'off'}`,`Fire: ${fireOn()?'on':layerState.fire?.loading?'loading':'off'}`,`Scene: ${gauss.loading?'loading…':gauss.scene==='gaussian'?'Gaussian':'Photo'}`,'Nearest station','Close'];}
-function drawMenu(){const {ctx,canvas}=menu,W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.95)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,30);ctx.fill();ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,86);ctx.fillStyle='#FDB515';ctx.fillRect(4,86,W-8,5);
- ctx.fillStyle='#fff';ctx.font='700 44px Arial';ctx.fillText('Grimes L1 · Scan↔BIM overlay',36,62);
- const loaded=Object.values(layerState).filter(s=>s.loaded).length,total=Object.keys(layerState).length;
- const rows=[[`${capture?.label||''} · station ${active+1}/${stations.length}`,'#e8f1f8'],[`Alignment: ${capture?.alignmentText||''}`,capture?.provisional?'#ffb4a8':'#ffe495'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · ${loaded}/${total} layers · opacity ${Math.round(state.opacity[state.mode]*100)}% · cone ${state.coneDeg}°`,'#a9c1d6'],[gauss.scene==='gaussian'?gauss.label:`Scene: 360° photo · Gaussian ${gaussianSource()?'available':'not available for this capture'}`,gauss.scene==='gaussian'?'#ffd9a0':'#cfe3f5'],
-  [gauss.scene==='gaussian'?'Trigger: info · Stick ↑ at floor, release: teleport · ↑ at horizon: next station · ←→: snap turn':'Trigger: info / buttons · Stick ↑↓: next station · Stick ←→: snap turn · A/X: Lens/All','#8aa2b8']];
- let y=142;for(const [t,c] of rows){ctx.fillStyle=c;if(y===142){ctx.font='600 34px Arial';ctx.fillText(wrap(ctx,t,W-72,1)[0]||'',36,y);}else fitText(ctx,t,36,y,W-72,30,'Arial');y+=50;}
- menuLabels().forEach((label,i)=>{const r=X.menuRect(i),x=r.x*W,yy=r.y*H,w=r.w*W,h=r.h*H;ctx.fillStyle=i===11?'#7a2633':i===9&&gauss.scene==='gaussian'?'#6a4a10':'#123a5c';ctx.beginPath();ctx.roundRect(x,yy,w,h,16);ctx.fill();ctx.strokeStyle='#5d82a3';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#fff';ctx.font='600 28px Arial';ctx.textAlign='center';ctx.fillText(label,x+w/2,yy+h/2+10,w-16);ctx.textAlign='left';});
+/* ── XR menu panel (2026-10-22 redesign after the first headset test) ── at most 5 large buttons (Capture, Lens/All, Photo/Gaussian,
+   Recenter, More ▸); More holds Flashlight hands, Opacity, Photo 2K/4K, Exit VR and the layer toggles. ~0.8 m in front, slightly below
+   eye height, facing the head; it rides with the rig (jumps, snap turns). B/Y opens/closes; it also closes 1.5 s after every ray left it.
+   Buttons are hit by id (X.menuButtons/menuLayout); a click acts only on the button the ray highlights. */
+const MENU_W=.64,MENU_H=.4,MENU_DIST=.8,MENU_DROP=.15,MENU_AWAY_MS=1500;
+const menu=makeSurface(1280,800,MENU_W,MENU_H,70);scene.add(menu.mesh);
+const tag=makeSurface(1024,200,.6,.117,65);scene.add(tag.mesh);
+const menuHover=new Set();let menuSeen=false,menuAway=0;
+const layerOn=k=>!!layerState[k]&&layerState[k].group.visible&&!layerState[k].error;
+function menuModel(){return {buttons:X.menuButtons(state.page,{captureLabel:capture?capture.label.replace(/, \d{4}$/,''):'May 6',mode:state.mode,scene:gauss.scene,gaussianAvailable:capture?!!gaussianSource():undefined,gaussianLoading:gauss.loading,
+ hands:state.hands,opacity:state.opacity.lens,hiRes:state.hiRes,layers:OVERLAY_LAYER_KEYS.map(k=>({key:k,label:LAYERS[k].label,on:layerOn(k),loading:!!layerState[k]?.loading}))}),rects:X.menuLayout(X.MENU_PAGES[state.page])};}
+const TONE={on:'#14532d',exit:'#7a2633',nav:'#24425f','':'#123a5c'};
+function fitFont(ctx,text,x,y,width,size,weight){let s=size;do{ctx.font=weight+' '+s+'px Arial';}while(ctx.measureText(text).width>width&&--s>12);ctx.fillText(text,x,y);}
+function drawMenu(){const {ctx,canvas}=menu,W=canvas.width,H=canvas.height,{buttons,rects}=menuModel(),more=state.page==='more';ctx.clearRect(0,0,W,H);
+ ctx.fillStyle='rgba(8,16,28,.95)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,36);ctx.fill();ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,92);ctx.fillStyle='#FDB515';ctx.fillRect(4,92,W-8,6);
+ ctx.fillStyle='#fff';fitFont(ctx,more?'More · settings and layers':'Grimes L1 · Scan↔BIM',36,64,W-300,48,'700');ctx.fillStyle='#9fb6cb';ctx.textAlign='right';ctx.font='600 30px Arial';ctx.fillText('B/Y closes',W-36,62);ctx.textAlign='left';
+ const rows=more?[[`Opacity is fixed (Lens ${Math.round(state.opacity.lens*100)} %, All ${Math.round(state.opacity.all*100)} %) · Right stick ↑↓ widens / narrows the flashlight (${state.coneDeg}°)`,'#cfe3f5'],
+   ['Layers load on demand · loading inside VR can stutter for a few seconds','#9fb6cb'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · Design (BIM) positions`,'#9fb6cb']]
+  :[[`${capture?.label||''} · capture ${active+1}/${stations.length}${gauss.scene==='gaussian'&&gauss.label?' · '+gauss.label:''}`,gauss.scene==='gaussian'?'#ffd9a0':'#e8f1f8'],
+   [`Alignment: ${capture?.alignmentText||''} · Design (BIM) positions`,capture?.provisional?'#ffb4a8':'#ffe495'],
+   ['Left stick ↑ hold: aim · release: go · ←→ turn 30° · Right hand: flashlight, trigger = info card · A/X Lens/All','#9fb6cb']];
+ let y=150;for(const [t,c] of rows){ctx.fillStyle=c;fitText(ctx,t,36,y,W-72,32,'Arial');y+=56;}
+ buttons.forEach((b,i)=>{const r=rects[i];if(!r)return;const hov=menuHover.has(i),g=hov?8:0,x=r.x*W-g,yy=r.y*H-g,w=r.w*W+2*g,h=r.h*H+2*g;
+  ctx.fillStyle=hov?'#FDB515':TONE[b.tone]||TONE[''];ctx.beginPath();ctx.roundRect(x,yy,w,h,24);ctx.fill();ctx.strokeStyle=hov?'#ffffff':'#5d82a3';ctx.lineWidth=hov?7:3;ctx.stroke();
+  ctx.textAlign='center';ctx.fillStyle=hov?'#0b1020':'#ffffff';const big=more?34:46,small=more?26:32;
+  if(b.value){fitFont(ctx,b.label,x+w/2,yy+h/2-small*.25,w-28,big,'700');ctx.fillStyle=hov?'#0b1020':'#cfe3f5';fitFont(ctx,b.value,x+w/2,yy+h/2+small*1.15,w-28,small,'500');}
+  else fitFont(ctx,b.label,x+w/2,yy+h/2+big*.35,w-28,big,'700');
+  ctx.textAlign='left';});
  menu.texture.needsUpdate=true;invalidate();}
-function placeInFront(mesh,dist,drop){camera.getWorldPosition(_head);const f=camera.getWorldDirection(_v);f.y=0;if(f.lengthSq()<1e-6)f.set(0,0,-1);f.normalize();mesh.position.copy(_head).addScaledVector(f,dist);mesh.position.y-=drop;mesh.lookAt(_head.x,mesh.position.y+drop*.35,_head.z);}
-function setMenu(on){state.menu=on;if(on){drawMenu();placeInFront(menu.mesh,1.1,.28);}menu.mesh.visible=on;invalidate();}
+/* World placement in front of the head, then parented to the rig so it follows station jumps, teleports and snap turns. */
+function placeInFront(mesh,dist,drop){scene.attach(mesh);camera.getWorldPosition(_head);const f=camera.getWorldDirection(_v);f.y=0;if(f.lengthSq()<1e-6)f.set(0,0,-1);f.normalize();
+ mesh.position.copy(_head).addScaledVector(f,dist);mesh.position.y-=drop;mesh.lookAt(_head);rig.attach(mesh);}
+function setMenu(on){state.menu=on;menuHover.clear();menuSeen=false;menuAway=0;if(on){state.page='main';drawMenu();placeInFront(menu.mesh,MENU_DIST,MENU_DROP);}menu.mesh.visible=on;invalidate();}
+function menuAutoClose(){if(!state.menu)return;const now=performance.now(),on=controllers.some(c=>c.userData.hover?.panel==='menu');if(on){menuSeen=true;menuAway=now;}else if(menuSeen&&now-menuAway>MENU_AWAY_MS)setMenu(false);}
 function placeTag(){const {ctx,canvas}=tag,W=canvas.width,H=canvas.height,g=gauss.scene==='gaussian';ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,W-4,H-4,40);ctx.fill();ctx.textAlign='center';
- ctx.fillStyle=capture.provisional?'#ffb4a8':'#ffe495';fitText(ctx,capture.label+' · '+(capture.provisional?'PROVISIONAL alignment':'registered, not surveyed')+' · B/Y menu',W/2,g?62:96,W-60,40,'Arial');
- if(g){ctx.fillStyle='#ffd9a0';fitText(ctx,'Gaussian · experimental appearance, not surveyed geometry',W/2,124,W-60,36,'Arial');}
+ ctx.fillStyle=capture.provisional?'#ffb4a8':'#ffe495';fitText(ctx,capture.label+' · '+(capture.provisional?'PROVISIONAL alignment':'registered, not surveyed')+' · B/Y menu',W/2,g?56:72,W-60,40,'Arial');
+ if(g){ctx.fillStyle='#ffd9a0';fitText(ctx,'Gaussian · experimental appearance, not surveyed geometry',W/2,108,W-60,34,'Arial');}
+ ctx.fillStyle='#9fb6cb';fitText(ctx,'Left stick ↑ hold: aim, release: go · ←→ turn · Right trigger: info',W/2,g?160:140,W-60,32,'Arial');
  ctx.textAlign='left';tag.texture.needsUpdate=true;placeInFront(tag.mesh,1.3,.75);tag.mesh.visible=true;}
-async function menuAction(i){
- if(i===0)setStyle(state.mode==='lens'?'all':'lens');
- else if(i===1||i===2){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],i===1?-1:1);applyShaderState();}
- else if(i===3||i===4){state.coneDeg=X.stepCone(state.coneDeg,i===3?-1:1);applyShaderState();}
- else if(i===5){await switchCapture(X.nextCapture(capture.date,availableCaptures));}
- else if(i===6)setHiRes(!state.hiRes);
- else if(i===7){state.snap=!state.snap;}
- else if(i===8)setFire(!fireOn());
- else if(i===9)await setScene(X.toggleScene(gauss.scene));
- else if(i===10)await recenter();
- else if(i===11){setMenu(false);return;}
- if(state.menu)drawMenu();
-}
-/* Trigger / click: menu buttons first, then service elements. */
+function setLayer(k,on){if(!LAYERS[k])return;const st=layerState[k];if(on&&!st){loadLayer(k);status(LAYERS[k].label+' loading'+(xrSession?' · frames may stutter':''));}else if(st)st.group.visible=on;
+ if(k==='fire')$('fire').setAttribute('aria-pressed',String(on));if(state.menu)drawMenu();invalidate();}
+function setHands(h){state.hands=h==='both'?'both':'right';if(state.hands==='right')U.cone2On.value=0;status('Flashlight: '+(state.hands==='both'?'both hands':'right hand'));if(state.menu)drawMenu();invalidate();}
+/* id ('capture', 'style', …) or a button index on the current page; returns the id that acted. */
+async function menuAction(k){const {buttons}=menuModel(),id=(typeof k==='number'?buttons[k]:buttons.find(b=>b.id===k)||{id:k})?.id;if(!id)return null;
+ menuHover.clear();
+ if(id==='capture')await switchCapture(X.nextCapture(capture.date,availableCaptures));
+ else if(id==='style')setStyle(state.mode==='lens'?'all':'lens');
+ else if(id==='scene')await setScene(X.toggleScene(gauss.scene));
+ else if(id==='recenter'){await recenter();if(state.menu)placeInFront(menu.mesh,MENU_DIST,MENU_DROP);}
+ else if(id==='more')state.page='more';else if(id==='back')state.page='main';
+ else if(id==='hands')setHands(state.hands==='both'?'right':'both');
+ else if(id==='opacity'){state.opacity.lens=X.nextLensOpacity(state.opacity.lens);applyShaderState();}
+ else if(id==='hires'){if(gauss.scene!=='gaussian')setHiRes(!state.hiRes);}
+ else if(id==='exit'){if(xrSession)xrSession.end();else setMenu(false);return id;}
+ else if(id.startsWith('layer:')){const key=id.slice(6);setLayer(key,!layerOn(key));}
+ else return null;
+ if(state.menu)drawMenu();return id;}
+/* Pointing: the visible interactive panel (VR menu or MR panel) and which button a ray is on (-1 = panel background). */
+function activePanel(){if(MODE_AR)return mrPanel.mesh.visible?{name:'mr',mesh:mrPanel.mesh,hit:(u,v)=>{const i=MR.gridHit(MR.PANEL,u,v);return i>=0&&mrButtons()[i]?i:-1;}}:null;
+ return menu.mesh.visible?{name:'menu',mesh:menu.mesh,hit:(u,v)=>X.layoutHit(menuModel().rects,u,v)}:null;}
+function panelHit(o,d){const p=activePanel();if(!p)return null;raycaster.set(o,d);raycaster.far=10;const h=raycaster.intersectObject(p.mesh,false)[0];if(!h)return null;return {panel:p.name,button:p.hit(h.uv.x,h.uv.y),point:h.point.clone(),distance:h.distance};}
+/* Trigger / click (desktop and legacy path): a panel button first, then service elements. */
 async function selectRay(origin,dir){
  if(MODE_AR)return mrSelectDesktop(origin,dir);
- if(menu.mesh.visible){raycaster.set(origin,dir);raycaster.far=10;const h=raycaster.intersectObject(menu.mesh,false)[0];if(h){const b=X.menuHit(h.uv.x,h.uv.y);if(b>=0)await menuAction(b);return {menu:b};}}
+ const h=panelHit(origin,dir);if(h)return {menu:h.button>=0?await menuAction(h.button):null};
  return pickAlong(origin,dir);
 }
 function setStyle(mode){state.mode=mode;applyShaderState();}
@@ -408,33 +447,75 @@ async function setScene(want,{boot=false}={}){
 async function recenter(){if(active<0)return;const n=X.nearestStation(stations,viewPos,gauss.scene==='gaussian'?gauss.stationIdx:null).index;await openStation(n<0?active:n,{force:true});}
 /* Teleport: controller (or mouse) ray against an invisible floor plane EYE_H below the eye; short fade; eye height kept. */
 function teleportPreview(origin,dir){return X.teleportTarget(origin.toArray(),dir.toArray(),{viewY:viewPos[1],eyeHeight:EYE_H,maxDistance:TELEPORT_MAX,stations,indices:gauss.stationIdx,stationRadius:TELEPORT_STATION_RADIUS,bounds:gauss.manifest?.zone?.bounds||null,boundsPad:ZONE_PAD});}
-async function teleport(origin,dir){
+async function teleportTo(t){
  if(gauss.scene!=='gaussian'||!gauss.dropIn||active<0||busyStation)return null;
- const t=teleportPreview(origin,dir);if(!t.ok){status(t.reason);return t;}
+ if(!t?.ok){status(t?.reason||'No teleport target');return t;}
  busyStation=true;
  try{await fade(0,120);hideCard();viewPos=t.landing;active=t.nearest;placeRig();stationBim=X.applyReg(reg,viewPos);updateRadius();gauss.teleports++;
   $('station').value=String(active);$('prev').disabled=active===0;$('next').disabled=active===stations.length-1;
   if(xrSession)placeTag();status('Teleported · nearest capture '+(active+1)+'/'+stations.length+' · '+gauss.label);await fade(1,180);}
  finally{busyStation=false;invalidate();if(state.menu)drawMenu();}
  return t;}
-function showRing(t){if(!t||!t.point){ring.visible=false;return;}ring.position.fromArray(t.point);ring.material.color.set(t.ok?0xffd479:0xe2725b);ring.visible=true;}
+function teleport(origin,dir){return teleportTo(teleportPreview(origin,dir));}
+/* ── Point-and-go (2026-10-22) ── LEFT controller: hold stick ↑ to aim, release to go, pull back to cancel.
+   Photo: discrete jump to the capture station nearest the pointed floor spot, or within a 30° cone up to 15 m (X.stationTarget,
+   route-detour penalty from the station graph). Gaussian: free teleport to the pointed floor point (X.teleportTarget, ≤ 8 m);
+   at the horizon it falls back to the station cone. MR: no teleport (the BIM is aligned to the real building; you walk). */
+const AIM_MAX=15,AIM_CONE=30;
+let routeCache={key:null,dist:null},deskAim=null;
+function routeFrom(i){const k=captureEpoch+':'+i;if(routeCache.key!==k)routeCache={key:k,dist:X.routeDistances(stations,i)};return routeCache.dist;}
+function aimTarget(o,d){if(MODE_AR||active<0||!stations.length)return null;const g=gauss.scene==='gaussian'&&!!gauss.dropIn;
+ if(g){const t=teleportPreview(o,d);if(t.ok)return {...t,kind:'point',distance:Math.hypot(t.landing[0]-viewPos[0],t.landing[2]-viewPos[2])};if(t.point)return {...t,kind:'point'};}
+ const r=X.stationTarget(stations,o.toArray(),d.toArray(),{current:g?-1:active,from:viewPos,floorY:viewPos[1]-EYE_H,maxDistance:AIM_MAX,coneDeg:AIM_CONE,refY:viewPos[1],indices:g?gauss.stationIdx:null,route:g?null:routeFrom(active)});
+ return {...r,kind:'station'};}
+async function goAim(t,c){if(!t?.ok){status(t?.reason||'No target');return false;}
+ if(c)buzz(c,.5,40);
+ if(t.kind==='point')return !!(await teleportTo(t))?.ok;
+ await openStation(t.index);return active===t.index;}
+const AIM_DOTS=28,_m4=new THREE.Matrix4(),_p=new THREE.Vector3();
+const aimDots=new THREE.InstancedMesh(new THREE.SphereGeometry(.014,8,6),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.95,depthTest:false,depthWrite:false,toneMapped:false}),AIM_DOTS);
+aimDots.renderOrder=58;aimDots.frustumCulled=false;aimDots.visible=false;scene.add(aimDots);
+const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,1,16,1,true).translate(0,.5,0),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.4,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
+pillar.renderOrder=57;pillar.visible=false;pillar.frustumCulled=false;scene.add(pillar);
+const aimTag=makeSurface(768,120,.46,.072,66);aimTag.text=null;scene.add(aimTag.mesh);
+function drawAimTag(text,ok){const {ctx,canvas}=aimTag,W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,W-4,H-4,56);ctx.fill();
+ ctx.strokeStyle=ok?'#FDB515':'#e2725b';ctx.lineWidth=5;ctx.stroke();ctx.textAlign='center';ctx.fillStyle=ok?'#ffffff':'#ffb4a8';fitFont(ctx,text,W/2,H/2+15,W-50,42,'700');ctx.textAlign='left';aimTag.texture.needsUpdate=true;}
+function showAim(o,d,t){
+ if(!t){hideAim();return;}
+ const color=t.ok?0xffd479:0xe2725b,text=X.targetLabel(t,t.kind==='station'&&t.ok?'Capture '+(t.index+1):'');
+ if(text!==aimTag.text){drawAimTag(text,t.ok);aimTag.text=text;}
+ let labelAt;
+ if(t.point){const pts=X.arcPoints(o.toArray(),t.point,AIM_DOTS);for(let k=0;k<AIM_DOTS;k++){_m4.makeTranslation(pts[k][0],pts[k][1],pts[k][2]);aimDots.setMatrixAt(k,_m4);}
+  aimDots.instanceMatrix.needsUpdate=true;aimDots.material.color.set(color);aimDots.visible=true;ring.position.fromArray(t.point);ring.material.color.set(color);ring.visible=true;
+  if(t.ok&&t.kind==='station'){const s=stations[t.index].position;pillar.position.set(s[0],t.point[1],s[2]);pillar.scale.set(1,Math.max(.1,s[1]-t.point[1]),1);pillar.visible=true;labelAt=_p.set(s[0],s[1]+.35,s[2]);}
+  else{pillar.visible=false;labelAt=_p.set(t.point[0],t.point[1]+EYE_H+.3,t.point[2]);}}
+ else{aimDots.visible=false;ring.visible=false;pillar.visible=false;labelAt=_p.copy(o).addScaledVector(d,2.5);}
+ camera.getWorldPosition(_head);const dist=_head.distanceTo(labelAt);aimTag.mesh.position.copy(labelAt);aimTag.mesh.scale.setScalar(clamp(dist/1.8,.5,9));aimTag.mesh.lookAt(_head);aimTag.mesh.visible=true;
+ if(t.point)ring.scale.setScalar(clamp(_head.distanceTo(ring.position)/4,1,4));invalidate();}
+function hideAim(){aimDots.visible=false;ring.visible=false;pillar.visible=false;aimTag.mesh.visible=false;invalidate();}
 /* ── Desktop input (testing without a headset): drag look, wheel zoom, click = trigger, mouse = flashlight, WASD walk ── */
 const ndc=new THREE.Vector2();let drag=null,pointerInside=false;
 function coneFromPointer(x,y){if(xrSession)return;ndc.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(ndc,camera);U.coneOrigin.value.copy(raycaster.ray.origin);U.coneDir.value.copy(raycaster.ray.direction);invalidate();}
 function coneFromView(){camera.getWorldPosition(U.coneOrigin.value);camera.getWorldDirection(U.coneDir.value);invalidate();}
 const cvs=renderer.domElement;
 cvs.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY};cvs.setPointerCapture(e.pointerId);});
+/* Desktop pointer = a pseudo controller: it highlights panel buttons like a controller ray; Shift + move previews point-and-go, Shift + click goes. */
+const mouse={userData:{hoverBtn:-1,hoverPanel:null,hover:null}};
+function mouseRay(x,y){ndc.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(ndc,camera);return [raycaster.ray.origin.clone(),raycaster.ray.direction.clone()];}
 cvs.addEventListener('pointermove',e=>{pointerInside=e.pointerType==='mouse';if(drag&&drag.id===e.pointerId){yaw-=(e.clientX-drag.x)*.004;pitch=clamp(pitch-(e.clientY-drag.y)*.004,-1.45,1.45);drag.x=e.clientX;drag.y=e.clientY;setDesktopLook();}
- if(e.pointerType==='mouse')coneFromPointer(e.clientX,e.clientY);else coneFromView();});
-cvs.addEventListener('pointerup',e=>{if(drag&&drag.id===e.pointerId&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<5){ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);raycaster.setFromCamera(ndc,camera);
- const o=raycaster.ray.origin.clone(),d=raycaster.ray.direction.clone();if(e.shiftKey&&gauss.scene==='gaussian')teleport(o,d);else selectRay(o,d);}drag=null;});
+ if(e.pointerType==='mouse')coneFromPointer(e.clientX,e.clientY);else coneFromView();
+ if(!xrSession){const [o,d]=mouseRay(e.clientX,e.clientY);setHover(mouse,panelHit(o,d));if(e.shiftKey&&!MODE_AR){deskAim=aimTarget(o,d);showAim(o,d,deskAim);}else if(deskAim){deskAim=null;hideAim();}}});
+cvs.addEventListener('pointerup',e=>{if(drag&&drag.id===e.pointerId&&Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<5){const [o,d]=mouseRay(e.clientX,e.clientY);
+ if(e.shiftKey&&!MODE_AR){hideAim();deskAim=null;goAim(aimTarget(o,d));}else selectRay(o,d);}drag=null;});
+addEventListener('keyup',e=>{if(e.key==='Shift'&&deskAim){deskAim=null;hideAim();}});
 cvs.addEventListener('pointercancel',()=>drag=null);cvs.addEventListener('pointerleave',()=>{pointerInside=false;coneFromView();});
 cvs.addEventListener('wheel',e=>{e.preventDefault();camera.fov=clamp(camera.fov+e.deltaY*.025,40,95);camera.updateProjectionMatrix();invalidate();},{passive:false});
 const KEYDIR={KeyW:'f',ArrowUp:'f',KeyS:'b',ArrowDown:'b',KeyA:'l',ArrowLeft:'l',KeyD:'r',ArrowRight:'r'};
 addEventListener('keydown',e=>{if(['SELECT','INPUT'].includes(e.target.tagName))return;
  if(KEYDIR[e.code]){e.preventDefault();const f=camera.getWorldDirection(new THREE.Vector3());f.y=0;f.normalize();const r=new THREE.Vector3().crossVectors(f,new THREE.Vector3(0,1,0)),k=KEYDIR[e.code];walk(k==='f'?f:k==='b'?f.negate():k==='l'?r.negate():r);}
  else if(e.code==='KeyL')setStyle(state.mode==='lens'?'all':'lens');else if(e.code==='KeyM'){if(MODE_AR)mrSetPanel(!mr.panel);else setMenu(!state.menu);}else if(e.code==='Escape')hideCard();
- else if(e.code==='KeyG')setScene(X.toggleScene(gauss.scene));});
+ else if(e.code==='KeyG')setScene(X.toggleScene(gauss.scene));
+ else if(e.code==='KeyQ'||e.code==='KeyE'){yaw+=e.code==='KeyQ'?XR_SNAP:-XR_SNAP;setDesktopLook();coneFromView();}});
 $('prev').onclick=()=>openStation(active-1);$('next').onclick=()=>openStation(active+1);$('station').onchange=e=>openStation(Number(e.target.value));
 $('capture').onchange=e=>switchCapture(e.target.value);
 $('styleLens').onclick=()=>setStyle('lens');$('styleAll').onclick=()=>setStyle('all');
@@ -446,13 +527,57 @@ addEventListener('resize',()=>{if(renderer.xr.isPresenting)return;camera.aspect=
 cvs.addEventListener('webglcontextlost',e=>{e.preventDefault();status('Graphics paused · reload this page',true);});
 /* ── WebXR (Quest Browser) ── immersive-vr, 'local' reference space, controllers in the rig, snap turn, no smooth locomotion. */
 let xrSession=null,xrSupported=false,xrARSupported=false,activeController=null,pendingPlace=0;
-const controllers=[0,1].map(i=>{const c=renderer.xr.getController(i);c.userData={source:null,stick:{armed:true},adjust:{armed:true}};
- const ray=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,0,-1)]),new THREE.LineBasicMaterial({color:0xffd479,transparent:true,opacity:.55,depthTest:false}));ray.scale.z=3;ray.renderOrder=55;ray.visible=false;c.add(ray);c.userData.ray=ray;
+/* Pointing feedback (2026-10-22): each tracked controller shows a tapered laser ray and a reticle where it hits (menu button = gold,
+   service element = amber, assumed floor = flat white ring); hovering a button highlights it and gives a short haptic tick. */
+const RAY_IDLE=4,HOVER_ELEMENTS=q.get('hover')!=='0';
+const rayGeo=new THREE.CylinderGeometry(.0018,.0045,1,8,1,true).rotateX(-Math.PI/2).translate(0,0,-.5);
+const reticleGeo=[new THREE.RingGeometry(.6,1,32),new THREE.CircleGeometry(.28,16)];
+function makeReticle(){const g=new THREE.Group(),m=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.95,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
+ for(const geo of reticleGeo){const x=new THREE.Mesh(geo,m);x.renderOrder=62;x.frustumCulled=false;g.add(x);}g.visible=false;g.userData.mat=m;scene.add(g);return g;}
+const controllers=[0,1].map(i=>{const c=renderer.xr.getController(i);c.userData={source:null,stick:{armed:true},adjust:{armed:true},o:new THREE.Vector3(),d:new THREE.Vector3(0,0,-1),hoverBtn:-1,hoverPanel:null,hover:null,aiming:false,aimKey:null,elemHit:null,elemNext:0};
+ const ray=new THREE.Mesh(rayGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.55,depthTest:false,depthWrite:false,toneMapped:false}));ray.scale.z=RAY_IDLE;ray.renderOrder=55;ray.visible=false;ray.frustumCulled=false;c.add(ray);c.userData.ray=ray;c.userData.reticle=makeReticle();
  c.addEventListener('connected',e=>{c.userData.source=e.data;ray.visible=e.data.targetRayMode==='tracked-pointer';if(!activeController||e.data.handedness==='right')activeController=c;});
- c.addEventListener('disconnected',()=>{c.userData.source=null;ray.visible=false;if(activeController===c)activeController=controllers.find(o=>o!==c&&o.userData.source)||null;});
+ c.addEventListener('disconnected',()=>{const u=c.userData;u.source=null;ray.visible=false;u.reticle.visible=false;if(u.aiming){u.aiming=false;hideAim();}setHover(c,null);if(activeController===c)activeController=controllers.find(o=>o!==c&&o.userData.source)||null;});
  c.addEventListener('selectstart',()=>{activeController=c;});
- c.addEventListener('select',()=>{c.updateMatrixWorld(true);const o=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld);if(MODE_AR)mrSelect(c,o,d);else selectRay(o,d);});
+ c.addEventListener('select',()=>onSelect(c));
  rig.add(c);return c;});
+function rayOf(c,o,d){c.updateMatrixWorld(true);o.setFromMatrixPosition(c.matrixWorld);d.set(0,0,-1).transformDirection(c.matrixWorld);}
+let curRoles={move:-1,lens:[]};
+function roles(){return X.controllerRoles(controllers.map(c=>{const s=c.userData.source;return s?{handedness:s.handedness,pointer:s.targetRayMode==='tracked-pointer'}:null;}),state.hands);}
+/* Haptics: Quest Browser exposes gamepad.hapticActuators[0].pulse(); newer Chromium has vibrationActuator.playEffect(). */
+function buzz(c,intensity=.3,ms=15){const gp=c?.userData?.source?.gamepad;if(!gp)return false;
+ try{const h=gp.hapticActuators?.[0];if(h?.pulse){h.pulse(intensity,ms);return true;}const v=gp.vibrationActuator;if(v?.playEffect){v.playEffect('dual-rumble',{duration:ms,strongMagnitude:intensity,weakMagnitude:intensity}).catch(()=>{});return true;}}catch(e){}return false;}
+const mrHover=new Set();
+function setHover(c,hit){const u=c.userData,b=hit&&hit.button>=0?hit.button:-1,p=hit?.panel||null;u.hover=hit;if(u.hoverBtn===b&&u.hoverPanel===p)return;u.hoverBtn=b;u.hoverPanel=p;if(b>=0)buzz(c,.25,12);refreshHover();}
+function refreshHover(){const tgt=MODE_AR?mrHover:menuHover,want=new Set([...controllers,mouse].filter(c=>c.userData.hoverBtn>=0).map(c=>c.userData.hoverBtn));
+ if(want.size===tgt.size&&[...want].every(i=>tgt.has(i)))return;tgt.clear();want.forEach(i=>tgt.add(i));if(MODE_AR){if(mr.panel)mrDrawPanel();}else if(state.menu)drawMenu();}
+/* Element hover for the flashlight ray: a full raycast of the visible batches, throttled and self-timed (cost x 20, 120-800 ms).
+   Between casts the reticle stays on the ray at the last hit distance. ?hover=0 disables it. */
+const hoverCost={ms:0,interval:150,casts:0};
+function elementHover(c,o,d){const u=c.userData,now=performance.now();
+ if(now>=u.elemNext){const t0=performance.now();raycaster.set(o,d);raycaster.far=(MODE_AR?Math.min(40,mrCullRadius()):P.radius)+6;const h=raycaster.intersectObjects(pickables(),false)[0],dt=performance.now()-t0;
+  hoverCost.ms=hoverCost.casts?hoverCost.ms*.8+dt*.2:dt;hoverCost.casts++;hoverCost.interval=clamp(hoverCost.ms*20,120,800);u.elemNext=now+hoverCost.interval;u.elemHit=h?h.distance:null;}
+ return u.elemHit==null?null:{distance:u.elemHit,point:_p.copy(o).addScaledVector(d,u.elemHit)};}
+function updatePointer(c,o,d,isLens){const u=c.userData,ray=u.ray,ret=u.reticle;
+ if(!xrSession||u.source?.targetRayMode!=='tracked-pointer'||u.aiming){ray.visible=false;ret.visible=false;setHover(c,null);return;}
+ const hit=panelHit(o,d);let kind=hit?(hit.button>=0?'button':'panel'):null,dist=hit?.distance,point=hit?.point;setHover(c,hit);
+ if(!kind&&isLens&&HOVER_ELEMENTS){const e=elementHover(c,o,d);if(e){kind='element';dist=e.distance;point=e.point;}}
+ if(!kind){const f=X.floorHit(o.toArray(),d.toArray(),MODE_AR?0:viewPos[1]-EYE_H,AIM_MAX);if(f){kind='floor';point=_p.fromArray(f);dist=o.distanceTo(point);}}
+ const col=kind==='button'?0xffd479:kind==='element'?0xffb020:0xffffff;
+ ray.visible=true;ray.scale.z=kind?Math.max(.05,dist):RAY_IDLE;ray.material.color.set(col);ray.material.opacity=kind==='button'?.9:.55;
+ if(!kind){ret.visible=false;return;}
+ ret.position.copy(point);camera.getWorldPosition(_head);
+ if(kind==='floor'){ret.rotation.set(-Math.PI/2,0,0);ret.scale.setScalar(clamp(dist*.02,.03,.25));}else{ret.lookAt(_head);ret.scale.setScalar(clamp(dist*.012,.006,.1));}
+ ret.userData.mat.color.set(col);ret.visible=true;}
+/* Trigger: acts only on what the ray highlights. Menu/panel button > (right or 'both' flashlight hand) info card. */
+function onSelect(c){const u=c.userData;rayOf(c,u.o,u.d);const o=u.o.clone(),d=u.d.clone(),h=u.hover;
+ if(h&&h.panel){if(h.button>=0){buzz(c,.6,30);if(h.panel==='mr')mrButton(h.button);else menuAction(h.button);}return;}
+ if(MODE_AR)return mrSelect(c,o,d);
+ if(u.aiming)return;
+ const k=controllers.indexOf(c),R=curRoles.move>=0||curRoles.lens.length?curRoles:roles();
+ if(R.lens.includes(k))pickAlong(o,d).then(r=>{if(r)buzz(c,.4,25);});
+ else status('Info card: right trigger · both-hand flashlight: menu ▸ More ▸ Flashlight');}
+function snapBy(a){camera.getWorldPosition(_head);const r=X.snapTurn(rig.position.toArray(),rig.rotation.y,_head.toArray(),a);rig.position.fromArray(r.position);rig.rotation.y=r.yaw;rig.updateMatrixWorld(true);gauss.pendingSort=true;invalidate();}
 async function detectXR(){
  if(!navigator.xr||!isSecureContext){if(MODE_AR){$('xrNote').textContent='Desktop MR simulation · passthrough needs Quest Browser over HTTPS (immersive-ar), see docs/QUEST_XR_OVERLAY.md';return false;}$('xrNote').textContent=isSecureContext?'Desktop preview · WebXR not available in this browser':'Desktop preview · open over HTTPS in Quest Browser for VR (see docs/QUEST_XR_OVERLAY.md)';return false;}
  xrSupported=await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);xrARSupported=await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
@@ -463,35 +588,35 @@ $('enterVR').onclick=async()=>{if(xrSession)return xrSession.end();try{
  const session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['hand-tracking']});
  await renderer.xr.setSession(session);renderer.xr.setFoveation(P.foveation);xrSession=session;
  if(gauss.dropIn&&gauss.asset?.shDegree>0)gauss.dropIn.setActiveSphericalHarmonicsDegrees(0);   // SH0 in XR even if the desktop loaded the full file
- rig.rotation.set(0,yaw,0);camera.position.set(0,0,0);camera.quaternion.identity();pendingPlace=3;hideCard();coneFromView();
- session.addEventListener('end',()=>{xrSession=null;ring.visible=false;if(gauss.dropIn&&gauss.asset?.shDegree>0)gauss.dropIn.setActiveSphericalHarmonicsDegrees(gauss.asset.shDegree);rig.rotation.set(0,0,0);camera.position.set(0,0,0);setDesktopLook();setMenu(false);tag.mesh.visible=false;for(const c of controllers)c.userData.ray.visible=false;placeRig();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);$('enterVR').textContent='Enter VR';invalidate();});
+ rig.rotation.set(0,yaw,0);camera.position.set(0,0,0);camera.quaternion.identity();pendingPlace=3;hideCard();setMenu(false);hideAim();deskAim=null;coneFromView();
+ session.addEventListener('end',()=>{xrSession=null;hideAim();toast.mesh.visible=false;for(const c of controllers){c.userData.aiming=false;c.userData.reticle.visible=false;setHover(c,null);}U.cone2On.value=0;if(gauss.dropIn&&gauss.asset?.shDegree>0)gauss.dropIn.setActiveSphericalHarmonicsDegrees(gauss.asset.shDegree);rig.rotation.set(0,0,0);camera.position.set(0,0,0);setDesktopLook();setMenu(false);tag.mesh.visible=false;for(const c of controllers)c.userData.ray.visible=false;placeRig();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);$('enterVR').textContent='Enter VR';invalidate();});
  $('enterVR').textContent='Exit VR';
 }catch(e){console.error(e);status('Could not start VR: '+(e.message||e));}};
 const prevButtons=new Map();
+/* VR input per frame. LEFT = move hand: stick ↑ hold = aim (arc + target marker + name/distance), release = go, pull back = cancel;
+   stick ↓ = step back along the route; ←/→ = snap turn 30°. RIGHT = flashlight: cone follows its ray, trigger = info card,
+   stick ←/→ = snap turn, ↑/↓ = wider / narrower cone. A/X = Lens/All, B/Y = menu. One controller alone does both jobs. */
 function xrInput(){
- for(const c of controllers){const src=c.userData.source,gp=src?.gamepad;if(!gp||gp.mapping!=='xr-standard')continue;
-  const was=prevButtons.get(c)||[],now=gp.buttons.map(b=>b.pressed),edge=k=>now[k]&&!was[k];prevButtons.set(c,now);
-  if(edge(4))setStyle(state.mode==='lens'?'all':'lens');               // A / X
-  if(edge(5))setMenu(!state.menu);                                        // B / Y
-  const x=gp.axes[2]||0,y=gp.axes[3]||0;
-  if(now[1]){const a=X.stickStep(c.userData.adjust,x,y);c.userData.stick.armed=false;   // grip held: stick adjusts the lens
-   if(a==='forward'||a==='back'){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],a==='forward'?1:-1);applyShaderState();}
-   else if(a){state.coneDeg=X.stepCone(state.coneDeg,a==='turn-right'?1:-1);applyShaderState();}
-   continue;}
-  if(c.userData.aim){   // Gaussian teleport: stick ↑ held = aim (ring on the floor), release = go
-   c.updateMatrixWorld(true);const o=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld),d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld),t=teleportPreview(o,d);
-   if(Math.hypot(x,y)>=.3&&gauss.scene==='gaussian'){showRing(t);c.userData.ray.scale.z=t.point?Math.max(.3,o.distanceTo(new THREE.Vector3().fromArray(t.point))):3;continue;}
-   c.userData.aim=false;c.userData.stick.armed=true;ring.visible=false;c.userData.ray.scale.z=3;
-   if(gauss.scene!=='gaussian')continue;
-   if(t.ok)teleport(o,d);else if(!t.point)walk(d);else status(t.reason);   // pointing at the horizon keeps the neighbour-station jump
-   continue;}
-  const a=X.stickStep(c.userData.stick,x,y);if(!a)continue;
-  if(a==='forward'&&gauss.scene==='gaussian'&&gauss.dropIn){c.userData.aim=true;continue;}
-  if(a==='forward'||a==='back'){c.updateMatrixWorld(true);const d=new THREE.Vector3(0,0,-1).transformDirection(c.matrixWorld);if(a==='back')d.negate();walk(d);}
-  else if(state.snap){camera.getWorldPosition(_head);const r=X.snapTurn(rig.position.toArray(),rig.rotation.y,_head.toArray(),a==='turn-left'?XR_SNAP:-XR_SNAP);rig.position.fromArray(r.position);rig.rotation.y=r.yaw;rig.updateMatrixWorld(true);gauss.pendingSort=true;}
- }
- const c=activeController&&activeController.userData.source?.targetRayMode==='tracked-pointer'?activeController:null;
- if(c){c.updateMatrixWorld(true);U.coneOrigin.value.setFromMatrixPosition(c.matrixWorld);U.coneDir.value.set(0,0,-1).transformDirection(c.matrixWorld);}else coneFromView();
+ const R=curRoles=roles();
+ controllers.forEach((c,k)=>{const u=c.userData,src=u.source;if(!src)return;rayOf(c,u.o,u.d);const o=u.o,d=u.d,gp=src.gamepad;
+  const role=R.move===k?(R.lens.length===1&&R.lens[0]===k?'both':'move'):R.lens.includes(k)?'lens':null;u.role=role;
+  if(gp&&gp.mapping==='xr-standard'){const was=prevButtons.get(c)||[],now=gp.buttons.map(b=>b.pressed),edge=i=>now[i]&&!was[i];prevButtons.set(c,now);
+   if(edge(4))setStyle(state.mode==='lens'?'all':'lens');          // A / X
+   if(edge(5))setMenu(!state.menu);                                   // B / Y
+   const x=gp.axes[2]||0,y=gp.axes[3]||0;
+   if(u.aiming){const a=X.aimUpdate(x,y),t=aimTarget(o,d);
+    if(a==='hold'){showAim(o,d,t);const key=t?.ok?(t.kind==='station'?'s'+t.index:'p'):null;if(key&&key!==u.aimKey&&t.kind==='station')buzz(c,.15,10);u.aimKey=key;}
+    else{u.aiming=false;u.aimKey=null;u.stick.armed=false;hideAim();if(a==='go')goAim(t,c);else status('Move cancelled');}}
+   else{const intent=X.stickIntent(role,X.stickStep(u.stick,x,y));
+    if(intent==='aim'){if(busyStation||gauss.loading)status('Moving… wait a moment');else u.aiming=true;}
+    else if(intent==='step-back')walk(d.clone().negate());
+    else if(intent==='turn-left'||intent==='turn-right')snapBy(intent==='turn-left'?XR_SNAP:-XR_SNAP);
+    else if(intent){state.coneDeg=X.stepConeHalf(state.coneDeg,intent==='cone-wider'?1:-1);applyShaderState();status('Flashlight cone '+state.coneDeg+'°');}}}
+  updatePointer(c,o,d,R.lens.includes(k));});
+ const L=R.lens.map(k=>controllers[k]);
+ if(L[0]){U.coneOrigin.value.copy(L[0].userData.o);U.coneDir.value.copy(L[0].userData.d);}else coneFromView();
+ if(L[1]){U.cone2Origin.value.copy(L[1].userData.o);U.cone2Dir.value.copy(L[1].userData.d);U.cone2On.value=1;}else U.cone2On.value=0;
+ menuAutoClose();
 }
 /* ══ Mixed reality (passthrough) mode: ?mode=ar ══ docs/QUEST_XR_OVERLAY.md "MR passthrough mode".
    No photo and no capture registration: the BIM services are placed in the WebXR 'local-floor' space by a MANUAL
@@ -582,7 +707,7 @@ function mrDrawPanel(){const {ctx,canvas}=mrPanel,W=canvas.width,H=canvas.height
  if(p&&mr.note){ctx.fillStyle='#8aa2b8';ctx.font='22px Arial';ctx.fillText(wrap(ctx,mr.note,tw-30,1)[0]||'',30,y);y+=30;}
  ctx.fillStyle='#8aa2b8';ctx.font='22px Arial';ctx.fillText(xrSession?'Trigger: capture/press · grip+trigger: surface hit · B/Y panel · A/X Lens/All'+(mr.nudge?' · stick: nudge (grip: turn/height)':''):'Desktop simulation · M panel · click buttons',30,top-14,tw-30);
  mrDrawMap(ctx,tw+10,100,W-tw-30,top-120);
- mrButtons().forEach((label,i)=>{if(!label)return;const r=MR.gridRect(MR.PANEL,i),x=r.x*W,yy=r.y*H,w=r.w*W,h=r.h*H;ctx.fillStyle=i===14?'#7a2633':(i===6&&mr.nudge)||(i===8&&mr.checkIdx>=0)?'#6a4a10':i===5?'#14532d':'#123a5c';ctx.beginPath();ctx.roundRect(x,yy,w,h,14);ctx.fill();ctx.strokeStyle='#5d82a3';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#fff';ctx.font='600 26px Arial';ctx.textAlign='center';ctx.fillText(label,x+w/2,yy+h/2+9,w-14);ctx.textAlign='left';});
+ mrButtons().forEach((label,i)=>{if(!label)return;const hov=mrHover.has(i),g=hov?6:0,r=MR.gridRect(MR.PANEL,i),x=r.x*W-g,yy=r.y*H-g,w=r.w*W+2*g,h=r.h*H+2*g;ctx.fillStyle=hov?'#FDB515':i===14?'#7a2633':(i===6&&mr.nudge)||(i===8&&mr.checkIdx>=0)?'#6a4a10':i===5?'#14532d':'#123a5c';ctx.beginPath();ctx.roundRect(x,yy,w,h,14);ctx.fill();ctx.strokeStyle=hov?'#fff':'#5d82a3';ctx.lineWidth=hov?6:3;ctx.stroke();ctx.fillStyle=hov?'#0b1020':'#fff';ctx.font='600 26px Arial';ctx.textAlign='center';ctx.fillText(label,x+w/2,yy+h/2+9,w-14);ctx.textAlign='left';});
  mrPanel.texture.needsUpdate=true;invalidate();}
 /* tip = a small gold ball MR_TIP in front of the controller's target-ray origin; that ball (seen over the passthrough) is the touch point */
 function mrTip(c){if(!c){camera.getWorldPosition(_head);return _head.toArray();}c.updateMatrixWorld(true);return c.userData.tip.getWorldPosition(new THREE.Vector3()).toArray();}
@@ -614,6 +739,7 @@ function mrFrame(){const frame=renderer.xr.getFrame(),ref=renderer.xr.getReferen
   else if(now[1]){if(a==='forward'||a==='back'){state.opacity[state.mode]=X.stepOpacity(state.opacity[state.mode],a==='forward'?1:-1);applyShaderState();}else{state.coneDeg=X.stepCone(state.coneDeg,a==='turn-right'?1:-1);applyShaderState();}}}
  const c=activeController&&activeController.userData.source?.targetRayMode==='tracked-pointer'?activeController:null;
  if(c){c.updateMatrixWorld(true);U.coneOrigin.value.setFromMatrixPosition(c.matrixWorld);U.coneDir.value.set(0,0,-1).transformDirection(c.matrixWorld);}else coneFromView();
+ for(const k of controllers){if(!k.userData.source)continue;rayOf(k,k.userData.o,k.userData.d);updatePointer(k,k.userData.o,k.userData.d,k===c);}   // laser + reticle + panel hover
  mrUpdateCull();}
 function mrOnSessionStart(session){
  // enabledFeatures where the browser reports it; otherwise feature-detect (a refused request is caught where it is used)
@@ -627,7 +753,7 @@ function mrOnSessionStart(session){
  else if(rec&&rec.area===mr.area.id){mr.record=rec;mrSetT(rec,'saved, earlier session');mr.stale=true;mr.note='Saved alignment from an earlier session WITHOUT an anchor: valid only if MR started at the same spot and heading. Check a landmark or Re-align.';}
  else mrStartAlign();
  mrSetPanel(true);mrRefresh();}
-function mrOnSessionEnd(){xrSession=null;mr.hitSources.clear();mr.hitPending.clear();mr.anchor=null;mr.pendingAnchor=null;hitRing.visible=false;for(const c of controllers){c.userData.ray.visible=false;c.userData.tip.visible=false;}
+function mrOnSessionEnd(){xrSession=null;mr.hitSources.clear();mr.hitPending.clear();mr.anchor=null;mr.pendingAnchor=null;hitRing.visible=false;for(const c of controllers){c.userData.ray.visible=false;c.userData.tip.visible=false;c.userData.reticle.visible=false;setHover(c,null);}toast.mesh.visible=false;
  mrSetPanel(false);renderer.xr.setReferenceSpaceType('local');rig.position.set(0,1.6,0);rig.rotation.set(0,0,0);camera.position.set(0,0,0);setDesktopLook();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
  $('enterMR').textContent='Enter MR';mr.note='MR session ended · the alignment belonged to that session';mrRefresh();}
 $('enterMR').onclick=async()=>{if(xrSession)return xrSession.end();if(!mr.area){status('Landmarks not loaded yet');return;}try{
@@ -700,6 +826,9 @@ function inspection(){const heap=performance.memory?Math.round(performance.memor
   totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation},
   card:picked?{id:picked.id,layer:picked.layer,tier:picked.tier,lines:picked.lines}:null,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()},rig:{position:rig.position.toArray(),yaw:rig.rotation.y},camera:{world:camera.getWorldPosition(new THREE.Vector3()).toArray()},
   viewPos:viewPos.slice(),photoSphereVisible:sphere.visible,mode:MODE_AR?'ar':'vr',mr:MODE_AR?mrInspection():null,
+  menu:{open:state.menu,page:state.page,buttons:menuModel().buttons.map(b=>b.id),hover:[...menuHover],distance:state.menu?menu.mesh.getWorldPosition(new THREE.Vector3()).distanceTo(camera.getWorldPosition(new THREE.Vector3())):null},
+  controls:{hands:state.hands,lensOpacity:state.opacity.lens,allOpacity:state.opacity.all,cone2:U.cone2On.value,roles:curRoles,hoverElements:HOVER_ELEMENTS,hoverCastMs:+hoverCost.ms.toFixed(2),hoverIntervalMs:Math.round(hoverCost.interval)},
+  aim:deskAim?{ok:deskAim.ok,kind:deskAim.kind,index:deskAim.index??null,method:deskAim.method??null,reason:deskAim.reason??null}:null,
   scene:{mode:gauss.scene,available:!!gaussianSource(),manifest:gauss.source?.path??null,local:!!gauss.source?.local,label:gauss.label||null,file:gauss.asset?.file??null,mobile:gauss.asset?.mobile??null,shDegree:gauss.asset?.shDegree??null,
    splats:gauss.count,loadMs:gauss.loadMs,loading:gauss.loading,error:gauss.error,overrideNote:gauss.overrideNote,override:gauss.override,zone:gauss.manifest?.zone?.id??null,zoneStations:gauss.stationIdx?.length??null,
    sortRunning:!!gauss.dropIn?.viewer.sortRunning,splatVisible:!!gauss.dropIn?.visible,teleports:gauss.teleports,eyeHeight:EYE_H,sharedMemory:false,renderer:'GaussianSplats3D 0.4.7 DropInViewer'}};}
@@ -711,6 +840,18 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
  look:(y,p)=>{yaw=y;pitch=p;setDesktopLook();camera.updateMatrixWorld(true);coneFromView();},
  teleportNdc:(x,y,preview=false)=>{ndc.set(x,y);camera.updateMatrixWorld(true);raycaster.setFromCamera(ndc,camera);const o=raycaster.ray.origin.clone(),d=raycaster.ray.direction.clone();return preview?teleportPreview(o,d):teleport(o,d);},
  pickNdc:(x,y)=>{ndc.set(x,y);raycaster.setFromCamera(ndc,camera);return selectRay(raycaster.ray.origin.clone(),raycaster.ray.direction.clone());},
+ // desktop emulation of the controllers: the camera ray through NDC (x, y) stands in for a controller ray
+ ndcRay:(x,y)=>{ndc.set(x,y);camera.updateMatrixWorld(true);raycaster.setFromCamera(ndc,camera);return [raycaster.ray.origin.clone(),raycaster.ray.direction.clone()];},
+ aimNdc:(x,y)=>{const [o,d]=xrDebug.ndcRay(x,y);deskAim=aimTarget(o,d);showAim(o,d,deskAim);return deskAim&&{...deskAim,label:X.targetLabel(deskAim,deskAim.kind==='station'&&deskAim.ok?'Capture '+(deskAim.index+1):'')};},
+ goNdc:async(x,y)=>{const [o,d]=xrDebug.ndcRay(x,y),t=aimTarget(o,d);hideAim();deskAim=null;return {target:t,moved:await goAim(t)};},
+ hoverNdc:(x,y)=>{const [o,d]=xrDebug.ndcRay(x,y),h=panelHit(o,d);setHover(mouse,h);return h?{panel:h.panel,button:h.button,id:h.panel==='menu'&&h.button>=0?menuModel().buttons[h.button].id:null}:null;},
+ menuButtonNdc:id=>{const {buttons,rects}=menuModel(),i=buttons.findIndex(b=>b.id===id);if(i<0||!menu.mesh.visible)return null;const r=rects[i];menu.mesh.updateMatrixWorld(true);camera.updateMatrixWorld(true);
+  const p=new THREE.Vector3((r.x+r.w/2-.5)*MENU_W,(.5-(r.y+r.h/2))*MENU_H,0).applyMatrix4(menu.mesh.matrixWorld).project(camera);return [p.x,p.y];},
+ snapTurn:sign=>{const before=camera.getWorldPosition(new THREE.Vector3()).toArray();snapBy(sign<0?XR_SNAP:-XR_SNAP);camera.updateMatrixWorld(true);return {before,after:camera.getWorldPosition(new THREE.Vector3()).toArray(),yaw:rig.rotation.y};},
+ lookAtScan:p=>{const c=camera.getWorldPosition(new THREE.Vector3()),d=new THREE.Vector3().fromArray(p).sub(c).normalize(),ry=rig.rotation.y;yaw=Math.atan2(-d.x,-d.z)-ry;pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();return d.toArray();},
+ setHands,
+ // cost of one element-hover raycast along the centre ray (what the flashlight hand pays per throttled cast), median of n
+ rayCostMs:(n=15)=>{const [o,d]=xrDebug.ndcRay(0,0),t=[];for(let k=0;k<n;k++){const t0=performance.now();raycaster.set(o,d);raycaster.far=P.radius+6;raycaster.intersectObjects(pickables(),false);t.push(performance.now()-t0);}t.sort((a,b)=>a-b);return +t[n>>1].toFixed(2);},
  lookAtBim:p=>{const s=new THREE.Vector3().fromArray(X.invertReg(reg,p)),c=camera.getWorldPosition(new THREE.Vector3()),d=s.sub(c).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();return d.toArray();},
  elementsNearStation:(n=5)=>{const out=[];const c=new THREE.Vector3().fromArray(stationBim);for(const st of Object.values(layerState))for(const m of st.meshes){if(!m.visible||m.userData.isLine||m.isInstancedMesh)continue;const pos=m.geometry.attributes.position;for(const r of m.userData.ranges){const v=new THREE.Vector3().fromBufferAttribute(pos,r.vertexStart);const d=v.distanceTo(c);if(d>1.5&&d<6)out.push({id:r.id,layer:m.userData.layer,point:v.toArray(),d});if(out.length>400)break;}}return out.sort((a,b)=>a.d-b.d).slice(0,n);}};
 function updateStats(){const s=$('stats');if(s.hidden)return;const i=inspection(),t=i.totals;
