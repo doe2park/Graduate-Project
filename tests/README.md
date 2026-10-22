@@ -52,6 +52,7 @@ node --test tests/scan-xr-core.test.cjs        # registration placement vs regis
 node --test tests/xr-spatial-tier.test.mjs     # needs three (THREE_MODULE, tools/node_modules/three or 'three')
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_serve_quest_https.py
 PLAYWRIGHT_MODULE=/path/to/playwright-core node tests/scan-xr-smoke.cjs   # one headless desktop run + measurements; XR_SMOKE_LAYERS=equipment,lighting for a lighter run
+IWER_BUILD=/path/to/iwer/build/iwer.min.js PLAYWRIGHT_MODULE=/path/to/playwright-core node tests/scan-xr-immersive-smoke.cjs   # Enter VR under an emulated Quest 2 (iwer@2.5.0): XR view not black, loop alive; skipped without IWER_BUILD
 ```
 The smoke starts its own `python3 -m http.server` unless `VIEWER_BASE_URL` is set, uses a meter fixture, and launches Chrome with `--use-angle=metal --ignore-gpu-blocklist` (headless WebGL is otherwise disabled on macOS). Its numbers are desktop numbers, not Quest frame rates. See `docs/QUEST_XR_OVERLAY.md`.
 

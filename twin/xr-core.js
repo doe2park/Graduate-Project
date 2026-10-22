@@ -383,7 +383,11 @@ function teleportTarget(origin, dir, {viewY, eyeHeight = 1.5, maxDistance = 8, s
   return {ok: true, point: hit, landing: [hit[0], viewY, hit[2]], nearest: near.index};
 }
 
-return {CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
+/* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
+   Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
+const API = 2;
+
+return {API, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
   chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines,
   MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,

@@ -158,6 +158,23 @@ Verified on desktop:
   Run it with:
   `PLAYWRIGHT_MODULE=<playwright or playwright-core> node tests/scan-xr-smoke.cjs`. `XR_SMOKE_LAYERS=equipment,lighting` gives a lighter run. It launches Chrome with `--use-angle=metal --ignore-gpu-blocklist`, because headless WebGL was otherwise disabled on this Mac.
 
+### Black VR view on 2026-10-22 and the immersive smoke
+
+After the MR prototype (81afd8fb) and the controls redesign (296f0951) were deployed, Enter VR on a Quest 2 showed only black. Both commits were reverted on `main`. With matching files, both revisions render the photo in an emulated immersive session. The black view is reproduced when the new page runs with the previous `twin/xr-core.js`. In that case `X.controllerRoles is not a function` is thrown in the first XR frame (`xrInput` → `roles`). three.js requests the next XR frame only after the animation callback returns, so one exception stops rendering for the whole session. GitHub Pages serves every file with `Cache-Control: max-age=600` and the helper scripts were not versioned. A browser that had loaded the previous version within 10 minutes could therefore pair the new page with the cached older core. This is the most likely cause. It has not been confirmed on the headset, because no headset log exists.
+
+Fix (branch `fix/vr-black-screen`):
+- The helpers are loaded as `twin/xr-core.js?v=2` (also `overlay-visibility.js`, `mr-align.js`).
+- `ScanXRCore.API` must equal the page's `XR_CORE_API`. On a mismatch the page hides Enter VR/MR and asks for a reload. Bump both, and the `?v=`, whenever the xr-core exports change.
+- The per-frame XR work (input, placement, MR tracking) runs in `xrFrameSafe()`. An exception there is counted (`xrInspection().xr.frameErrors`), logged once and shown in the headset, and rendering continues.
+
+`tests/scan-xr-immersive-smoke.cjs` presses Enter VR under Meta's Immersive Web Emulation Runtime (`iwer@2.5.0`, emulated Quest 2, two Touch controllers). It reads the XR framebuffer inside an XR frame and asserts the following: the view is not black, the photo sphere is visible, the page loop keeps rendering, and there are no page errors or caught frame errors. It runs these checks after entering, during an aim preview, with the menu open and with hand tracking. `XR_SMOKE_CORE_REV=<rev>` serves an older `twin/xr-core.js`, which models the stale cache. `XR_SMOKE_GIT_REV=<rev>` tests an older page. Without `IWER_BUILD` the test is skipped; set `XR_IMMERSIVE_REQUIRED=1` to make it fail instead.
+
+```sh
+npm install --prefix /tmp/iwer-tools --ignore-scripts --save-exact iwer@2.5.0
+PLAYWRIGHT_MODULE=<playwright-core> IWER_BUILD=/tmp/iwer-tools/node_modules/iwer/build/iwer.min.js node tests/scan-xr-immersive-smoke.cjs
+```
+Emulation renders into the page canvas. It has no Quest compositor, no opaque XR framebuffer and no foveation, so a passing run is not a headset test.
+
 Unverified for the 2026-10-22 controls (desktop emulation only, no headset run):
 - How the left and right roles map to `handedness` on real Touch controllers, and the stick hold/release feel. The 0.3 release threshold may need tuning against stick drift.
 - Haptic pulses on Quest Browser.

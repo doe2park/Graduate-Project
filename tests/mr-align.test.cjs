@@ -189,7 +189,7 @@ test('shader mirror: lens floor outside the cone and the overlay-visibility dist
 
 test('scan-xr.html MR wiring: immersive-ar with local-floor + optional features, transparent services-only scene, honest labels, storage via MRAlign only', () => {
   const html = read('scan-xr.html');
-  for (const s of ['twin/overlay-visibility.js', 'twin/mr-align.js']) assert.ok(html.includes(`<script src="${s}"></script>`));
+  for (const s of ['twin/overlay-visibility.js', 'twin/mr-align.js']) assert.match(html, new RegExp(`<script src="${s.replace(/\./g, '\\.')}(\\?v=\\d+)?"></script>`));
   assert.ok(html.includes("navigator.xr.requestSession('immersive-ar',{requiredFeatures:['local-floor'],optionalFeatures:['hit-test','anchors','plane-detection','mesh-detection','dom-overlay']"));
   assert.ok(html.includes("isSessionSupported('immersive-ar')") && html.includes("const MODE_AR=q.get('mode')==='ar'"));
   assert.ok(html.includes("const MR_DEFAULT_LAYERS=['fire','duct','plumbing']"));

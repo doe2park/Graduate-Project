@@ -31,7 +31,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js"></script><script src="twin/overlay-visibility.js"></script><script src="twin/mr-align.js"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=2"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=2"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -64,6 +64,9 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
 import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight,applyRadius} from './twin/xr-spatial-tier.mjs';
 const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
+/* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
+   inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
+const XR_CORE_API=2,CORE_OK=X?.API===XR_CORE_API&&!!MR&&!!OV;
 const T0=performance.now(),q=new URLSearchParams(location.search);
 const MODE_AR=q.get('mode')==='ar';   // mixed-reality passthrough mode (immersive-ar, manual alignment); default = the 360° photo VR overlay
 const MR_DEFAULT_LAYERS=['fire','duct','plumbing'];   // Quest 2 budget: fire piping, ducts, plumbing on; the rest toggle from the MR panel
@@ -579,6 +582,7 @@ function onSelect(c){const u=c.userData;rayOf(c,u.o,u.d);const o=u.o.clone(),d=u
  else status('Info card: right trigger · both-hand flashlight: menu ▸ More ▸ Flashlight');}
 function snapBy(a){camera.getWorldPosition(_head);const r=X.snapTurn(rig.position.toArray(),rig.rotation.y,_head.toArray(),a);rig.position.fromArray(r.position);rig.rotation.y=r.yaw;rig.updateMatrixWorld(true);gauss.pendingSort=true;invalidate();}
 async function detectXR(){
+ if(!CORE_OK){$('enterVR').hidden=true;$('enterMR').hidden=true;$('xrNote').textContent='Page files out of sync (an older cached twin/xr-core.js) · reload the page before entering VR';console.error('scan-xr: twin/xr-core.js API '+X?.API+', page expects '+XR_CORE_API);return false;}
  if(!navigator.xr||!isSecureContext){if(MODE_AR){$('xrNote').textContent='Desktop MR simulation · passthrough needs Quest Browser over HTTPS (immersive-ar), see docs/QUEST_XR_OVERLAY.md';return false;}$('xrNote').textContent=isSecureContext?'Desktop preview · WebXR not available in this browser':'Desktop preview · open over HTTPS in Quest Browser for VR (see docs/QUEST_XR_OVERLAY.md)';return false;}
  xrSupported=await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);xrARSupported=await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
  if(MODE_AR){$('enterVR').hidden=true;$('enterMR').hidden=!xrARSupported;$('xrNote').textContent=xrARSupported?'':'Desktop MR simulation · this browser offers no immersive-ar (passthrough) session · use Quest Browser';return xrSupported;}
@@ -804,9 +808,15 @@ async function bootMR(){
 function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycaster.far=10;const h=raycaster.intersectObject(mrPanel.mesh,false)[0];if(h){const b=MR.gridHit(MR.PANEL,h.uv.x,h.uv.y);if(b>=0)mrButton(b);return {menu:b};}}
  return mr.T?pickAlong(o,d):null;}
 /* ── Loop ── */
+/* XR per-frame work (input, placement, MR tracking) is guarded: three.js requests the next XR frame only after this callback returns,
+   so one uncaught exception would stop rendering for the rest of the session (Quest shows black). Errors are counted, logged once
+   per message and shown in the headset; the photo and services keep rendering. */
+let xrFrameErrors=0,lastXrFrameError=null;
+function xrFrameSafe(){try{if(MODE_AR)mrFrame();else{if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}}
+ catch(e){xrFrameErrors++;const m=String(e?.message||e);if(m!==lastXrFrameError){lastXrFrameError=m;console.error('XR frame error (rendering continues):',e);try{status('XR controls error · '+m);}catch(_){}}}}
 renderer.setAnimationLoop((t)=>{
  const xr=renderer.xr.isPresenting;
- if(xr){if(MODE_AR)mrFrame();else{if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}}
+ if(xr)xrFrameSafe();
  else if(!pointerInside&&!drag)coneFromViewIfIdle();
  const anim=stepFade(performance.now()),splat=gaussBusy();
  if(!xr&&!needsRender&&!anim&&!splat)return;needsRender=false;
@@ -823,10 +833,10 @@ function inspection(){const heap=performance.memory?Math.round(performance.memor
  return {ready:active>=0&&!gauss.loading,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},availableCaptures,station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
   style:state.mode,opacity:state.opacity[state.mode],coneDeg:state.coneDeg,radius:P.radius,levels:[...P.levels],hiRes:state.hiRes,texture:sphereMat.map?.image?{width:sphereMat.map.image.width,height:sphereMat.map.image.height}:null,
   layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{loaded:s.loaded,loading:s.loading,error:s.error||null,visible:s.group.visible,loadMs:s.loadMs??null,...s.stats,visibleBatches:s.meshes.filter(m=>m.visible).length}])),
-  totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation},
+  totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation,coreInSync:CORE_OK,coreApi:X?.API??null,frameErrors:xrFrameErrors,lastFrameError:lastXrFrameError},
   card:picked?{id:picked.id,layer:picked.layer,tier:picked.tier,lines:picked.lines}:null,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()},rig:{position:rig.position.toArray(),yaw:rig.rotation.y},camera:{world:camera.getWorldPosition(new THREE.Vector3()).toArray()},
   viewPos:viewPos.slice(),photoSphereVisible:sphere.visible,mode:MODE_AR?'ar':'vr',mr:MODE_AR?mrInspection():null,
-  menu:{open:state.menu,page:state.page,buttons:menuModel().buttons.map(b=>b.id),hover:[...menuHover],distance:state.menu?menu.mesh.getWorldPosition(new THREE.Vector3()).distanceTo(camera.getWorldPosition(new THREE.Vector3())):null},
+  menu:{open:state.menu,page:state.page,buttons:CORE_OK?menuModel().buttons.map(b=>b.id):null,hover:[...menuHover],distance:state.menu?menu.mesh.getWorldPosition(new THREE.Vector3()).distanceTo(camera.getWorldPosition(new THREE.Vector3())):null},
   controls:{hands:state.hands,lensOpacity:state.opacity.lens,allOpacity:state.opacity.all,cone2:U.cone2On.value,roles:curRoles,hoverElements:HOVER_ELEMENTS,hoverCastMs:+hoverCost.ms.toFixed(2),hoverIntervalMs:Math.round(hoverCost.interval)},
   aim:deskAim?{ok:deskAim.ok,kind:deskAim.kind,index:deskAim.index??null,method:deskAim.method??null,reason:deskAim.reason??null}:null,
   scene:{mode:gauss.scene,available:!!gaussianSource(),manifest:gauss.source?.path??null,local:!!gauss.source?.local,label:gauss.label||null,file:gauss.asset?.file??null,mobile:gauss.asset?.mobile??null,shDegree:gauss.asset?.shDegree??null,

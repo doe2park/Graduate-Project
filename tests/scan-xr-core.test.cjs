@@ -256,7 +256,11 @@ test('info card keeps the ElementCards honesty ladder (CONTEXT is a building met
 
 test('scan-xr.html wiring: shared scripts, pinned three, overlay layer set, no edits to the source pages', () => {
   const html = read('scan-xr.html');
-  for (const s of ['registration-core.js', 'twin/element-cards.js', 'twin/xr-core.js']) assert.ok(html.includes(`<script src="${s}"></script>`));
+  for (const s of ['registration-core.js', 'twin/element-cards.js', 'twin/xr-core.js']) assert.match(html, new RegExp(`<script src="${s.replace(/\./g, '\\.')}(\\?v=\\d+)?"></script>`));
+  // stale-cache guard (2026-10-22 black VR view): the page loads the core with ?v=<API> and checks the same API number
+  assert.ok(html.includes(`<script src="twin/xr-core.js?v=${X.API}"></script>`), 'xr-core.js is versioned with its API');
+  assert.ok(html.includes(`XR_CORE_API=${X.API},`), 'page expects the current xr-core API');
+  assert.match(html, /if\(xr\)xrFrameSafe\(\);/, 'XR per-frame work runs guarded (an exception must not stop the XR loop)');
   assert.ok(html.includes('three@0.169.0/build/three.module.js') && !/three@0\.1[^6]/.test(html));
   const bim = read('scan-bim.html'), keys = bim.match(/const OVERLAY_LAYER_KEYS=(\[[^\]]*\])/)[1];
   assert.ok(html.includes('const OVERLAY_LAYER_KEYS=' + keys), 'same service layers as the web overlay');
