@@ -3085,6 +3085,23 @@ document.getElementById('scanObjects').onclick=async()=>{
 let mobileSearchTimer;document.getElementById('mobileElementSearch').oninput=()=>{clearTimeout(mobileSearchTimer);mobileSearchTimer=setTimeout(renderMobileElements,100);};
 document.getElementById('mobileElementClose').onclick=()=>{document.getElementById('mobileElementBrowser').hidden=true;};
 
+/* SENSOR DEMO (opt-in ?sensors=demo from scan-compare, BIM pane only; twin/sensor-demo.js). Illustrative sensors anchored
+   to real element ids: a render-only gradient copy for DTS plus projected anchors posted to the parent after each render.
+   Without the parameter nothing here loads or runs. */
+let sensorDemo=null;
+if(splitPane==='bim'&&new URLSearchParams(location.search).get('sensors')==='demo'){
+ const sdRay=new THREE.Ray(),sdEye=new THREE.Vector3(),sdP=new THREE.Vector3();
+ const sdScript=document.createElement('script');sdScript.src='twin/sensor-demo.js?v=1';
+ sdScript.onload=()=>{sensorDemo=window.SensorDemo.mountBim({THREE,scene,camera,getLayer:k=>layerState[k],elementInfo,kick:()=>_kick(),post:m=>window.parent.postMessage(m,location.origin),
+  /* Overlay Range fade x wall occlusion at the anchor (same rules as the element fragments); 1 outside Overlay */
+  visibility:p=>{if(!overlayOn)return 1;camera.getWorldPosition(sdEye);sdP.set(p[0],p[1],p[2]);const d=sdEye.distanceTo(sdP);if(!(d>1e-6))return 1;
+   let v=OV.rangeFade(d,ovPreset);sdRay.origin.copy(sdEye);sdRay.direction.copy(sdP).sub(sdEye).normalize();if(!(ovWallDistance(sdRay)<d-.15))return v;
+   /* behind a counted wall: dimmed, except inside the Lens, which relaxes wall occlusion for the elements too */
+   if(ovLensCss.on){sdP.project(camera);const c=renderer.domElement,x=(sdP.x+1)/2*c.clientWidth,y=(1-sdP.y)/2*c.clientHeight;if(Math.hypot(x-ovLensCss.x,y-ovLensCss.y)<=ovLensCss.r)return v;}
+   return v*.35;}});
+  window.sensorDemoInspection=()=>sensorDemo.inspection();};
+ document.head.appendChild(sdScript);
+}
 let _lastT = 0, _lastWalkRender = -Infinity;
 // Draw only when something can have changed: the camera/viewport moved, an input or parent message arrived,
 // or as a slow heartbeat (async layer loads, highlights). An idle page no longer redraws every frame.
@@ -3122,6 +3139,7 @@ renderer.setAnimationLoop((t) => {
         if (typeof ovBeforeRender === 'function') ovBeforeRender();   // Overlay distance culling + wall-depth pre-pass (no-op outside Overlay)
         renderer.render(scene, camera);
       } finally { if (typeof ovAfterRender === 'function') ovAfterRender(); }   // swap culled batches back to their full data
+      if (typeof sensorDemo !== 'undefined' && sensorDemo) sensorDemo.frame();   // ?sensors=demo only: post projected demo-sensor anchors
       _lastDraw = t;
     }
     _lastWalkRender = t;

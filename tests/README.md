@@ -54,3 +54,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_serve_quest_https.py
 PLAYWRIGHT_MODULE=/path/to/playwright-core node tests/scan-xr-smoke.cjs   # one headless desktop run + measurements; XR_SMOKE_LAYERS=equipment,lighting for a lighter run
 ```
 The smoke starts its own `python3 -m http.server` unless `VIEWER_BASE_URL` is set, uses a meter fixture, and launches Chrome with `--use-angle=metal --ignore-gpu-blocklist` (headless WebGL is otherwise disabled on macOS). Its numbers are desktop numbers, not Quest frame rates. See `docs/QUEST_XR_OVERLAY.md`.
+
+## Demo sensor layer (illustrative, opt-in)
+
+`node --test tests/sensor-demo.test.cjs` checks `twin/sensor-demo.json` (status `illustrative-not-installed`; every anchor is a real sidecar element with the same name and `source_guid`), the pure helpers in `twin/sensor-demo.js` and that `scan-compare.html` / `scan-bim.html` load the layer only behind `?sensors=demo`. `THREE_MODULE=/path/to/three/build/three.module.js node --test tests/sensor-demo-bim.test.mjs` runs the BIM-pane half on real three@0.169.0 objects (identity gate, DTS gradient copy from exactly the element's triangles, source batch byte-identical, projected anchors). No sensor is installed; every reading in the JSON is made up for a concept presentation.
