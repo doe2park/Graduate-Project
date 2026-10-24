@@ -29,46 +29,49 @@ TIMEZONE = "US/Pacific"
 CO2_PER_KWH = 0.21
 COST_PER_KWH = 0.15
 
+# MACs audited 2026-10-23 against BMO "AcquiSuite Inventory": each entry must be the
+# logger BMO lists under that building's name (prefer the "... New (as of ...)" logger
+# when an old one stopped uploading). Grimes is listed in BMO as "Bechtel Center".
+# Meter IDs on re-mapped loggers are still the 3/76/77 template; verify with
+# scripts/discover_channels.py. Tolman (demolished, logger silent since 2018) and the
+# Cory legacy logger (silent since 2012) were dropped.
 BUILDINGS = [
     {"id":"grimes","name":"Grimes Engineering Center","mac":"001EC6000C5A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"cory","name":"Cory Hall","mac":"001EC6001885","db":"dbU216ucberkelF682","meters":["1","2","3","4","5","6","48","53","58"]},
-    {"id":"cory","name":"Cory Hall (Legacy)","mac":"444D50E07076","db":"dbU216ucberkelF682","meters":["48","53","58","63"]},
     {"id":"soda","name":"Soda Hall","mac":"001EC600187F","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"davis","name":"Davis Hall","mac":"001EC6000C58","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"etch","name":"Etcheverry Hall","mac":"001EC600077E","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"davis","name":"Davis Hall","mac":"001EC6000CD2","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"etch","name":"Etcheverry Hall","mac":"001EC600077A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"hmm","name":"Hearst Memorial Mining","mac":"001EC6000450","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"hesse","name":"Hesse & O'Brien Hall","mac":"001EC600077D","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"sutardja","name":"Sutardja Dai Hall","mac":"444D50E019ED","db":"dbU216ucberkelF682","meters":["76","29","30","97"]},
-    {"id":"mclaughlin","name":"McLaughlin Hall","mac":"001EC6000495","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    # "stanley" removed 2026-07: its MAC (001EC6000C5A) duplicated Grimes — readings were
-    # actually Grimes meter #3. Re-add only after confirming Stanley's real AcquiSuite MAC.
-    {"id":"tan","name":"Tan Hall","mac":"0050C230ED00","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"hesse","name":"Hesse & O'Brien Hall","mac":"001EC6001CE7","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"sutardja","name":"Sutardja Dai Hall","mac":"001EC6001B32","db":"dbU216ucberkelF682","meters":["76","29","30","97"]},
+    {"id":"mclaughlin","name":"McLaughlin Hall","mac":"001EC6001C79","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"stanley","name":"Stanley Hall","mac":"001EC600009A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"tan","name":"Tan Hall","mac":"001EC6001473","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"latimer","name":"Latimer & Pimentel Hall","mac":"0050C230ECE6","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"birge","name":"Birge Hall","mac":"001EC6001C55","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"hilde","name":"Hildebrand Hall","mac":"001EC6000764","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"birge","name":"Birge Hall","mac":"001EC6000777","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"hilde","name":"Hildebrand Hall","mac":"001EC600077D","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"lksc","name":"Li Ka Shing","mac":"001EC6000C83","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"koshland","name":"Koshland Hall","mac":"001EC6000C2F","db":"dbU216ucberkelF682","meters":["1","2","3","91","92","93","94"]},
+    {"id":"koshland","name":"Koshland Hall","mac":"001EC6002AFC","db":"dbU216ucberkelF682","meters":["1","2","3","91","92","93","94"]},
     {"id":"wheeler","name":"Wheeler Hall","mac":"001EC6000C8C","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"dwinelle","name":"Dwinelle Hall","mac":"001EC600045C","db":"dbU216ucberkelF682","meters":["1","2","3","76","77","53","59"]},
     {"id":"barrows","name":"Barrows Hall","mac":"001EC600063F","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"moses","name":"Moses Hall","mac":"001EC6001C7A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"moses","name":"Moses Hall","mac":"001EC6001BC1","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"stephens","name":"Stephens Hall","mac":"001EC6000CB6","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"wurster","name":"Wurster Hall","mac":"001EC6000B5F","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"giannini","name":"Giannini Hall","mac":"001EC6000CCA","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"tolman","name":"Tolman Hall","mac":"001EC6000CA3","db":"dbU216ucberkelF682","meters":["76"]},
-    {"id":"morgan","name":"Morgan Hall","mac":"001EC6001BC1","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"boalt","name":"Boalt Hall","mac":"001EC6000793","db":"dbU216ucberkelF682","meters":["76","77"]},
-    {"id":"mlk","name":"MLK Student Union","mac":"001EC6000481","db":"dbU216ucberkelF682","meters":["1"]},
+    {"id":"morgan","name":"Morgan Hall","mac":"001EC6000C90","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"boalt","name":"Law Building (Boalt & Simon)","mac":"001EC6002AA3","db":"dbU216ucberkelF682","meters":["76","77"]},
+    {"id":"mlk","name":"ML King, Eshleman & 2401 Bancroft","mac":"001EC600222C","db":"dbU216ucberkelF682","meters":["1"]},
     {"id":"rsf","name":"Rec Sports Facility","mac":"001EC6000CA0","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"chavez","name":"Chavez Center","mac":"001EC6000BB9","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"anthony","name":"Anthony Hall","mac":"001EC6000C9A","db":"dbU216ucberkelF682","meters":["76"]},
+    {"id":"anthony","name":"Anthony Hall","mac":"001EC6001BBF","db":"dbU216ucberkelF682","meters":["76"]},
     {"id":"sproul","name":"Sproul Hall","mac":"001EC6000CAE","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"doe","name":"Doe Library","mac":"001EC6000C54","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"moffitt","name":"Moffitt Library","mac":"001EC6000C90","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"moffitt","name":"Moffitt Library","mac":"001EC6001C7B","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"uhall","name":"University Hall","mac":"001EC6002D3C","db":"dbU216ucberkelF682","meters":["76"]},
     {"id":"northgate","name":"North Gate Hall","mac":"001EC6070132","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"donner","name":"Donner Laboratory","mac":"001EC6000C24","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"bww","name":"Berkeley Way West","mac":"001EC6000777","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"bww","name":"Berkeley Way West","mac":"001EC600282B","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"mulford","name":"Mulford Hall","mac":"001EC6000CB2","db":"dbU216ucberkelF682","meters":["3","76","77"]},
 ]
 
