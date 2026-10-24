@@ -32,23 +32,24 @@ COST_PER_KWH = 0.15
 # MACs audited 2026-10-23 against BMO "AcquiSuite Inventory": each entry must be the
 # logger BMO lists under that building's name (prefer the "... New (as of ...)" logger
 # when an old one stopped uploading). Grimes is listed in BMO as "Bechtel Center".
-# Meter IDs on re-mapped loggers are still the 3/76/77 template; verify with
-# scripts/discover_channels.py. Tolman (demolished, logger silent since 2018) and the
+# Meter IDs for cory/davis/stanley/tan/birge/anthony come from the 2026-10-24
+# discover_channels.py report (meters exposing a kW column, device 250 excluded);
+# other re-mapped loggers still use the 3/76/77 template. Tolman (demolished, logger silent since 2018) and the
 # Cory legacy logger (silent since 2012) were dropped.
 BUILDINGS = [
     {"id":"grimes","name":"Grimes Engineering Center","mac":"001EC6000C5A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"cory","name":"Cory Hall","mac":"001EC6001885","db":"dbU216ucberkelF682","meters":["1","2","3","4","5","6","48","53","58"]},
+    {"id":"cory","name":"Cory Hall","mac":"001EC6001885","db":"dbU216ucberkelF682","meters":["29","58","63"]},
     {"id":"soda","name":"Soda Hall","mac":"001EC600187F","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"davis","name":"Davis Hall","mac":"001EC6000CD2","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"davis","name":"Davis Hall","mac":"001EC6000CD2","db":"dbU216ucberkelF682","meters":["1","2"]},
     {"id":"etch","name":"Etcheverry Hall","mac":"001EC600077A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"hmm","name":"Hearst Memorial Mining","mac":"001EC6000450","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"hesse","name":"Hesse & O'Brien Hall","mac":"001EC6001CE7","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"sutardja","name":"Sutardja Dai Hall","mac":"001EC6001B32","db":"dbU216ucberkelF682","meters":["76","29","30","97"]},
     {"id":"mclaughlin","name":"McLaughlin Hall","mac":"001EC6001C79","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"stanley","name":"Stanley Hall","mac":"001EC600009A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"tan","name":"Tan Hall","mac":"001EC6001473","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"stanley","name":"Stanley Hall","mac":"001EC600009A","db":"dbU216ucberkelF682","meters":["48","63","76"]},
+    {"id":"tan","name":"Tan Hall","mac":"001EC6001473","db":"dbU216ucberkelF682","meters":["29","30"]},
     {"id":"latimer","name":"Latimer & Pimentel Hall","mac":"0050C230ECE6","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"birge","name":"Birge Hall","mac":"001EC6000777","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"birge","name":"Birge Hall","mac":"001EC6000777","db":"dbU216ucberkelF682","meters":["29","30","76"]},
     {"id":"hilde","name":"Hildebrand Hall","mac":"001EC600077D","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"lksc","name":"Li Ka Shing","mac":"001EC6000C83","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"koshland","name":"Koshland Hall","mac":"001EC6002AFC","db":"dbU216ucberkelF682","meters":["1","2","3","91","92","93","94"]},
@@ -64,7 +65,7 @@ BUILDINGS = [
     {"id":"mlk","name":"ML King, Eshleman & 2401 Bancroft","mac":"001EC600222C","db":"dbU216ucberkelF682","meters":["1"]},
     {"id":"rsf","name":"Rec Sports Facility","mac":"001EC6000CA0","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"chavez","name":"Chavez Center","mac":"001EC6000BB9","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"anthony","name":"Anthony Hall","mac":"001EC6001BBF","db":"dbU216ucberkelF682","meters":["76"]},
+    {"id":"anthony","name":"Anthony Hall","mac":"001EC6001BBF","db":"dbU216ucberkelF682","meters":["1","30"]},
     {"id":"sproul","name":"Sproul Hall","mac":"001EC6000CAE","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"doe","name":"Doe Library","mac":"001EC6000C54","db":"dbU216ucberkelF682","meters":["3","76","77"]},
     {"id":"moffitt","name":"Moffitt Library","mac":"001EC6001C7B","db":"dbU216ucberkelF682","meters":["3","76","77"]},
