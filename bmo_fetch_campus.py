@@ -29,51 +29,109 @@ TIMEZONE = "US/Pacific"
 CO2_PER_KWH = 0.21
 COST_PER_KWH = 0.15
 
-# MACs audited 2026-10-23 against BMO "AcquiSuite Inventory": each entry must be the
-# logger BMO lists under that building's name (prefer the "... New (as of ...)" logger
-# when an old one stopped uploading). Grimes is listed in BMO as "Bechtel Center".
-# Meter IDs for cory/davis/stanley/tan/birge/anthony come from the 2026-10-24
-# discover_channels.py report (meters exposing a kW column, device 250 excluded);
-# other re-mapped loggers still use the 3/76/77 template. Tolman (demolished, logger silent since 2018) and the
-# Cory legacy logger (silent since 2012) were dropped.
+# Audited 2026-10-23/24 against the BMO "UC Berkeley" AcquiSuite inventory and each
+# logger's device list. Each entry uses the logger BMO lists under that building's
+# name and only meters BMO names as building mains ("basis"). "pulse" lists exact
+# device-#250 demand columns summed into the building total. Not included: off-core
+# street-address properties, campus feeder loggers (2232 Piedmont), water-only
+# loggers, retired/stale loggers, and loggers whose main meter is ambiguous
+# (McCone, SRB1/Oxford Tract, Edwards Stadium) — see docs/CAMPUS_METER_AUDIT.md.
 BUILDINGS = [
-    {"id":"grimes","name":"Grimes Engineering Center","mac":"001EC6000C5A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"cory","name":"Cory Hall","mac":"001EC6001885","db":"dbU216ucberkelF682","meters":["29","58","63"]},
-    {"id":"soda","name":"Soda Hall","mac":"001EC600187F","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"davis","name":"Davis Hall","mac":"001EC6000CD2","db":"dbU216ucberkelF682","meters":["1","2"]},
-    {"id":"etch","name":"Etcheverry Hall","mac":"001EC600077A","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"hmm","name":"Hearst Memorial Mining","mac":"001EC6000450","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"hesse","name":"Hesse & O'Brien Hall","mac":"001EC6001CE7","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"sutardja","name":"Sutardja Dai Hall","mac":"001EC6001B32","db":"dbU216ucberkelF682","meters":["76","29","30","97"]},
-    {"id":"mclaughlin","name":"McLaughlin Hall","mac":"001EC6001C79","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"stanley","name":"Stanley Hall","mac":"001EC600009A","db":"dbU216ucberkelF682","meters":["48","63","76"]},
-    {"id":"tan","name":"Tan Hall","mac":"001EC6001473","db":"dbU216ucberkelF682","meters":["29","30"]},
-    {"id":"latimer","name":"Latimer & Pimentel Hall","mac":"0050C230ECE6","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"birge","name":"Birge Hall","mac":"001EC6000777","db":"dbU216ucberkelF682","meters":["29","30","76"]},
-    {"id":"hilde","name":"Hildebrand Hall","mac":"001EC600077D","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"lksc","name":"Li Ka Shing","mac":"001EC6000C83","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"koshland","name":"Koshland Hall","mac":"001EC6002AFC","db":"dbU216ucberkelF682","meters":["1","2","3","91","92","93","94"]},
-    {"id":"wheeler","name":"Wheeler Hall","mac":"001EC6000C8C","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"dwinelle","name":"Dwinelle Hall","mac":"001EC600045C","db":"dbU216ucberkelF682","meters":["1","2","3","76","77","53","59"]},
-    {"id":"barrows","name":"Barrows Hall","mac":"001EC600063F","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"moses","name":"Moses Hall","mac":"001EC6001BC1","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"stephens","name":"Stephens Hall","mac":"001EC6000CB6","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"wurster","name":"Wurster Hall","mac":"001EC6000B5F","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"giannini","name":"Giannini Hall","mac":"001EC6000CCA","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"morgan","name":"Morgan Hall","mac":"001EC6000C90","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"boalt","name":"Law Building (Boalt & Simon)","mac":"001EC6002AA3","db":"dbU216ucberkelF682","meters":["76","77"]},
-    {"id":"mlk","name":"ML King, Eshleman & 2401 Bancroft","mac":"001EC600222C","db":"dbU216ucberkelF682","meters":["1"]},
-    {"id":"rsf","name":"Rec Sports Facility","mac":"001EC6000CA0","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"chavez","name":"Chavez Center","mac":"001EC6000BB9","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"anthony","name":"Anthony Hall","mac":"001EC6001BBF","db":"dbU216ucberkelF682","meters":["1","30"]},
-    {"id":"sproul","name":"Sproul Hall","mac":"001EC6000CAE","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"doe","name":"Doe Library","mac":"001EC6000C54","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"moffitt","name":"Moffitt Library","mac":"001EC6001C7B","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"uhall","name":"University Hall","mac":"001EC6002D3C","db":"dbU216ucberkelF682","meters":["76"]},
-    {"id":"northgate","name":"North Gate Hall","mac":"001EC6070132","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"donner","name":"Donner Laboratory","mac":"001EC6000C24","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"bww","name":"Berkeley Way West","mac":"001EC600282B","db":"dbU216ucberkelF682","meters":["3","76","77"]},
-    {"id":"mulford","name":"Mulford Hall","mac":"001EC6000CB2","db":"dbU216ucberkelF682","meters":["3","76","77"]},
+    {"id":"grimes","name":"Grimes Engineering Center","mac":"001EC6000C5A","db":"dbU216ucberkelF682","meters":["3","76","77"],"basis":"BMO 'Bechtel Center': #3 Roof, #76 480/277 V, #77 208/120 V","note":"Roof meter #3 may be a submeter of #76; unverified"},
+    {"id":"cory","name":"Cory Hall","mac":"001EC6001885","db":"dbU216ucberkelF682","meters":[],"basis":"","note":"No whole-building electric meter identified in BMO (only panel submeters)"},
+    {"id":"soda","name":"Soda Hall","mac":"001EC600187F","db":"dbU216ucberkelF682","meters":[],"basis":"Device #250 Electric Main #1 and #2 shown separately","note":"Two main channels not summed until overlap is confirmed"},
+    {"id":"davis","name":"Davis Hall","mac":"001EC6000CD2","db":"dbU216ucberkelF682","meters":["1","2"],"basis":"#1 Main 480 V + #2 Main 208/120 V"},
+    {"id":"etch","name":"Etcheverry Hall","mac":"001EC600077A","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 480 V + #77 208 V main breakers"},
+    {"id":"hmm","name":"Hearst Mining Building","mac":"001EC6000450","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 277/480 V + #77 120/208 V"},
+    {"id":"hesse","name":"Hesse & O'Brien Hall","mac":"001EC6001CE7","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 Hesse main + #77 O'Brien main"},
+    {"id":"sutardja","name":"Sutardja Dai Hall","mac":"001EC6001B32","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 MSA + #77 MSB"},
+    {"id":"mclaughlin","name":"McLaughlin Hall","mac":"001EC6001C79","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"stanley","name":"Stanley Hall","mac":"001EC600009A","db":"dbU216ucberkelF682","meters":[],"pulse":["Main # 1 Demand (kW)","Main # 2 Demand (kW)","Main # 3 Demand (kW)","Main # 4 Demand (kW)"],"basis":"Device #250 Main #1-#4 demand"},
+    {"id":"tan","name":"Tan Hall","mac":"001EC6001473","db":"dbU216ucberkelF682","meters":["29","30"],"basis":"#29 208/120 V + #30 480/277 V"},
+    {"id":"latimer","name":"Latimer & Pimentel Hall","mac":"0050C230ECE6","db":"dbU216ucberkelF682","meters":["26","27","77"],"basis":"#26 480 V + #27 208 V + #77 Pimentel main"},
+    {"id":"birge","name":"Birge Hall","mac":"001EC6000777","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"hilde","name":"Hildebrand Hall","mac":"001EC600077D","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 480 V + #77 208 V"},
+    {"id":"lksc","name":"Li Ka Shing Center","mac":"001EC6000C83","db":"dbU216ucberkelF682","meters":[],"pulse":["Electric MB01 Demand (kW)","Electric MB02 Demand (kW)"],"basis":"Device #250 MB01 + MB02 demand"},
+    {"id":"koshland","name":"Koshland Hall","mac":"001EC6002AFC","db":"dbU216ucberkelF682","meters":["91","92","93","94"],"basis":"#91-#94 480 V / 120 V switchboards"},
+    {"id":"wheeler","name":"Wheeler Hall","mac":"001EC6000C8C","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"dwinelle","name":"Dwinelle Hall","mac":"001EC600045C","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 Office + #77 Classroom"},
+    {"id":"barrows","name":"Barrows Hall","mac":"001EC600063F","db":"dbU216ucberkelF682","meters":[],"pulse":["BARROWS MAIN ELECTRIC Demand (kW)"],"basis":"Device #250 Barrows main electric demand"},
+    {"id":"moses","name":"Moses Hall","mac":"001EC6001BC1","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"stephens","name":"Stephens Hall","mac":"001EC6000CB6","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"wurster","name":"Wurster Hall","mac":"001EC6000B5F","db":"dbU216ucberkelF682","meters":[],"pulse":["Wurster Main Electric Demand (kW)"],"basis":"Device #250 Wurster main electric demand"},
+    {"id":"giannini","name":"Giannini Hall","mac":"001EC6000CCA","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"morgan","name":"Morgan Hall","mac":"001EC6000C90","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"boalt","name":"Law Building (Boalt & Simon)","mac":"001EC6002AA3","db":"dbU216ucberkelF682","meters":["76","77"],"pulse":["West Elec Meter Demand (kW)"],"basis":"#76 East 480 V + #77 East 208 V + #250 West"},
+    {"id":"mlk","name":"ML King, Eshleman & 2401 Bancroft","mac":"001EC600222C","db":"dbU216ucberkelF682","meters":["1","7","8"],"basis":"#1 Eshleman main + #7 2401 Bancroft main + #8 ML King main"},
+    {"id":"rsf","name":"Rec Sports Facility","mac":"001EC6000CA0","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 RSF main 480/277 V"},
+    {"id":"chavez","name":"Chavez Center","mac":"001EC6000BB9","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 Main 1 (480) + #77 Main 2 (208)"},
+    {"id":"anthony","name":"Anthony Hall","mac":"001EC6001BBF","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main"},
+    {"id":"sproul","name":"Sproul Hall","mac":"001EC6000CAE","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"doe","name":"Doe Library","mac":"001EC6000C54","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 Main 2 (480/277) + #77 Main 1 (208/120)"},
+    {"id":"moffitt","name":"Moffitt Library","mac":"001EC6001C7B","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main","note":"Main meter in Alarm status in BMO"},
+    {"id":"uhall","name":"University Hall","mac":"001EC6002D3C","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main","note":"Logger has not uploaded since Oct 27 2023"},
+    {"id":"northgate","name":"North Gate Hall","mac":"001EC6070132","db":"dbU216ucberkelF682","meters":[],"pulse":["Power Average, total all phases (kW)"],"basis":"Device #250 main electric (total all phases)"},
+    {"id":"donner","name":"Donner Laboratory","mac":"001EC6000C24","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"bww","name":"Berkeley Way West","mac":"001EC600282B","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"mulford","name":"Mulford Hall","mac":"001EC6000CB2","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    # Added 2026-10-24: every other active campus logger in BMO with an identifiable main meter.
+    {"id":"bampfa","name":"BAMPFA","mac":"001EC6002164","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main"},
+    {"id":"barker","name":"Barker Hall","mac":"0050C230ECED","db":"dbU216ucberkelF682","meters":["185"],"basis":"#185 Electric meter"},
+    {"id":"blum","name":"Blum Hall","mac":"001EC6001C55","db":"dbU216ucberkelF682","meters":["11"],"basis":"#11 Main"},
+    {"id":"botanical","name":"UC Botanical Garden","mac":"001EC6001E01","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"stadium","name":"California Memorial Stadium","mac":"001EC6001CF4","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 IQ1 + #77 IQ2"},
+    {"id":"california","name":"California Hall","mac":"001EC6000775","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"calvin","name":"Calvin Laboratory","mac":"001EC6001D07","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"campbell","name":"Campbell Hall","mac":"001EC600219A","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"chou","name":"Chou Hall","mac":"001EC6002693","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main (solar PV excluded)"},
+    {"id":"doeannex","name":"Doe Annex","mac":"001EC6000C58","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"durant","name":"Durant Hall","mac":"001EC6001DE7","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"eal","name":"East Asian Library","mac":"001EC6000CD7","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"ebb","name":"Energy Biosciences Building","mac":"001EC60014D0","db":"dbU216ucberkelF682","meters":[],"pulse":["Main Electric Meter 1 Demand (kW)","Main Electric Meter 2 Demand (kW)"],"basis":"Device #250 Main 1 + Main 2 demand (submeters excluded)"},
+    {"id":"bakar","name":"Bakar BioEnginuity Hub","mac":"001EC6001DD7","db":"dbU216ucberkelF682","meters":[],"pulse":["Main Electric New Demand (kW)"],"basis":"Device #250 Main Electric (new) demand"},
+    {"id":"evans","name":"Evans Hall","mac":"001EC600077E","db":"dbU216ucberkelF682","meters":["76","77","106","153"],"basis":"#76, #77 switchgear + #106, #153 Federal Pacific switches","note":"Sum of four switchgear meters; coverage unverified"},
+    {"id":"gardner","name":"Gardner Stacks","mac":"001EC6000B62","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"giauque","name":"Giauque Hall","mac":"001EC6001C7D","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"gilman","name":"Gilman Hall","mac":"001EC6000C57","db":"dbU216ucberkelF682","meters":["76","78"],"basis":"#76 480 V main + #78 208 V main (lighting submeter excluded)"},
+    {"id":"greek","name":"Greek Theatre","mac":"001EC6001CC0","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"haasclub","name":"Haas Clubhouse","mac":"001EC6001C97","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main"},
+    {"id":"haaspav","name":"Haas Pavilion","mac":"001EC6000C30","db":"dbU216ucberkelF682","meters":["78"],"basis":"#78 Main"},
+    {"id":"haas","name":"Haas School of Business","mac":"001EC6000099","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 East main + #77 West main"},
+    {"id":"hargrove","name":"Hargrove Music Library","mac":"001EC6000C8D","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"haviland","name":"Haviland Hall","mac":"001EC6000CC0","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main (new)"},
+    {"id":"hazmat","name":"Hazardous Material Facility","mac":"001EC60701BB","db":"dbU216ucberkelF682","meters":[],"pulse":["Power Average, total all phases (kW)"],"basis":"Device #250 main electric (total all phases)"},
+    {"id":"hfa","name":"Hearst Field Annex","mac":"001EC6001CEC","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"hearstgym","name":"Hearst Gym","mac":"001EC6000CCD","db":"dbU216ucberkelF682","meters":["77"],"basis":"#77 Main (new Jan 2015)"},
+    {"id":"hertz","name":"Hertz & Morrison Halls","mac":"001EC6001DE3","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 Hertz main + #77 Morrison main"},
+    {"id":"hilgard","name":"Hilgard Hall","mac":"001EC6000764","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"hudson","name":"Hudson Rugby Field House","mac":"001EC6001E46","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main"},
+    {"id":"jacobs","name":"Jacobs Hall","mac":"001EC6002308","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main (PV excluded)"},
+    {"id":"kroeber","name":"Kroeber Hall","mac":"001EC6000779","db":"dbU216ucberkelF682","meters":["2"],"basis":"#2 Main"},
+    {"id":"lawinfill","name":"Law Building In-fill","mac":"001EC6001C05","db":"dbU216ucberkelF682","meters":["78"],"basis":"#78 Main"},
+    {"id":"lhs","name":"Lawrence Hall of Science","mac":"001EC6000C8E","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"leconteannex","name":"Le Conte Annex","mac":"001EC6000C35","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"leconte","name":"Le Conte Hall","mac":"001EC6000459","db":"dbU216ucberkelF682","meters":["116","117"],"basis":"#116 MSB-1 (208/120) + #117 MSB-2 (480/277)"},
+    {"id":"legends","name":"Legends Aquatic Center","mac":"001EC600254B","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Power meter"},
+    {"id":"lewis","name":"Lewis Hall","mac":"001EC6000CCF","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 500 kVA transformer meter"},
+    {"id":"lowerhearst","name":"Lower Hearst Parking Structure","mac":"001EC6001DE1","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main"},
+    {"id":"lsa","name":"Life Sciences Addition","mac":"001EC6000778","db":"dbU216ucberkelF682","meters":["11","12"],"basis":"#11 MSB-2 South + #12 MSB-1 North"},
+    {"id":"maxwell","name":"Maxwell Field & Garage","mac":"001EC6001CF6","db":"dbU216ucberkelF682","meters":["1","2"],"basis":"#1 Garage main + #2 Field main"},
+    {"id":"mensclub","name":"Men's Faculty Club","mac":"001EC600173A","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main"},
+    {"id":"minoradd","name":"Minor Addition","mac":"001EC6000495","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 480 V main + #77 208 V main"},
+    {"id":"minor","name":"Minor Hall","mac":"001EC60701C1","db":"dbU216ucberkelF682","meters":["76"],"pulse":["Power Average, total all phases (kW)"],"basis":"#76 Main #1 + #250 Main #2"},
+    {"id":"msri","name":"MSRI (SLMath)","mac":"001EC6001C7A","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"nwaf","name":"Northwest Animal Facility","mac":"001EC6000B5E","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"parkingb","name":"Bancroft Parking Structure","mac":"001EC6001DE0","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Bancroft Parking Structure"},
+    {"id":"silveradd","name":"Silver Addition","mac":"001EC6001834","db":"dbU216ucberkelF682","meters":["70"],"basis":"#70 Main 480 V"},
+    {"id":"silver","name":"Silver Laboratory","mac":"001EC6001CE4","db":"dbU216ucberkelF682","meters":["1","76"],"basis":"#1 480 V main + #76 208 V main"},
+    {"id":"simpson","name":"Simpson Center","mac":"001EC6001DD6","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"south","name":"South Hall","mac":"001EC6001D70","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"strawberry","name":"Strawberry Canyon Center","mac":"001EC6001D6F","db":"dbU216ucberkelF682","meters":["1"],"basis":"#1 Main"},
+    {"id":"underhill","name":"Underhill Parking","mac":"001EC6001CC2","db":"dbU216ucberkelF682","meters":["145"],"basis":"#145 Main (field lights, EV chargers excluded)"},
+    {"id":"vlsb","name":"Valley Life Sciences Building","mac":"001EC6000073","db":"dbU216ucberkelF682","meters":["76","77","78","79","80","81"],"basis":"#76-#81 electric rooms 150, 1180, 1030B (left/right)","note":"Sum of six electric-room meters; coverage unverified"},
+    {"id":"wellman","name":"Wellman Hall","mac":"001EC6000C89","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Electric meter"},
+    {"id":"womensclub","name":"Women's Faculty Club","mac":"001EC6001CBB","db":"dbU216ucberkelF682","meters":["76"],"basis":"#76 Main"},
+    {"id":"zellerbach","name":"Zellerbach Hall","mac":"001EC6000C8F","db":"dbU216ucberkelF682","meters":["76","77"],"basis":"#76 Main #1 + #77 Main #2"},
 ]
 
 KW_COLUMNS = [
@@ -170,7 +228,21 @@ def _kw_from_row(row):
     return None
 
 
-def fetch_kw_rows(session, mac, db, meter_id, start, end):
+def _sum_columns(row, columns):
+    """Sum named demand columns (device #250 pulse channels); None unless every one parses."""
+    total = 0.0
+    for col in columns:
+        try:
+            v = float(row.get(col))
+        except (TypeError, ValueError):
+            return None
+        if not 0 <= v < 50000:
+            return None
+        total += v
+    return round(total, 1)
+
+
+def fetch_kw_rows(session, mac, db, meter_id, start, end, columns=None):
     """All interval rows in [start, end] (naive Pacific) -> [(ts, kw)] ascending.
 
     Rows with an unparsable or DST-ambiguous timestamp are unknown and dropped.
@@ -193,7 +265,7 @@ def fetch_kw_rows(session, mac, db, meter_id, start, end):
             dt = parse_pt(ts)
             if dt is None or is_ambiguous_pt(dt):
                 continue
-            kw = _kw_from_row(row)
+            kw = _kw_from_row(row) if columns is None else _sum_columns(row, columns)
             if kw is not None:
                 out.append((dt, ts.strip(), kw))
         out.sort(key=lambda x: x[0])
@@ -542,6 +614,9 @@ def run():
         start = window_start(history.get(bid), now_pt)
         per_meter = {mid: fetch_kw_rows(session, b["mac"], b["db"], mid, start, now_pt)
                      for mid in b["meters"]}
+        if b.get("pulse"):
+            per_meter["250"] = fetch_kw_rows(session, b["mac"], b["db"], "250", start, now_pt,
+                                             columns=b["pulse"])
         rows, meters_used_ids = combine_meters(per_meter)
         kw, ts = (rows[-1][1], rows[-1][0]) if rows else (None, None)
         meter_used = "+".join(meters_used_ids) if meters_used_ids else None
@@ -564,7 +639,9 @@ def run():
                 "timestamp": ts,
                 "mac": b["mac"],
                 "meter": meter_used,
-                "meters_configured": b["meters"],
+                "meters_configured": b["meters"] + (["250"] if b.get("pulse") else []),
+                "basis": b.get("basis") or None,
+                "note": b.get("note") or None,
                 "predicted_kw": prediction,
                 "anomaly": anomaly,
                 "sparkline": sparkline,

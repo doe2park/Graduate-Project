@@ -31,3 +31,15 @@ class Channels(unittest.TestCase):
         r=m.fetch_soda_electric_channels(Session('<html>unavailable</html>'),previous)
         self.assertIsNone(r[0]['kw'])
         self.assertEqual(r[0]['last_observed_at'],'2026-10-12 18:45:00')
+
+
+class PulseColumnSumTest(unittest.TestCase):
+    """Device #250 demand columns named in BUILDINGS are summed, never guessed."""
+
+    def test_sums_named_columns(self):
+        from importlib import util
+        spec = util.spec_from_file_location("campus_pulse", Path(__file__).parents[1] / "bmo_fetch_campus.py")
+        mod = util.module_from_spec(spec); spec.loader.exec_module(mod)
+        row = {"Main # 1 Demand (kW)": "100.5", "Main # 2 Demand (kW)": "50", "Fire Pump Meter Demand (kW)": "9"}
+        self.assertEqual(mod._sum_columns(row, ["Main # 1 Demand (kW)", "Main # 2 Demand (kW)"]), 150.5)
+        self.assertIsNone(mod._sum_columns(row, ["Main # 1 Demand (kW)", "Missing (kW)"]))
