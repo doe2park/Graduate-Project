@@ -21,7 +21,7 @@ test('config is a valid, explicitly illustrative demo file', () => {
   /* the five deck scenarios, each with numbered sensors 1..n */
   const by = {};
   for (const s of CFG.sensors) (by[s.scenario] = by[s.scenario] || []).push(s.k);
-  assert.deepEqual(Object.keys(by).sort(), ['fan', 'hvac', 'leak', 'power', 'water']);
+  assert.deepEqual(Object.keys(by).sort(), ['air', 'elec', 'leak', 'rotating', 'water']);
   for (const [sc, ks] of Object.entries(by)) assert.deepEqual(ks, ks.map((_, i) => i + 1), sc);
   assert.ok(CFG.sensors.some(s => s.type === 'dts'), 'at least one DTS fibre');
 });
@@ -44,7 +44,7 @@ test('every anchor is a real BIM element in an Overlay layer: sidecar id, exact 
   assert.match(cache.fire[leak.anchor.id].system, /^F-SPRN-MAIN/);
   assert.equal(cache.duct[CFG.sensors.find(s => s.id === 'hvac-airflow').anchor.id].type, 'Spiral duct');
   assert.match(cache.plumbing[CFG.sensors.find(s => s.id === 'water-puck').anchor.id].name, /^Charlotte No-Hub Coupling/);
-  for (const s of CFG.sensors.filter(x => x.scenario === 'fan')) assert.equal(cache.duct[s.anchor.id].type, 'Rectangular duct', s.id + ': slide 11 is a straight rectangular duct');
+  for (const s of CFG.sensors.filter(x => x.scenario === 'rotating')) assert.equal(cache.duct[s.anchor.id].type, 'Rectangular duct', s.id + ': slide 11 is a straight rectangular duct');
 });
 
 test('validateConfig refuses malformed or dishonest entries', () => {
@@ -69,6 +69,22 @@ test('validateConfig refuses malformed or dishonest entries', () => {
 test('opt-in parameter: only sensors=demo', () => {
   assert.equal(SD.parseSensorsParam('?sensors=demo&view=overlay'), 'demo');
   for (const q of ['', '?view=overlay', '?sensors=1', '?sensors=DEMO', '?sensors=demo2']) assert.equal(SD.parseSensorsParam(q), null, q);
+});
+
+test('scene filter: ?scene=<scenario> keeps only that scenario; absent = all; links stay inside the scene', () => {
+  assert.equal(SD.parseSceneParam('?sensors=demo&scene=leak'), 'leak');
+  for (const q of ['', '?scene=', '?scene=Leak!', '?scene=' + 'x'.repeat(40)]) assert.equal(SD.parseSceneParam(q), null, q);
+  const all = SD.validateConfig(CFG).sensors;
+  assert.equal(SD.filterScene(all, null).length, all.length);
+  for (const sc of ['leak', 'air', 'water', 'elec', 'rotating']) {
+    const f = SD.filterScene(all, sc), ids = new Set(f.map(s => s.id));
+    assert.ok(f.length >= 3 && f.every(s => s.scenario === sc), sc);
+    for (const s of f) for (const l of s.links || []) assert.ok(ids.has(l), sc + ' link ' + l);
+  }
+  assert.deepEqual(SD.filterScene(all, 'nope'), []);
+  /* both pages pass the scene on: compare -> BIM frame URL, and to its own mount */
+  assert.match(compare, /mountParent\(\{main:mainEl,frame:frames\[1\],sceneFilter:SensorDemo\.parseSceneParam\(location\.search\)\}\)/);
+  assert.match(bim, /mountBim\(\{THREE,scene,camera,sceneFilter:window\.SensorDemo\.parseSceneParam\(location\.search\),/);
 });
 
 test('temperature colour map and DTS profile: cool ends, hottest at the alert position', () => {
@@ -141,6 +157,9 @@ test('scan-compare.html: no static script tag, the BIM frame URL is unchanged wi
   assert.equal(src('?view=overlay'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1');
   assert.equal(src('?view=overlay&sensors=demo'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1&sensors=demo');
   assert.equal(src('?view=overlay&sensors=yes'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1');
+  assert.equal(src('?view=overlay&sensors=demo&scene=leak'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1&sensors=demo&scene=leak');
+  assert.equal(src('?view=overlay&sensors=demo&scene=%3Cx%3E'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1&sensors=demo');
+  assert.equal(src('?view=overlay&scene=leak'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1', 'scene alone does nothing');
   /* the loader block is the last script, behind the guard */
   const block = compare.slice(compare.lastIndexOf('/* SENSOR DEMO'));
   assert.match(block, /^\/\* SENSOR DEMO[\s\S]*?\nif\(new URLSearchParams\(location\.search\)\.get\('sensors'\)==='demo'\)\{[\s\S]*twin\/sensor-demo\.js/);

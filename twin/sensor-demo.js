@@ -32,6 +32,11 @@ const vec3 = v => Array.isArray(v) && v.length === 3 && v.every(finite);
 const str = (v, n = 300) => typeof v === 'string' ? v.slice(0, n) : '';
 const clamp01 = v => Math.min(1, Math.max(0, v));
 
+/* ?scene=<scenario id> shows one scenario's sensors (its tint, fibre and links too); absent or unknown-format = all */
+function parseSceneParam(search) {
+  try { const v = new URLSearchParams(search || '').get('scene'); return v && /^[a-z0-9-]{1,30}$/.test(v) ? v : null; } catch (e) { return null; }
+}
+function filterScene(sensors, scene) { return scene ? sensors.filter(s => s.scenario === scene) : sensors.slice(); }
 function parseSensorsParam(search) {
   try { return new URLSearchParams(search || '').get('sensors') === 'demo' ? 'demo' : null; } catch (e) { return null; }
 }
@@ -271,11 +276,11 @@ function mountBim(ctx) {
     post({type: MSG.frame, items, fibres, zones});
   }
   fetch(ctx.configUrl || CONFIG_URL, {cache: 'no-store'}).then(r => { if (!r.ok) throw Error('config ' + r.status); return r.json(); }).then(cfg => {
-    const v = validateConfig(cfg); config = cfg; sensors.push(...v.sensors);
+    const v = validateConfig(cfg); config = cfg; sensors.push(...filterScene(v.sensors, ctx.sceneFilter || null));
     if (!v.ok) console.warn('[sensor-demo] config entries skipped:', v.errors);
     sendState(); tryResolve(); const iv = setInterval(() => { tryResolve(); if (resolved.size + Object.values(states).filter(x => x.status === 'refused').length >= sensors.length) clearInterval(iv); }, 600);
   }).catch(e => { failed = String(e && e.message || e); sendState(); console.warn('[sensor-demo] not shown:', failed); });
-  const api = {frame, inspection: () => ({config: !!config, failed, states: JSON.parse(JSON.stringify(states)), dtsMeshes: group.children.length}), resend: () => { lastSig = ''; sendState(); }};
+  const api = {frame, inspection: () => ({scene: ctx.sceneFilter || null, sensors: sensors.map(x => x.id), config: !!config, failed, states: JSON.parse(JSON.stringify(states)), dtsMeshes: group.children.length}), resend: () => { lastSig = ''; sendState(); }};
   return api;
 }
 
@@ -384,7 +389,7 @@ function mountParent(ctx) {
     }
     for (const [id, b] of pins) if (!seen.has(id)) b.hidden = true;
     const attached = Object.values(elements).length;
-    count.textContent = failed ? '· not loaded' : '· ' + seen.size + ' in view · ' + attached + ' attached to BIM elements';
+    count.textContent = failed ? '· not loaded' : '· ' + (ctx.sceneFilter ? 'scene ' + ctx.sceneFilter + ' · ' : '') + seen.size + ' in view · ' + attached + ' attached to BIM elements';
     renderCard();
   }
   function renderCard() {
@@ -415,12 +420,12 @@ function mountParent(ctx) {
   doc.documentElement.addEventListener('mouseleave', () => { if (hover) { hover = null; renderCard(); } });   // pointer left the page (e.g. into the deck)
   main.addEventListener('pointerdown', e => { if (!e.target.closest || !e.target.closest('.sd-pin')) { if (pinned) { pinned = null; renderCard(); } } }, true);
   fetch(ctx.configUrl || CONFIG_URL, {cache: 'no-store'}).then(r => { if (!r.ok) throw Error('config ' + r.status); return r.json(); }).then(cfg => {
-    const v = validateConfig(cfg); for (const s of v.sensors) byId.set(s.id, s); schedule();
+    const v = validateConfig(cfg); for (const s of filterScene(v.sensors, ctx.sceneFilter || null)) byId.set(s.id, s); schedule();
   }).catch(e => { failed = String(e && e.message || e); count.textContent = '· not loaded'; });
-  return {inspection: () => ({sensors: byId.size, attached: Object.keys(elements), pins: [...pins].filter(([, b]) => !b.hidden).map(([id]) => id), fibreSegments: gFibre.childNodes.length / 2, pulses: gPulse.childNodes.length / 3, links: gLinks.childNodes.length, zones: gZones.childNodes.length, card: card.classList.contains('show') ? card.dataset.sensor : null, failed}),
+  return {inspection: () => ({scene: ctx.sceneFilter || null, sensors: byId.size, attached: Object.keys(elements), pins: [...pins].filter(([, b]) => !b.hidden).map(([id]) => id), fibreSegments: gFibre.childNodes.length / 2, pulses: gPulse.childNodes.length / 3, links: gLinks.childNodes.length, zones: gZones.childNodes.length, card: card.classList.contains('show') ? card.dataset.sensor : null, failed}),
     focus: id => { pinned = byId.has(id) ? id : null; renderCard(); }};
 }
 
-return {SCHEMA, STATUS, CONFIG_URL, BADGE_TEXT, MSG, TYPES, parseSensorsParam, validateConfig, colorAt, cssColor, dtsTempC, dtsValue,
+return {SCHEMA, STATUS, CONFIG_URL, BADGE_TEXT, MSG, TYPES, parseSensorsParam, parseSceneParam, filterScene, validateConfig, colorAt, cssColor, dtsTempC, dtsValue,
   principalAxis, axisParam, axisPoint, anchorPoint, zoneRing, esc, sparkSvg, cardHtml, mountBim, mountParent, PARENT_CSS};
 });

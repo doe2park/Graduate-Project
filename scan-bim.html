@@ -3092,7 +3092,7 @@ let sensorDemo=null;
 if(splitPane==='bim'&&new URLSearchParams(location.search).get('sensors')==='demo'){
  const sdRay=new THREE.Ray(),sdEye=new THREE.Vector3(),sdP=new THREE.Vector3();
  const sdScript=document.createElement('script');sdScript.src='twin/sensor-demo.js?v=1';
- sdScript.onload=()=>{sensorDemo=window.SensorDemo.mountBim({THREE,scene,camera,getLayer:k=>layerState[k],elementInfo,kick:()=>_kick(),post:m=>window.parent.postMessage(m,location.origin),
+ sdScript.onload=()=>{sensorDemo=window.SensorDemo.mountBim({THREE,scene,camera,sceneFilter:window.SensorDemo.parseSceneParam(location.search),getLayer:k=>layerState[k],elementInfo,kick:()=>_kick(),post:m=>window.parent.postMessage(m,location.origin),
   /* Overlay Range fade x wall occlusion at the anchor (same rules as the element fragments); 1 outside Overlay */
   visibility:p=>{if(!overlayOn)return 1;camera.getWorldPosition(sdEye);sdP.set(p[0],p[1],p[2]);const d=sdEye.distanceTo(sdP);if(!(d>1e-6))return 1;
    let v=OV.rangeFade(d,ovPreset);sdRay.origin.copy(sdEye);sdRay.direction.copy(sdP).sub(sdEye).normalize();if(!(ovWallDistance(sdRay)<d-.15))return v;
