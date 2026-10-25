@@ -1,0 +1,449 @@
+{
+ "deck": {
+  "title": "Building Data and Sensing for the Grimes Twin",
+  "author": "Yoonsung",
+  "header": "UC Berkeley · Civil & Environmental Engineering",
+  "presentationDate": "2026-10-29",
+  "output": "Temp_BMS_and_Sensors.pptx"
+ },
+ "slides": [
+  {
+   "id": "cover",
+   "kind": "cover",
+   "title": "Building Data and Sensing\nfor the Grimes Twin",
+   "subtitle": "Draft for discussion",
+   "date": "{date_long}",
+   "org": "UNIVERSITY OF CALIFORNIA, BERKELEY",
+   "dept": "Civil & Environmental Engineering",
+   "presenter": "Yoonsung",
+   "notes": "This is a short draft for discussion about live data for the Grimes digital twin. First, what building data Grimes already has. Second, which sensors from Professor Soga's lab could add, a small pilot, and what it would look like in the twin."
+  },
+  {
+   "id": "part-1",
+   "kind": "divider",
+   "number": "01",
+   "title": "Building data",
+   "subtitle": "What Grimes already measures, and what we could ask Facilities for",
+   "notes": "Part one: the building data that already exists."
+  },
+  {
+   "id": "bms",
+   "kind": "figure",
+   "layout": "free",
+   "title": "Building data: what Grimes already has",
+   "subtitle": "Meters today; a building automation system is the likely next source",
+   "blocks": [
+    {
+     "type": "bullets",
+     "x": 0.55,
+     "y": 1.25,
+     "w": 4.35,
+     "h": 2.45,
+     "head": "Today: utility meters (BMO)",
+     "head_size": 13,
+     "size": 11.5,
+     "items": [
+      "Obvius AcquiSuite loggers on Building Manager Online",
+      "Whole-building electricity, water, steam",
+      "15-minute data",
+      "Feeds the campus energy dashboard",
+      "Not a building automation system"
+     ]
+    },
+    {
+     "type": "bullets",
+     "x": 5.1,
+     "y": 1.25,
+     "w": 4.35,
+     "h": 2.45,
+     "head": "Likely: building automation (WebCTRL / BACnet)",
+     "head_size": 13,
+     "size": 10.5,
+     "items": [
+      "Campus standard: Automated Logic WebCTRL (BACnet); new projects use it",
+      "Grimes: opened April 2025, SOM / Stantec, LEED Platinum target, heat-recovery chiller, radiant panels",
+      "Very likely on it, but NOT confirmed for Grimes",
+      "Would add temperatures, airflow, CO2, valve positions, equipment status",
+      "Access: CalNet login, operational need, Facilities work order (may be charged back)"
+     ]
+    },
+    {
+     "type": "text",
+     "x": 0.55,
+     "y": 3.85,
+     "w": 8.9,
+     "h": 0.8,
+     "head": "What we need",
+     "head_size": 13,
+     "size": 11.5,
+     "text": "Read-only trend export + point list + sequences of operation, tagged to equipment so points link to BIM element IDs."
+    }
+   ],
+   "footnote": "Grimes BAS vendor unconfirmed; campus controls standard (Div. 25) not found publicly.",
+   "notes": "Today Grimes only has utility meters. The Obvius loggers on Building Manager Online give whole-building electricity, water and steam every 15 minutes, and they feed the campus energy dashboard. That is not a building automation system. The campus standard is Automated Logic WebCTRL over BACnet, and new projects use it, so Grimes very likely has it, but we have not confirmed that. If it exists it would add temperatures, airflow, CO2, valve positions and equipment status. Access needs a CalNet login, an operational need and a Facilities work order, which may be charged back. What we need is a read-only trend export, the point list and the sequences of operation, tagged to equipment so each point can link to a BIM element ID."
+  },
+  {
+   "id": "part-2",
+   "kind": "divider",
+   "number": "02",
+   "title": "Sensing",
+   "subtitle": "Options, how fiber and MEMS sensing work, one pilot, and how it would look in the twin",
+   "notes": "Part two: new sensing. The options, a small pilot, and a concept of how the readings would appear on the BIM."
+  },
+  {
+   "id": "sensing",
+   "kind": "figure",
+   "layout": "free",
+   "title": "Sensing options for Grimes",
+   "subtitle": "From Prof. Soga’s lab and the CE170/278 course, ranked by fit for Grimes",
+   "blocks": [
+    {
+     "type": "image",
+     "path": "temp_bms_sensors/assets/s1-fiber-cable.jpg",
+     "x": 0.55,
+     "y": 1.595,
+     "w": 0.84,
+     "h": 0.56,
+     "border": true,
+     "align": "left"
+    },
+    {
+     "type": "image",
+     "path": "temp_bms_sensors/assets/s2-wireless-accel.jpg",
+     "x": 0.55,
+     "y": 2.225,
+     "w": 0.84,
+     "h": 0.56,
+     "border": true,
+     "align": "left"
+    },
+    {
+     "type": "image",
+     "path": "temp_bms_sensors/assets/s1-fiber-cable.jpg",
+     "x": 0.55,
+     "y": 2.855,
+     "w": 0.84,
+     "h": 0.56,
+     "border": true,
+     "align": "left"
+    },
+    {
+     "type": "image",
+     "path": "temp_bms_sensors/assets/s3-fbg-rail.jpg",
+     "x": 0.55,
+     "y": 3.485,
+     "w": 0.84,
+     "h": 0.56,
+     "border": true,
+     "align": "left"
+    },
+    {
+     "type": "table",
+     "x": 1.5,
+     "y": 1.24,
+     "size": 10,
+     "row_h": 0.63,
+     "head_h": 0.32,
+     "band": true,
+     "cols": [
+      {
+       "head": "Technology",
+       "w": 2.45,
+       "bold": true
+      },
+      {
+       "head": "What it detects",
+       "w": 2.35
+      },
+      {
+       "head": "Fit for Grimes",
+       "w": 1.3,
+       "bold": true
+      },
+      {
+       "head": "Main limit",
+       "w": 1.85
+      }
+     ],
+     "rows": [
+      [
+       "1  Fiber temperature (DTS) along pipes / plenums",
+       "Leaks as warm or cold spots, ~1 m apart; radiant-loop faults",
+       "Best fit",
+       "Costly analyzer; retrofit cable routing"
+      ],
+      [
+       "2  Wireless MEMS vibration nodes",
+       "Pump, fan and pipe vibration level and spectrum",
+       "Easy, commercial",
+       "Battery life; radio through floors; IT approval"
+      ],
+      [
+       "3  Fiber vibration (DAS) on risers",
+       "Flow noise, water hammer, pump harmonics along the riser",
+       "Research-grade for leaks",
+       "Data volume (kHz per metre); building noise"
+      ],
+      [
+       "4  FBG point sensors",
+       "Strain / temperature at chosen points",
+       "Niche",
+       "Misses leaks at unknown locations"
+      ],
+      [
+       "5  Indoor-environment IoT nodes",
+       "Temperature, humidity, CO2",
+       "Low",
+       "Mostly duplicates BAS points"
+      ]
+     ],
+     "w": 7.95,
+     "h": 3.3
+    }
+   ],
+   "footnote": "Lab track record: Crossrail, EBMUD Hayward Fault pipe, PG&E gas pipe, Millennium Tower pile. Concepts: CE170/278 Infrastructure Sensing, UC Berkeley (Prof. K. Soga). Photos, Wikimedia Commons: fiber cable — Asurnipal, CC BY-SA 4.0 (telecom cable, shown as example); wireless accelerometer on a bridge hanger — Y. Lei et al., CC BY 4.0; packaged FBG sensors — L2MRail, CC BY-SA 4.0 (cropped).",
+   "notes": "These are the sensing options from Professor Soga's lab and the CE170/278 infrastructure sensing course, ranked for Grimes. Fiber temperature sensing along pipes is the best fit: it shows leaks as cold or warm spots and can reveal radiant loop faults, but the analyzer is costly and the cable needs routing. Wireless vibration nodes are easy and commercial, though battery life and IT approval are limits. Fiber vibration sensing on risers is research grade for leaks. Fiber Bragg grating sensors only measure known points, so they miss leaks elsewhere. Indoor environment nodes mostly duplicate points the building automation system already has. The lab's track record is Crossrail, the EBMUD Hayward Fault water pipe, a PG&E gas pipe and the Millennium Tower pile; we found no operating-building MEP or leak detection deployment. The small photos are generic examples from Wikimedia Commons: a fiber cable, a wireless accelerometer on a bridge hanger, and packaged FBG sensors on a rail. They are not the lab's own hardware."
+  },
+  {
+   "id": "pilot",
+   "kind": "figure",
+   "layout": "free",
+   "title": "Pilot idea: fiber temperature (DTS) on one riser, linked to BIM",
+   "blocks": [
+    {
+     "type": "numsteps",
+     "x": 0.55,
+     "y": 1.25,
+     "w": 8.9,
+     "h": 1.5,
+     "head_size": 11,
+     "size": 10.5,
+     "arrow": 0.2,
+     "steps": [
+      {
+       "head": "Fiber on a riser",
+       "text": "Fiber cable along one riser"
+      },
+      {
+       "head": "Temperature",
+       "text": "Temperature every ~1 m along the cable"
+      },
+      {
+       "head": "Map to BIM",
+       "text": "Map cable distance to BIM pipe element IDs"
+      },
+      {
+       "head": "Show in twin",
+       "text": "Show temperature on the pipe in the twin viewer"
+      },
+      {
+       "head": "Validate",
+       "text": "Validate with a controlled warm-water release"
+      }
+     ]
+    },
+    {
+     "type": "bullets",
+     "x": 0.55,
+     "y": 2.95,
+     "w": 4.35,
+     "h": 1.45,
+     "head": "Why it matters",
+     "head_size": 13,
+     "size": 11,
+     "items": [
+      "Joins Soga lab sensing with this project's BIM link",
+      "Tests the full chain: sensor → BIM element → viewer",
+      "No building-MEP deployment by the lab found: a publishable gap"
+     ]
+    },
+    {
+     "type": "bullets",
+     "x": 5.1,
+     "y": 2.95,
+     "w": 4.35,
+     "h": 1.45,
+     "head": "Needs",
+     "head_size": 13,
+     "size": 11,
+     "items": [
+      "Facilities approval",
+      "A riser with access",
+      "DTS analyzer loan",
+      "BAS supply/return temperatures to compare"
+     ]
+    }
+   ],
+   "notes": "The pilot is small. Run a fiber cable along one riser. The analyzer gives a temperature about every meter along the cable. We map each cable distance to a BIM pipe element ID, so the temperature shows on that pipe in the twin viewer. We then validate with a controlled warm-water release. It matters because it joins the Soga lab's sensing with this project's BIM link, it tests the whole chain from sensor to BIM element to viewer, and since we found no building MEP deployment by the lab, it is publishable. We need Facilities approval, a riser we can access, a loan of a DTS analyzer, and the building automation supply and return temperatures to compare against.",
+   "takeaway": "Small and low-risk: one riser, one cable, one controlled test."
+  },
+  {
+   "id": "twin-concept",
+   "kind": "figure",
+   "layout": "free",
+   "title": "How it would look in the twin (concept)",
+   "subtitle": "Sensors placed virtually on the Level 1 leak ceiling in the Lens overlay (May 6 capture)",
+   "blocks": [
+    {
+     "type": "image",
+     "path": "temp_bms_sensors/assets/t2-twin-sensor-mockup.jpg",
+     "x": 0.55,
+     "y": 1.22,
+     "w": 3.937,
+     "h": 3.2,
+     "border": true,
+     "align": "left",
+     "labels": [
+      {
+       "text": "1",
+       "fx": 0.17,
+       "fy": 0.035,
+       "dx": 0.0,
+       "dy": 0.16,
+       "w": 0.26,
+       "h": 0.26,
+       "bg": "1E50DC",
+       "color": "FFFFFF",
+       "size": 11
+      },
+      {
+       "text": "2",
+       "fx": 0.474,
+       "fy": 0.268,
+       "dx": -0.48,
+       "dy": -0.12,
+       "w": 0.26,
+       "h": 0.26,
+       "bg": "C81E1E",
+       "color": "FFFFFF",
+       "size": 11
+      },
+      {
+       "text": "3",
+       "fx": 0.289,
+       "fy": 0.075,
+       "dx": 0.28,
+       "dy": 0.0,
+       "w": 0.26,
+       "h": 0.26,
+       "bg": "087F8C",
+       "color": "FFFFFF",
+       "size": 11
+      },
+      {
+       "text": "4",
+       "fx": 0.497,
+       "fy": 0.433,
+       "dx": 0.3,
+       "dy": 0.0,
+       "w": 0.26,
+       "h": 0.26,
+       "bg": "003262",
+       "color": "FFFFFF",
+       "size": 11
+      }
+     ]
+    },
+    {
+     "type": "legend",
+     "x": 0.55,
+     "y": 4.47,
+     "w": 3.937,
+     "h": 0.22,
+     "marker": 0.13,
+     "size": 9,
+     "items": [
+      {
+       "marker": "square",
+       "color": "1E50DC",
+       "text": "cool",
+       "w": 0.35
+      },
+      {
+       "marker": "square",
+       "color": "00BEE6",
+       "text": "normal",
+       "w": 0.5
+      },
+      {
+       "marker": "square",
+       "color": "FAD728",
+       "text": "warm",
+       "w": 0.4
+      },
+      {
+       "marker": "square",
+       "color": "E61E1E",
+       "text": "hot (alert)",
+       "w": 0.8
+      }
+     ]
+    },
+    {
+     "type": "heads",
+     "x": 4.65,
+     "y": 1.22,
+     "w": 4.8,
+     "h": 1.95,
+     "head_size": 10.5,
+     "size": 9.5,
+     "items": [
+      {
+       "head": "1  Fiber temperature line (DTS)",
+       "text": "Colour = temperature every ~1 m along the pipe"
+      },
+      {
+       "head": "2  Alert ring",
+       "text": "Warm spot above the expected value: possible leak"
+      },
+      {
+       "head": "3  Vibration node",
+       "text": "Wireless MEMS node on the line: pump / flow condition"
+      },
+      {
+       "head": "4  Leak sensor",
+       "text": "Point check on the tile below the warm spot"
+      }
+     ]
+    },
+    {
+     "type": "numsteps",
+     "x": 4.65,
+     "y": 3.3,
+     "w": 4.8,
+     "h": 1.39,
+     "head_size": 10,
+     "size": 9,
+     "arrow": 0.18,
+     "steps": [
+      {
+       "head": "Reading",
+       "text": "Analyzer: 31 °C at 42 m along the cable"
+      },
+      {
+       "head": "Map to BIM",
+       "text": "42 m → pipe element ID (cable route survey)"
+      },
+      {
+       "head": "Show",
+       "text": "Colour and alert on that pipe, in the Lens and the headset"
+      }
+     ]
+    }
+   ],
+   "footnote": "Concept mockup — no sensors are installed; values are illustrative. Base: public Lens overlay of the May 6, 2026 capture (own screenshot); graphics added.",
+   "notes": "This is a concept of how the sensors would look in the twin. The base is the public Lens overlay of the Level 1 leak ceiling from the May 6 capture. Nothing is installed and the values are made up. Marker one is the fiber temperature line, coloured from blue for cool to red for hot along the sprinkler main. Marker two is an alert ring where the line is warmer than expected, which could mean a leak. Marker three is a wireless vibration node, and marker four is a leak sensor on the tile below the warm spot, to confirm water. It would work in three steps. The analyzer reports a temperature at a distance along the cable. We map that distance to a BIM pipe element ID using a survey of the cable route. Then the viewer colours that pipe and shows the alert, both in the Lens on the computer and in the headset."
+  },
+  {
+   "id": "thanks",
+   "kind": "thanks",
+   "title": "Thank you",
+   "org": "UNIVERSITY OF CALIFORNIA, BERKELEY",
+   "dept": "Civil & Environmental Engineering",
+   "lines": [
+    "Yoonsung"
+   ],
+   "notes": "Thank you. I would welcome feedback, especially on whether Facilities can share building automation data, and whether the riser pilot is worth proposing to Professor Soga's lab."
+  }
+ ]
+}
