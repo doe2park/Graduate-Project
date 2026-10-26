@@ -238,7 +238,7 @@ let lensSent='';
 function sendLensState(on,x,y,r){const k=on?[x,y,r].map(v=>Math.round(v)).join(','):'off';if(k===lensSent)return;lensSent=k;send('bim',on?{type:'grimes-overlay-lens',on:true,x,y,r}:{type:'grimes-overlay-lens',on:false});}
 /* scan panes report the mouse position (normalised); touch devices keep the lens centred */
 function edgeFromScan(d){
- if(d?.type==='grimes-pointer'){lensTarget=Number.isFinite(d.x)&&Number.isFinite(d.y)&&!touchMq.matches?{x:d.x,y:d.y}:null;layoutLens(false);return;}
+ if(d?.type==='grimes-pointer'){if(window.sdLensLock)return;/* ?sensors=demo: a focused sensor holds the Lens */lensTarget=Number.isFinite(d.x)&&Number.isFinite(d.y)&&!touchMq.matches?{x:d.x,y:d.y}:null;layoutLens(false);return;}
  if(d?.type==='grimes-photo-station'&&Number.isInteger(d.index)){lastStation=d.index;}
 }
 frames[1].src='scan-bim.html?pane=bim&revision=overlay2'+(view==='overlay'?'&overlay=1':'')+(new URLSearchParams(location.search).get('sensors')==='demo'?'&sensors=demo'+(/^[a-z0-9-]{1,30}$/.test(new URLSearchParams(location.search).get('scene')||'')?'&scene='+new URLSearchParams(location.search).get('scene'):''):'');
@@ -636,7 +636,9 @@ alRender();
    BIM element ids, drawn over the BIM frame with a persistent "not installed" badge. Without the parameter nothing loads. */
 if(new URLSearchParams(location.search).get('sensors')==='demo'){
  const s=document.createElement('script');s.src='twin/sensor-demo.js?v=1';
- s.onload=()=>{const sd=SensorDemo.mountParent({main:mainEl,frame:frames[1],sceneFilter:SensorDemo.parseSceneParam(location.search)});window.sensorDemoInspection=()=>sd.inspection();};
+ s.onload=()=>{const sd=SensorDemo.mountParent({main:mainEl,frame:frames[1],sceneFilter:SensorDemo.parseSceneParam(location.search),
+  /* a clicked / deck-focused sensor centres the Lens on its pin (mouse: normalised target; touch: dragged centre) */
+  lens:{set:(x,y,w,h)=>{const q=SensorDemo.lensPoint([x,y],w,h,8);if(!q)return;window.sdLensLock=true;if(touchMq.matches)lensDrag={x:q.x*w,y:q.y*h};else lensTarget=q;layoutLens(false);},release:()=>{window.sdLensLock=false;}}});window.sensorDemoInspection=()=>sd.inspection();};
  document.head.appendChild(s);
 }
 </script>

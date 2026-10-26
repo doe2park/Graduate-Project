@@ -143,7 +143,17 @@ def sensing_table():
 from twin_lib import build_twin, TWIN_JS, TWIN_CSS
 SC = {sc['id']: sc for sc in SCENARIOS}
 
+# Sensor type look (icon, colour, short label) shared with the viewer: ../../twin/sensor-demo.json
+SDJ = json.loads((ROOT.parent.parent / 'twin' / 'sensor-demo.json').read_text())
+SD_TYPE = {x['id']: x['type'] for x in SDJ['sensors']}
+def sd_style(sid): return SDJ['types'][SD_TYPE[sid]]
+def sd_icon(sid, px_):
+    return (f'<svg viewBox="0 0 24 24" width="{px_:.0f}" height="{px_:.0f}" aria-hidden="true"><path d="{e(sd_style(sid)["icon"])}" fill="none" stroke="#fff" '
+            'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>')
+
 def twin_slide(sc):
+    for el in sc['elements']:
+        if el.get('sid') in SD_TYPE: el['col'] = sd_style(el['sid'])['color']   # rows and cards use the viewer's type colour
     x, y, h = .55, 1.2, 3.3
     out, w = build_twin(sc, U, x, y, h)
     rx = x + w + .3; rw = 9.45 - rx; yy = 1.2; els = sc['elements']
@@ -151,8 +161,8 @@ def twin_slide(sc):
     for el in els:
         k = el['k']
         out += (f'<div class="twrow card" data-m="{k}" data-sid="{e(el.get("sid",""))}" style="{pos(rx,yy,rw,rowh)};border-radius:{.06*rowh*U:.1f}px;cursor:pointer"></div>'
-                f'<div class="circ" style="{pos(rx+.1,yy+(rowh-.32)/2,.32,.32)};background:{el["col"]};font-size:{13*PT:.1f}px;pointer-events:none">{k}</div>'
-                + text(rx + .52, yy, rw - .6, rowh, [[(el['title'], dict(bold=True, size=10.5, color=NAVY))], [(el['row'], dict(size=9))]], anchor='middle', extra='pointer-events:none'))
+                f'<div class="circ" style="{pos(rx+.1,yy+(rowh-.32)/2,.32,.32)};background:{el["col"]};font-size:{13*PT:.1f}px;pointer-events:none">{sd_icon(el["sid"], .2*U) if el.get("sid") in SD_TYPE else k}</div>'
+                + text(rx + .52, yy, rw - .6, rowh, [[(f'{k} · ' + el['title'], dict(bold=True, size=10.5, color=NAVY)), (('   ' + sd_style(el['sid'])['short']) if el.get('sid') in SD_TYPE else '', dict(size=8.5, color=el['col'], bold=True))], [(el['row'], dict(size=9))]], anchor='middle', extra='pointer-events:none'))
         yy += pitch
     if sc.get('legend'):
         lg = ''.join(f'<span style="display:inline-flex;align-items:center;margin-right:{.18*U:.0f}px"><i style="display:inline-block;width:{.13*U:.0f}px;height:{.13*U:.0f}px;background:{c};margin-right:{.06*U:.0f}px"></i>{n}</span>' for c, n in sc['legend'])

@@ -66,6 +66,66 @@ test('validateConfig refuses malformed or dishonest entries', () => {
   assert.equal(one({type: 'laser'}).sensors.length, base.sensors.length - 1, 'a bad entry is dropped, the rest survive');
 });
 
+test('per-type look: every used type has a short label, colour and icon; sensor colours follow their type', () => {
+  for (const s of CFG.sensors) {
+    const t = SD.typeStyle(CFG, s.type);
+    assert.ok(t.short && t.short.length <= 12, s.type + ' short label');
+    assert.equal(s.color, t.color, s.id + ' colour = type colour');
+    assert.match(SD.iconSvg(t.icon, 16), /^<svg class="sd-ico" viewBox="0 0 24 24"[^>]*><path d="[^"]+"/);
+  }
+  const shorts = new Set(Object.values(CFG.types).map(t => t.short)), colors = new Set(Object.values(CFG.types).map(t => t.color));
+  assert.equal(shorts.size, Object.keys(CFG.types).length, 'labels distinct');
+  assert.equal(colors.size, Object.keys(CFG.types).length, 'colours distinct');
+  const bad = JSON.parse(JSON.stringify(CFG)); bad.types.dts.icon = '<script>';
+  assert.equal(SD.validateConfig(bad).ok, false, 'icon must be SVG path data');
+});
+
+test('phones / Quest: fire anchors name the fire chunk that really holds their element', () => {
+  const fire = CFG.sensors.filter(s => s.anchor.layer === 'fire');
+  assert.ok(fire.length >= 4 && fire.every(s => s.anchor.part), 'every fire anchor has a chunk hint');
+  const chunks = JSON.parse(read('buildings/grimes/grimes-fire.chunks.json')).chunks.map(c => c.file);
+  const names = {};
+  for (const f of new Set(fire.map(s => s.anchor.part))) {
+    assert.ok(chunks.includes(f), f + ' is a published fire chunk');
+    const b = fs.readFileSync(path.join(root, 'buildings/grimes', f)), n = b.readUInt32LE(12);
+    names[f] = new Set(JSON.parse(b.subarray(20, 20 + n).toString('utf8')).nodes.map(x => String(x.name)));
+  }
+  for (const s of fire) assert.ok(names[s.anchor.part].has(s.anchor.id), s.id + ': node ' + s.anchor.id + ' is in ' + s.anchor.part);
+  /* the BIM pane's demo rule mirrors the Overlay skip rule exactly, and only exists inside the demo block */
+  assert.match(bim, /if\(key==='fire'&&mobileQuality\)continue;/);
+  const block = bim.slice(bim.indexOf('/* SENSOR DEMO'), bim.indexOf('let _lastT = 0'));
+  assert.match(block, /const sdSkipped=key=>key==='fire'&&mobileQuality;/);
+  assert.match(block, /skipped:k=>overlayOn&&sdSkipped\(k\),loadSubset:sdLoadSubset,/);
+  assert.ok(!/layerState\[key\]\s*=/.test(block), 'the anchor subset never becomes the fire layer');
+  const c = JSON.parse(JSON.stringify(CFG)); c.sensors[0].anchor.part = '../x.glb';
+  assert.equal(SD.validateConfig(c).ok, false, 'part must be a plain chunk file name');
+});
+
+test('Lens centring on a sensor: pin position -> normalised Lens target, clamped to the viewport', () => {
+  assert.deepEqual(SD.lensPoint([400, 300], 800, 600, 8), {x: 0.5, y: 0.5});
+  assert.deepEqual(SD.lensPoint([200, 450], 800, 600, 0), {x: 0.25, y: 0.75});
+  const q = SD.lensPoint([-50, 9999], 800, 600, 8);
+  assert.deepEqual(q, {x: 8 / 800, y: (600 - 8) / 600}, 'off-screen pin clamps to the edge margin');
+  assert.equal(SD.lensPoint([NaN, 1], 800, 600), null);
+  assert.equal(SD.lensPoint([1, 1], 0, 600), null);
+  /* the page wires it: a focused sensor locks the Lens, the mouse no longer moves it until released */
+  assert.match(compare, /lens:\{set:\(x,y,w,h\)=>\{const q=SensorDemo\.lensPoint\(\[x,y\],w,h,8\);/);
+  assert.match(compare, /if\(d\?\.type==='grimes-pointer'\)\{if\(window\.sdLensLock\)return;/);
+});
+
+test('type chips: placed beside their pins without overlapping pins or each other', () => {
+  const box = {x: 0, y: 0, w: 800, h: 500};
+  const items = [[300, 200], [312, 206], [326, 214], [300, 230], [780, 490], [5, 5]].map(([x, y], i) => ({id: 's' + i, x, y, w: 74, h: 17}));
+  const out = SD.placeChips(items, box, 14), rects = out.map(o => ({...o, w: 74, h: 17}));
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i];
+    assert.ok(r.x >= 0 && r.y >= 0 && r.x + r.w <= 800 && r.y + r.h <= 500, 'inside the box ' + r.id);
+    for (let j = i + 1; j < rects.length; j++) assert.ok(!hit(r, rects[j]), r.id + ' vs ' + rects[j].id);
+    for (const p of items) assert.ok(!hit(r, {x: p.x - 14, y: p.y - 14, w: 28, h: 28}), r.id + ' clear of pin ' + p.id);
+  }
+});
+
 test('opt-in parameter: only sensors=demo', () => {
   assert.equal(SD.parseSensorsParam('?sensors=demo&view=overlay'), 'demo');
   for (const q of ['', '?view=overlay', '?sensors=1', '?sensors=DEMO', '?sensors=demo2']) assert.equal(SD.parseSensorsParam(q), null, q);
@@ -83,7 +143,7 @@ test('scene filter: ?scene=<scenario> keeps only that scenario; absent = all; li
   }
   assert.deepEqual(SD.filterScene(all, 'nope'), []);
   /* both pages pass the scene on: compare -> BIM frame URL, and to its own mount */
-  assert.match(compare, /mountParent\(\{main:mainEl,frame:frames\[1\],sceneFilter:SensorDemo\.parseSceneParam\(location\.search\)\}\)/);
+  assert.match(compare, /mountParent\(\{main:mainEl,frame:frames\[1\],sceneFilter:SensorDemo\.parseSceneParam\(location\.search\),/);
   assert.match(bim, /mountBim\(\{THREE,scene,camera,sceneFilter:window\.SensorDemo\.parseSceneParam\(location\.search\),/);
 });
 

@@ -59,6 +59,7 @@ function validateConfig(cfg) {
     if (a.t !== undefined && !(finite(a.t) && a.t >= 0 && a.t <= 1)) return bad('anchor.t must be 0..1');
     if (a.offset !== undefined && !(vec3(a.offset) && a.offset.every(v => Math.abs(v) <= 3))) return bad('anchor.offset must be 3 numbers within 3 m');
     if (s.color !== undefined && !/^#[0-9a-fA-F]{6}$/.test(s.color)) return bad('color must be #rrggbb');
+    if (a.part !== undefined && !(typeof a.part === 'string' && /^grimes-[a-z0-9-]+\.glb$/.test(a.part))) return bad('anchor.part must be a grimes-*.glb chunk file name');
     if (s.type === 'dts') {
       const d = s.dts;
       if (!d || ![d.baselineC, d.peakC, d.hotT, d.hotWidth].every(finite) || !Array.isArray(d.scaleC) || d.scaleC.length !== 2 || !d.scaleC.every(finite) || d.scaleC[1] <= d.scaleC[0] || d.hotWidth <= 0) return bad('dts needs baselineC, peakC, hotT, hotWidth and scaleC [lo, hi]');
@@ -69,6 +70,10 @@ function validateConfig(cfg) {
     ids.add(s.id); sensors.push(s);
   });
   for (const s of sensors) for (const l of s.links || []) if (!ids.has(l)) errors.push(s.id + ': link to unknown sensor ' + l);
+  if (cfg.types !== undefined) for (const [k, t] of Object.entries(cfg.types)) {
+    if (!TYPES[k]) errors.push('types.' + k + ': unknown type');
+    else if (!t || !str(t.short, 30) || !/^#[0-9a-fA-F]{6}$/.test(t.color || '') || !/^[MmLlHhVvCcSsQqTtAaZz0-9 .,\-]+$/.test(t.icon || '')) errors.push('types.' + k + ': needs short, #rrggbb color and an SVG path icon');
+  }
   return {ok: errors.length === 0, errors, sensors};
 }
 
@@ -136,6 +141,45 @@ function anchorPoint(ax, anchor) {
 /* a horizontal circle (zone tint) around a point */
 function zoneRing(c, r, n) { n = n || 28; const out = []; for (let i = 0; i < n; i++) { const a = i / n * 2 * Math.PI; out.push([c[0] + r * Math.cos(a), c[1], c[2] + r * Math.sin(a)]); } return out; }
 
+/* ── per-type look: icon (24x24 stroke path), colour and short chip label, from cfg.types ── */
+const FALLBACK_TYPE = {short: 'Sensor', color: '#087F8C', icon: 'M12 4a8 8 0 1 0 .01 0'};
+function typeStyle(cfg, type) { const t = cfg && cfg.types && cfg.types[type]; return t ? t : {...FALLBACK_TYPE, short: TYPES[type] || 'Sensor'}; }
+function iconSvg(path, size, stroke) {
+  return '<svg class="sd-ico" viewBox="0 0 24 24" width="' + (size || 16) + '" height="' + (size || 16) + '" aria-hidden="true"><path d="' + esc(path) + '" fill="none" stroke="' + esc(stroke || '#fff') + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+/* Lens centre for a sensor: its pin position (main-element px) as the normalised pointer the Lens uses, clamped so the
+   ring centre stays inside the viewport with a margin. */
+function lensPoint(p, w, h, margin) {
+  if (!p || !(w > 0) || !(h > 0) || !finite(p[0]) || !finite(p[1])) return null;
+  const m = Math.max(0, margin || 0), cx = Math.min(w - m, Math.max(m, p[0])), cy = Math.min(h - m, Math.max(m, p[1]));
+  return {x: m * 2 >= w ? 0.5 : cx / w, y: m * 2 >= h ? 0.5 : cy / h};
+}
+/* Greedy label placement: each chip tries right, left, above, below its pin (then further out) and takes the first spot
+   that overlaps no pin and no chip already placed and stays inside the box. Returns [{id, x, y}] (chip top-left). */
+function placeChips(items, box, pinR) {
+  const r = pinR || 14, placed = [], pins = items.map(it => ({x: it.x - r, y: it.y - r, w: 2 * r, h: 2 * r}));
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const out = [];
+  for (const it of items) {
+    const w = it.w, h = it.h, gap = r + 4;
+    const cands = [];
+    for (const k of [0, 1, 2]) {
+      const d = k * (h + 4);
+      cands.push([it.x + gap, it.y - h / 2 + d], [it.x - gap - w, it.y - h / 2 + d], [it.x - w / 2, it.y - gap - h - d], [it.x - w / 2, it.y + gap + d], [it.x + gap, it.y - h / 2 - d], [it.x - gap - w, it.y - h / 2 - d]);
+    }
+    let best = null;
+    for (const [x, y] of cands) {
+      const c = {x, y, w, h};
+      if (x < box.x || y < box.y || x + w > box.x + box.w || y + h > box.y + box.h) continue;
+      if (pins.some(p => hit(c, p)) || placed.some(p => hit(c, p))) continue;
+      best = c; break;
+    }
+    if (!best) best = {x: Math.min(box.x + box.w - w, Math.max(box.x, it.x + gap)), y: Math.min(box.y + box.h - h, Math.max(box.y, it.y - h / 2)), w, h};
+    placed.push(best); out.push({id: it.id, x: best.x, y: best.y});
+  }
+  return out;
+}
+
 /* ── card (Lens-card look: gz-* classes) ── */
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]); }
 function sparkSvg(series, color) {
@@ -151,12 +195,12 @@ function elementLabel(el) {
   const name = String(el.name || el.type || 'Element');
   return name.length > 46 ? name.slice(0, 45) + '…' : name;
 }
-function cardHtml(s, el) {
+function cardHtml(s, el, style) {
   const color = /^#[0-9a-fA-F]{6}$/.test(s.color || '') ? s.color : '#22d3ee';
   const sub = [TYPES[s.type], s.kind].filter(Boolean).join(' · ');
   const elSub = el ? [el.type, el.system, el.level].filter(Boolean).join(' · ') : '';
   const where = s.anchor.layer + ':' + s.anchor.id;
-  let html = '<div class="gz-top"><span class="gz-name"><i class="sd-dot" style="background:' + color + '"></i>' + esc(s.label) + '</span><span class="gz-badge sd-demo">DEMO</span></div>'
+  let html = '<div class="gz-top"><span class="gz-name"><i class="sd-dot" style="background:' + color + '">' + (style ? iconSvg(style.icon, 12) : '') + '</i>' + (s.k ? esc(s.k) + ' · ' : '') + esc(s.label) + '</span><span class="gz-badge sd-demo">DEMO</span></div>'
     + (sub ? '<div class="gz-sub">' + esc(sub) + '</div>' : '')
     + '<div class="gz-val">' + esc(s.reading.value) + '</div>'
     + (s.reading.detail ? '<div class="gz-det">' + esc(s.reading.detail) + '</div>' : '');
@@ -234,9 +278,10 @@ function mountBim(ctx) {
     let changed = false;
     for (const s of sensors) {
       if (resolved.has(s.id) || (states[s.id] && states[s.id].status === 'refused')) continue;
-      const st = ctx.getLayer(s.anchor.layer);
-      if (!st || !st.group || !st.meshes) { if (!states[s.id]) { states[s.id] = {status: 'pending', reason: s.anchor.layer + ' layer not loaded'}; changed = true; } continue; }
-      const info = ctx.elementInfo(s.anchor.layer, s.anchor.id);
+      let st = ctx.getLayer(s.anchor.layer);
+      if ((!st || !st.group || !st.meshes) && subsets[s.anchor.layer] && subsets[s.anchor.layer].st) st = subsets[s.anchor.layer].st;
+      if (!st || !st.group || !st.meshes) { requestSubset(s.anchor.layer); if (!states[s.id] || states[s.id].reason !== layerReason(s.anchor.layer)) { states[s.id] = {status: 'pending', reason: layerReason(s.anchor.layer)}; changed = true; } continue; }
+      const info = (st.meta && st.meta[s.anchor.id]) || ctx.elementInfo(s.anchor.layer, s.anchor.id);
       if (!info) { states[s.id] = {status: 'refused', reason: 'element ' + s.anchor.id + ' not in the ' + s.anchor.layer + ' sidecar'}; changed = true; continue; }
       if (s.anchor.name && info.name !== s.anchor.name) { states[s.id] = {status: 'refused', reason: 'sidecar name differs from the config anchor'}; changed = true; continue; }
       if (s.anchor.guid && info.source_guid && info.source_guid !== s.anchor.guid) { states[s.id] = {status: 'refused', reason: 'source_guid differs from the config anchor'}; changed = true; continue; }
@@ -250,6 +295,17 @@ function mountBim(ctx) {
       changed = true;
     }
     if (changed) { lastSig = ''; sendState(); if (ctx.kick) ctx.kick(); }
+  }
+  /* A layer the Overlay skips on this device (fire on phones / coarse-pointer browsers such as Quest): load only the
+     anchored elements, from the chunk(s) named by anchor.part, as a separate render-only group (never layerState). */
+  const subsets = {};
+  function layerReason(layer) { const sb = subsets[layer]; return sb ? (sb.error ? layer + ' anchors failed to load: ' + sb.error : sb.st ? layer + ' anchors loaded' : 'loading only the anchored ' + layer + ' elements') : layer + ' layer not loaded'; }
+  function requestSubset(layer) {
+    if (subsets[layer] || !ctx.skipped || !ctx.skipped(layer) || !ctx.loadSubset) return;
+    const mine = sensors.filter(x => x.anchor.layer === layer), ids = [...new Set(mine.map(x => x.anchor.id))], parts = [...new Set(mine.map(x => x.anchor.part).filter(Boolean))];
+    if (!parts.length) { subsets[layer] = {error: 'no anchor.part chunk named for this device'}; return; }
+    const sb = subsets[layer] = {ids, parts, st: null, error: null};
+    Promise.resolve(ctx.loadSubset(layer, ids, parts)).then(st => { sb.st = st; tryResolve(); }).catch(e => { sb.error = String(e && e.message || e); lastSig = ''; sendState(); });
   }
   function project(p) {
     _v.set(p[0], p[1], p[2]); _c.copy(_v).applyMatrix4(ctx.camera.matrixWorldInverse);
@@ -278,9 +334,9 @@ function mountBim(ctx) {
   fetch(ctx.configUrl || CONFIG_URL, {cache: 'no-store'}).then(r => { if (!r.ok) throw Error('config ' + r.status); return r.json(); }).then(cfg => {
     const v = validateConfig(cfg); config = cfg; sensors.push(...filterScene(v.sensors, ctx.sceneFilter || null));
     if (!v.ok) console.warn('[sensor-demo] config entries skipped:', v.errors);
-    sendState(); tryResolve(); const iv = setInterval(() => { tryResolve(); if (resolved.size + Object.values(states).filter(x => x.status === 'refused').length >= sensors.length) clearInterval(iv); }, 600);
+    sendState(); tryResolve(); const iv = setInterval(() => { tryResolve(); if (resolved.size + Object.values(states).filter(x => x.status === 'refused').length >= sensors.length) clearInterval(iv); }, 600); if (iv && iv.unref) iv.unref();   // Node tests: never keep the process alive
   }).catch(e => { failed = String(e && e.message || e); sendState(); console.warn('[sensor-demo] not shown:', failed); });
-  const api = {frame, inspection: () => ({scene: ctx.sceneFilter || null, sensors: sensors.map(x => x.id), config: !!config, failed, states: JSON.parse(JSON.stringify(states)), dtsMeshes: group.children.length}), resend: () => { lastSig = ''; sendState(); }};
+  const api = {frame, inspection: () => ({scene: ctx.sceneFilter || null, sensors: sensors.map(x => x.id), subsets: Object.fromEntries(Object.entries(subsets).map(([k, v]) => [k, {ids: v.ids || [], parts: v.parts || [], loaded: !!v.st, meshes: v.st ? v.st.meshes.length : 0, error: v.error || null}])), config: !!config, failed, states: JSON.parse(JSON.stringify(states)), dtsMeshes: group.children.length}), resend: () => { lastSig = ''; sendState(); }};
   return api;
 }
 
@@ -290,7 +346,13 @@ const PARENT_CSS = `
 #sdLayer svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
 #sdLayer .sd-pin{position:absolute;left:0;top:0;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;border:3px solid #fff;color:#fff;font:700 13px/22px Arial,sans-serif;text-align:center;padding:0;cursor:pointer;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,.55);transition:opacity .15s}
 #sdLayer .sd-pin:hover,#sdLayer .sd-pin.on{outline:3px solid #FDB515;outline-offset:1px}
-#sdLayer .sd-pin[hidden]{display:none}
+#sdLayer .sd-pin[hidden],#sdLayer .sd-chip[hidden]{display:none}
+#sdLayer .sd-pin svg{display:block;margin:3px auto 0}
+#sdLayer .sd-pin.alert svg{margin-top:2px}
+#sdLayer .sd-chip{position:absolute;left:0;top:0;display:inline-flex;align-items:center;gap:4px;padding:1px 6px 1px 2px;border-radius:9px;border:1.5px solid #FDB515;background:rgba(8,14,28,.82);color:#f1f5f9;font:700 11px/15px Arial,sans-serif;white-space:nowrap;pointer-events:auto;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.45);transition:opacity .15s}
+#sdLayer .sd-chip b{display:inline-block;min-width:15px;height:15px;border-radius:8px;color:#fff;font-size:10px;line-height:15px;text-align:center}
+#sdLayer .sd-chip.on{outline:2px solid #FDB515}
+#sdCard .sd-dot svg{display:block;margin:1px}
 #sdLayer .sd-pin.alert{width:24px;height:24px;margin:-12px 0 0 -12px;line-height:18px;font-size:12px}
 @keyframes sdPulse{0%{r:14;stroke-opacity:.95}100%{r:46;stroke-opacity:0}}
 #sdLayer circle.sd-pulse{animation:sdPulse 1.8s ease-out infinite}
@@ -308,7 +370,7 @@ const PARENT_CSS = `
 #sdCard .gz-val{margin-top:6px;font-size:14px;font-weight:600;color:#f1f5f9}
 #sdCard .gz-det{margin-top:2px;font-size:12px;line-height:1.35;color:#94a3b8}
 #sdCard .gz-spark{margin-top:6px}#sdCard .gz-spark svg{display:block;width:100%;height:30px}
-#sdCard .sd-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0;border:1px solid #fff}
+#sdCard .sd-dot{display:inline-block;width:16px;height:16px;border-radius:50%;margin-right:6px;vertical-align:-3px;border:1px solid #fff}
 #sdCard .sd-grad{margin-top:7px;height:9px;border-radius:5px}
 #sdCard .sd-grad-cap{display:flex;justify-content:space-between;font-size:10.5px;color:#94a3b8;margin-top:2px}
 #sdCard .sd-map{margin-top:7px;padding-top:6px;border-top:1px solid rgba(148,163,184,.3);font-size:12px;color:#cbd5e1;line-height:1.35;word-break:break-word}
@@ -316,10 +378,11 @@ const PARENT_CSS = `
 #sdCard .sd-note{margin-top:5px;font-size:11px;color:#fbbf24}
 body.sd-card-on #lensCard{opacity:0!important;visibility:hidden!important}
 body.sd-off #sdLayer{display:none}
-@media(max-width:768px),(pointer:coarse){#sdCard{width:230px;font-size:11.5px}#sdBadge{font-size:10.5px;bottom:auto;top:8px}}
+@media(max-width:768px),(pointer:coarse){#sdCard{width:230px;font-size:11.5px}#sdBadge{font-size:10.5px;bottom:58px;max-width:calc(100% - 24px)}#sdBadge small{display:none}#sdLayer .sd-chip{font-size:9.5px;line-height:13px;padding:0 5px 0 2px}#sdLayer .sd-chip b{min-width:13px;height:13px;line-height:13px;font-size:9px}}
 `;
 const MIN_VIS = 0.5;   // Range fade x occlusion below this: the sensor is not drawn (Room: about 11 m; Near: about 4.5 m)
 function mountParent(ctx) {
+  const lens = ctx.lens || null;   // {set(px, py, mainW, mainH), release()} from scan-compare: Lens follows the focused sensor
   const doc = ctx.document || document, main = ctx.main, frame = ctx.frame, SVGNS = 'http://www.w3.org/2000/svg';
   const style = doc.createElement('style'); style.id = 'sdStyle'; style.textContent = PARENT_CSS; doc.head.appendChild(style);
   const layer = doc.createElement('div'); layer.id = 'sdLayer'; layer.setAttribute('aria-label', 'Demo sensors (illustrative)');
@@ -330,14 +393,20 @@ function mountParent(ctx) {
   badge.innerHTML = '<span>' + esc(BADGE_TEXT) + ' <small id="sdCount"></small></span><button type="button" id="sdToggle" aria-pressed="true">Hide</button>';
   const card = doc.createElement('div'); card.id = 'sdCard'; card.setAttribute('role', 'status');
   main.append(layer, badge, card);
-  const byId = new Map(), pins = new Map(), elements = {};
-  let last = null, raf = 0, hover = null, pinned = null, on = true, failed = null;
+  const byId = new Map(), pins = new Map(), chips = new Map(), elements = {};
+  let last = null, raf = 0, hover = null, pinned = null, on = true, failed = null, cfgAll = null, lensLocked = false;
+  const styleOf = s => typeStyle(cfgAll, s.type);
   const count = doc.getElementById('sdCount');
   doc.getElementById('sdToggle').onclick = e => { on = !on; doc.body.classList.toggle('sd-off', !on); e.currentTarget.textContent = on ? 'Hide' : 'Show'; e.currentTarget.setAttribute('aria-pressed', String(on)); if (!on) { pinned = hover = null; } renderCard(); e.currentTarget.blur(); };
   function pinFor(s) {
     let b = pins.get(s.id); if (b) return b;
-    b = doc.createElement('button'); b.type = 'button'; b.className = 'sd-pin' + (s.type === 'alert' ? ' alert' : ''); b.textContent = String(s.k || '•');
-    b.style.background = s.color || '#087F8C'; b.dataset.sensor = s.id; b.setAttribute('aria-label', s.label + ' (demo, illustrative)'); b.hidden = true;
+    const st = styleOf(s);
+    b = doc.createElement('button'); b.type = 'button'; b.className = 'sd-pin' + (s.type === 'alert' ? ' alert' : ''); b.innerHTML = iconSvg(st.icon, s.type === 'alert' ? 13 : 15);
+    b.style.background = st.color; b.dataset.sensor = s.id; b.dataset.type = s.type; b.setAttribute('aria-label', (s.k ? s.k + ' ' : '') + s.label + ' (demo, illustrative)'); b.hidden = true;
+    const c = doc.createElement('span'); c.className = 'sd-chip'; c.dataset.sensor = s.id; c.style.borderColor = st.color; c.hidden = true;
+    c.innerHTML = (s.k ? '<b style="background:' + esc(st.color) + '">' + esc(s.k) + '</b>' : '') + esc(st.short);
+    c.addEventListener('click', e => { e.stopPropagation(); pinned = pinned === s.id ? null : s.id; renderCard(); });
+    layer.appendChild(c); chips.set(s.id, c);
     b.addEventListener('mouseenter', () => { hover = s.id; renderCard(); }); b.addEventListener('mouseleave', () => { hover = null; renderCard(); });
     b.addEventListener('focus', () => { hover = s.id; renderCard(); }); b.addEventListener('blur', () => { hover = null; renderCard(); });
     b.addEventListener('click', e => { e.stopPropagation(); pinned = pinned === s.id ? null : s.id; renderCard(); });
@@ -388,15 +457,23 @@ function mountParent(ctx) {
         gLinks.appendChild(el('line', {x1: p[0].toFixed(1), y1: p[1].toFixed(1), x2: pos[l][0].toFixed(1), y2: pos[l][1].toFixed(1), stroke: '#FDB515', 'stroke-width': '2.5', 'stroke-dasharray': '6 5', 'stroke-opacity': '.95'}));
     }
     for (const [id, b] of pins) if (!seen.has(id)) b.hidden = true;
+    /* always-visible type chips beside the pins, nudged apart (placeChips) */
+    const items = [];
+    for (const [id, c] of chips) { if (!seen.has(id)) { c.hidden = true; continue; } c.hidden = false; items.push({id, x: pos[id][0], y: pos[id][1], w: c.offsetWidth || 70, h: c.offsetHeight || 18}); }
+    for (const q of placeChips(items, {x: 4, y: 4, w: R.mw - 8, h: R.mh - 8}, 14)) { const c = chips.get(q.id); c.style.transform = 'translate(' + q.x.toFixed(1) + 'px,' + q.y.toFixed(1) + 'px)'; c.style.opacity = pins.get(q.id).style.opacity; }
     const attached = Object.values(elements).length;
     count.textContent = failed ? '· not loaded' : '· ' + (ctx.sceneFilter ? 'scene ' + ctx.sceneFilter + ' · ' : '') + seen.size + ' in view · ' + attached + ' attached to BIM elements';
     renderCard();
   }
   function renderCard() {
     const id = on ? (pinned || hover) : null, s = id && byId.get(id), b = s && pins.get(id);
-    pins.forEach((p, k) => p.classList.toggle('on', k === id));
+    pins.forEach((p, k) => p.classList.toggle('on', k === id)); chips.forEach((c, k) => c.classList.toggle('on', k === id));
+    /* the Lens follows a clicked / deck-focused sensor: centred on its pin, recomputed from each new projection */
+    const lockId = on && pinned && pins.get(pinned) && !pins.get(pinned).hidden ? pinned : null;
+    if (lens && lockId) { const pb = pins.get(lockId), m = main.getBoundingClientRect(); lens.set(+pb.dataset.x, +pb.dataset.y, m.width, m.height); lensLocked = true; }
+    else if (lens && lensLocked && !pinned) { lens.release(); lensLocked = false; }
     if (!s || !b || b.hidden) { card.classList.remove('show'); doc.body.classList.remove('sd-card-on'); return; }
-    if (card.dataset.sensor !== id) { card.innerHTML = cardHtml(s, elements[id]); card.dataset.sensor = id; }
+    if (card.dataset.sensor !== id) { card.innerHTML = cardHtml(s, elements[id], styleOf(s)); card.dataset.sensor = id; }
     const R = rect(), x = +b.dataset.x || 0, y = +b.dataset.y || 0;
     const cw = card.offsetWidth || 270, ch = card.offsetHeight || 160;
     let L = x + 22; if (L + cw > R.mw - 8) L = x - 22 - cw; L = Math.max(8, Math.min(R.mw - cw - 8, L));
@@ -420,12 +497,13 @@ function mountParent(ctx) {
   doc.documentElement.addEventListener('mouseleave', () => { if (hover) { hover = null; renderCard(); } });   // pointer left the page (e.g. into the deck)
   main.addEventListener('pointerdown', e => { if (!e.target.closest || !e.target.closest('.sd-pin')) { if (pinned) { pinned = null; renderCard(); } } }, true);
   fetch(ctx.configUrl || CONFIG_URL, {cache: 'no-store'}).then(r => { if (!r.ok) throw Error('config ' + r.status); return r.json(); }).then(cfg => {
-    const v = validateConfig(cfg); for (const s of filterScene(v.sensors, ctx.sceneFilter || null)) byId.set(s.id, s); schedule();
+    const v = validateConfig(cfg); cfgAll = cfg; for (const s of filterScene(v.sensors, ctx.sceneFilter || null)) byId.set(s.id, s); schedule();
   }).catch(e => { failed = String(e && e.message || e); count.textContent = '· not loaded'; });
-  return {inspection: () => ({scene: ctx.sceneFilter || null, sensors: byId.size, attached: Object.keys(elements), pins: [...pins].filter(([, b]) => !b.hidden).map(([id]) => id), fibreSegments: gFibre.childNodes.length / 2, pulses: gPulse.childNodes.length / 3, links: gLinks.childNodes.length, zones: gZones.childNodes.length, card: card.classList.contains('show') ? card.dataset.sensor : null, failed}),
+  return {inspection: () => ({lensLocked, chips: [...chips].filter(([, c]) => !c.hidden).map(([id, c]) => { const r = c.getBoundingClientRect(); return [id, c.textContent, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }),
+    pinXY: Object.fromEntries([...pins].filter(([, b]) => !b.hidden).map(([id, b]) => [id, [+b.dataset.x, +b.dataset.y]])), scene: ctx.sceneFilter || null, sensors: byId.size, attached: Object.keys(elements), pins: [...pins].filter(([, b]) => !b.hidden).map(([id]) => id), fibreSegments: gFibre.childNodes.length / 2, pulses: gPulse.childNodes.length / 3, links: gLinks.childNodes.length, zones: gZones.childNodes.length, card: card.classList.contains('show') ? card.dataset.sensor : null, failed}),
     focus: id => { pinned = byId.has(id) ? id : null; renderCard(); }};
 }
 
-return {SCHEMA, STATUS, CONFIG_URL, BADGE_TEXT, MSG, TYPES, parseSensorsParam, parseSceneParam, filterScene, validateConfig, colorAt, cssColor, dtsTempC, dtsValue,
+return {typeStyle, iconSvg, lensPoint, placeChips, SCHEMA, STATUS, CONFIG_URL, BADGE_TEXT, MSG, TYPES, parseSensorsParam, parseSceneParam, filterScene, validateConfig, colorAt, cssColor, dtsTempC, dtsValue,
   principalAxis, axisParam, axisPoint, anchorPoint, zoneRing, esc, sparkSvg, cardHtml, mountBim, mountParent, PARENT_CSS};
 });

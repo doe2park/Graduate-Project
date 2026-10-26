@@ -6,7 +6,13 @@ addEventListener('resize',fit);
 /* ---------- live frames: load on the active slide, pre-warm the next slide's frame (hidden), unload the rest ---------- */
 const CLEAN_CSS='header,#overlayBar{display:none!important}';
 const CLEAN_CSS_SENSOR=CLEAN_CSS+'#lensCard{display:none!important}';   /* live twin slides: the sensor pins and cards carry the story */
-function applyClean(el,f){try{const d=f.contentDocument;let s=d.getElementById('deck-clean');const on=el.dataset.clean==='1';
+/* live twin slides: also hide the capture / Walk controls of the nested scan (photo) frame, same origin; re-applied when it reloads */
+const NESTED_CLEAN_CSS='#tools{display:none!important}';
+function cleanNested(el,f){if(el.dataset.live!=='sensor')return;const apply=n=>{try{const d=n.contentDocument;if(!d||!d.head)return;let s=d.getElementById('deck-clean-nested');const on=el.dataset.clean==='1';
+    if(on&&!s){s=d.createElement('style');s.id='deck-clean-nested';s.textContent=NESTED_CLEAN_CSS;d.head.appendChild(s)}if(!on&&s)s.remove()}catch(_){}};
+  const scan=()=>{try{f.contentDocument.querySelectorAll('iframe').forEach(n=>{apply(n);if(!n._deckClean){n._deckClean=1;n.addEventListener('load',()=>apply(n))}})}catch(_){}};
+  scan();let k=0;const iv=setInterval(()=>{if(!f.isConnected||++k>40){clearInterval(iv);return}scan()},500)}
+function applyClean(el,f){cleanNested(el,f);try{const d=f.contentDocument;let s=d.getElementById('deck-clean');const on=el.dataset.clean==='1';
   if(on&&!s){s=d.createElement('style');s.id='deck-clean';s.textContent=el.dataset.live==='sensor'?CLEAN_CSS_SENSOR:CLEAN_CSS;d.head.appendChild(s)}
   if(!on&&s)s.remove();f.contentWindow.dispatchEvent(new Event('resize'));
   const b=el.querySelector('[data-toggle-chrome]');if(b)b.textContent=on?'Show page controls':'Hide page controls'}catch(e){}}

@@ -76,7 +76,7 @@ S2 = dict(
        what='Damper position and zone setpoint, read from the building automation system if we get access.', val='Damper 72 % open; cooling mode',
        maps='Shown on branch duct 401200; the VAV box is outside this view', badge=(655, 385), hit=(655, 385, 26), draw=pin(4, 655, 385, '#003262')),
  ],
- legend=[('#FFC14D', 'slightly warm'), ('#FF7A1A', 'above setpoint'), ('#1E50DC', 'room node')],
+ legend=[('#FFC14D', 'slightly warm'), ('#FF7A1A', 'above setpoint'), ('#7C3AED', 'room node')],
  steps=[dict(head='Measure', text='Duct airflow, room CO2 and temperature'), dict(head='Map to BIM', text='Probe → duct ID; node → room / space ID'),
         dict(head='Show', text='Tint the room, flag a duct that under-delivers')],
  footnote=foot(43),

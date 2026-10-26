@@ -3092,7 +3092,21 @@ let sensorDemo=null;
 if(splitPane==='bim'&&new URLSearchParams(location.search).get('sensors')==='demo'){
  const sdRay=new THREE.Ray(),sdEye=new THREE.Vector3(),sdP=new THREE.Vector3();
  const sdScript=document.createElement('script');sdScript.src='twin/sensor-demo.js?v=1';
- sdScript.onload=()=>{sensorDemo=window.SensorDemo.mountBim({THREE,scene,camera,sceneFilter:window.SensorDemo.parseSceneParam(location.search),getLayer:k=>layerState[k],elementInfo,kick:()=>_kick(),post:m=>window.parent.postMessage(m,location.origin),
+ /* layers the Overlay skips on this device (same rule as setOverlay: fire on phones / coarse-pointer browsers incl. Quest)
+    get only their anchored elements, from the chunk named by the sensor config, as a render-only group outside layerState */
+ const sdSkipped=key=>key==='fire'&&mobileQuality;
+ const sdLoadSubset=async(key,ids,parts)=>{
+  const L=LAYERS[key],all=(await cachedJson(L.json)).elements||{},meta={};
+  for(const id of ids)if(all[id]){meta[id]={...all[id],layer:key};meta[id].levelKey=elementLevel(meta[id])||'UNKNOWN';}
+  const tier=await assembleElementParts(parts.map(f=>'buildings/grimes/'+f),path=>new Promise((res,rej)=>loader.load(path,res,undefined,rej)),async gltf=>{
+   const g=gltf.scene;g.rotation.y=Math.PI;g.position.set(EQUIP_OFFSET.x,EQUIP_OFFSET.y,EQUIP_OFFSET.z);g.updateMatrixWorld(true);bindElementSourceIds(gltf);
+   const drop=[];g.traverse(o=>{if(!(o.isMesh||o.isLine))return;for(let p=o;p;p=p.parent){const id=p.userData.elementId??p.name;if(id&&meta[id])return;}drop.push(o);});
+   for(const o of drop)o.parent?.remove(o);
+   return await buildElementRenderTier(THREE,g,meta,key);},releaseElementSource);
+  for(const im of tier.meshes)ovPatchMaterial(im.material);
+  const group=new THREE.Group();group.name='sensor-demo anchors:'+key;for(const im of tier.meshes)group.add(im);scene.add(group);_kick();
+  return {group,meshes:tier.meshes,meta,subset:true};};
+ sdScript.onload=()=>{sensorDemo=window.SensorDemo.mountBim({THREE,scene,camera,sceneFilter:window.SensorDemo.parseSceneParam(location.search),skipped:k=>overlayOn&&sdSkipped(k),loadSubset:sdLoadSubset,getLayer:k=>layerState[k],elementInfo,kick:()=>_kick(),post:m=>window.parent.postMessage(m,location.origin),
   /* Overlay Range fade x wall occlusion at the anchor (same rules as the element fragments); 1 outside Overlay */
   visibility:p=>{if(!overlayOn)return 1;camera.getWorldPosition(sdEye);sdP.set(p[0],p[1],p[2]);const d=sdEye.distanceTo(sdP);if(!(d>1e-6))return 1;
    let v=OV.rangeFade(d,ovPreset);sdRay.origin.copy(sdEye);sdRay.direction.copy(sdP).sub(sdEye).normalize();if(!(ovWallDistance(sdRay)<d-.15))return v;

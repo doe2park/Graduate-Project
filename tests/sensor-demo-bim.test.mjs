@@ -80,3 +80,33 @@ test('frame(): posts projected anchors, fibre samples and visibility; silent whe
   camera.position.x += 0.5; camera.updateMatrixWorld(); api.frame();
   assert.equal(posts.filter(m => m.type === SD.MSG.frame).length, 1, 'moved camera: anchors re-projected');
 });
+
+test('a layer the Overlay skips on this device: only the anchored elements load (subset), then attach', async () => {
+  const {mesh, group} = batch(), scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(60, 1, 0.05, 100);
+  camera.position.set(2, 0, 4); camera.lookAt(2, 3, -1); camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+  const calls = [], posts = [], realFetch = globalThis.fetch;
+  const fire = {...dts, anchor: {...dts.anchor, part: 'grimes-fire-l1-1.glb'}}, fire2 = {...pin, anchor: {...pin.anchor, part: 'grimes-fire-l1-1.glb'}};
+  globalThis.fetch = async () => ({ok: true, json: async () => cfg([fire, fire2])});
+  try {
+    const api = SD.mountBim({THREE, scene, camera, getLayer: () => null, elementInfo: () => null, post: m => posts.push(m), visibility: () => 1, configUrl: 'x.json',
+      skipped: k => k === 'fire',
+      loadSubset: async (k, ids, parts) => { calls.push([k, ids, parts]); return {group, meshes: [mesh], meta: {'11': {name: 'Pipe11', source_guid: 'g-11'}}, subset: true}; }});
+    for (let i = 0; i < 80 && api.inspection().states['p-dts']?.status !== 'attached'; i++) await new Promise(r => setTimeout(r, 10));
+    assert.equal(api.inspection().states['p-dts'].status, 'attached');
+    assert.equal(api.inspection().states['p-pin'].status, 'attached');
+    assert.deepEqual(calls, [['fire', ['11'], ['grimes-fire-l1-1.glb']]], 'one subset request: unique ids, named chunk only');
+    assert.deepEqual(api.inspection().subsets.fire, {ids: ['11'], parts: ['grimes-fire-l1-1.glb'], loaded: true, meshes: 1, error: null});
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('not skipped on this device (desktop): no subset request, waits for the real layer', async () => {
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), calls = [], realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ok: true, json: async () => cfg([{...dts, anchor: {...dts.anchor, part: 'grimes-fire-l1-1.glb'}}])});
+  try {
+    const api = SD.mountBim({THREE, scene, camera, getLayer: () => null, elementInfo: () => null, post: () => {}, configUrl: 'x.json', skipped: () => false, loadSubset: async (...a) => { calls.push(a); }});
+    await new Promise(r => setTimeout(r, 80));
+    assert.equal(calls.length, 0);
+    assert.equal(api.inspection().states['p-dts'].status, 'pending');
+    assert.match(api.inspection().states['p-dts'].reason, /fire layer not loaded/);
+  } finally { globalThis.fetch = realFetch; }
+});
