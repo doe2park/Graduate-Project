@@ -26,20 +26,20 @@ def lect_credit(lec, page, extra=''): return f'Figure: {COURSE}, Lecture {lec}, 
 EXTRA = {
  'fiber': dict(id='fiber', kind='figure', title='Fiber sensing: one cable, many sensors',
    subtitle='A laser pulse is sent down the fiber; light scattered back is timed to give a reading every metre or so',
-   footnote='Concepts: ' + COURSE + '. Typical values; actual performance depends on the analyzer and cable. Photo: fiber cable — Asurnipal, Wikimedia Commons, CC BY-SA 4.0.',
-   notes='Fiber optic sensing turns one cable into thousands of sensors. The analyzer sends a laser pulse and times the light scattered back, so each slice of the cable becomes a reading. The type of scattering decides what is measured. Raman scattering gives temperature: that is DTS, about one reading per metre over kilometres, which is why it suits leak detection on pipes. Brillouin scattering, BOTDR or BOTDA, gives strain and temperature; Professor Soga’s lab uses it on tunnels, piles and pipelines. Rayleigh scattering, read as phase, gives vibration at kilohertz rates: that is DAS, distributed acoustic sensing. Fiber Bragg gratings are different: they are written at chosen points, so they measure strain or temperature only there. The concepts come from the CE170/278 infrastructure sensing course.'),
- 'ce278': dict(id='ce278', kind='figure', title='From the CE278 project: fiber sensing in practice',
-   subtitle='Distributed acoustic sensing (DAS) on a roadside fiber, one minute of data: every passing vehicle leaves a stripe',
+   footnote='Concepts: ' + COURSE + '. Typical values; actual performance depends on the analyzer and cable. Sketches drawn for this deck.',
+   notes='Fiber optic sensing turns one cable into thousands of sensors. The analyzer sends a laser pulse and times the light scattered back, so each slice of the cable becomes a reading. The type of scattering decides what is measured. Raman scattering gives temperature: that is DTS, about one reading per metre over kilometres, which is why it suits leak detection on pipes. Brillouin scattering, BOTDR or BOTDA, gives strain and temperature; in a building that means pipe, hanger or slab strain. Rayleigh scattering, read as phase, gives vibration at kilohertz rates: that is DAS, distributed acoustic sensing. Fiber Bragg gratings are different: they are written at chosen points, so they measure strain or temperature only there. The concepts come from the CE170/278 infrastructure sensing course.'),
+ 'ce278': dict(id='ce278', kind='figure', title='From the CE278 project: the DAS method a riser would use',
+   subtitle='Own CE278 project: one minute of DAS on a roadside fiber. The same method on a riser would show water hammer and pump noise',
    footnote='Figures: own CE278 final project (UC Berkeley, fall 2025), DAS run 15:59:38–16:00:38, focused channels 1450–1650; course-provided DAS dataset.',
-   notes='This is from my own CE278 final project, which used distributed acoustic sensing on a fiber along a road. The left plot is a waterfall: across is position along the fiber, one channel is roughly a metre, down is time over one minute, and colour is dynamic strain. Each vehicle shows up as a short burst at the channels it passes. On the right, the strain energy in a hundred channels is reduced to one curve, and every peak above the dashed threshold is a detected event. The same picture would work on a pipe riser: across becomes height along the riser, and flow noise, water hammer or a pump would appear as stripes at the floor where they happen.'),
- 'mems': dict(id='mems', kind='figure', title='Point sensors: MEMS accelerometers and strain sensors',
+   notes='This is from my own CE278 final project, which used distributed acoustic sensing on a fiber along a road. The left plot is a waterfall: across is position along the fiber, one channel is roughly a metre, down is time over one minute, and colour is dynamic strain. Each vehicle shows up as a short burst at the channels it passes. On the right, the strain energy in a hundred channels is reduced to one curve, and every peak above the dashed threshold is a detected event. The road is only where the project data came from. The point for Grimes is the method: on a pipe riser, across becomes height along the riser, and water hammer, pump noise or the hiss of a leak would appear as stripes at the floor where they happen.'),
+ 'mems': dict(id='mems', kind='figure', title='Point sensors: MEMS vibration nodes',
    subtitle='Micro-electro-mechanical systems: silicon-made, small, cheap and low-power, the core of wireless vibration nodes',
-   footnote=lect_credit('2-4', 3) + '; ' + lect_credit('2-4', 5, 'Yan, Seshia and Soga') + '.',
-   notes='The point sensors in the concepts are mostly MEMS. In a MEMS accelerometer a small proof mass on springs carries comb fingers between fixed electrodes; when it moves, the capacitance changes, and that gives acceleration. They are made thousands at a time on a silicon wafer, so they are small, cheap and low-power, which is why wireless vibration nodes use them. The same technology gives very fine strain sensors: Professor Soga’s group reports one to ten nano-strain resolution, compared with one to ten micro-strain for a conventional vibrating-wire gauge, at half to two milliwatts. Figures are from the CE170/278 lectures.'),
+   footnote=lect_credit('2-4', 3) + '; ' + lect_credit('2-4', 19) + '.',
+   notes='The point sensors in the concepts are mostly MEMS. In a MEMS accelerometer a small proof mass on springs carries comb fingers between fixed electrodes; when it moves, the capacitance changes, and that gives acceleration. They are made thousands at a time on a silicon wafer, so they are small, cheap and low-power, and a battery node like the one in the photo, from the course lab, can carry one. It samples at about a kilohertz, so it records short bursts when triggered. In Grimes we would clamp nodes on pumps, fans, air-handler casings or pipe hangers, where rising vibration warns of bearing wear or loose supports. Figures are from the CE170/278 lectures.'),
  'wsn': dict(id='wsn', kind='figure', title='Wireless sensor networks: what limits them',
    subtitle='Sensor nodes report by radio to a gateway; battery, sampling rate and radio paths decide the design',
-   footnote=lect_credit('2-4', 10) + '. Design points summarised from ' + COURSE + ', Lecture 2-4.',
-   notes='A wireless sensor network is a set of nodes that measure and send data by radio to a gateway, and from there to the cloud. The figure from the course shows the idea on a gas pipeline, above and below ground. Four things limit the design. Topology: a star is simple, a mesh relays around obstacles. Battery: a tilt node reading hourly on one D cell can in theory last twenty to twenty-five years, but a vibration node sampling at a kilohertz cannot run continuously, so it records short bursts when triggered. Radio: walls, floors, people and metal ducts weaken the signal. For Grimes that means nodes in the ceiling plenums, a gateway per floor, triggered vibration recordings, and IT approval for the radio.'),
+   footnote='Diagram drawn for this deck. Design points summarised from ' + COURSE + ', Lecture 2-4.',
+   notes='A wireless sensor network is a set of nodes that measure and send data by radio to a gateway, and from there to the cloud. The diagram shows how it would sit in Grimes: battery nodes in the ceiling plenums, a gateway on each floor, and the campus network carrying the data to the building management system and the twin. Four things limit the design. Topology: a star is simple, a mesh relays around obstacles. Battery: a tilt node reading hourly on one D cell can in theory last twenty to twenty-five years, but a vibration node sampling at a kilohertz cannot run continuously, so it records short bursts when triggered. Radio: walls, floors, people and metal ducts weaken the signal. For Grimes that means nodes in the ceiling plenums, a gateway per floor, triggered vibration recordings, and IT approval for the radio.'),
 }
 CS.update(EXTRA)
 ORDER = ['cover', 'part-1', 'bms', 'part-2', 'sensing', 'fiber', 'ce278', 'mems', 'wsn', 'pilot'] + [sc['id'] for sc in SCENARIOS] + ['thanks']
@@ -118,6 +118,12 @@ def numsteps(x, y, w, h, steps, head_size=11, size=10.5, arrow=.2, compact=False
         if i < n - 1: out += f'<div class="arrow" style="{pos(sx+sw+.02,y+h/2-.1,arrow-.04,.2)}"></div>'
     return out
 
+ICON_DAS = 'M2 12h3l2-5 3 10 3-8 2 6 2-3h5'
+ICON_FBG = 'M2 12h20M7 8v8M10 8v8M13 8v8M16 8v8'
+def _sd_types(): return json.loads((ROOT.parent.parent / 'twin' / 'sensor-demo.json').read_text())['types']
+_T = _sd_types()
+ROW_ICONS = [(_T['dts']['icon'], _T['dts']['color']), (_T['vibration']['icon'], _T['vibration']['color']), (ICON_DAS, '#0F766E'), (ICON_FBG, '#5B21B6'), (_T['iaq']['icon'], _T['iaq']['color'])]
+
 def sensing_table():
     t = blk('sensing', 'table'); x, y = 1.5, 1.24; cw = [c['w'] for c in t['cols']]; rh, hh = t['row_h'], t['head_h']
     th = ''.join(f'<th style="width:{px(w)};font-size:{10*PT:.1f}px;text-align:left;padding:0 {.08*U:.0f}px">{e(c["head"])}</th>' for c, w in zip(t['cols'], cw))
@@ -133,10 +139,10 @@ def sensing_table():
         rows += f'<tr style="height:{px(rh)};background:{bg}">{tds}</tr>'
     out = (f'<table class="stbl" style="{pos(x,y,sum(cw),hh+rh*len(t["rows"]))};width:{px(sum(cw))};border-collapse:collapse;table-layout:fixed;box-shadow:0 4px 10px rgba(0,0,0,.18)">'
            f'<thead><tr style="height:{px(hh)};background:{NAVY};color:#fff">{th}</tr></thead><tbody>{rows}</tbody></table>')
-    # photos beside the rows (credits in the footnote)
-    for i, im in enumerate(['s1-fiber-cable.jpg', 's2-wireless-accel.jpg', 's1-fiber-cable.jpg', 's3-fbg-rail.jpg']):
-        iw, ih = .84, .56
-        out += f'<img src="img/{im}" alt="" style="{pos(.55, y+hh+rh*i+(rh-ih)/2, iw, ih)};object-fit:cover;outline:2px solid #C8D1DC;outline-offset:-1px">'
+    # a type icon beside each row (same icons as the live sensor layer; no stock photos)
+    for i, (path, col) in enumerate(ROW_ICONS):
+        d = .5; out += (f'<div class="circ" style="{pos(.8, y+hh+rh*i+(rh-d)/2, d, d)};background:{col}">'
+                        f'<svg viewBox="0 0 24 24" width="{.3*U:.0f}" height="{.3*U:.0f}" aria-hidden="true"><path d="{e(path)}" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>')
     return out
 
 # --- interactive twin concept slides (generic; scenarios in scenarios.py)
@@ -177,13 +183,30 @@ def fig(p, x, y, w, h, frame=False):
 def credit(x, y, w, t):
     return text(x, y, w, .2, P(t, size=7, color=MUTED, italic=True))
 
+# native principle sketches for the fiber techniques (SVG, drawn here; no raster text)
+def _sk(inner): return f'<svg viewBox="0 0 160 60" style="width:100%;height:100%" xmlns="http://www.w3.org/2000/svg">{inner}</svg>'
+FIB = '<line x1="6" y1="48" x2="154" y2="48" stroke="#5B7089" stroke-width="3" stroke-linecap="round"/>'
+PULSE = '<path d="M8 40h10l-4-4M18 40l-4 4" fill="none" stroke="#C4402F" stroke-width="2"/>'
+SKETCH = {
+ 'DTS': _sk(FIB + PULSE + '<path d="M6 30 C40 30 50 30 62 28 C72 6 84 6 94 28 C108 31 130 31 154 31" fill="none" stroke="#E61E1E" stroke-width="2.6"/>'
+            '<path d="M120 40h-10l4-4M110 40l4 4" fill="none" stroke="#1E50DC" stroke-width="2"/>'),
+ 'BOTDR / BOTDA': _sk(FIB.replace('stroke-width="3"', 'stroke-width="3" stroke-dasharray="0"') + PULSE +
+            '<path d="M6 32H70V16H106V32H154" fill="none" stroke="#087F8C" stroke-width="2.6"/><path d="M70 48l-4 -4M106 48l4 -4" stroke="#087F8C" stroke-width="2"/>'),
+ 'DAS': _sk(''.join(f'<line x1="{12+i*12}" y1="6" x2="{12+i*12}" y2="54" stroke="#EEF3F8" stroke-width="1"/>' for i in range(12)) +
+            '<path d="M20 8 L60 54M60 8 L100 54M104 8 L150 50" stroke="#C4402F" stroke-width="5" stroke-linecap="round" opacity=".8"/>'
+            '<rect x="2" y="2" width="156" height="56" fill="none" stroke="#C8D1DC"/>'),
+ 'FBG': _sk(FIB + ''.join(f'<line x1="{70+i*4}" y1="42" x2="{70+i*4}" y2="54" stroke="#5B21B6" stroke-width="2"/>' for i in range(6)) +
+            '<path d="M8 22h40" stroke="url(#rb)" stroke-width="6"/><defs><linearGradient id="rb"><stop offset="0" stop-color="#1E50DC"/><stop offset=".5" stop-color="#22C55E"/><stop offset="1" stop-color="#E61E1E"/></linearGradient></defs>'
+            '<path d="M48 22h12l-4-4M60 22l-4 4" fill="none" stroke="#5B7089" stroke-width="2"/><path d="M118 28 L124 28 L127 8 L130 28 L154 28" fill="none" stroke="#22C55E" stroke-width="2.6"/>'
+            '<path d="M110 22h-10l4-4M100 22l4 4" fill="none" stroke="#22C55E" stroke-width="2"/>'),
+}
 def fiber_slide():
-    rows = [('DTS', 'Raman', 'Temperature', '~1 m over km; 0.1 °C', 'Leaks as warm/cold spots; radiant loops'),
-            ('BOTDR / BOTDA', 'Brillouin', 'Strain + temperature', '~1 m; static', 'Slab, pile, pipe strain (lab: tunnels, piles)'),
-            ('DAS', 'Rayleigh (phase)', 'Vibration / sound', '1–10 m; up to kHz', 'Flow noise, water hammer, pumps on a riser'),
-            ('FBG', 'Bragg gratings', 'Strain / temperature', 'Chosen points only', 'Known hot spots, equipment mounts')]
-    cw = [1.35, 1.35, 1.45, 1.6, 2.65]; x, y, rh, hh = 1.3, 1.25, .56, .32
-    heads = ['Technique', 'Scattering', 'Measures', 'Spacing / speed (typical)', 'Use in a building']
+    rows = [('DTS', 'Raman', 'Temperature', '~1 m over km; 0.1 °C', 'Leaks as warm or cold spots on pipes; radiant-loop faults'),
+            ('BOTDR / BOTDA', 'Brillouin', 'Strain + temperature', '~1 m; slow (static)', 'Pipe and hanger strain; slab or riser movement'),
+            ('DAS', 'Rayleigh (phase)', 'Vibration / sound', '1–10 m; up to kHz', 'Flow noise, water hammer, pumps along a riser'),
+            ('FBG', 'Bragg gratings', 'Strain / temperature', 'Chosen points only', 'A few known hot spots: pump or AHU mounts')]
+    cw = [1.35, 1.25, 1.25, 1.45, 2.3]; x, y, rh, hh = 1.85, 1.2, .56, .3
+    heads = ['Technique', 'Scattering', 'Measures', 'Spacing / speed (typical)', 'Use in Grimes']
     th = ''.join(f'<th style="width:{px(w)};font-size:{10*PT:.1f}px;text-align:left;padding:0 {.08*U:.0f}px">{e(h)}</th>' for h, w in zip(heads, cw))
     trs = ''
     for i, r in enumerate(rows):
@@ -191,38 +214,64 @@ def fiber_slide():
         trs += f'<tr style="height:{px(rh)};background:{"#FFF3D6" if i in (0, 2) else ("#EEF3F8" if i % 2 else "#fff")}">{tds}</tr>'
     out = (f'<table class="stbl" style="{pos(x,y,sum(cw),hh+rh*len(rows))};width:{px(sum(cw))};border-collapse:collapse;table-layout:fixed;box-shadow:0 4px 10px rgba(0,0,0,.18)">'
            f'<thead><tr style="height:{px(hh)};background:{NAVY};color:#fff">{th}</tr></thead><tbody>{trs}</tbody></table>')
-    out += f'<img src="img/s1-fiber-cable.jpg" alt="" style="{pos(.3,1.25,.9,.6)};object-fit:cover;outline:2px solid #C8D1DC;outline-offset:-1px">'
-    out += box(.55, 3.95, 4.3, .75, 'card') + text(.7, 3.97, 4.0, .72, [[('Distributed', dict(bold=True, color=NAVY, size=11))], [('DTS, BOTDR, DAS: every metre of the cable is a sensor, so a leak can be anywhere', dict(size=10))]], anchor='middle', gap=1)
-    out += box(5.05, 3.95, 4.4, .75, 'card') + text(5.2, 3.97, 4.1, .72, [[('Point', dict(bold=True, color=NAVY, size=11))], [('FBG and MEMS nodes: precise, but only where they are placed', dict(size=10))]], anchor='middle', gap=1)
+    out += text(.55, y, 1.2, hh, P('How it works', size=9, bold=True, color=NAVY), anchor='middle')
+    for i, (k, *_r) in enumerate(rows):
+        out += f'<div style="{pos(.55, y+hh+rh*i+.04, 1.2, rh-.08)};background:#fff;outline:1px solid #C8D1DC;outline-offset:-1px" title="{e(k)} principle sketch">{SKETCH[k]}</div>'
+    out += text(.55, y + hh + rh * 4 + .03, 8.9, .22, P('Sketches: DTS temperature bump at a leak · BOTDR shift where strained · DAS stripes in distance × time · FBG reflects one wavelength', size=8, color=MUTED, italic=True))
+    out += box(.55, 4.08, 4.3, .64, 'card') + text(.7, 4.09, 4.0, .62, [[('Distributed', dict(bold=True, color=NAVY, size=11))], [('DTS, BOTDR, DAS: every metre of the cable is a sensor, so a leak can be anywhere along a pipe', dict(size=10))]], anchor='middle', gap=1)
+    out += box(5.05, 4.08, 4.4, .64, 'card') + text(5.2, 4.09, 4.1, .62, [[('Point', dict(bold=True, color=NAVY, size=11))], [('FBG and MEMS nodes: precise, but only where they are placed', dict(size=10))]], anchor='middle', gap=1)
     return out
 
 def ce278_slide():
     out = fig('ce278-das-waterfall.jpg', .45, 1.2, 3.75, 2.9, frame=True)
     out += fig('ce278-das-detection.jpg', 4.4, 1.2, 5.1, 2.0, frame=True)
     out += box(4.4, 3.5, 2.45, 1.25, 'card') + text(4.52, 3.53, 2.25, 1.2, [[('Reading a waterfall', dict(bold=True, color=NAVY, size=11))], [('Across: position along the fiber (channel ≈ 1 m). Down: time. Colour: dynamic strain. A vehicle = a short burst where it passes.', dict(size=9.5))]], gap=2)
-    out += box(7.0, 3.5, 2.5, 1.25, 'card navy') + text(7.12, 3.53, 2.3, 1.2, [[('On a pipe riser', dict(bold=True, color=GOLD, size=11))], [('Across = height up the riser. Flow noise, water hammer or a pump show as stripes at the floor where they happen.', dict(size=9.5, color='#fff'))]], gap=2)
+    out += box(7.0, 3.5, 2.5, 1.25, 'card navy') + text(7.12, 3.53, 2.3, 1.2, [[('Same method on a Grimes riser', dict(bold=True, color=GOLD, size=11))], [('Across = height up the riser. Water hammer, pump noise or a leak’s hiss would show as stripes at the floor where they happen.', dict(size=9.5, color='#fff'))]], gap=2)
     out += text(.45, 4.15, 3.75, .5, P('Waterfall: 60 s of dynamic strain, channels 1450–1650', size=9, color=MUTED, italic=True))
     out += text(4.4, 3.21, 5.1, .22, P('Detection: RMS strain in channels 1500–1600; each × above the dashed threshold is an event', size=9, color=MUTED, italic=True))
     return out
 
 def mems_slide():
-    out = fig('l24-p3-mems-accelerometer.jpg', .55, 1.25, 2.55, 2.4, frame=True)
-    out += credit(.55, 3.68, 2.6, 'MEMS accelerometer (comb design)')
-    out += fig('l24-p5-vw-vs-mems-strain.jpg', 3.35, 1.25, 6.1, 2.37, frame=True)
-    out += text(3.35, 3.66, 3.0, .3, P('Vibrating-wire gauge: 1–10 µε resolution', size=10, bold=True, color=NAVY))
-    out += text(6.45, 3.66, 3.0, .3, P('MEMS strain sensor: 1–10 nε, 0.5–2 mW', size=10, bold=True, color=NAVY))
-    out += bullets_card(.55, 3.98, 8.9, .78, 'How a MEMS accelerometer works', [], head_size=11)
-    out += text(.7, 4.33, 8.6, .4, P('A proof mass on springs moves its comb fingers between fixed electrodes; the change in capacitance gives acceleration. In Grimes: clamp a node on a pump, fan or pipe for vibration level and spectrum.', size=10))
+    out = fig('l24-p3-mems-accelerometer.jpg', .55, 1.22, 2.75, 2.56, frame=True)
+    out += credit(.55, 3.8, 2.8, 'MEMS accelerometer (comb design)')
+    out += fig('l24-p19-wireless-node.jpg', 3.5, 1.22, 2.3, 2.56, frame=True)
+    out += credit(3.5, 3.8, 2.4, 'Battery wireless sensor node (course lab hardware)')
+    items = ['A proof mass on springs moves its comb fingers between fixed electrodes; the capacitance change gives acceleration',
+             'Made thousands at a time on silicon: small, cheap, milliwatt power, so a node can run on a battery',
+             'Records vibration level and spectrum; samples ~1 kHz, so it stores short bursts when triggered']
+    out += bullets_card(6.0, 1.22, 3.45, 2.56, 'How it works', items, head_size=12, size=9.5)
+    out += box(.55, 4.05, 8.9, .68, 'card navy') + text(.7, 4.07, 8.6, .64, [[('In Grimes', dict(bold=True, color=GOLD, size=11))], [('Clamp a node on a pump, fan, air-handler casing or pipe hanger: rising vibration warns of bearing wear or loose supports before failure (concepts 1 and 5).', dict(size=10, color='#fff'))]], anchor='middle', gap=1)
     return out
 
+def wsn_svg():
+    """native diagram: three floors, nodes in the ceiling plenums -> a gateway per floor -> campus network -> BMS / twin"""
+    W, H = 1000, 560; out = []
+    for i, (lvl, y) in enumerate([('Level 3', 40), ('Level 2', 210), ('Level 1', 380)]):
+        out.append(f'<rect x="20" y="{y}" width="700" height="150" fill="#F6F8FB" stroke="#C8D1DC"/><rect x="20" y="{y}" width="700" height="40" fill="#EEF3F8"/>'
+                   f'<text x="30" y="{y+140}" font-size="22" fill="#5B7089">{lvl}</text><text x="30" y="{y+27}" font-size="17" fill="#5B7089">ceiling plenum</text>')
+        for j, nx in enumerate([200, 330, 460, 590]):
+            out.append(f'<line x1="{nx}" y1="{y+20}" x2="660" y2="{y+20}" stroke="#087F8C" stroke-width="2" stroke-dasharray="5 6" opacity=".7"/>' if j == 0 else '')
+            out.append(f'<circle cx="{nx}" cy="{y+20}" r="13" fill="#087F8C" stroke="#fff" stroke-width="3"/>')
+        out.append(f'<rect x="645" y="{y+5}" width="56" height="30" rx="6" fill="#003262"/><text x="673" y="{y+26}" font-size="15" fill="#fff" text-anchor="middle" font-weight="700">GW</text>'
+                   f'<path d="M701 {y+20} H790" stroke="#003262" stroke-width="3"/>')
+    out.append('<path d="M790 60 V400" stroke="#003262" stroke-width="3"/><path d="M790 230 H830" stroke="#003262" stroke-width="3"/>'
+               '<rect x="830" y="180" width="150" height="100" rx="10" fill="#003262"/><text x="905" y="222" font-size="19" fill="#FDB515" text-anchor="middle" font-weight="700">Campus</text>'
+               '<text x="905" y="248" font-size="19" fill="#fff" text-anchor="middle">network</text>'
+               '<path d="M905 280 V330" stroke="#003262" stroke-width="3"/><rect x="830" y="330" width="150" height="90" rx="10" fill="#FDB515"/>'
+               '<text x="905" y="368" font-size="19" fill="#003262" text-anchor="middle" font-weight="700">BMS +</text><text x="905" y="394" font-size="19" fill="#003262" text-anchor="middle" font-weight="700">twin viewer</text>'
+               '<circle cx="40" cy="545" r="9" fill="#087F8C"/><text x="56" y="551" font-size="17" fill="#1F2A37">battery sensor node</text>'
+               '<rect x="250" y="533" width="34" height="22" rx="4" fill="#003262"/><text x="294" y="551" font-size="17" fill="#1F2A37">gateway (one per floor)</text>'
+               '<line x1="520" y1="544" x2="560" y2="544" stroke="#087F8C" stroke-width="2" stroke-dasharray="5 6"/><text x="570" y="551" font-size="17" fill="#1F2A37">radio link</text>')
+    return f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:100%" xmlns="http://www.w3.org/2000/svg" font-family="Calibri,Carlito,Arial,sans-serif">{"".join(out)}</svg>'
+
 def wsn_slide():
-    out = fig('l24-p10-wsn-pipeline.jpg', .45, 1.2, 5.3, 3.07, frame=True)
-    out += credit(.45, 4.3, 5.3, 'Course example: WSN instrumentation for above-ground (top) and buried (bottom) gas pipeline monitoring')
+    out = f'<div style="{pos(.45,1.2,5.3,2.97)};background:#fff;outline:2px solid #C8D1DC;outline-offset:-1px">{wsn_svg()}</div>'
+    out += credit(.45, 4.2, 5.3, 'How a wireless network would sit in Grimes (illustrative layout, not a design)')
     items = ['Topology: star is simple; mesh relays around obstacles',
              'Battery: an hourly tilt node on one D-cell ≈ 20–25 years (theory); a 1 kHz vibration node records 5–25 s bursts when triggered',
              'Sampling: slow for temperature, humidity, CO2; fast for acceleration and sound',
              'Radio: walls, floors, people and metal ducts block the signal']
-    out += bullets_card(5.95, 1.2, 3.5, 2.55, 'Design limits', items, head_size=12, size=9.5)
+    out += bullets_card(5.95, 1.2, 3.5, 2.55, 'Design limits (CE170/278)', items, head_size=12, size=9.5)
     out += box(5.95, 3.88, 3.5, .82, 'card navy') + text(6.08, 3.9, 3.3, .78, [[('For Grimes', dict(bold=True, color=GOLD, size=11))], [('Nodes in ceiling plenums, a gateway per floor, triggered vibration recordings, IT approval for the radio', dict(size=9.5, color='#fff'))]], anchor='middle', gap=1)
     return out
 

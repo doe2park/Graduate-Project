@@ -110,3 +110,17 @@ test('not skipped on this device (desktop): no subset request, waits for the rea
     assert.match(api.inspection().states['p-dts'].reason, /fire layer not loaded/);
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('projectPoint (compare page, same frame) matches THREE.PerspectiveCamera projection', () => {
+  const cam = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 2000);
+  for (const [pos, q, zoom] of [[[-32.082, 7.233, -14.823], [0.3367, 0.3199, -0.1228, 0.8771], 1], [[1, 2, 3], [0, 0.9397, -0.342, 0], 1.5], [[0, 0, 0], [0, 0, 0, 1], 1]]) {
+    cam.position.fromArray(pos); cam.quaternion.fromArray(q).normalize(); cam.zoom = zoom; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+    const pose = {position: pos, quaternion: cam.quaternion.toArray(), fov: 75, zoom};
+    for (const p of [[-31, 8, -13], [pos[0] + 1, pos[1] + 0.5, pos[2] - 3], [pos[0] - 2, pos[1] - 1, pos[2] - 6]]) {
+      const v = new THREE.Vector3(...p), c = v.clone().applyMatrix4(cam.matrixWorldInverse); v.project(cam);
+      const [x, y, f] = SD.projectPoint(p, pose, 16 / 9);
+      if (c.z < -0.05) { assert.ok(Math.abs(x - (v.x + 1) / 2) < 2e-4 && Math.abs(y - (1 - v.y) / 2) < 2e-4, JSON.stringify([p, x, y, (v.x + 1) / 2, (1 - v.y) / 2])); assert.equal(f, 1); }
+      else assert.equal(f, 0);
+    }
+  }
+});

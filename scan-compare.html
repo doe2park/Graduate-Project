@@ -637,8 +637,12 @@ alRender();
 if(new URLSearchParams(location.search).get('sensors')==='demo'){
  const s=document.createElement('script');s.src='twin/sensor-demo.js?v=1';
  s.onload=()=>{const sd=SensorDemo.mountParent({main:mainEl,frame:frames[1],sceneFilter:SensorDemo.parseSceneParam(location.search),
+  /* the BIM pose this page has just forwarded (linked) or received: pins are projected from it in the same frame */
+  getPose:()=>poses.bim&&valid(poses.bim)?poses.bim:null,
   /* a clicked / deck-focused sensor centres the Lens on its pin (mouse: normalised target; touch: dragged centre) */
-  lens:{set:(x,y,w,h)=>{const q=SensorDemo.lensPoint([x,y],w,h,8);if(!q)return;window.sdLensLock=true;if(touchMq.matches)lensDrag={x:q.x*w,y:q.y*h};else lensTarget=q;layoutLens(false);},release:()=>{window.sdLensLock=false;}}});window.sensorDemoInspection=()=>sd.inspection();};
+  lens:{set:(x,y,w,h)=>{const q=SensorDemo.lensPoint([x,y],w,h,8);if(!q)return;window.sdLensLock=true;if(touchMq.matches)lensDrag={x:q.x*w,y:q.y*h};else lensTarget=q;layoutLens(true);/* snap, no easing */},release:()=>{window.sdLensLock=false;}}});window.sensorDemoInspection=()=>sd.inspection();
+  /* re-project as soon as a new camera pose arrives (after the main handler above has stored it) */
+  addEventListener('message',e=>{if(e.origin===location.origin&&e.data?.type==='grimes-camera-pose'&&(e.source===frames[0].contentWindow||e.source===frames[1].contentWindow))sd.poseChanged();});};
  document.head.appendChild(s);
 }
 </script>

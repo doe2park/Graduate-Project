@@ -64,7 +64,10 @@ test('provenance: every image is listed in img/SOURCES.md and used; lecture figu
     const page = f.match(/^l24-p(\d+)-/)[1];
     assert.ok(html.includes('CE170/278 Infrastructure Sensing, UC Berkeley (Prof. K. Soga), Lecture 2-4, p. ' + page), 'credit for ' + f);
   }
-  assert.match(html, /Asurnipal/); assert.match(html, /L2MRail/); assert.match(html, /Lei et al\./);
+  /* relevance (owner, 2026-10-25): no bridge / rail / gas-pipeline / telecom imagery; off-building projects only as a one-line lab track record */
+  const visible = html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ');
+  for (const w of [/bridge/i, /\brail\b/i, /telecom/i, /gas pipeline/i, /Asurnipal|L2MRail|Lei et al\./]) assert.ok(!w.test(visible), 'off-topic content: ' + w);
+  assert.equal((visible.match(/Lab track record/g) || []).length, 1, 'track record framed in one line');
   assert.match(html, /own CE278 final project/);
   assert.ok(fs.readFileSync(path.join(deck, 'fonts', 'OFL.txt'), 'utf8').includes('SIL OPEN FONT LICENSE Version 1.1'));
 });

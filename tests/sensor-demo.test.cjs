@@ -111,6 +111,10 @@ test('Lens centring on a sensor: pin position -> normalised Lens target, clamped
   /* the page wires it: a focused sensor locks the Lens, the mouse no longer moves it until released */
   assert.match(compare, /lens:\{set:\(x,y,w,h\)=>\{const q=SensorDemo\.lensPoint\(\[x,y\],w,h,8\);/);
   assert.match(compare, /if\(d\?\.type==='grimes-pointer'\)\{if\(window\.sdLensLock\)return;/);
+  /* lag fix: pins are projected from the pose the page has just forwarded, re-drawn on each camera-pose message, Lens snaps */
+  assert.match(compare, /getPose:\(\)=>poses\.bim&&valid\(poses\.bim\)\?poses\.bim:null,/);
+  assert.match(compare, /e\.data\?\.type==='grimes-camera-pose'&&\(e\.source===frames\[0\]\.contentWindow\|\|e\.source===frames\[1\]\.contentWindow\)\)sd\.poseChanged\(\)/);
+  assert.match(compare, /else lensTarget=q;layoutLens\(true\);/);
 });
 
 test('type chips: placed beside their pins without overlapping pins or each other', () => {
