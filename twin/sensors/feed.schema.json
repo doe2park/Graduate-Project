@@ -1,0 +1,50 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://doe2park.github.io/Graduate-Project/twin/sensors/feed.schema.json",
+ "title": "Feed snapshot file: latest.json or history/<date>.json",
+ "type": "object",
+ "required": [
+  "schema",
+  "simulated",
+  "source",
+  "observations"
+ ],
+ "properties": {
+  "schema": {
+   "type": "string",
+   "enum": [
+    "grimes-sensor-feed/1"
+   ]
+  },
+  "generated_at": {
+   "type": "string"
+  },
+  "date": {
+   "type": "string",
+   "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+  },
+  "simulated": {
+   "type": "boolean"
+  },
+  "source": {
+   "type": "string",
+   "enum": [
+    "demo-sim",
+    "bms",
+    "bmo",
+    "gateway",
+    "fiber",
+    "mixed"
+   ]
+  },
+  "note": {
+   "type": "string"
+  },
+  "observations": {
+   "type": "array",
+   "items": {
+    "$ref": "observation.schema.json"
+   }
+  }
+ }
+}

@@ -1,6 +1,6 @@
 # Sensor deck (public)
 
-"Building Data and Sensing for the Grimes Twin": a 16-slide HTML deck, served by GitHub Pages at
+"Building Data and Sensing for the Grimes Twin": a 17-slide HTML deck, served by GitHub Pages at
 `https://doe2park.github.io/Graduate-Project/talks/sensor-deck/` and locally at `http://127.0.0.1:8790/talks/sensor-deck/`
 (a static server at the repository root). `#11` jumps to slide 11.
 
@@ -8,14 +8,14 @@
 - **Concept slides 11–15** embed the live twin viewer in a same-origin iframe:
   `../../scan-compare.html?view=overlay&capture=2026-05-06&mode=photo&style=lens&sensors=demo&scene=<leak|air|water|elec|rotating>&at=<pose>`.
   - The URL is relative, so the same file works locally and on Pages.
-  - Each slide loads only its own scenario's demo sensors (`scene=`), from `twin/sensor-demo.json`. Nothing is installed; every value is illustrative.
+  - Each slide loads only its own scenario's demo sensors (`scene=`), from `twin/sensors/registry.json`. Nothing is installed; every value is illustrative.
   - A viewer loads only while its slide is active and is unloaded when you leave.
   - Drag to look around. Hovering a numbered card points the viewer at that sensor.
   - **Static view** (or a failed load) shows the screenshot fallback with SVG markers.
   - **Open in viewer ↗** opens the same live view in a new tab.
 
 ## Editing
-Edit `content.json` (text slides), `scenarios.py` (concept slides) or `gen.py` (layout and the fiber / CE278 / MEMS / WSN slides). Then run:
+Edit `content.json` (text slides), `scenarios.py` (concept slides) or `gen.py` (layout and the fiber / CE278 / MEMS / WSN / “Ready for real sensors” slides). Sensor data for the live views: `twin/sensors/registry.json` + the simulated feed (`twin/sensors/README.md`). Then run:
 
 ```sh
 python3 talks/sensor-deck/gen.py      # writes talks/sensor-deck/index.html

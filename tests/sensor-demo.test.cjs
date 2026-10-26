@@ -1,4 +1,4 @@
-/* Virtual-sensor DEMO layer (twin/sensor-demo.js + twin/sensor-demo.json, opt-in ?sensors=demo).
+/* Virtual-sensor DEMO layer (twin/sensor-demo.js + twin/sensors/registry.json, opt-in ?sensors=demo).
    Checks: the config is valid and honest (status, every anchor = a real sidecar element with the same name and
    source_guid), the pure helpers (colour map, DTS profile, element axis, card), and that both pages load the layer ONLY
    behind the ?sensors=demo guard (no request, no DOM, no render change without it). */
@@ -6,7 +6,7 @@ const {test} = require('node:test'), assert = require('node:assert/strict'), fs 
 const root = path.join(__dirname, '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const SD = require('../twin/sensor-demo.js');
-const CFG = JSON.parse(read('twin/sensor-demo.json'));
+const CFG = JSON.parse(read('twin/sensors/registry.json'));
 const compare = read('scan-compare.html'), bim = read('scan-bim.html');
 const OVERLAY_LAYERS = ['equipment', 'lighting', 'conduit', 'duct', 'hydronic', 'plumbing', 'lifesafety', 'fire'];
 const sidecarFile = l => 'buildings/grimes/' + (l === 'equipment' ? 'elements.json' : l + '.elements.json');
@@ -15,8 +15,8 @@ test('config is a valid, explicitly illustrative demo file', () => {
   const v = SD.validateConfig(CFG);
   assert.deepEqual(v.errors, []);
   assert.equal(v.ok, true);
-  assert.equal(CFG.status, 'illustrative-not-installed');
-  assert.match(CFG.scope, /No sensors are installed/);
+  assert.match(CFG.scope, /no sensor is installed/);
+  for (const x of CFG.sensors) { assert.equal(x.install_status, 'demo', x.id); assert.equal(x.data_source, 'demo-sim', x.id); }
   assert.equal(v.sensors.length, CFG.sensors.length);
   /* the five deck scenarios, each with numbered sensors 1..n */
   const by = {};
@@ -49,7 +49,7 @@ test('every anchor is a real BIM element in an Overlay layer: sidecar id, exact 
 
 test('validateConfig refuses malformed or dishonest entries', () => {
   const base = JSON.parse(JSON.stringify(CFG));
-  assert.equal(SD.validateConfig({...base, status: 'installed'}).ok, false);
+  { const c = JSON.parse(JSON.stringify(base)); c.sensors[0].install_status = 'installed'; assert.equal(SD.validateConfig(c).ok, false, 'installed + demo-sim is refused'); }
   assert.equal(SD.validateConfig({...base, schema: 'x'}).ok, false);
   const one = patch => { const c = JSON.parse(JSON.stringify(base)); Object.assign(c.sensors[1], patch); return SD.validateConfig(c); };
   for (const [what, patch] of [

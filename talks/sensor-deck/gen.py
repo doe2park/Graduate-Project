@@ -40,9 +40,13 @@ EXTRA = {
    subtitle='Sensor nodes report by radio to a gateway; battery, sampling rate and radio paths decide the design',
    footnote='Diagram drawn for this deck. Design points summarised from ' + COURSE + ', Lecture 2-4.',
    notes='A wireless sensor network is a set of nodes that measure and send data by radio to a gateway, and from there to the cloud. The diagram shows how it would sit in Grimes: battery nodes in the ceiling plenums, a gateway on each floor, and the campus network carrying the data to the building management system and the twin. Four things limit the design. Topology: a star is simple, a mesh relays around obstacles. Battery: a tilt node reading hourly on one D cell can in theory last twenty to twenty-five years, but a vibration node sampling at a kilohertz cannot run continuously, so it records short bursts when triggered. Radio: walls, floors, people and metal ducts weaken the signal. For Grimes that means nodes in the ceiling plenums, a gateway per floor, triggered vibration recordings, and IT approval for the radio.'),
+  'ready': dict(id='ready', kind='figure', title='Ready for real sensors',
+   subtitle='Every source is turned into one feed format and tied to a BIM element: attaching a real sensor only changes the source',
+   footnote='Today every value in the twin’s sensor layer is simulated (labelled “Simulated”); no sensor is installed. Brick class names are candidates, not yet verified.',
+   notes='This slide is about what happens after the demo. Whatever the source is, a building automation point, a BMO meter, a wireless gateway or a fiber analyzer, a small adapter turns it into one common feed format: sensor, time, value, unit, quality and source. A registry ties each sensor to its BIM element by the element GUID, with a Brick class, its units and its alert rule. The Lens, the headset and the dashboard read only that feed and registry. Today the feed is a simulator that runs in the browser and is clearly labelled Simulated. When a real sensor is installed, we add its row, switch its source, and it appears with a Live badge, under the same rules for missing and stale data.'),
 }
 CS.update(EXTRA)
-ORDER = ['cover', 'part-1', 'bms', 'part-2', 'sensing', 'fiber', 'ce278', 'mems', 'wsn', 'pilot'] + [sc['id'] for sc in SCENARIOS] + ['thanks']
+ORDER = ['cover', 'part-1', 'bms', 'part-2', 'sensing', 'fiber', 'ce278', 'mems', 'wsn', 'pilot'] + [sc['id'] for sc in SCENARIOS] + ['ready', 'thanks']
 SLIDES = [CS[i] for i in ORDER]
 
 # ---------------------------------------------------------------- primitives (same as v1)
@@ -120,7 +124,7 @@ def numsteps(x, y, w, h, steps, head_size=11, size=10.5, arrow=.2, compact=False
 
 ICON_DAS = 'M2 12h3l2-5 3 10 3-8 2 6 2-3h5'
 ICON_FBG = 'M2 12h20M7 8v8M10 8v8M13 8v8M16 8v8'
-def _sd_types(): return json.loads((ROOT.parent.parent / 'twin' / 'sensor-demo.json').read_text())['types']
+def _sd_types(): return json.loads((ROOT.parent.parent / 'twin' / 'sensors' / 'registry.json').read_text())['types']
 _T = _sd_types()
 ROW_ICONS = [(_T['dts']['icon'], _T['dts']['color']), (_T['vibration']['icon'], _T['vibration']['color']), (ICON_DAS, '#0F766E'), (ICON_FBG, '#5B21B6'), (_T['iaq']['icon'], _T['iaq']['color'])]
 
@@ -149,8 +153,8 @@ def sensing_table():
 from twin_lib import build_twin, TWIN_JS, TWIN_CSS
 SC = {sc['id']: sc for sc in SCENARIOS}
 
-# Sensor type look (icon, colour, short label) shared with the viewer: ../../twin/sensor-demo.json
-SDJ = json.loads((ROOT.parent.parent / 'twin' / 'sensor-demo.json').read_text())
+# Sensor type look (icon, colour, short label) shared with the viewer: ../../twin/sensors/registry.json
+SDJ = json.loads((ROOT.parent.parent / 'twin' / 'sensors' / 'registry.json').read_text())
 SD_TYPE = {x['id']: x['type'] for x in SDJ['sensors']}
 def sd_style(sid): return SDJ['types'][SD_TYPE[sid]]
 def sd_icon(sid, px_):
@@ -275,6 +279,40 @@ def wsn_slide():
     out += box(5.95, 3.88, 3.5, .82, 'card navy') + text(6.08, 3.9, 3.3, .78, [[('For Grimes', dict(bold=True, color=GOLD, size=11))], [('Nodes in ceiling plenums, a gateway per floor, triggered vibration recordings, IT approval for the radio', dict(size=9.5, color='#fff'))]], anchor='middle', gap=1)
     return out
 
+def ready_svg():
+    """native diagram: sources -> adapters -> common feed -> registry (sensor <-> BIM GUID, Brick) -> Lens / headset / dashboard"""
+    W, H = 1700, 560; o = []
+    def bx(x, y, w, h, fill, title, sub=None, tc='#fff', sc='#DCE6F0'):
+        o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="14" fill="{fill}"/>'
+                 f'<text x="{x+w/2}" y="{y+(h/2 if not sub else h/2-8)}" font-size="26" font-weight="700" fill="{tc}" text-anchor="middle" dominant-baseline="middle">{title}</text>')
+        if sub: o.append(f'<text x="{x+w/2}" y="{y+h/2+22}" font-size="19" fill="{sc}" text-anchor="middle" dominant-baseline="middle">{sub}</text>')
+    def ar(x1, y1, x2, y2): o.append(f'<path d="M{x1} {y1} L{x2} {y2}" stroke="#FDB515" stroke-width="5" marker-end="url(#ah)"/>')
+    o.append('<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#FDB515"/></marker></defs>')
+    srcs = [('BAS / BACnet', 'Facilities points'), ('BMO meters', 'already collected'), ('Wireless gateway', 'MEMS nodes'), ('Fiber analyzer', 'DTS / DAS')]
+    for i, (t, sb) in enumerate(srcs):
+        y = 20 + i * 132; bx(20, y, 300, 108, '#EEF3F8', t, sb, tc='#003262', sc='#5B7089'); ar(325, y + 54, 395, y + 54)
+    o.append('<rect x="400" y="20" width="230" height="504" rx="14" fill="#087F8C"/>'
+             '<text x="515" y="250" font-size="27" font-weight="700" fill="#fff" text-anchor="middle">Adapters</text>'
+             '<text x="515" y="290" font-size="19" fill="#DFF5F3" text-anchor="middle">one per source</text>')
+    ar(635, 272, 705, 272)
+    bx(710, 172, 290, 200, '#003262', 'Common feed', 'id · time · value · unit', sc='#C9D7E6')
+    o.append('<text x="855" y="330" font-size="19" fill="#C9D7E6" text-anchor="middle">quality · source</text>')
+    ar(1005, 272, 1075, 272)
+    bx(1080, 172, 290, 200, '#003262', 'Registry', 'sensor ↔ BIM GUID', sc='#C9D7E6')
+    o.append('<text x="1225" y="330" font-size="19" fill="#C9D7E6" text-anchor="middle">Brick class · units · rules</text>')
+    for i, (t, sb) in enumerate([('Lens', 'on the scan'), ('Headset', 'Quest MR'), ('Dashboard', 'campus energy')]):
+        y = 60 + i * 150; ar(1375, 272, 1440, y + 54); bx(1445, y, 235, 108, '#FDB515', t, sb, tc='#003262', sc='#003262')
+    return f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:100%" xmlns="http://www.w3.org/2000/svg" font-family="Calibri,Carlito,Arial,sans-serif">{"".join(o)}</svg>'
+
+def ready_slide():
+    out = f'<div style="{pos(.55,1.12,8.9,2.62)}">{ready_svg()}</div>'
+    out += box(.55, 3.82, 8.9, .38, 'card') + text(.7, 3.82, 8.6, .38, [[('Today: ', dict(bold=True, color=TEAL, size=11)), ('simulated feed in the browser, labelled “Simulated”', dict(size=11)), ('   →   Tomorrow: ', dict(bold=True, color=NAVY, size=11)), ('add the row, switch the source → “Live”', dict(size=11))]], anchor='middle')
+    items = ['Registry: 17 demo sensors tied to real BIM element GUIDs, with units, intervals, alert rules and Brick classes',
+             'One feed format and shared rules: missing is never zero, stale after 3 intervals, units must match',
+             'Adapters: simulator live today; BMS, BMO, gateway and fiber stubs ready to be filled in']
+    out += text(.6, 4.28, 8.8, .7, [[('✓ ', dict(bold=True, color=TEAL, size=10)), (t, dict(size=10))] for t in items], gap=0)
+    return out
+
 def block(b):
     return b
 
@@ -344,6 +382,7 @@ def slide(s, n):
         elif sid == 'ce278': body += ce278_slide()
         elif sid == 'mems': body += mems_slide()
         elif sid == 'wsn': body += wsn_slide()
+        elif sid == 'ready': body += ready_slide()
         elif sid in SC: body += twin_slide(SC[sid])
     return f'<section class="slide" id="{s["id"]}">{body}</section>'
 

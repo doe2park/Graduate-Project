@@ -1,0 +1,337 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://doe2park.github.io/Graduate-Project/twin/sensors/registry.schema.json",
+ "title": "Grimes twin sensor registry (grimes-sensor-registry/1)",
+ "type": "object",
+ "required": [
+  "schema",
+  "scope",
+  "feed",
+  "sensors"
+ ],
+ "properties": {
+  "schema": {
+   "type": "string",
+   "enum": [
+    "grimes-sensor-registry/1"
+   ]
+  },
+  "scope": {
+   "type": "string"
+  },
+  "brick_note": {
+   "type": "string"
+  },
+  "feed": {
+   "type": "object",
+   "required": [
+    "contract",
+    "stale_after_intervals",
+    "timezone"
+   ],
+   "properties": {
+    "stale_after_intervals": {
+     "type": "number",
+     "minimum": 1
+    },
+    "contract": {
+     "type": "string"
+    },
+    "timezone": {
+     "type": "string"
+    }
+   }
+  },
+  "primary": {
+   "type": "object"
+  },
+  "types": {
+   "type": "object"
+  },
+  "sensors": {
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "type": "object",
+    "required": [
+     "id",
+     "scenario",
+     "type",
+     "label",
+     "anchor",
+     "point_kind",
+     "quantity",
+     "unit",
+     "location",
+     "install_status",
+     "data_source",
+     "source_point",
+     "sampling_interval_s",
+     "brick",
+     "provenance",
+     "reading"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,40}$"
+     },
+     "scenario": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,30}$"
+     },
+     "k": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "dts",
+       "alert",
+       "vibration",
+       "leak",
+       "airflow",
+       "iaq",
+       "zone",
+       "damper",
+       "flow",
+       "ct",
+       "rollup",
+       "bearing"
+      ]
+     },
+     "color": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$"
+     },
+     "label": {
+      "type": "string",
+      "minLength": 1
+     },
+     "kind": {
+      "type": "string"
+     },
+     "anchor": {
+      "type": "object",
+      "required": [
+       "layer",
+       "id",
+       "name",
+       "guid"
+      ],
+      "properties": {
+       "layer": {
+        "type": "string",
+        "enum": [
+         "equipment",
+         "fixtures",
+         "lighting",
+         "lifesafety",
+         "structural",
+         "conduit",
+         "duct",
+         "hydronic",
+         "plumbing",
+         "fire"
+        ]
+       },
+       "id": {
+        "type": "string",
+        "pattern": "^[0-9]+$"
+       },
+       "name": {
+        "type": "string",
+        "minLength": 1
+       },
+       "guid": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+       },
+       "t": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+       },
+       "offset": {
+        "type": "array",
+        "items": {
+         "type": "number",
+         "minimum": -3,
+         "maximum": 3
+        },
+        "minItems": 3,
+        "maxItems": 3
+       },
+       "part": {
+        "type": "string",
+        "pattern": "^grimes-[a-z0-9-]+\\.glb$"
+       }
+      },
+      "additionalProperties": false
+     },
+     "point_kind": {
+      "type": "string",
+      "enum": [
+       "sensor",
+       "derived"
+      ]
+     },
+     "derived_from": {
+      "type": "string"
+     },
+     "quantity": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+     },
+     "unit": {
+      "type": "string",
+      "enum": [
+       "degC",
+       "mm/s",
+       "bool",
+       "CFM",
+       "ppm",
+       "%",
+       "L/s",
+       "kW",
+       "A"
+      ]
+     },
+     "location": {
+      "type": "object",
+      "required": [
+       "level"
+      ],
+      "properties": {
+       "level": {
+        "type": "string",
+        "enum": [
+         "LOWER",
+         "L1",
+         "L2",
+         "L3"
+        ]
+       },
+       "space": {
+        "type": [
+         "string",
+         "null"
+        ]
+       }
+      }
+     },
+     "install_status": {
+      "type": "string",
+      "enum": [
+       "planned",
+       "demo",
+       "installed",
+       "retired"
+      ]
+     },
+     "data_source": {
+      "type": "string",
+      "enum": [
+       "demo-sim",
+       "bms",
+       "bmo",
+       "gateway",
+       "fiber"
+      ]
+     },
+     "future_source": {
+      "type": "string",
+      "enum": [
+       "bms",
+       "bmo",
+       "gateway",
+       "fiber"
+      ]
+     },
+     "source_point": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "pattern": "^(bmo:meter:[0-9]+:[a-z_]+|bacnet:[0-9]+/[a-z-]+:[0-9]+|gw:[A-Za-z0-9:_-]+|fiber:[A-Za-z0-9_-]+@[0-9.]+m)$"
+     },
+     "sampling_interval_s": {
+      "type": "number",
+      "minimum": 1
+     },
+     "alert_rule": {
+      "type": [
+       "object",
+       "null"
+      ],
+      "required": [
+       "kind"
+      ],
+      "properties": {
+       "kind": {
+        "type": "string",
+        "enum": [
+         "threshold",
+         "baseline_delta",
+         "band",
+         "state",
+         "night_flow",
+         "trend"
+        ]
+       }
+      }
+     },
+     "brick": {
+      "type": "object",
+      "required": [
+       "class",
+       "status",
+       "isPointOf"
+      ],
+      "properties": {
+       "class": {
+        "type": "string",
+        "pattern": "^brick:[A-Za-z0-9_]+$"
+       },
+       "status": {
+        "type": "string",
+        "enum": [
+         "used-in-model",
+         "candidate",
+         "verified"
+        ]
+       },
+       "isPointOf": {
+        "type": "string",
+        "pattern": "^urn:grimes:bim-guid:[0-9a-f-]{36}$"
+       }
+      }
+     },
+     "provenance": {
+      "type": "string",
+      "minLength": 10
+     },
+     "reading": {
+      "type": "object",
+      "required": [
+       "value"
+      ]
+     },
+     "dts": {
+      "type": "object"
+     },
+     "zone": {
+      "type": "object"
+     },
+     "links": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   }
+  }
+ }
+}

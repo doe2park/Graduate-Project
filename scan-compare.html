@@ -350,6 +350,7 @@ function onLensPick(d){
   let tier=pick.hit.tier,water=false;try{const w=lensWaterTier(pick.hit,tier);if(w){tier=w;water=true;}}catch(e){}
   lensCard.innerHTML=ElementCards.gazeCardHtml(pick.hit.id,pick.hit.meta,tier,{adjustment:abMode==='asbuilt'?pick.hit.adjustment:null});
   try{lensCard.insertAdjacentHTML('beforeend',water?lensWaterSparkHtml():lensSparkHtml(tier));}catch(e){}
+  try{if(window.sdElementFeedApply)window.sdElementFeedApply(lensCard,pick.hit.layer,pick.hit.id,tier);}catch(e){}   /* ?sensors=demo only: the element's sensor feed */
   lensCard.dataset.elementKey=k;lensShownKey=k;placeLensCard();lensCard.classList.add('show');
  }else if(!k)hideLensCard(false);
  if(!abPanel.hidden)abRender();
@@ -632,7 +633,7 @@ if(registration&&!alBase){alignOnRegistration(registration,registrationPreview);
 alRender();
 </script>
 <script>
-/* SENSOR DEMO (opt-in ?sensors=demo; twin/sensor-demo.js + twin/sensor-demo.json). Illustrative sensors anchored to real
+/* SENSOR DEMO (opt-in ?sensors=demo; twin/sensor-demo.js + twin/sensors/registry.json). Illustrative sensors anchored to real
    BIM element ids, drawn over the BIM frame with a persistent "not installed" badge. Without the parameter nothing loads. */
 if(new URLSearchParams(location.search).get('sensors')==='demo'){
  const s=document.createElement('script');s.src='twin/sensor-demo.js?v=1';
@@ -640,11 +641,13 @@ if(new URLSearchParams(location.search).get('sensors')==='demo'){
   /* the BIM pose this page has just forwarded (linked) or received: pins are projected from it in the same frame */
   getPose:()=>poses.bim&&valid(poses.bim)?poses.bim:null,
   focus:SensorDemo.parseFocusParam(location.search),
+  feedModule:window.SensorFeed||null,
   /* a clicked / deck-focused sensor centres the Lens on its pin (mouse: normalised target; touch: dragged centre) */
-  lens:{set:(x,y,w,h)=>{const q=SensorDemo.lensPoint([x,y],w,h,8);if(!q)return;window.sdLensLock=true;if(touchMq.matches)lensDrag={x:q.x*w,y:q.y*h};else lensTarget=q;layoutLens(true);/* snap, no easing */},release:()=>{window.sdLensLock=false;}}});window.sensorDemoInspection=()=>sd.inspection();window.sdPointerMoved=()=>sd.pointerMoved();
+  lens:{set:(x,y,w,h)=>{const q=SensorDemo.lensPoint([x,y],w,h,8);if(!q)return;window.sdLensLock=true;if(touchMq.matches)lensDrag={x:q.x*w,y:q.y*h};else lensTarget=q;layoutLens(true);/* snap, no easing */},release:()=>{window.sdLensLock=false;}}});window.sensorDemoInspection=()=>sd.inspection();window.sdPointerMoved=()=>sd.pointerMoved();window.sdElementFeedApply=(c,l,i,t)=>sd.elementFeedApply(c,l,i,t);
   /* re-project as soon as a new camera pose arrives (after the main handler above has stored it) */
   addEventListener('message',e=>{if(e.origin===location.origin&&e.data?.type==='grimes-camera-pose'&&(e.source===frames[0].contentWindow||e.source===frames[1].contentWindow))sd.poseChanged();});};
- document.head.appendChild(s);
+ /* the feed adapter first (twin/sensors/feed.js: demo-sim now, real sources later), then the layer; the layer still runs without it */
+ const f=document.createElement('script');f.src='twin/sensors/feed.js?v=1';f.onload=f.onerror=()=>document.head.appendChild(s);document.head.appendChild(f);
 }
 </script>
 </body></html>

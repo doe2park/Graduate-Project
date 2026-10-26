@@ -22,7 +22,8 @@ function batch() {
   const group = new THREE.Group(); group.add(mesh);
   return {mesh, group, triA: ia.length / 3};
 }
-const cfg = sensors => ({schema: SD.SCHEMA, status: SD.STATUS, sensors});
+const DEMO = {install_status: 'demo', data_source: 'demo-sim', quantity: 'temperature', unit: 'degC', sampling_interval_s: 60};
+const cfg = sensors => ({schema: SD.SCHEMA, sensors: sensors.map(x => ({...DEMO, ...x}))});
 const dts = {id: 'p-dts', k: 1, type: 'dts', label: 'DTS', reading: {value: 'x'}, anchor: {layer: 'fire', id: '11', name: 'Pipe11', guid: 'g-11', t: 0.8},
   dts: {baselineC: 22, peakC: 31, hotT: 0.4, hotWidth: 0.1, scaleC: [18, 32]}};
 const pin = {id: 'p-pin', k: 2, type: 'leak', label: 'Leak', reading: {value: 'dry'}, anchor: {layer: 'fire', id: '11', name: 'Pipe11', t: 0.5, offset: [0, -0.5, 0]}};

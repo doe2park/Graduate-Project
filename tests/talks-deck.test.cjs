@@ -5,7 +5,7 @@ const {test} = require('node:test'), assert = require('node:assert/strict'), fs 
 const root = path.join(__dirname, '..'), deck = path.join(root, 'talks', 'sensor-deck');
 const read = f => fs.readFileSync(path.join(deck, f), 'utf8');
 const html = read('index.html'), sources = read('img/SOURCES.md');
-const CFG = JSON.parse(fs.readFileSync(path.join(root, 'twin', 'sensor-demo.json'), 'utf8'));
+const CFG = JSON.parse(fs.readFileSync(path.join(root, 'twin', 'sensors', 'registry.json'), 'utf8'));
 const scenes = new Set(CFG.sensors.map(s => s.scenario));
 const unesc = s => s.replace(/&amp;/g, '&');
 

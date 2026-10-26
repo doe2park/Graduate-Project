@@ -1,5 +1,5 @@
 /* Virtual-sensor DEMO layer (opt-in: scan-compare.html?...&sensors=demo). ILLUSTRATIVE ONLY: no sensor is installed in
-   Grimes and every reading comes from twin/sensor-demo.json, a hand-written concept file. Each sensor is anchored to a
+   Grimes and every reading comes from twin/sensors/registry.json, a hand-written concept file. Each sensor is anchored to a
    real BIM element (layer sidecar id + source_guid) so it stays on that pipe/duct while the camera moves.
 
    Split of work (same-origin postMessage, like the Lens pick contract in twin/element-cards.js):
@@ -19,7 +19,8 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const SCHEMA = 'grimes-sensor-demo/1', STATUS = 'illustrative-not-installed', CONFIG_URL = 'twin/sensor-demo.json';
+const SCHEMA = 'grimes-sensor-registry/1', CONFIG_URL = 'twin/sensors/registry.json';   // one registry for demo and real sensors
+const INSTALL = ['planned', 'demo', 'installed', 'retired'], SOURCES = ['demo-sim', 'bms', 'bmo', 'gateway', 'fiber'];
 const BADGE_TEXT = 'Demo sensors — illustrative, not installed';
 const MSG = {state: 'grimes-sensor-demo-state', frame: 'grimes-sensor-demo-frame', focus: 'grimes-sensor-demo-focus'};
 const TYPES = {
@@ -64,7 +65,6 @@ function parseSensorsParam(search) {
 function validateConfig(cfg) {
   const errors = [], sensors = [], ids = new Set();
   if (!cfg || cfg.schema !== SCHEMA) return {ok: false, errors: ['schema must be ' + SCHEMA], sensors};
-  if (cfg.status !== STATUS) return {ok: false, errors: ['status must be ' + STATUS], sensors};
   if (!Array.isArray(cfg.sensors)) return {ok: false, errors: ['sensors must be an array'], sensors};
   cfg.sensors.forEach((s, i) => {
     const where = 'sensor ' + i + (s && s.id ? ' (' + s.id + ')' : ''), a = s && s.anchor;
@@ -74,6 +74,11 @@ function validateConfig(cfg) {
     if (!TYPES[s.type]) return bad('unknown type ' + s.type);
     if (!str(s.label)) return bad('label missing');
     if (!s.reading || !str(s.reading.value)) return bad('reading.value missing');
+    if (!INSTALL.includes(s.install_status)) return bad('install_status must be one of ' + INSTALL.join('|'));
+    if (!SOURCES.includes(s.data_source)) return bad('data_source must be one of ' + SOURCES.join('|'));
+    if (s.install_status === 'retired') return;   // kept for history, never drawn
+    if (s.data_source === 'demo-sim' && s.install_status === 'installed') return bad('an installed sensor cannot use the demo simulator');
+    if (!str(s.quantity, 60) || !str(s.unit, 12) || !(finite(s.sampling_interval_s) && s.sampling_interval_s > 0)) return bad('quantity, unit and sampling_interval_s are required');
     if (!a || !LAYERS.includes(a.layer) || typeof a.id !== 'string' || !/^\d+$/.test(a.id)) return bad('anchor needs a known layer and a numeric element id');
     if (a.t !== undefined && !(finite(a.t) && a.t >= 0 && a.t <= 1)) return bad('anchor.t must be 0..1');
     if (a.offset !== undefined && !(vec3(a.offset) && a.offset.every(v => Math.abs(v) <= 3))) return bad('anchor.offset must be 3 numbers within 3 m');
@@ -229,14 +234,15 @@ function elementLabel(el) {
   const name = String(el.name || el.type || 'Element');
   return name.length > 46 ? name.slice(0, 45) + '…' : name;
 }
-function cardHtml(s, el, style) {
+function cardHtml(s, el, style, feed) {
   const color = /^#[0-9a-fA-F]{6}$/.test(s.color || '') ? s.color : '#22d3ee';
   const sub = [TYPES[s.type], s.kind].filter(Boolean).join(' · ');
   const elSub = el ? [el.type, el.system, el.level].filter(Boolean).join(' · ') : '';
   const where = s.anchor.layer + ':' + s.anchor.id;
   let html = '<div class="gz-top"><span class="gz-name"><i class="sd-dot" style="background:' + color + '">' + (style ? iconSvg(style.icon, 12) : '') + '</i>' + (s.k ? esc(s.k) + ' · ' : '') + esc(s.label) + '</span><span class="gz-badge sd-demo">DEMO</span></div>'
     + (sub ? '<div class="gz-sub">' + esc(sub) + '</div>' : '')
-    + '<div class="gz-val">' + esc(s.reading.value) + '</div>'
+    + (feed ? feed : '<div class="gz-val">' + esc(s.reading.value) + '</div>')   // feed: value/age/quality/source block (twin/sensors/feed.js)
+    + (feed ? '<div class="gz-det">Scenario: ' + esc(s.reading.value) + '</div>' : '')
     + (s.reading.detail ? '<div class="gz-det">' + esc(s.reading.detail) + '</div>' : '');
   if (s.type === 'dts' && s.dts) {
     const g = STOPS.map(([v, c]) => cssColor(c) + ' ' + (v * 100) + '%').join(',');
@@ -244,7 +250,7 @@ function cardHtml(s, el, style) {
   }
   html += sparkSvg(s.reading.series, color);
   html += '<div class="sd-map">Maps to BIM element: <b>' + esc(el ? elementLabel(el) : (s.anchor.name || where)) + '</b><br><span>' + esc([where, elSub].filter(Boolean).join(' · ')) + '</span></div>'
-    + '<div class="sd-note">Illustrative value · no sensor installed</div>';
+    + (s.install_status === 'installed' ? '' : '<div class="sd-note">' + (feed ? 'Simulated feed · no sensor installed' : 'Illustrative value · no sensor installed') + '</div>');
   return html;
 }
 
@@ -413,6 +419,15 @@ const PARENT_CSS = `
 #sdCard .sd-map b{color:#f1f5f9;font-weight:600}#sdCard .sd-map span{color:#94a3b8;font-size:11px}
 #sdCard .sd-note{margin-top:5px;font-size:11px;color:#fbbf24}
 body.sd-card-on #lensCard{opacity:0!important;visibility:hidden!important}
+.sd-feed{margin-top:6px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 7px}
+.sd-feed b{font-size:15px;font-weight:700;color:#f1f5f9}
+.sd-feed small{flex-basis:100%;font-size:11px;color:#94a3b8}
+.sd-src{font:700 9px/1 monospace;letter-spacing:.4px;padding:3px 5px;border-radius:4px}
+.sd-src.sim{background:rgba(167,139,250,.22);color:#c4b5fd}.sd-src.live{background:rgba(52,211,153,.2);color:#34d399}
+.sd-feed.sd-missing b,.sd-feed.sd-stale b{color:#94a3b8}.sd-feed.sd-stale small,.sd-feed.sd-suspect small{color:#fbbf24}
+.sd-elfeed{margin-top:6px;padding-top:5px;border-top:1px solid rgba(167,139,250,.35)}
+.sd-elrow{font-size:11.5px;color:#cbd5e1;margin-top:3px}
+#lensCard .gz-badge.sd-feedbadge{background:rgba(167,139,250,.22);color:#c4b5fd}
 body.sd-off #sdLayer{display:none}
 @media(max-width:768px),(pointer:coarse){#sdCard{width:230px;font-size:11.5px}#sdBadge{font-size:10.5px;bottom:58px;max-width:calc(100% - 24px)}#sdBadge small{display:none}#sdLayer .sd-chip{font-size:9.5px;line-height:13px;padding:0 5px 0 2px}#sdLayer .sd-chip b{min-width:13px;height:13px;line-height:13px;font-size:9px}}
 `;
@@ -435,7 +450,17 @@ function mountParent(ctx) {
   /* Lens rest sensor (?focus= or the scene's primary). auto = the Lens sits on it when no sensor is pinned (a pin click or a
      deck card switches the lock; releasing returns to the primary). In a deck embed it always stays on; standalone, the badge
      button toggles between "on sensor" and mouse-follow. */
-  let primaryId = null, auto = false;
+  let primaryId = null, auto = false, feed = null, obs = {}, feedAt = 0;
+  /* observations from twin/sensors/feed.js (ctx.feedModule): demo-sim now, real adapters later; refreshed every 15 s */
+  function refreshFeed() {
+    if (!feed) return;
+    feed.getLatest([...byId.keys()]).then(o => { obs = o; feedAt = Date.now(); card.dataset.sensor = ''; renderCard(); }).catch(() => {});
+  }
+  function feedBlock(s) {
+    if (!feed || !ctx.feedModule) return '';
+    const o = obs[s.id]; const a = ctx.feedModule.assess(o, s, Date.now(), feed.staleAfter);
+    return ctx.feedModule.feedHtml(s, o, a);
+  }
   const embedded = (ctx.window || window).parent !== (ctx.window || window);   // BIM-world anchors per sensor (from the state message); measured chip sizes
   /* Pins follow the camera pose the compare page has just forwarded (ctx.getPose), projected here in the same frame; the
      BIM pane's own 2D projection (one render + one message later) is only the fallback, and still supplies visibility. */
@@ -536,7 +561,7 @@ function mountParent(ctx) {
     else if (lens && lensLocked) { lens.release(); lensLocked = false; }
     if (lensBtn) { lensBtn.hidden = !primaryId || embedded; lensBtn.textContent = auto ? 'Lens: on sensor' : 'Lens: mouse'; lensBtn.setAttribute('aria-pressed', String(auto)); }
     if (!s || !b || b.hidden) { card.classList.remove('show'); doc.body.classList.remove('sd-card-on'); return; }
-    if (card.dataset.sensor !== id) { card.innerHTML = cardHtml(s, elements[id], styleOf(s)); card.dataset.sensor = id; cardSize = null; }
+    if (card.dataset.sensor !== id) { card.innerHTML = cardHtml(s, elements[id], styleOf(s), feedBlock(s)); card.dataset.sensor = id; cardSize = null; }
     const R = RR, x = +b.dataset.x || 0, y = +b.dataset.y || 0;
     if (!cardSize) cardSize = [card.offsetWidth || 270, card.offsetHeight || 160];   // measured once per card content
     const [cw, ch] = cardSize;
@@ -563,16 +588,28 @@ function mountParent(ctx) {
   fetch(ctx.configUrl || CONFIG_URL, {cache: 'no-store'}).then(r => { if (!r.ok) throw Error('config ' + r.status); return r.json(); }).then(cfg => {
     const v = validateConfig(cfg); cfgAll = cfg; for (const s of filterScene(v.sensors, ctx.sceneFilter || null)) byId.set(s.id, s);
     primaryId = primaryFor(cfg, ctx.sceneFilter || null, ctx.focus || null, [...byId.keys()]); auto = !!primaryId; schedule();
+    if (ctx.feedModule) { feed = ctx.feedModule.create({registry: cfg}); refreshFeed(); setInterval(refreshFeed, 15000); }
   }).catch(e => { failed = String(e && e.message || e); count.textContent = '· not loaded'; });
-  return {poseChanged: schedule,
+  const api = {poseChanged: schedule,
+    /* Lens element card (scan-compare onLensPick): when the picked element has sensors in the registry, the card shows their
+       feed (value, age, quality, Simulated/Live badge) instead of "No feed yet"; other elements keep the standard card */
+    elementFeedApply: (cardEl, layer, id, tier) => {
+      const h = api.elementFeedHtml(layer, id); if (!h) return false;
+      if (!tier || tier.tier === 'NONE') { cardEl.querySelectorAll('.gz-val,.gz-det').forEach(n => n.remove()); const b = cardEl.querySelector('.gz-badge'); if (b) { b.textContent = 'SENSOR FEED'; b.className = 'gz-badge sd-feedbadge'; } }
+      cardEl.insertAdjacentHTML('beforeend', h); return true;
+    },
+
+    elementFeedHtml: (layer, id) => { const list = [...byId.values()].filter(s => s.point_kind !== 'derived' && s.anchor.layer === layer && s.anchor.id === String(id));
+      return list.length && feed ? '<div class="sd-elfeed">' + list.map(s => '<div class="sd-elrow">' + esc((s.k ? s.k + ' · ' : '') + s.label) + '</div>' + feedBlock(s)).join('') + '</div>' : ''; },
     /* a locked Lens ignores mouse moves over the photo (dragging the view included), so it stays on its sensor; standalone,
        the badge button "Lens: on sensor / mouse" hands it back to the mouse. true = let the mouse move the Lens */
     pointerMoved: () => !lensLocked,
-    inspection: () => ({primary: primaryId, auto, lockId: on ? (pinned || (auto ? primaryId : null)) : null, restDiff, projectedFromPose: !!(ctx.getPose && ctx.getPose() && Object.keys(worlds).length), lensLocked, chips: [...chips].filter(([, c]) => !c.hidden).map(([id, c]) => { const r = c.getBoundingClientRect(); return [id, c.textContent, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }),
+    inspection: () => ({feed: {sources: [...new Set(Object.values(obs).map(o => o.source))], count: Object.keys(obs).length, at: feedAt}, primary: primaryId, auto, lockId: on ? (pinned || (auto ? primaryId : null)) : null, restDiff, projectedFromPose: !!(ctx.getPose && ctx.getPose() && Object.keys(worlds).length), lensLocked, chips: [...chips].filter(([, c]) => !c.hidden).map(([id, c]) => { const r = c.getBoundingClientRect(); return [id, c.textContent, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }),
     pinXY: Object.fromEntries([...pins].filter(([, b]) => !b.hidden).map(([id, b]) => [id, [+b.dataset.x, +b.dataset.y]])), scene: ctx.sceneFilter || null, sensors: byId.size, attached: Object.keys(elements), pins: [...pins].filter(([, b]) => !b.hidden).map(([id]) => id), fibreSegments: gFibre.childNodes.length / 2, pulses: gPulse.childNodes.length / 3, links: gLinks.childNodes.length, zones: gZones.childNodes.length, card: card.classList.contains('show') ? card.dataset.sensor : null, failed}),
     focus: id => { pinned = byId.has(id) ? id : null; renderCard(); }};
+  return api;
 }
 
-return {parseFocusParam, primaryFor, lensAnchor, projectPoint, typeStyle, iconSvg, lensPoint, placeChips, SCHEMA, STATUS, CONFIG_URL, BADGE_TEXT, MSG, TYPES, parseSensorsParam, parseSceneParam, filterScene, validateConfig, colorAt, cssColor, dtsTempC, dtsValue,
+return {INSTALL, SOURCES, parseFocusParam, primaryFor, lensAnchor, projectPoint, typeStyle, iconSvg, lensPoint, placeChips, SCHEMA, CONFIG_URL, BADGE_TEXT, MSG, TYPES, parseSensorsParam, parseSceneParam, filterScene, validateConfig, colorAt, cssColor, dtsTempC, dtsValue,
   principalAxis, axisParam, axisPoint, anchorPoint, zoneRing, esc, sparkSvg, cardHtml, mountBim, mountParent, PARENT_CSS};
 });
