@@ -27,6 +27,7 @@ test('live views: relative viewer URL, sensors=demo, one known scene per concept
     const q = new URLSearchParams(u.split('?')[1]);
     assert.equal(q.get('sensors'), 'demo'); assert.equal(q.get('capture'), '2026-05-06'); assert.equal(q.get('view'), 'overlay');
     assert.ok(scenes.has(q.get('scene')), 'known scene ' + q.get('scene'));
+    assert.equal(q.get('focus'), CFG.primary[q.get('scene')], 'Lens opens on the scene primary');
     assert.equal(q.get('at').split(',').length, 8);
     assert.ok(html.includes('href="' + u.replace(/&/g, '&amp;') + '"'), 'Open in viewer link for ' + q.get('scene'));
     seen.push(q.get('scene'));

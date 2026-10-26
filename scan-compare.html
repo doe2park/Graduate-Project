@@ -238,7 +238,7 @@ let lensSent='';
 function sendLensState(on,x,y,r){const k=on?[x,y,r].map(v=>Math.round(v)).join(','):'off';if(k===lensSent)return;lensSent=k;send('bim',on?{type:'grimes-overlay-lens',on:true,x,y,r}:{type:'grimes-overlay-lens',on:false});}
 /* scan panes report the mouse position (normalised); touch devices keep the lens centred */
 function edgeFromScan(d){
- if(d?.type==='grimes-pointer'){if(window.sdLensLock)return;/* ?sensors=demo: a focused sensor holds the Lens */lensTarget=Number.isFinite(d.x)&&Number.isFinite(d.y)&&!touchMq.matches?{x:d.x,y:d.y}:null;layoutLens(false);return;}
+ if(d?.type==='grimes-pointer'){if(window.sdLensLock&&!(window.sdPointerMoved&&window.sdPointerMoved()))return;/* ?sensors=demo: a locked sensor holds the Lens */lensTarget=Number.isFinite(d.x)&&Number.isFinite(d.y)&&!touchMq.matches?{x:d.x,y:d.y}:null;layoutLens(false);return;}
  if(d?.type==='grimes-photo-station'&&Number.isInteger(d.index)){lastStation=d.index;}
 }
 frames[1].src='scan-bim.html?pane=bim&revision=overlay2'+(view==='overlay'?'&overlay=1':'')+(new URLSearchParams(location.search).get('sensors')==='demo'?'&sensors=demo'+(/^[a-z0-9-]{1,30}$/.test(new URLSearchParams(location.search).get('scene')||'')?'&scene='+new URLSearchParams(location.search).get('scene'):''):'');
@@ -639,8 +639,9 @@ if(new URLSearchParams(location.search).get('sensors')==='demo'){
  s.onload=()=>{const sd=SensorDemo.mountParent({main:mainEl,frame:frames[1],sceneFilter:SensorDemo.parseSceneParam(location.search),
   /* the BIM pose this page has just forwarded (linked) or received: pins are projected from it in the same frame */
   getPose:()=>poses.bim&&valid(poses.bim)?poses.bim:null,
+  focus:SensorDemo.parseFocusParam(location.search),
   /* a clicked / deck-focused sensor centres the Lens on its pin (mouse: normalised target; touch: dragged centre) */
-  lens:{set:(x,y,w,h)=>{const q=SensorDemo.lensPoint([x,y],w,h,8);if(!q)return;window.sdLensLock=true;if(touchMq.matches)lensDrag={x:q.x*w,y:q.y*h};else lensTarget=q;layoutLens(true);/* snap, no easing */},release:()=>{window.sdLensLock=false;}}});window.sensorDemoInspection=()=>sd.inspection();
+  lens:{set:(x,y,w,h)=>{const q=SensorDemo.lensPoint([x,y],w,h,8);if(!q)return;window.sdLensLock=true;if(touchMq.matches)lensDrag={x:q.x*w,y:q.y*h};else lensTarget=q;layoutLens(true);/* snap, no easing */},release:()=>{window.sdLensLock=false;}}});window.sensorDemoInspection=()=>sd.inspection();window.sdPointerMoved=()=>sd.pointerMoved();
   /* re-project as soon as a new camera pose arrives (after the main handler above has stored it) */
   addEventListener('message',e=>{if(e.origin===location.origin&&e.data?.type==='grimes-camera-pose'&&(e.source===frames[0].contentWindow||e.source===frames[1].contentWindow))sd.poseChanged();});};
  document.head.appendChild(s);

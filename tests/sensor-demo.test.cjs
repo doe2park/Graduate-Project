@@ -110,7 +110,7 @@ test('Lens centring on a sensor: pin position -> normalised Lens target, clamped
   assert.equal(SD.lensPoint([1, 1], 0, 600), null);
   /* the page wires it: a focused sensor locks the Lens, the mouse no longer moves it until released */
   assert.match(compare, /lens:\{set:\(x,y,w,h\)=>\{const q=SensorDemo\.lensPoint\(\[x,y\],w,h,8\);/);
-  assert.match(compare, /if\(d\?\.type==='grimes-pointer'\)\{if\(window\.sdLensLock\)return;/);
+
   /* lag fix: pins are projected from the pose the page has just forwarded, re-drawn on each camera-pose message, Lens snaps */
   assert.match(compare, /getPose:\(\)=>poses\.bim&&valid\(poses\.bim\)\?poses\.bim:null,/);
   assert.match(compare, /e\.data\?\.type==='grimes-camera-pose'&&\(e\.source===frames\[0\]\.contentWindow\|\|e\.source===frames\[1\]\.contentWindow\)\)sd\.poseChanged\(\)/);
@@ -128,6 +128,29 @@ test('type chips: placed beside their pins without overlapping pins or each othe
     for (let j = i + 1; j < rects.length; j++) assert.ok(!hit(r, rects[j]), r.id + ' vs ' + rects[j].id);
     for (const p of items) assert.ok(!hit(r, {x: p.x - 14, y: p.y - 14, w: 28, h: 28}), r.id + ' clear of pin ' + p.id);
   }
+});
+
+test('Lens rests on the scene primary (or ?focus=), follows it, falls back sensibly', () => {
+  const ids = s => CFG.sensors.filter(x => x.scenario === s).map(x => x.id);
+  for (const sc of ['leak', 'air', 'water', 'elec', 'rotating']) {
+    const p = SD.primaryFor(CFG, sc, null, ids(sc));
+    assert.ok(p && ids(sc).includes(p), sc + ' has a primary in its scene');
+  }
+  assert.equal(SD.primaryFor(CFG, 'leak', null, ids('leak')), 'leak-alert');
+  assert.equal(SD.primaryFor(CFG, 'leak', 'leak-puck', ids('leak')), 'leak-puck', '?focus= wins');
+  assert.equal(SD.primaryFor(CFG, 'leak', 'hvac-airflow', ids('leak')), 'leak-alert', 'focus outside the scene is ignored');
+  assert.equal(SD.primaryFor(CFG, null, null, CFG.sensors.map(x => x.id)), null, 'no scene, no focus: no auto-lock');
+  assert.equal(SD.parseFocusParam('?focus=leak-dts'), 'leak-dts'); assert.equal(SD.parseFocusParam('?focus=<x>'), null);
+  const bad = JSON.parse(JSON.stringify(CFG)); bad.primary.leak = 'hvac-airflow';
+  assert.equal(SD.validateConfig(bad).ok, false, 'primary must belong to its scenario');
+  const proj = {a: [100, 200, 1], b: [300, 400, 1], c: [999, -50, 1], d: [10, 10, 0]};
+  assert.deepEqual(SD.lensAnchor('a', proj, ['a', 'b']), [100, 200]);
+  assert.deepEqual(SD.lensAnchor('c', proj, ['a', 'b']), [999, -50], 'in front but off-screen: its point (lensPoint clamps to the edge)');
+  assert.deepEqual(SD.lensAnchor('d', proj, ['a', 'b']), [200, 300], 'behind the camera: centroid of visible sensors');
+  assert.equal(SD.lensAnchor('d', proj, []), null, 'nothing visible: stay');
+  assert.deepEqual(SD.lensPoint([999, -50], 800, 600, 8), {x: 792 / 800, y: 8 / 600});
+  assert.match(compare, /if\(window\.sdLensLock&&!\(window\.sdPointerMoved&&window\.sdPointerMoved\(\)\)\)return;/);
+  assert.match(compare, /focus:SensorDemo\.parseFocusParam\(location\.search\),/);
 });
 
 test('opt-in parameter: only sensors=demo', () => {

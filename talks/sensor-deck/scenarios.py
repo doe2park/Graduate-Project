@@ -4,8 +4,11 @@ from twin_lib import *
 
 # Live twin: the LOCAL viewer (same origin as this deck) with the opt-in demo-sensor layer (twin/sensor-demo.json).
 # Relative to talks/sensor-deck/: works on the local server and on GitHub Pages (site root = repo root).
-LENS = '../../scan-compare.html?view=overlay&capture=2026-05-06&mode=photo&style=lens&sensors=demo&scene={scene}&at='
-def live(scene, at): return LENS.format(scene=scene) + at
+LENS = '../../scan-compare.html?view=overlay&capture=2026-05-06&mode=photo&style=lens&sensors=demo&scene={scene}&focus={focus}&at='
+# the Lens opens on (and follows) the scene's main sensor: twin/sensor-demo.json "primary"
+import json as _json, pathlib as _pl
+_PRIMARY = _json.loads((_pl.Path(__file__).resolve().parent.parent.parent / 'twin' / 'sensor-demo.json').read_text())['primary']
+def live(scene, at): return LENS.format(scene=scene, focus=_PRIMARY[scene]) + at
 FOOT = 'Concept mockup — no sensors are installed; values are illustrative.'
 def foot(capture): return FOOT + ' Live twin: public May 6, 2026 capture ' + str(capture) + '; demo sensors anchored to real BIM elements.'
 

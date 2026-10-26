@@ -36,6 +36,25 @@ const clamp01 = v => Math.min(1, Math.max(0, v));
 function parseSceneParam(search) {
   try { const v = new URLSearchParams(search || '').get('scene'); return v && /^[a-z0-9-]{1,30}$/.test(v) ? v : null; } catch (e) { return null; }
 }
+function parseFocusParam(search) {
+  try { const v = new URLSearchParams(search || '').get('focus'); return v && /^[a-z0-9-]{1,40}$/.test(v) ? v : null; } catch (e) { return null; }
+}
+/* The sensor the Lens rests on: ?focus=<id> if it is in the scene, else the scene's configured primary, else none. */
+function primaryFor(cfg, scene, focus, ids) {
+  if (focus && ids.includes(focus)) return focus;
+  const p = scene && cfg && cfg.primary ? cfg.primary[scene] : null;
+  return p && ids.includes(p) ? p : null;
+}
+/* Where the locked Lens goes: the locked sensor's projected pin if it is in front of the camera (lensPoint then clamps it
+   to the viewport, so an off-screen sensor keeps the Lens at the nearest edge); if it is behind the camera, the centroid
+   of the sensors that are visible; otherwise null (the Lens stays where it is). proj: {id: [px, py, inFront]}. */
+function lensAnchor(lockId, proj, visibleIds) {
+  const p = lockId && proj[lockId];
+  if (p && p[2]) return [p[0], p[1]];
+  const v = (visibleIds || []).map(id => proj[id]).filter(q => q && q[2]);
+  if (!v.length) return null;
+  return [v.reduce((a, q) => a + q[0], 0) / v.length, v.reduce((a, q) => a + q[1], 0) / v.length];
+}
 function filterScene(sensors, scene) { return scene ? sensors.filter(s => s.scenario === scene) : sensors.slice(); }
 function parseSensorsParam(search) {
   try { return new URLSearchParams(search || '').get('sensors') === 'demo' ? 'demo' : null; } catch (e) { return null; }
@@ -65,11 +84,13 @@ function validateConfig(cfg) {
       if (!d || ![d.baselineC, d.peakC, d.hotT, d.hotWidth].every(finite) || !Array.isArray(d.scaleC) || d.scaleC.length !== 2 || !d.scaleC.every(finite) || d.scaleC[1] <= d.scaleC[0] || d.hotWidth <= 0) return bad('dts needs baselineC, peakC, hotT, hotWidth and scaleC [lo, hi]');
     }
     if (s.type === 'zone' && !(s.zone && finite(s.zone.radiusM) && s.zone.radiusM > 0 && s.zone.radiusM <= 5)) return bad('zone.radiusM must be 0..5 m');
+    if (cfg.primary !== undefined && (typeof cfg.primary !== 'object' || !cfg.primary)) return bad('primary must map scenario -> sensor id');
     if (s.links !== undefined && !(Array.isArray(s.links) && s.links.every(x => typeof x === 'string'))) return bad('links must be sensor ids');
     if (s.reading.series !== undefined && !(Array.isArray(s.reading.series) && s.reading.series.length >= 2 && s.reading.series.every(finite))) return bad('reading.series must be numbers');
     ids.add(s.id); sensors.push(s);
   });
   for (const s of sensors) for (const l of s.links || []) if (!ids.has(l)) errors.push(s.id + ': link to unknown sensor ' + l);
+  for (const [sc, id] of Object.entries(cfg.primary || {})) { const s = sensors.find(x => x.id === id); if (!s || s.scenario !== sc) errors.push('primary.' + sc + ': ' + id + ' is not a sensor of that scenario'); }
   if (cfg.types !== undefined) for (const [k, t] of Object.entries(cfg.types)) {
     if (!TYPES[k]) errors.push('types.' + k + ': unknown type');
     else if (!t || !str(t.short, 30) || !/^#[0-9a-fA-F]{6}$/.test(t.color || '') || !/^[MmLlHhVvCcSsQqTtAaZz0-9 .,\-]+$/.test(t.icon || '')) errors.push('types.' + k + ': needs short, #rrggbb color and an SVG path icon');
@@ -405,12 +426,17 @@ function mountParent(ctx) {
   const gZones = doc.createElementNS(SVGNS, 'g'), gLinks = doc.createElementNS(SVGNS, 'g'), gFibre = doc.createElementNS(SVGNS, 'g'), gPulse = doc.createElementNS(SVGNS, 'g');
   svg.append(gZones, gLinks, gFibre, gPulse);
   const badge = doc.createElement('div'); badge.id = 'sdBadge'; badge.setAttribute('role', 'note');
-  badge.innerHTML = '<span>' + esc(BADGE_TEXT) + ' <small id="sdCount"></small></span><button type="button" id="sdToggle" aria-pressed="true">Hide</button>';
+  badge.innerHTML = '<span>' + esc(BADGE_TEXT) + ' <small id="sdCount"></small></span><button type="button" id="sdLensMode" hidden title="Lens follows the scene\u2019s main sensor, or the mouse">Lens: on sensor</button><button type="button" id="sdToggle" aria-pressed="true">Hide</button>';
   const card = doc.createElement('div'); card.id = 'sdCard'; card.setAttribute('role', 'status');
   main.append(layer, badge, card);
   const byId = new Map(), pins = new Map(), chips = new Map(), elements = {};
   let last = null, raf = 0, hover = null, pinned = null, on = true, failed = null, cfgAll = null, lensLocked = false;
-  const worlds = {}, chipSize = new Map(); let lastRect = null, cardSize = null;   // BIM-world anchors per sensor (from the state message); measured chip sizes
+  const worlds = {}, chipSize = new Map(); let lastRect = null, cardSize = null, lastProj = {}, lastSeen = [], restDiff = null;
+  /* Lens rest sensor (?focus= or the scene's primary). auto = the Lens sits on it when no sensor is pinned (a pin click or a
+     deck card switches the lock; releasing returns to the primary). In a deck embed it always stays on; standalone, the badge
+     button toggles between "on sensor" and mouse-follow. */
+  let primaryId = null, auto = false;
+  const embedded = (ctx.window || window).parent !== (ctx.window || window);   // BIM-world anchors per sensor (from the state message); measured chip sizes
   /* Pins follow the camera pose the compare page has just forwarded (ctx.getPose), projected here in the same frame; the
      BIM pane's own 2D projection (one render + one message later) is only the fallback, and still supplies visibility. */
   function projected(R) {
@@ -423,7 +449,8 @@ function mountParent(ctx) {
       zones: (last.zones || []).map(([id, pts]) => { const w = worlds[id]; return [id, w && w.ring ? w.ring.map(P) : pts]; })};
   }
   const styleOf = s => typeStyle(cfgAll, s.type);
-  const count = doc.getElementById('sdCount');
+  const count = doc.getElementById('sdCount'), lensBtn = doc.getElementById('sdLensMode');
+  lensBtn.onclick = e => { auto = !auto; renderCard(); e.currentTarget.blur(); };
   doc.getElementById('sdToggle').onclick = e => { on = !on; doc.body.classList.toggle('sd-off', !on); e.currentTarget.textContent = on ? 'Hide' : 'Show'; e.currentTarget.setAttribute('aria-pressed', String(on)); if (!on) { pinned = hover = null; } renderCard(); e.currentTarget.blur(); };
   function pinFor(s) {
     let b = pins.get(s.id); if (b) return b;
@@ -484,6 +511,10 @@ function mountParent(ctx) {
         gLinks.appendChild(el('line', {x1: p[0].toFixed(1), y1: p[1].toFixed(1), x2: pos[l][0].toFixed(1), y2: pos[l][1].toFixed(1), stroke: '#FDB515', 'stroke-width': '2.5', 'stroke-dasharray': '6 5', 'stroke-opacity': '.95'}));
     }
     for (const [id, b] of pins) if (!seen.has(id)) b.hidden = true;
+    lastProj = {}; for (const [id, x, y, front] of L.items || []) { const q = at(R, x, y); lastProj[id] = [q[0], q[1], front]; }
+    lastSeen = [...seen];
+    /* at rest the page projection must coincide with the BIM pane's own (one render later): worst pin offset, px */
+    if (L !== last) { let m = 0; for (const it of last.items || []) { const q = lastProj[it[0]]; if (q && it[3]) { const b2 = at(R, it[1], it[2]); m = Math.max(m, Math.hypot(b2[0] - q[0], b2[1] - q[1])); } } restDiff = +m.toFixed(2); }
     /* always-visible type chips beside the pins, nudged apart (placeChips) */
     const items = [];
     for (const [id, c] of chips) { if (!seen.has(id)) { c.hidden = true; continue; } if (c.hidden) c.hidden = false; }
@@ -498,10 +529,12 @@ function mountParent(ctx) {
     const id = on ? (pinned || hover) : null, s = id && byId.get(id), b = s && pins.get(id);
     pins.forEach((p, k) => p.classList.toggle('on', k === id)); chips.forEach((c, k) => c.classList.toggle('on', k === id));
     /* the Lens follows a clicked / deck-focused sensor: centred on its pin, recomputed from each new projection */
-    const lockId = on && pinned && pins.get(pinned) && !pins.get(pinned).hidden ? pinned : null;
+    const lockId = on ? (pinned || (auto ? primaryId : null)) : null;
     const RR = lastRect || rect();   // the rect read at the start of this render: no forced layout after the pin writes
-    if (lens && lockId) { const pb = pins.get(lockId); lens.set(+pb.dataset.x, +pb.dataset.y, RR.mw, RR.mh); lensLocked = true; }
-    else if (lens && lensLocked && !pinned) { lens.release(); lensLocked = false; }
+    const pt = lockId ? lensAnchor(lockId, lastProj, lastSeen) : null;
+    if (lens && lockId) { if (pt) lens.set(pt[0], pt[1], RR.mw, RR.mh); lensLocked = true; }
+    else if (lens && lensLocked) { lens.release(); lensLocked = false; }
+    if (lensBtn) { lensBtn.hidden = !primaryId || embedded; lensBtn.textContent = auto ? 'Lens: on sensor' : 'Lens: mouse'; lensBtn.setAttribute('aria-pressed', String(auto)); }
     if (!s || !b || b.hidden) { card.classList.remove('show'); doc.body.classList.remove('sd-card-on'); return; }
     if (card.dataset.sensor !== id) { card.innerHTML = cardHtml(s, elements[id], styleOf(s)); card.dataset.sensor = id; cardSize = null; }
     const R = RR, x = +b.dataset.x || 0, y = +b.dataset.y || 0;
@@ -528,13 +561,18 @@ function mountParent(ctx) {
   doc.documentElement.addEventListener('mouseleave', () => { if (hover) { hover = null; renderCard(); } });   // pointer left the page (e.g. into the deck)
   main.addEventListener('pointerdown', e => { if (!e.target.closest || !e.target.closest('.sd-pin')) { if (pinned) { pinned = null; renderCard(); } } }, true);
   fetch(ctx.configUrl || CONFIG_URL, {cache: 'no-store'}).then(r => { if (!r.ok) throw Error('config ' + r.status); return r.json(); }).then(cfg => {
-    const v = validateConfig(cfg); cfgAll = cfg; for (const s of filterScene(v.sensors, ctx.sceneFilter || null)) byId.set(s.id, s); schedule();
+    const v = validateConfig(cfg); cfgAll = cfg; for (const s of filterScene(v.sensors, ctx.sceneFilter || null)) byId.set(s.id, s);
+    primaryId = primaryFor(cfg, ctx.sceneFilter || null, ctx.focus || null, [...byId.keys()]); auto = !!primaryId; schedule();
   }).catch(e => { failed = String(e && e.message || e); count.textContent = '· not loaded'; });
-  return {poseChanged: schedule, inspection: () => ({projectedFromPose: !!(ctx.getPose && ctx.getPose() && Object.keys(worlds).length), lensLocked, chips: [...chips].filter(([, c]) => !c.hidden).map(([id, c]) => { const r = c.getBoundingClientRect(); return [id, c.textContent, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }),
+  return {poseChanged: schedule,
+    /* a locked Lens ignores mouse moves over the photo (dragging the view included), so it stays on its sensor; standalone,
+       the badge button "Lens: on sensor / mouse" hands it back to the mouse. true = let the mouse move the Lens */
+    pointerMoved: () => !lensLocked,
+    inspection: () => ({primary: primaryId, auto, lockId: on ? (pinned || (auto ? primaryId : null)) : null, restDiff, projectedFromPose: !!(ctx.getPose && ctx.getPose() && Object.keys(worlds).length), lensLocked, chips: [...chips].filter(([, c]) => !c.hidden).map(([id, c]) => { const r = c.getBoundingClientRect(); return [id, c.textContent, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }),
     pinXY: Object.fromEntries([...pins].filter(([, b]) => !b.hidden).map(([id, b]) => [id, [+b.dataset.x, +b.dataset.y]])), scene: ctx.sceneFilter || null, sensors: byId.size, attached: Object.keys(elements), pins: [...pins].filter(([, b]) => !b.hidden).map(([id]) => id), fibreSegments: gFibre.childNodes.length / 2, pulses: gPulse.childNodes.length / 3, links: gLinks.childNodes.length, zones: gZones.childNodes.length, card: card.classList.contains('show') ? card.dataset.sensor : null, failed}),
     focus: id => { pinned = byId.has(id) ? id : null; renderCard(); }};
 }
 
-return {projectPoint, typeStyle, iconSvg, lensPoint, placeChips, SCHEMA, STATUS, CONFIG_URL, BADGE_TEXT, MSG, TYPES, parseSensorsParam, parseSceneParam, filterScene, validateConfig, colorAt, cssColor, dtsTempC, dtsValue,
+return {parseFocusParam, primaryFor, lensAnchor, projectPoint, typeStyle, iconSvg, lensPoint, placeChips, SCHEMA, STATUS, CONFIG_URL, BADGE_TEXT, MSG, TYPES, parseSensorsParam, parseSceneParam, filterScene, validateConfig, colorAt, cssColor, dtsTempC, dtsValue,
   principalAxis, axisParam, axisPoint, anchorPoint, zoneRing, esc, sparkSvg, cardHtml, mountBim, mountParent, PARENT_CSS};
 });
