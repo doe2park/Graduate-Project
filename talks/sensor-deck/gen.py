@@ -65,9 +65,13 @@ EXTRA.update({
    subtitle='Four asks, in order of urgency',
    footnote='Asks 1 and 2 go to Facilities through the existing email threads; ask 3 is within the lab.',
    notes='To sum up, four asks in order of urgency. One, SkySpark meter data for the main campus, hourly, twelve months, before the November 16 presentations. Two, owners and processes for floor plans, sensor installs and drone filming. Three, the lab Quest 3 and a quiet time in the Grimes foyer this week. Four, later, a read-only building automation trend export and point list once the first three are moving.'),
+ 'open-ceiling': dict(id='open-ceiling', kind='figure', title='Oct 18: a leak repair opened this ceiling',
+   subtitle='Level 1 entrance by the auditorium doors: our 360° walk passed under the open tiles',
+   footnote='Oct 18 capture, ceiling only, no people. Model overlay uses a provisional alignment (not surveyed); offsets read from screenshots. Pipes deeper in the plenum were too dark to check.',
+   notes='Before the concepts, a real case. On October 18 the ceiling at the Level 1 entrance was open for a leak repair, and our 360 walk passed right under it. On the right is the same view with the building model on top. The supply diffuser, the flex duct and the sprinkler head line up within a few centimetres. The fire-alarm device in the tile is about 0.7 metres from where the model puts it, so it was installed in a different spot than the drawings show. Two lessons for sensors. First, today a leak is found when water shows on a tile, and the ceiling has to be opened to find the source. Second, if we attach sensors to BIM elements, the model has to match what is installed, and an opening like this is the chance to check it. The next slides show how sensors in the twin would point to the pipe before anyone opens a tile.'),
 })
 CS.update(EXTRA)
-ORDER = ['cover', 'part-0', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'part-1', 'bms', 'part-2', 'sensing', 'fiber', 'ce278', 'mems', 'wsn', 'pilot'] + [sc['id'] for sc in SCENARIOS] + ['ready', 'thanks']
+ORDER = ['cover', 'part-0', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'part-1', 'bms', 'part-2', 'sensing', 'fiber', 'ce278', 'mems', 'wsn', 'pilot', 'open-ceiling'] + [sc['id'] for sc in SCENARIOS] + ['ready', 'thanks']
 SLIDES = [CS[i] for i in ORDER]
 
 # ---------------------------------------------------------------- primitives (same as v1)
@@ -371,6 +375,19 @@ def pilot(s):
     out += bullets_card(5.1, 2.95, 4.35, 1.65, bl[1]['head'], bl[1]['items'], size=11)
     return out
 
+def open_ceiling():
+    out = fig('oct18-ceiling-open-photo.jpg', .55, 1.17, 3.3, 2.58)
+    out += fig('oct18-ceiling-open-model.jpg', 4.0, 1.17, 3.3, 2.58, frame=True)
+    out += pill(.65, 1.27, 1.6, .26, 'Photo · ceiling open', size=9)
+    out += pill(5.6, 1.27, 1.6, .26, 'Same view + model', size=9)
+    out += text(.55, 3.78, 6.75, .3, P('1 supply diffuser · 2 flex duct · 3 sprinkler head · 4 fire-alarm device (model position)', size=10, color=MUTED), anchor='middle')
+    out += card(7.45, 1.17, 2.0, 1.12, '1–3  Match', 'Diffuser, flex duct and sprinkler head line up within a few cm', head_size=11.5, size=9.5)
+    out += card(7.45, 2.39, 2.0, 1.12, '4  Moved', 'Fire-alarm device ≈0.7 m from its modelled spot', head_size=11.5, size=9.5)
+    out += card(7.45, 3.61, 2.0, .44, 'As-built check before sensors', '', head_size=9.5, middle=True)
+    out += box(.55, 4.15, 8.9, .72, 'card navy')
+    out += text(.7, 4.15, 1.9, .72, P('With sensors', size=17, bold=True, color=GOLD), anchor='middle')
+    return out + text(2.55, 4.15, 6.8, .72, P('The warm or wet spot shows on the BIM pipe before anyone opens a tile. Next: five concepts of how that looks in the twin', size=12, color='#fff'), anchor='middle')
+
 def ask_bar(t, y=4.15, h=.72):
     out = box(.55, y, 8.9, h, 'card navy')
     out += text(.7, y, 1.9, h, P('What we need', size=17, bold=True, color=GOLD), anchor='middle')
@@ -468,6 +485,7 @@ def slide(s, n):
         if sid == 'bms': body += bms(s)
         elif sid == 'sensing': body += sensing_table()
         elif sid == 'pilot': body += pilot(s)
+        elif sid == 'open-ceiling': body += open_ceiling()
         elif sid == 'fiber': body += fiber_slide()
         elif sid == 'ce278': body += ce278_slide()
         elif sid == 'mems': body += mems_slide()

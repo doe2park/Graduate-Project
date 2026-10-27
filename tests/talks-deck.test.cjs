@@ -47,10 +47,14 @@ test('nothing private, local-only or personal in the public folder', () => {
     assert.ok(/\.(html|css|js|py|json|md|txt|ttf|jpg|png)$/.test(rel), 'unexpected file type: ' + rel);
     if (!/\.(ttf|jpg|png)$/.test(rel)) {
       const t = fs.readFileSync(f, 'utf8');
-      for (const bad of [/2026-10-18/, /Oct(ober)? 18/, /capture-local/, ...(rel === 'README.md' ? [] : [/127\.0\.0\.1|localhost/]), /@gmail\.com|@berkeley\.edu/, /ghp_[A-Za-z0-9]{10}|github_pat_/, /Chung/])
-        assert.ok(!bad.test(rel === 'img/SOURCES.md' ? t.replace('There is no imagery from the Oct 18 capture', '') : t), rel + ' matches ' + bad);
+      // Oct 18 is named only for the two open-ceiling views the owner approved for public use (2026-10-27); see the image check below.
+      for (const bad of [/2026-10-18/, /capture-local/, ...(rel === 'README.md' ? [] : [/127\.0\.0\.1|localhost/]), /@gmail\.com|@berkeley\.edu/, /ghp_[A-Za-z0-9]{10}|github_pat_/, /Chung/])
+        assert.ok(!bad.test(t), rel + ' matches ' + bad);
     }
   }
+  const OCT18_OK = ['oct18-ceiling-open-photo.jpg', 'oct18-ceiling-open-model.jpg'];
+  for (const f of fs.readdirSync(path.join(deck, 'img')).filter(f => /oct.?18|10-?18/i.test(f))) assert.ok(OCT18_OK.includes(f), 'Oct 18 image not approved for public use: ' + f);
+  assert.match(sources, /approved public use on 2026-10-27/);
   assert.match(html, /Concept mockup — no sensors are installed; values are illustrative\./);
   assert.ok(!/>Ask</.test(html) && html.includes('What we need'), 'slide 3 label is "What we need"');
 });

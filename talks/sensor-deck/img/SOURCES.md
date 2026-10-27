@@ -10,8 +10,9 @@ Every raster image used by the deck (the fiber principle sketches, row icons and
 | `l24-p19-wireless-node.jpg` | Same course, Lecture 2-4, p. 19: a battery wireless sensor node (course lab hardware, top-left photo of four) | Course material, same permission. | Page rendered at 220 dpi; only that one photo is cropped (no lecture text). | MEMS |
 | `b-hvac.jpg`, `b-plumb.jpg`, `b-elec.jpg`, `b-fan.jpg`, `t1-lens-base.jpg` | Own headless screenshots of the public viewer (`scan-compare.html`, Overlay · Lens) on the **public May 6, 2026 capture** (captures 43, 1, 43, 22 and 35) | Own work, from published project data | Cropped so that no viewer UI text remains | Static fallback of concept slides 2–5 and 1 |
 | `t2-twin-sensor-mockup.jpg` | `t1-lens-base.jpg` with drawn concept graphics (temperature line, alert ring, two markers); contains no text | Own work | Graphics drawn with Pillow | Fallback if the concept 1 base image fails |
+| `oct18-ceiling-open-photo.jpg`, `oct18-ceiling-open-model.jpg` | Own Oct 18, 2026 capture, Capture 87 (pano_107294711), Level 1 entrance by the auditorium doors, ceiling open for a leak repair: photo only, and the same view in the viewer with the building model (Plain 55 %, fire / duct / plumbing / life safety). Copied from the facilities briefing assets (`g02-ceiling-open-*.jpg`, made by `make_facilities_assets.py`) | Own work. Ceiling only, no people; the owner approved public use on 2026-10-27 | Perspective crop, x1.25; numbered callouts 1–4 drawn on the model view (no text) | Oct 18 open ceiling |
 
-There is no imagery from the Oct 18 capture or from any capture still under privacy review.
+The only Oct 18 imagery is the two open-ceiling views above (ceiling only, no people, approved by the owner on 2026-10-27). No other imagery from the Oct 18 capture or from any capture still under privacy review is used.
 
 Fonts: `../fonts/Carlito-*.ttf` are Carlito by tyPoland Łukasz Dziedzic, licensed under the SIL Open Font License 1.1 (`../fonts/OFL.txt`). They are not modified.
 
