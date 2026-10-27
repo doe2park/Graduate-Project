@@ -103,16 +103,16 @@ S3 = dict(
        maps='BIM no-hub coupling above it, element 423698', badge=(560, 470), hit=(560, 470, 26), draw=pin(2, 560, 470, '#003262')),
   dict(k=3, sid='water-alert', col='#C81E1E', title='Night-flow alert', row='Flow when the building is empty, shown on the pipe',
        what='Alert when this branch flows at night: a likely leak. It is compared with the Grimes water meter on the campus energy dashboard.', val='+0.6 L/s between 1 and 4 am; building meter shows the same rise',
-       maps='Pipe 418392; building water meter in BMO', badge=(715, 148), hit=(715, 148, 40),
+       maps='Pipe 418392; Grimes building water meter', badge=(715, 148), hit=(715, 148, 40),
        draw=ring(615, 300, 46) + '<circle cx="715" cy="148" r="16" fill="#C81E1E" stroke="#fff" stroke-width="3"/><text x="715" y="154" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">3</text>'),
  ],
  legend=None,
- steps=[dict(head='Measure', text='Flow on the branch; water on the slats'), dict(head='Compare', text='Night flow vs the Grimes water meter (BMO)'),
+ steps=[dict(head='Measure', text='Flow on the branch; water on the slats'), dict(head='Compare', text='Night flow vs the Grimes building water meter'),
         dict(head='Show', text='Alert on that pipe in the Lens and the dashboard')],
  footnote=foot(1),
  notes='Concept three is a water branch. The view looks up at the Level 1 lobby ceiling, where the BIM shows a cast iron no hub pipe and coupling in the plumbing model. Cast iron no hub is usually drain piping, so a real flow meter would go on a copper supply branch; treat the location as illustrative. Marker one is a clamp on ultrasonic flow meter, which measures flow without cutting the pipe. Marker two is a leak puck on the slats below the fittings. Marker three is the night flow alert: if the branch flows between one and four in the morning when the building is empty, we compare it with the Grimes water meter on the campus energy dashboard. The alert shows on that pipe in the Lens. All values are illustrative.')
 
-# ---------- 4. Electrical: CT sub-meter + panel monitor, rolled up to the BMO meter  (capture 43, station 83697643, yaw 180 / pitch 40)
+# ---------- 4. Electrical: CT sub-meter + panel monitor, rolled up to the building meter  (capture 43, station 83697643, yaw 180 / pitch 40)
 SPK_KW = [8, 7.5, 7.2, 7, 7.4, 9, 12, 15, 17, 18, 17.5, 18, 17, 17.5, 16.5, 15, 13, 11, 10, 9.4, 9, 8.6, 8.2, 8]
 S4 = dict(
  id='twin-power', slug='power', base='b-elec.jpg', fallback='', anim='',
@@ -128,16 +128,16 @@ S4 = dict(
   dict(k=2, sid='power-unit', col='#087F8C', title='Unit power monitor', row='Controller and actuator current at the VAV terminal unit',
        what='Small monitor at the VAV box: controller supply and damper-actuator current.', val='24 VAC controller; actuator 0.6 A',
        maps='BIM VAV terminal unit (Price SDV5), element 396073', badge=(705, 380), hit=(705, 380, 26), draw=pin(2, 705, 380, '#087F8C')),
-  dict(k=3, sid='power-bmo', col='#003262', title='Link to the BMO building meter', row='Sub-meters should add up to the whole-building meter',
-       what='The Obvius meter on Building Manager Online reports whole-building electricity every 15 minutes. Sub-meters split that total by circuit.', val='Building 212 kW; sub-meters cover 61 %',
-       spark=spark([180, 176, 172, 175, 190, 205, 220, 230, 224, 212], '#003262'), spark_note='BMO, last 2.5 h',
-       maps='BMO channel (building meter); sub-meters roll up to it', badge=(700, 205), hit=(700, 205, 26), draw=pin(3, 700, 205, '#003262')),
+  dict(k=3, sid='power-bmo', col='#003262', title='Link to the building meter', row='Sub-meters should add up to the whole-building meter',
+       what='The whole-building meter reports electricity every 15 minutes (BMO today; SkySpark is the Facilities source going forward). Sub-meters split that total by circuit.', val='Building 212 kW; sub-meters cover 61 %',
+       spark=spark([180, 176, 172, 175, 190, 205, 220, 230, 224, 212], '#003262'), spark_note='building meter, last 2.5 h',
+       maps='Building meter channel; sub-meters roll up to it', badge=(700, 205), hit=(700, 205, 26), draw=pin(3, 700, 205, '#003262')),
  ],
  legend=None,
- steps=[dict(head='Measure', text='kW per circuit; unit current'), dict(head='Roll up', text='Sub-meters vs the BMO building meter'),
+ steps=[dict(head='Measure', text='kW per circuit; unit current'), dict(head='Roll up', text='Sub-meters vs the building meter'),
         dict(head='Show', text='Load on each circuit, in the viewer')],
  footnote=foot(43),
- notes='Concept four is electrical. The view shows two VAV terminal units in a Level 1 ceiling: in the BIM they are a Price SDV5 box and a coil kit. No conduit is modelled in this view, so the circuit is illustrative. Marker one is a clip on current transformer on the circuit feeding these units, giving kilowatts, and the card shows a small day profile. Marker two is a small monitor on the VAV box with controller and actuator current. Marker three is the link to the BMO building meter, which already reports whole building electricity every fifteen minutes. The idea is that circuit sub meters add up toward that total, so we can see where the load is. Each reading maps to a BIM element ID. Values are made up.')
+ notes='Concept four is electrical. The view shows two VAV terminal units in a Level 1 ceiling: in the BIM they are a Price SDV5 box and a coil kit. No conduit is modelled in this view, so the circuit is illustrative. Marker one is a clip on current transformer on the circuit feeding these units, giving kilowatts, and the card shows a small day profile. Marker two is a small monitor on the VAV box with controller and actuator current. Marker three is the link to the building meter, which already reports whole building electricity every fifteen minutes. The idea is that circuit sub meters add up toward that total, so we can see where the load is. Each reading maps to a BIM element ID. Values are made up.')
 
 # ---------- 5. Rotating equipment: vibration + bearing temperature + trend alert  (capture 22, station 83697587, yaw 180 / pitch 40)
 SPK_VIB = [1.1, 1.2, 1.1, 1.2, 1.3, 1.2, 1.4, 1.5, 1.5, 1.7, 1.8, 2.0, 2.1]

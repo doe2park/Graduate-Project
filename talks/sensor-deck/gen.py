@@ -43,10 +43,31 @@ EXTRA = {
   'ready': dict(id='ready', kind='figure', title='Ready for real sensors',
    subtitle='Every source is turned into one feed format and tied to a BIM element: attaching a real sensor only changes the source',
    footnote='Today every value in the twin’s sensor layer is simulated (labelled “Simulated”); no sensor is installed. Brick class names are candidates, not yet verified.',
-   notes='This slide is about what happens after the demo. Whatever the source is, a building automation point, a BMO meter, a wireless gateway or a fiber analyzer, a small adapter turns it into one common feed format: sensor, time, value, unit, quality and source. A registry ties each sensor to its BIM element by the element GUID, with a Brick class, its units and its alert rule. The Lens, the headset and the dashboard read only that feed and registry. Today the feed is a simulator that runs in the browser and is clearly labelled Simulated. When a real sensor is installed, we add its row, switch its source, and it appears with a Live badge, under the same rules for missing and stale data.'),
+   notes='This slide is about what happens after the demo. Whatever the source is, a building automation point, a campus meter (moving from BMO to SkySpark), a wireless gateway or a fiber analyzer, a small adapter turns it into one common feed format: sensor, time, value, unit, quality and source. A registry ties each sensor to its BIM element by the element GUID, with a Brick class, its units and its alert rule. The Lens, the headset and the dashboard read only that feed and registry. Today the feed is a simulator that runs in the browser and is clearly labelled Simulated. When a real sensor is installed, we add its row, switch its source, and it appears with a Live badge, under the same rules for missing and stale data.'),
 }
+EXTRA.update({
+ 'part-0': dict(id='part-0', kind='divider', number='01', title='This week: updates and asks',
+   subtitle='Campus energy data, the facilities follow-up and the Quest 3 test, and what we need for each',
+   notes='Part one is short and practical: three updates from this week, and for each one, what we need.'),
+ 'week-energy': dict(id='week-energy', kind='figure', title='Campus energy data: moving to the Facilities source',
+   subtitle='Facilities recommends SkySpark over BMO; the class needs hourly data covering the whole main campus',
+   footnote='Requested interval and period are from the utility side of the email thread (Oct 26). Dashboard values from BMO are shown for reference until the SkySpark feed is connected.',
+   notes='First, campus energy data. Facilities told us this week that BMO, which the dashboard reads today, is no longer their source of truth: the platform is outdated and new meters cannot be added. They recommend SkySpark, which they actively manage, and they are setting up an intake form so students can pull hourly data themselves. On the class side, the request is hourly electricity data, ideally at least twelve months so winter and summer are both covered. One student group wants to do an energy balance of the main campus, so coverage matters. The dashboard today covers 37 buildings from BMO. Some main-campus buildings are not listed yet, for example the Valley Life Sciences Building, and some buildings may be fed or sub-metered from a neighbour. What we need: SkySpark access, or the intake form, before the student presentations in the week of November 16; a confirmed interval, period and building list; and which buildings are fed from others. Once access is set, the dashboard switches its meter source to SkySpark.'),
+ 'week-facilities': dict(id='week-facilities', kind='figure', title='Facilities follow-up: three requests from the Oct 22 meeting',
+   subtitle='Asked of building operations a week ago; the team is sending one combined follow-up with the final list',
+   footnote='Status as of Oct 26: no decision yet on any of the three requests.',
+   notes='Second, the follow-up from our meeting with building operations on October 22. We asked for three things. One, floor plans or building data for older campus buildings, which usually have no BIM: plans let us place the 360 captures and build a basic model. Two, whether sensors can be installed, so readings link to a room or a system instead of the whole-building meter. Three, permission to film with a drone, for the exterior and roof. None has a decision yet. This week the team is collecting each member\'s slides and sending one combined follow-up with the final list of requests. What we need is an owner and an approval process for each request, and a first candidate building.'),
+ 'week-quest': dict(id='week-quest', kind='figure', title='Quest 3 test this week: what is ready',
+   subtitle='Mixed reality on the real ceiling, plus the redesigned VR controls, prepared for a lab Quest 3',
+   footnote='Desktop and emulated-headset tests only; nothing has run on a Quest 3 yet. Landmarks are BIM-derived candidates, not surveyed. RMS measures touch consistency, not survey accuracy.',
+   notes='Third, the headset. We can borrow a Quest 3 from the lab this week, and three things are ready for it. Mixed reality: you stand in the real building and see the BIM services through the ceiling. You align it by touching four landmarks, column faces and wall corners, plus the floor; the page fits a rotation and a shift and reports the error. Two Level 1 areas are prepared, the auditorium foyer with its open ceiling and the east entrance. Then we check real sprinkler heads and a diffuser against their BIM positions, in centimetres. The target is three centimetres RMS and five at worst. Second, the VR controls were redesigned after the first headset try: point and go, a visible laser, and a five-button menu. Third, the black screen we saw on a Quest 2 is fixed and passes an emulated headset test. None of this has run on a Quest 3 yet. The Quest 3 matters because its passthrough is in colour and it builds a room mesh, so touching corners and ceiling devices is more precise. What we need: the headset this week, a quiet time in the Level 1 foyer, and after a pass, permission to put it on the public link.'),
+ 'week-asks': dict(id='week-asks', kind='figure', title='What we need',
+   subtitle='Four asks, in order of urgency',
+   footnote='Asks 1 and 2 go to Facilities through the existing email threads; ask 3 is within the lab.',
+   notes='To sum up, four asks in order of urgency. One, SkySpark meter data for the main campus, hourly, twelve months, before the November 16 presentations. Two, owners and processes for floor plans, sensor installs and drone filming. Three, the lab Quest 3 and a quiet time in the Grimes foyer this week. Four, later, a read-only building automation trend export and point list once the first three are moving.'),
+})
 CS.update(EXTRA)
-ORDER = ['cover', 'part-1', 'bms', 'part-2', 'sensing', 'fiber', 'ce278', 'mems', 'wsn', 'pilot'] + [sc['id'] for sc in SCENARIOS] + ['ready', 'thanks']
+ORDER = ['cover', 'part-0', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'part-1', 'bms', 'part-2', 'sensing', 'fiber', 'ce278', 'mems', 'wsn', 'pilot'] + [sc['id'] for sc in SCENARIOS] + ['ready', 'thanks']
 SLIDES = [CS[i] for i in ORDER]
 
 # ---------------------------------------------------------------- primitives (same as v1)
@@ -288,7 +309,7 @@ def ready_svg():
         if sub: o.append(f'<text x="{x+w/2}" y="{y+h/2+22}" font-size="19" fill="{sc}" text-anchor="middle" dominant-baseline="middle">{sub}</text>')
     def ar(x1, y1, x2, y2): o.append(f'<path d="M{x1} {y1} L{x2} {y2}" stroke="#FDB515" stroke-width="5" marker-end="url(#ah)"/>')
     o.append('<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#FDB515"/></marker></defs>')
-    srcs = [('BAS / BACnet', 'Facilities points'), ('BMO meters', 'already collected'), ('Wireless gateway', 'MEMS nodes'), ('Fiber analyzer', 'DTS / DAS')]
+    srcs = [('BAS / BACnet', 'Facilities points'), ('Meters', 'SkySpark (was BMO)'), ('Wireless gateway', 'MEMS nodes'), ('Fiber analyzer', 'DTS / DAS')]
     for i, (t, sb) in enumerate(srcs):
         y = 20 + i * 132; bx(20, y, 300, 108, '#EEF3F8', t, sb, tc='#003262', sc='#5B7089'); ar(325, y + 54, 395, y + 54)
     o.append('<rect x="400" y="20" width="230" height="504" rx="14" fill="#087F8C"/>'
@@ -309,7 +330,7 @@ def ready_slide():
     out += box(.55, 3.82, 8.9, .38, 'card') + text(.7, 3.82, 8.6, .38, [[('Today: ', dict(bold=True, color=TEAL, size=11)), ('simulated feed in the browser, labelled “Simulated”', dict(size=11)), ('   →   Tomorrow: ', dict(bold=True, color=NAVY, size=11)), ('add the row, switch the source → “Live”', dict(size=11))]], anchor='middle')
     items = ['Registry: 17 demo sensors tied to real BIM element GUIDs, with units, intervals, alert rules and Brick classes',
              'One feed format and shared rules: missing is never zero, stale after 3 intervals, units must match',
-             'Adapters: simulator live today; BMS, BMO, gateway and fiber stubs ready to be filled in']
+             'Adapters: simulator live today; BMS, meter, gateway and fiber stubs ready to be filled in (meter adapter to target SkySpark)']
     out += text(.6, 4.28, 8.8, .7, [[('✓ ', dict(bold=True, color=TEAL, size=10)), (t, dict(size=10))] for t in items], gap=0)
     return out
 
@@ -334,8 +355,8 @@ def chrome_bars():
 
 def bms(s):
     bl = [b for b in s['blocks'] if b['type'] == 'bullets']; ask = blk('bms', 'text')
-    out = bullets_card(.55, 1.2, 4.35, 2.85, 'Today: utility meters (BMO)', bl[0]['items'], size=11.5)
-    out += pill(.69, 3.62, 1.5, .26, 'In place today', bg=TEAL, size=9)
+    out = bullets_card(.55, 1.2, 4.35, 2.85, 'Meters: BMO today, SkySpark next', bl[0]['items'], size=11.5)
+    out += pill(.69, 3.62, 1.75, .26, 'Moving to SkySpark', bg=TEAL, size=9)
     out += bullets_card(5.1, 1.2, 4.35, 2.85, 'Likely: building automation (WebCTRL / BACnet)', bl[1]['items'], head_size=12, size=10.5)
     out += pill(5.24, 3.62, 1.95, .26, 'NOT confirmed for Grimes', bg=RED, size=9)
     out += box(.55, 4.15, 8.9, .72, 'card navy')
@@ -350,9 +371,78 @@ def pilot(s):
     out += bullets_card(5.1, 2.95, 4.35, 1.65, bl[1]['head'], bl[1]['items'], size=11)
     return out
 
+def ask_bar(t, y=4.15, h=.72):
+    out = box(.55, y, 8.9, h, 'card navy')
+    out += text(.7, y, 1.9, h, P('What we need', size=17, bold=True, color=GOLD), anchor='middle')
+    return out + text(2.55, y, 6.8, h, P(t, size=12, color='#fff'), anchor='middle')
+
+def week_energy():
+    out = bullets_card(.55, 1.2, 4.35, 2.85, 'What changed this week', [
+        'Facilities: BMO is outdated and cannot add meters; it is no longer their source of truth',
+        'Recommended source: SkySpark, actively managed by Facilities',
+        'An intake form is being set up so students can pull hourly data themselves',
+        'Class need: hourly electricity, ideally 12 months (winter and summer)'], size=11)
+    out += bullets_card(5.1, 1.2, 4.35, 2.85, 'The dashboard today', [
+        '37 buildings, read from BMO; values shown for reference',
+        'Some main-campus buildings are not listed yet (e.g. Valley Life Sciences)',
+        'Some buildings may be fed or sub-metered from a neighbour',
+        'A main-campus energy balance needs complete coverage',
+        'Next: switch the meter source to SkySpark'], size=11)
+    out += pill(5.24, 3.62, 1.75, .26, 'Moving to SkySpark', bg=TEAL, size=9)
+    return out + ask_bar('SkySpark access (or the intake form) before the Nov 16 student presentations · confirm interval, period and the main-campus building list · which buildings are fed from others')
+
+def week_facilities():
+    reqs = [('Floor plans for older buildings', 'Older buildings have no BIM; plans let us place 360° captures and build a basic model'),
+            ('Sensor installation', 'Readings tied to a room or system, not only the building meter; locations, approval, installer, data access'),
+            ('Drone filming', 'Exterior and roof capture to complete the model; approval process, forms, lead time')]
+    out = ''
+    for i, (h, b) in enumerate(reqs):
+        x = .55 + i * 3.0
+        out += card(x, 1.2, 2.85, 2.05, h, b, num=i + 1, head_size=12.5, size=10.5)
+        out += pill(x + .14, 2.88, 1.45, .26, 'Waiting for reply', bg=RED, size=9)
+    out += box(.55, 3.4, 8.9, .62, 'card')
+    out += text(.7, 3.4, 8.6, .62, [[('This week: ', dict(bold=True, color=TEAL, size=11.5)), ('the team collects each member’s slides and sends one combined follow-up with the final list of requests', dict(size=11.5))]], anchor='middle')
+    return out + ask_bar('An owner and an approval process for each request, and a first candidate building')
+
+def week_quest():
+    st = [dict(head='Align', text='Touch 4 landmarks (columns, wall corners) + floor; fit rotation + shift'),
+          dict(head='Check', text='Real sprinkler heads and a diffuser vs BIM, offset in cm'),
+          dict(head='Target', text='RMS ≤ 3 cm, worst point ≤ 5 cm; re-check after a 10 m walk')]
+    out = text(.6, 1.17, 4.4, .3, P('Mixed reality: BIM services through the real ceiling', size=12.5, bold=True, color=NAVY))
+    out += numsteps(.55, 1.5, 5.6, 1.35, st, head_size=11.5, size=10, arrow=.18)
+    out += bullets_card(6.3, 1.17, 3.15, 1.68, 'Also ready', [
+        'Two Level 1 areas: auditorium foyer (open ceiling), east entrance',
+        'VR controls redesigned: point-and-go, laser, 5-button menu',
+        'Quest 2 black-screen fix; passes an emulated headset test'], head_size=12, size=9.5)
+    out += bullets_card(.55, 2.97, 5.6, 1.08, 'Why the Quest 3', [
+        'Colour, sharper passthrough and a room mesh: touching corners and ceiling devices is more precise',
+        'More GPU headroom for extra service layers'], head_size=12, size=10)
+    out += box(6.3, 2.97, 3.15, 1.08, 'card')
+    out += text(6.44, 2.97, 2.9, 1.08, [[('10-minute protocol', dict(bold=True, color=NAVY, size=12))], [('Align → check 3 heads + 1 diffuser → walk 10 m → re-enter; log saved on the headset', dict(size=9.5))]], anchor='middle', gap=2)
+    out += pill(7.35, .9, 2.1, .24, 'NOT yet tested on a Quest 3', bg=RED, size=9)
+    return out + ask_bar('The lab Quest 3 this week · a quiet time in the Level 1 foyer · after a pass, permission to put it on the public link')
+
+def week_asks():
+    rows = [('1', 'SkySpark meter data for the main campus', 'hourly, 12 months, full building list', 'Facilities energy', 'Before Nov 16'),
+            ('2', 'Owner + process: floor plans, sensors, drone', 'and a first candidate building', 'Facilities operations', 'Reply to follow-up'),
+            ('3', 'Quest 3 + a quiet time in the Grimes foyer', 'mixed-reality alignment test', 'Lab', 'This week'),
+            ('4', 'Read-only BAS trend export + point list', 'tagged so points link to BIM elements', 'Facilities controls', 'Later')]
+    out = ''; y0 = 1.2; rh = .78
+    for c, (x, w, t) in enumerate([(1.15, 4.25, 'Ask'), (5.5, 2.0, 'From'), (7.6, 1.85, 'When')]):
+        out += text(x, y0, w, .28, P(t.upper(), size=8.5, bold=True, color=TEAL))
+    for i, (n, a, sub, frm, when) in enumerate(rows):
+        y = y0 + .32 + i * (rh + .08)
+        out += box(.55, y, 8.9, rh, 'card navy' if i == 0 else 'card')
+        col = '#fff' if i == 0 else DARK; hc = GOLD if i == 0 else NAVY
+        out += f'<div class="circ" style="{pos(.68,y+rh/2-.19,.38,.38)};background:{GOLD if i == 0 else NAVY};color:{NAVY if i == 0 else "#fff"};font-size:{14*PT:.1f}px">{n}</div>'
+        out += text(1.15, y, 4.25, rh, [[(a, dict(bold=True, size=13, color=hc))], [(sub, dict(size=10, color=col))]], anchor='middle', gap=1)
+        out += text(5.5, y, 2.0, rh, P(frm, size=11.5, color=col), anchor='middle')
+        out += text(7.6, y, 1.8, rh, P(when, size=11.5, bold=True, color=hc), anchor='middle')
+    return out
+
 def thanks_extra():
     out = ''
-    qs = ['Can Facilities share building automation (BAS) data?', 'Is the riser pilot worth proposing to Prof. Soga’s lab?']
+    qs = ['Can we get SkySpark meter data before the Nov 16 presentations?', 'Can we test mixed reality in the Grimes foyer with the Quest 3 this week?']
     for i, q in enumerate(qs):
         out += box(1.2 + 3.9 * i, 3.35, 3.7, .9, 'card')
         out += text(1.35 + 3.9 * i, 3.35, 3.4, .9, [[('QUESTION ' + str(i + 1), dict(bold=True, size=8, color=TEAL))], [(q, dict(size=12.5, color=NAVY, bold=True))]], anchor='middle', gap=2)
@@ -383,6 +473,10 @@ def slide(s, n):
         elif sid == 'mems': body += mems_slide()
         elif sid == 'wsn': body += wsn_slide()
         elif sid == 'ready': body += ready_slide()
+        elif sid == 'week-energy': body += week_energy()
+        elif sid == 'week-facilities': body += week_facilities()
+        elif sid == 'week-quest': body += week_quest()
+        elif sid == 'week-asks': body += week_asks()
         elif sid in SC: body += twin_slide(SC[sid])
     return f'<section class="slide" id="{s["id"]}">{body}</section>'
 
