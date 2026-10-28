@@ -167,6 +167,29 @@
       },
       "mobileBudget": 350000,
       "notes": "SUPERSEDED 2026-10-20: Level 2 and Level 3 will be re-scanned; kept for provenance only, do not train or publish. Only the 32 panoramas of video VID_20261018_153400 (19 Level 3 incl. 2 stair, 13 Level 2 incl. 2 stair). The old 2026-10-18-L3 preset mixed 33 Level 1 frames of the other video into 'L3' at overlapping Cupix coordinates (l3-a 20/36, l3-b 15/18 Level 1 images). No seed mesh: the Ground scan.glb mixes both videos. Unblurred originals: never publish without review. Use --mask-nadir."
+    },
+    "2026-10-18-upper-raw477": {
+      "building": "grimes",
+      "label": "Levels 2-3 + atrium stairs, October 18 2026 upper-floor video, raw INSV frames (local SfM placed on the Cupix video-B stations; local, unpublished)",
+      "manifest": "capture-local/grimes-UPPER-2026-10-18-raw477/panoramas/manifest.json",
+      "registration": "capture-local/grimes-UPPER-2026-10-18-raw477/registration.json",
+      "seedGlbs": [],
+      "centerId": "raw477_f000048",
+      "radius": 60,
+      "size": 768,
+      "pointCount": 150000,
+      "seedUpAxis": "z",
+      "train": {
+        "steps": 30000,
+        "maxSplats": 1000000,
+        "resolution": 768,
+        "checkpointEvery": 5000,
+        "refineEvery": 400,
+        "growthStop": 15000,
+        "shDegree": 2
+      },
+      "mobileBudget": 350000,
+      "notes": "2026-10-27, local experiment. 108 panoramas of VID_20261018_153400_00_477.insv (scripts/raw360_pipeline.py with --dual-stream, fisheye-rig COLMAP; three submodels placed in the Level 1 scan frame by frame number with scripts/multifloor_review.py place-raw) instead of the 32 Cupix frames of 2026-10-18-upper; same training settings for comparison. Privacy-blurred panoramas (automatic, manual review pending). Frames 136-213 (Level 3 west/north) and 6-31 unplaced. No seed mesh. Provisional, not surveyed; never publish. Use --mask-nadir."
     }
   }
 }

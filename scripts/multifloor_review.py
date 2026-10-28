@@ -10,6 +10,8 @@ System python (NumPy, SciPy, Matplotlib, Pillow); CPU only.
         --review capture-local/grimes-L3-2026-10-18/registration-review/multifloor-2026-10-20
     python3 scripts/multifloor_review.py package --candidate <that json> --ground ... --blurred <privacy output of video B> \
         --base scan-assets/captures/2026-10-18 --out capture-local/grimes-oct18-floors
+    python3 scripts/multifloor_review.py floors --candidate <that json> --ground ... --blurred <privacy output of video B> \
+        --base scan-assets/captures/2026-10-18 --link work/multifloor/2026-10-18/link.json   # -> capture-local/grimes-L{2,3}-2026-10-18-v2
 
 `register` = image-only placement (video B -> video A frame -> placed registration -> BIM), then a yaw+XYZ trimmed ICP of
 video B's own E57 points against the BIM L2/L3 band as an independent check/refinement, per-station BIM floor ray cast,
@@ -451,6 +453,300 @@ def upper(a):
     stage.rename(out); print('wrote', out, len(stations), 'stations')
 
 
+# ---------------- per-floor packages (local viewing; 2026-10-27) ----------------
+FLOOR_TOLERANCE = 0.45
+
+
+def package_floor(level, floor_y, tolerance=FLOOR_TOLERANCE):
+    """Package floor of a video-B station. L2/L3 stations keep their level. A stair station (or one with no level) goes with
+    the floor at the TOP of its flight: the lowest slab above its BIM floor height (+ tolerance), i.e. the floor one walks
+    down from. Level 1 has its own package, so a stair foot on Level 1 (floor between L1 and L2) goes with Level 2.
+    Returns None when nothing fits (no floor height, or above Level 3)."""
+    if level in ('L2', 'L3'):
+        return level
+    if floor_y is None:
+        return None
+    for k in ('L2', 'L3'):
+        if SLAB[k] > floor_y + tolerance:
+            return k
+    return 'L3' if abs(floor_y - SLAB['L3']) <= tolerance else None
+
+
+def subset_edges(edges, keep):
+    """Restrict build_route output to stations in `keep` (cross-floor and Level 1 links dropped)."""
+    return {a: {b: k for b, k in nb.items() if b in keep} for a, nb in edges.items() if a in keep}
+
+
+def components(ids, edges):
+    seen, out = set(), []
+    for i in ids:
+        if i in seen:
+            continue
+        comp, q = [], [i]; seen.add(i)
+        while q:
+            x = q.pop(); comp.append(x)
+            for y in edges.get(x, {}):
+                if y not in seen: seen.add(y); q.append(y)
+        out.append(comp)
+    return sorted(out, key=len, reverse=True)
+
+
+def default_station(rows, edges):
+    """Medoid (horizontal) of the largest walk-connected group, so the floor opens on its best-connected part; stair
+    stations only when the group has nothing else."""
+    comp = components([r['id'] for r in rows], edges)[0]; lvl = {r['id']: r.get('level') for r in rows}
+    comp = [i for i in comp if lvl[i] != 'stairs'] or comp; pos = {r['id']: np.asarray(r['position'], float)[[0, 2]] for r in rows}
+    return min(comp, key=lambda i: (sum(float(np.linalg.norm(pos[i] - pos[j])) for j in comp), i))
+
+
+def _cupix_rows(a, placed, to_l1):
+    """Video-B rows from the Cupix Ground export + upper-walk candidate (32 panoramas)."""
+    cand = json.loads(Path(a.candidate).read_text())
+    ground = json.loads((Path(a.ground) / 'panoramas/manifest.json').read_text()); by_id = {s['id']: s for s in ground['stations']}
+    blurred = Path(a.blurred).resolve(); rows = []
+    for k, r in enumerate(cand['stations']):
+        g = by_id[r['id']]
+        rows.append({'id': r['id'], 'name': r['name'], 'file': g['file'], 'src': blurred / g['file'], 'frame': source_frame(r['name']), 'order': k,
+                     'position': [float(v) for v in apply(to_l1, g['position'])[0]], 'positionBIM': [float(v) for v in r['positionBIM']],
+                     'e57Quaternion': rotate_e57_quaternion(g['e57Quaternion'], to_l1['rotationYDegrees']), 'dimensions': g['dimensions'],
+                     'originalSha256': g['sha256'], 'level': r['level'] or 'stairs', 'bimFloorBelow': r.get('bimFloorBelow'),
+                     'cameraAboveBimFloor': r.get('cameraAboveBimFloor')})
+    return rows, {'kind': 'cupix-ground-export', 'panoramas': len(rows), 'ground': str(Path(a.ground))}
+
+
+def _raw_rows(a, placed, htris):
+    """Rows from a raw INSV SfM placement (place-raw output): Level 1 scan frame poses, BIM floor ray cast per station."""
+    import raw360_core as core
+    P = json.loads(Path(a.raw_placed).read_text()); blurred = Path(a.blurred).resolve(); rows = []
+    for k, st in enumerate(P['stations']):
+        e = st['positionE57']; pos = [float(e[0]), float(e[2]), float(-e[1])]          # E57 [x,y,z] -> Y-up [x,z,-y]
+        bim = apply(placed, pos)[0]; fy = floor_below(htris, bim)
+        src = blurred / st['pano']
+        if not src.is_file():
+            raise SystemExit(f'missing blurred image {src}')
+        with open(src, 'rb') as fh:
+            from PIL import Image
+            w, h = Image.open(fh).size
+        rows.append({'id': '%s_f%06d' % (a.raw_tag, st['frame']), 'name': '%s frame %d' % (a.raw_tag, st['frame']), 'file': st['pano'], 'src': src,
+                     'frame': st['frame'], 'order': k, 'position': pos, 'positionBIM': [float(v) for v in bim],
+                     'e57Quaternion': [float(v) for v in core.quat_from_matrix(st['worldFromPanoE57'])], 'dimensions': [w, h],
+                     'originalSha256': None, 'level': classify_level(fy) or 'stairs', 'bimFloorBelow': fy,
+                     'cameraAboveBimFloor': None if fy is None else float(bim[1] - fy), 'sfmModel': st['model']})
+    return rows, {'kind': 'raw-insv-local-sfm', 'placement': str(Path(a.raw_placed)), 'panoramas': len(rows), 'models': P['models'],
+                  'unplacedKeyframes': P['unplacedKeyframes'], 'work': P['work']}
+
+
+def floors(a):
+    """Clean per-floor packages (Level 2, Level 3) from the upper-floor video only, for viewing each floor separately in
+    the local viewer. Sources: the 32 Cupix panoramas (--candidate/--ground), or a denser raw INSV SfM placement
+    (--raw-placed, from place-raw). Displayed panoramas are privacy-blurred copies (symlinked; 2048 px mobile copies
+    written). Positions/headings are in the Level 1 scan frame, so the Oct 18 provisional registration maps them to BIM;
+    registration.json says so and carries the upper-walk candidate status."""
+    from PIL import Image
+    import registration_diagnostics as rd
+    cand_path = Path(a.candidate); cand = json.loads(cand_path.read_text()); base = Path(a.base); root = Path(a.out_root)
+    outs = {k: root / (a.prefix % k) for k in ('L2', 'L3')}
+    for o in outs.values():
+        if o.exists():
+            raise SystemExit(f'{o} exists; packages are never overwritten')
+    placed = json.loads((base / 'registration.json').read_text())
+    blurred = Path(a.blurred).resolve(); privacy = json.loads((blurred / 'privacy-report.json').read_text())
+    to_l1 = compose({k: cand[k] for k in ('rotationYDegrees', 'translation')}, invert(placed))
+    tris = rd.load_soup(a.bim_soup) if a.bim_soup else None
+    if a.raw_placed:
+        rows, source = _raw_rows(a, placed, horizontal_triangles(tris)); visual = ()
+    else:
+        rows, source = _cupix_rows(a, placed, to_l1); visual = json.loads(Path(a.link).read_text()).get('visualLinks', ()) if a.link else ()
+    b_rows = [{'id': r['id'], 'position': r['positionBIM'], 'level': r['level']} for r in rows]
+    edges = build_route(b_rows, visual, (), clear=bim_clear_test(tris) if tris is not None else None)
+    assign = {r['id']: package_floor(r['level'], r['bimFloorBelow']) for r in rows}
+    summary = {}
+    if a.upper_out:  # all upper-floor stations in one training package (Gaussian), blurred panoramas, no route
+        up = Path(a.upper_out)
+        if up.exists():
+            raise SystemExit(f'{up} exists; packages are never overwritten')
+        stage = up.with_name('.' + up.name + '.partial')
+        if stage.exists(): shutil.rmtree(stage)
+        (stage / 'panoramas').mkdir(parents=True); rel = os.path.relpath(blurred, (stage / 'panoramas').resolve())
+        tst = []
+        for r in rows:
+            os.symlink(os.path.join(rel, r['file']), stage / 'panoramas' / r['file'])
+            tst.append({'id': r['id'], 'file': r['file'], 'sourceName': r['name'], 'sourceFrame': r['frame'], 'position': r['position'],
+                        'e57Quaternion': r['e57Quaternion'], 'dimensions': r['dimensions'], 'sha256': sha256(r['src']),
+                        'level': r['level'], 'packageFloor': assign[r['id']], 'neighbors': []})
+        mid = default_station([{'id': r['id'], 'position': r['positionBIM'], 'level': r['level']} for r in rows], {r['id']: {} for r in rows})
+        (stage / 'panoramas/manifest.json').write_text(json.dumps({'schema': 'grimes-captured-panoramas/1', 'building': 'grimes', 'level': 'L2-L3',
+            'captureDate': '2026-10-18', 'exportedStations': len(tst), 'defaultStation': mid, 'status': 'local-training-input', 'alignment': LABEL,
+            'frame': 'Level 1 scan frame of the Oct 18 capture, Y-up metres (as the per-floor packages)', 'source': source,
+            'privacy': 'Privacy-blurred panoramas (' + str(blurred) + '); manual review still required; never publish this package or a model trained from it without review.',
+            'stations': tst}, indent=1))
+        reg = dict(placed); reg['basis'] = placed.get('basis', '') + ' Upper-floor stations were moved into this Level 1 frame (' + source['kind'] + '; provisional, not surveyed).'
+        (stage / 'registration.json').write_text(json.dumps(reg, indent=2))
+        (stage / 'README.txt').write_text('Upper-floor Oct 18 stations (Level 2 + Level 3 + stairs) for Gaussian training; blurred panoramas; local; provisional, not surveyed. '
+                                          'Built by scripts/multifloor_review.py floors --upper-out.\n')
+        stage.rename(up); print('wrote', up, len(tst), 'stations, centre', mid)
+    for floor, out in outs.items():
+        sel = [r for r in rows if assign[r['id']] == floor]
+        keep = {r['id'] for r in sel}; fe = subset_edges(edges, keep)
+        excluded = [{'id': r['id'], 'frame': r['frame'], 'packageFloor': assign[r['id']], 'level': r['level']} for r in rows if r['id'] not in keep]
+        stage = out.with_name('.' + out.name + '.partial')
+        if stage.exists(): shutil.rmtree(stage)
+        photos = stage / 'panoramas'; (photos / 'mobile').mkdir(parents=True)
+        rel = os.path.relpath(blurred, photos.resolve())
+        idx = {r['id']: k for k, r in enumerate(sel)}; stations = []
+        for r in sel:
+            os.symlink(os.path.join(rel, r['file']), photos / r['file'])
+            with Image.open(r['src']) as im:
+                im.convert('RGB').resize((2048, 1024), Image.Resampling.LANCZOS).save(photos / 'mobile' / r['file'], quality=88)
+            st = {'id': r['id'], 'file': r['file'], 'sourceName': r['name'], 'video': 'B', 'sourceFrame': r['frame'], 'frameOrder': r['order'],
+                  'position': r['position'], 'positionBIM': r['positionBIM'], 'e57Quaternion': r['e57Quaternion'],
+                  'sha256': sha256(r['src']), 'originalSha256': r['originalSha256'], 'dimensions': r['dimensions'],
+                  'level': r['level'], 'packageFloor': floor, 'bimFloorBelow': r['bimFloorBelow'],
+                  'cameraAboveBimFloor': r['cameraAboveBimFloor'], 'neighbors': sorted(idx[j] for j in fe[r['id']])}
+            if 'sfmModel' in r: st['sfmModel'] = r['sfmModel']
+            if fe[r['id']]:
+                st['edgeKinds'] = {str(idx[j]): k for j, k in sorted(fe[r['id']].items(), key=lambda kv: idx[kv[0]])}
+                stairs = sorted(idx[j] for j, k in fe[r['id']].items() if k == 'stairs')
+                if stairs: st['stairs'] = stairs
+            stations.append(st)
+        order = {r['id']: r['order'] for r in sel}; comps = components([r['id'] for r in sel], fe)
+        counts = {}
+        for st in stations: counts[st['level']] = counts.get(st['level'], 0) + 1
+        name = LEVEL_NAMES[floor]; this_floor = cand['metrics'].get('heldOutAfterIcpPerFloor', {}).get(floor)
+        manifest = {'schema': 'grimes-captured-panoramas/1', 'building': 'grimes', 'level': floor, 'captureDate': '2026-10-18',
+                    'exportedStations': len(stations), 'defaultStation': default_station([{'id': r['id'], 'position': r['positionBIM'], 'level': r['level']} for r in sel], fe),
+                    'status': 'local-preview', 'alignment': LABEL,
+                    'frame': 'Level 1 scan frame of the Oct 18 capture, Y-up metres (upper-floor video placed via the upper-walk candidate'
+                             + (' and, for raw INSV frames, a per-submodel fit to the Cupix video-B stations by frame number' if a.raw_placed else '') +
+                             '); the Oct 18 provisional registration then maps every station to BIM (positionBIM).',
+                    'projection': 'equirectangular',
+                    'privacy': 'Displayed panoramas are the automatic blur output (scripts/raw360_pipeline.py privacy, ' + str(blurred / 'privacy-report.json') +
+                               '); detection is not complete, manual review required. Local only, never publish.',
+                    'navigation': 'Upper-video edges restricted to this floor: consecutive placed frames <= 7.7 m and rise <= 1.5 m = route; across a slab = stairs; '
+                                  + ('non-consecutive same-floor links only when the panoramas verify each other (route-visual) or ' if not a.raw_placed else 'non-consecutive same-floor links only when ')
+                                  + 'no BIM wall lies between stations <= 4 m apart (link-bim-clear, inferred from design walls). No links to other floors or to Level 1.',
+                    'navigationLimits': {'maxStep': 7.7, 'maxRise': 1.5, 'stairStep': 9.0, 'stairRise': 4.6},
+                    'levels': counts, 'walkGroups': [sorted(c, key=lambda i: order[i]) for c in comps],
+                    'floorAssignment': {'rule': 'Level from the highest near-horizontal BIM surface under the station (L2/L3 within ' + str(FLOOR_TOLERANCE) + ' m of the slab, '
+                                        'else stairs). Stair stations go with the floor at the top of their flight: lowest slab above that BIM floor. '
+                                        'Slabs (viewer frame, m): ' + json.dumps({k: SLAB[k] for k in ('L1', 'L2', 'L3')}) + '.',
+                                        'excludedStations': excluded},
+                    'source': {**source, 'video': 'VID_20261018_153400', 'candidate': str(cand_path), 'candidateStatus': cand['status'],
+                               'videoBToLevel1ScanFrame': to_l1, 'heldOutAfterIcp': cand['metrics']['heldOutAfterIcp'], 'heldOutAfterIcpThisFloor': this_floor,
+                               'privacyFlaggedImages': privacy.get('flaggedImages', [])},
+                    'coverage': 'partial: one upper-floor video (VID_20261018_153400). ' +
+                                ('Level 2: occupied study areas not captured.' if floor == 'L2' else 'Level 3: only the walked corridors; see walkGroups for disconnected parts.'),
+                    'stations': stations}
+        (photos / 'manifest.json').write_text(json.dumps(manifest, indent=1))
+        reg = {k: placed[k] for k in ('rotationYDegrees', 'translation', 'scale')}
+        reg.update({'status': cand['status'], 'label': LABEL, 'captureDate': '2026-10-18', 'level': floor,
+                    'frames': {'source': 'Level 1 scan frame of the Oct 18 capture (panoramas/manifest.json positions)', 'target': 'BIM viewer world, Y-up metres'},
+                    'basis': 'Chain: upper video -> (upper-walk candidate ' + str(cand_path) + ', photo matching to Level 1 + yaw/XYZ ICP to BIM'
+                             + ('; raw INSV SfM submodels fitted to its stations by frame number, ' + str(Path(a.raw_placed)) if a.raw_placed else '') + ') -> BIM; '
+                             'stored here as the Oct 18 provisional Level 1 registration (status ' + str(placed.get('status')) + ', borrowed May transform) '
+                             'applied to stations pre-moved into the Level 1 scan frame. Not surveyed.',
+                    'metrics': {'heldOutAfterIcp': cand['metrics']['heldOutAfterIcp'], 'heldOutAfterIcpThisFloor': this_floor,
+                                **({'rawPlacementPerSubmodel': [{k: m.get(k) for k in ('model', 'frames', 'status', 'scale', 'fitResidualMetres', 'leaveOneOutMetres')} for m in source['models']]} if a.raw_placed else {})},
+                    'honesty': cand.get('honesty')})
+        (stage / 'registration.json').write_text(json.dumps(reg, indent=2))
+        project = {'schema': 'capture-project/1', 'building': 'grimes', 'level': floor, 'captureDate': '2026-10-18', 'panoramas': 'panoramas/manifest.json',
+                   'model': None, 'registration': 'registration.json', 'dataStatus': 'NO FEED', 'status': 'local-preview', 'routeReady': True,
+                   'alignment': LABEL, 'coverage': 'partial',
+                   'notes': [f'{name} from the upper-floor video only ({len(stations)} panoramas, source {source["kind"]}); provisional, not surveyed.',
+                             'Supersedes grimes-%s-2026-10-18 for viewing (that package mixed Level 1 frames / used the wrong video split); the old one is left unchanged.' % floor,
+                             'Blurred panoramas only; manual privacy review still required. Not for publishing.',
+                             'Built by scripts/multifloor_review.py floors.']}
+        (stage / 'project.json').write_text(json.dumps(project, indent=1))
+        (stage / 'README.txt').write_text(f'Local {name} preview of the Oct 18 capture, upper-floor video only (provisional, not surveyed; not for publishing). '
+                                          f'Serve the repository and open scan-compare.html?capture=2026-10-18&floors={floor}. Built by scripts/multifloor_review.py floors.\n')
+        stage.rename(out)
+        summary[floor] = {'out': str(out), 'stations': len(stations), 'levels': counts, 'walkGroups': [len(c) for c in comps], 'default': manifest['defaultStation']}
+        print('wrote', out, counts, 'groups', [len(c) for c in comps], 'edges', sum(len(st['neighbors']) for st in stations) // 2, 'default', manifest['defaultStation'])
+    return summary
+
+
+# ---------------- raw INSV SfM submodels -> Level 1 scan frame (2026-10-27) ----------------
+def source_frame(name):
+    """Cupix image name 'VID_..._477(287).jpg' -> 287 (= 0-based video frame index of the raw INSV, checked by image
+    correlation on 6 frames, 2026-10-27)."""
+    return int(str(name).rsplit('(', 1)[1].split(')')[0])
+
+
+def fit_levelled_similarity(src, dst, up):
+    """dst ~ s * Rz(yaw) * L * src + t with L levelling `up` onto +Z (gravity from the panoramas themselves), so a
+    near-collinear corridor cannot roll the model. src: SfM centres, dst: E57-axis (Z-up) reference. Returns
+    (s, R (3x3, = Rz L), t)."""
+    import raw360_core as core
+    src = np.asarray(src, float); dst = np.asarray(dst, float); L = core.level_rotation(up); q = src @ L.T
+    if len(src) < 2:
+        raise ValueError('need >= 2 matches')
+    a = q[:, :2] - q[:, :2].mean(0); b = dst[:, :2] - dst[:, :2].mean(0)
+    za, zb = a[:, 0] + 1j * a[:, 1], b[:, 0] + 1j * b[:, 1]
+    k = (np.conj(za) @ zb) / (np.conj(za) @ za)          # complex least squares: s * e^{i yaw}
+    sc, yaw = float(abs(k)), float(np.angle(k)); c, sn = math.cos(yaw), math.sin(yaw)
+    Rz = np.array([[c, -sn, 0], [sn, c, 0], [0, 0, 1.0]]); R = Rz @ L
+    t = dst.mean(0) - sc * (R @ src.mean(0))
+    return sc, R, t
+
+
+def place_raw(a):
+    """Place every SfM submodel of a raw360 run into the Level 1 scan frame by frame number: Cupix video-B stations
+    (positions/headings of the multi-floor package, i.e. the upper-walk candidate) are the reference; exact keyframes
+    plus poses interpolated <= max-gap frames. Levelled 4-DoF similarity per submodel, leave-one-out check; frames farther
+    than --margin from the submodel's reference matches are dropped (2026-10-27: an unsupported tail came out 180 deg off). Writes
+    placed.json; the panoramas themselves are not touched. Run with the raw360 venv (pycolmap)."""
+    import pycolmap, raw360_core as core, raw360_sfm
+    work = Path(a.work); meta = json.loads((work / 'frames.json').read_text())
+    ref_m = json.loads(Path(a.reference).read_text())
+    ref = {}
+    for st in ref_m['stations']:
+        if st.get('video') == 'B':
+            ref[source_frame(st['sourceName'])] = {'id': st['id'], 'e57': np.array(core.yup_to_e57(st['position'])), 'R': core.matrix_from_quat(st['e57Quaternion'])}
+    mdir = work / 'sfm' / a.method / 'models'; models = []
+    for d in sorted(mdir.iterdir(), key=lambda x: int(x.name)):
+        rec = pycolmap.Reconstruction(str(d)); fr = [f for f in raw360_sfm._frame_poses(rec, meta) if f['registered']]
+        if len(fr) < a.min_model:
+            continue
+        frames = [f['frame'] for f in fr]; C = [np.array(f['centre']) for f in fr]; Rw = [np.array(f['worldFromPano']) for f in fr]
+        m = []
+        for q, r in sorted(ref.items()):
+            hit = core.interpolate_track(frames, C, Rw, q, a.max_gap)
+            if hit: m.append((q, hit[0], hit[2]))
+        info = {'model': int(d.name), 'frames': len(fr), 'frameRange': [min(frames), max(frames)], 'matches': [[q, kind] for q, _, kind in m]}
+        if len(m) < 3:
+            info['status'] = 'unplaced: fewer than 3 reference frames'; models.append(info); continue
+        up = core.up_from_panoramas(Rw); src = np.array([x[1] for x in m]); dst = np.array([ref[x[0]]['e57'] for x in m])
+        s, R, t = fit_levelled_similarity(src, dst, up); res = np.linalg.norm((s * (R @ src.T)).T + t - dst, axis=1)
+        loo = []
+        for i in range(len(m)):
+            keep = [j for j in range(len(m)) if j != i]
+            if len(keep) >= 2:
+                s1, R1, t1 = fit_levelled_similarity(src[keep], dst[keep], up); loo.append(float(np.linalg.norm(s1 * R1 @ src[i] + t1 - dst[i])))
+        info.update(status='placed', scale=s, fitResidualMetres=core.error_summary(res), leaveOneOutMetres=core.error_summary(loo),
+                    perMatch=[{'frame': q, 'id': ref[q]['id'], 'kind': kind, 'residual': float(e)} for (q, _, kind), e in zip(m, res)],
+                    stations=[{'frame': f['frame'], 'pano': f['pano'], 'positionE57': (s * R @ np.array(f['centre']) + t).tolist(),
+                               'worldFromPanoE57': (R @ np.array(f['worldFromPano'])).tolist()} for f in fr
+                              if m[0][0] - a.margin <= f['frame'] <= m[-1][0] + a.margin])
+        info['supportedFrameRange'] = [m[0][0] - a.margin, m[-1][0] + a.margin]
+        info['droppedOutsideSupport'] = [f['frame'] for f in fr if not m[0][0] - a.margin <= f['frame'] <= m[-1][0] + a.margin]
+        models.append(info)
+    # one pose per frame: the larger model wins where submodels overlap
+    chosen = {}
+    for info in sorted([x for x in models if x['status'] == 'placed'], key=lambda x: -x['frames']):
+        for st in info['stations']:
+            chosen.setdefault(st['frame'], {**st, 'model': info['model']})
+    out = {'schema': 'multifloor-raw-placement/1', 'label': LABEL, 'work': str(work), 'method': a.method, 'reference': str(Path(a.reference)),
+           'referenceUse': 'placement (video-B Cupix stations, upper-walk candidate) by frame number; frame index = Cupix (N)',
+           'fit': 'per submodel: levelled 4-DoF similarity (scale, yaw, translation; up from the panoramas), exact + interpolated (<= %d frames) matches' % a.max_gap,
+           'models': [{k: v for k, v in x.items() if k != 'stations'} for x in models],
+           'stations': [chosen[f] for f in sorted(chosen)], 'unplacedKeyframes': [k['frame'] for k in meta['keyframes'] if k['frame'] not in chosen]}
+    Path(a.out).write_text(json.dumps(out, indent=1))
+    for x in out['models']:
+        print(x['model'], x['frames'], x['frameRange'], x['status'], 'n=%d' % len(x['matches']), 'scale %.3f' % x.get('scale', float('nan')),
+              'fit med %.3f' % x.get('fitResidualMetres', {}).get('median', float('nan')), 'loo med %.3f' % x.get('leaveOneOutMetres', {}).get('median', float('nan')))
+    print('placed', len(out['stations']), 'unplaced', len(out['unplacedKeyframes']))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -467,8 +763,19 @@ def main():
     p.add_argument('--bim-soup', default=str(ROOT / 'work/floorplans/arch-struct.f32'))
     u = sub.add_parser('upper')
     u.add_argument('--candidate', required=True); u.add_argument('--ground', required=True); u.add_argument('--base', required=True); u.add_argument('--out', required=True)
+    fl = sub.add_parser('floors', help='per-floor Level 2 / Level 3 packages (video B only, blurred panoramas)')
+    fl.add_argument('--candidate', required=True); fl.add_argument('--ground'); fl.add_argument('--blurred', required=True)
+    fl.add_argument('--raw-placed', help='place-raw output: build from raw INSV SfM panoramas instead of the Cupix export'); fl.add_argument('--raw-tag', default='raw477')
+    fl.add_argument('--upper-out', help='also write one all-upper-floor training package here (Gaussian input)')
+    fl.add_argument('--base', required=True); fl.add_argument('--link'); fl.add_argument('--out-root', default=str(ROOT / 'capture-local'))
+    fl.add_argument('--prefix', default='grimes-%s-2026-10-18-v2'); fl.add_argument('--bim-soup', default=str(ROOT / 'work/floorplans/arch-struct.f32'))
+    pr = sub.add_parser('place-raw', help='place raw360 SfM submodels in the Level 1 scan frame by frame number (raw360 venv)')
+    pr.add_argument('--work', required=True); pr.add_argument('--method', default='colmap-incremental'); pr.add_argument('--out', required=True)
+    pr.add_argument('--reference', default=str(ROOT / 'capture-local/grimes-oct18-floors/panoramas/manifest.json'))
+    pr.add_argument('--max-gap', type=int, default=10); pr.add_argument('--min-model', type=int, default=5)
+    pr.add_argument('--margin', type=int, default=15, help='keep submodel frames only within this many frames of its first/last reference match (no unsupported extrapolation)')
     a = ap.parse_args()
-    {'register': register, 'figures': figures_only, 'package': package, 'upper': upper}[a.cmd](a)
+    {'register': register, 'figures': figures_only, 'package': package, 'upper': upper, 'floors': floors, 'place-raw': place_raw}[a.cmd](a)
 
 
 if __name__ == '__main__':

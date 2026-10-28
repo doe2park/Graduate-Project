@@ -52,7 +52,7 @@ def tool_versions():
     return out
 
 
-def stitch_filter(fov_deg, out_w, out_h, frames=None, gray=False):
+def stitch_filter(fov_deg, out_w, out_h, frames=None, gray=False, ops=('transpose=1', 'transpose=2')):
     """ffmpeg filtergraph: X2 lens files (_00_, _10_) -> upright dual fisheye -> equirect (E57 pixel convention).
 
     The X2 sensor images are rotated 90 deg; _00_ is turned clockwise (transpose=1), _10_ counter-clockwise
@@ -63,26 +63,60 @@ def stitch_filter(fov_deg, out_w, out_h, frames=None, gray=False):
     if frames is not None:
         sel = 'select=' + "'" + '+'.join(f'eq(n\\,{int(n)})' for n in frames) + "'" + ','
     fmt = ',format=gray' if gray else ''
-    return (f'[0:v]{sel}transpose=1[a];[1:v]{sel}transpose=2[b];[a][b]hstack=inputs=2,'
+    o0, o1 = (o if o and o != 'none' else 'null' for o in ops)
+    return (f'[0:v]{sel}{o0}[a];[1:v]{sel}{o1}[b];[a][b]hstack=inputs=2,'
             f'v360=input=dfisheye:output=equirect:ih_fov={fov_deg:.3f}:iv_fov={fov_deg:.3f}:w={out_w}:h={out_h}:interp=cubic{fmt}')
 
 
 def lens_paths(probe):
     return probe['inputs']['front']['path'], probe['inputs']['back']['path']
 
+
+def lens_streams(probe):
+    """Video stream index of each lens inside its file: (0, 0) for the dual-file _00_/_10_ layout; (0, 1) for a single
+    _00_ file carrying both lenses as two streams (Oct 2026 X2 recordings)."""
+    return probe['inputs']['front'].get('stream', 0), probe['inputs']['back'].get('stream', 0)
+
+
+def lens_ops(probe):
+    """Per-lens upright filter: Sep 17 dual-file X2 sensor images are rotated 90 deg (transpose=1 / =2); the Oct 18
+    single-file recordings are already upright ('none'). Stored in probe.json as lensOps."""
+    return tuple(probe.get('lensOps') or ('transpose=1', 'transpose=2'))
+
+
+def with_streams(fg, probe):
+    """Point the filtergraph's [0:v] / [1:v] at the lens streams (no-op for the dual-file layout)."""
+    s0, s1 = lens_streams(probe)
+    return fg.replace('[0:v]', f'[0:v:{s0}]').replace('[1:v]', f'[1:v:{s1}]')
+
 # ------------------------------------------------------------------ probe
 
 def cmd_probe(a):
     t0 = time.time(); work = Path(a.work); work.mkdir(parents=True, exist_ok=True)
     inputs = {}
-    for role, path in [('front', a.front), ('back', a.back)]:
+    if a.dual_stream:
+        if a.front or a.back:
+            raise SystemExit('--dual-stream replaces --front/--back')
+        # stream 0 plays the _00_ role, stream 1 the _10_ role (check the stitch heading against a reference)
+        roles = [('front', a.dual_stream, 0), ('back', a.dual_stream, 1)]
+    elif a.front and a.back:
+        roles = [('front', a.front, None), ('back', a.back, None)]
+    else:
+        raise SystemExit('give --front and --back, or --dual-stream')
+    for role, path, stream in roles:
         path = str(Path(path).resolve())
         info = json.loads(subprocess.run([FFPROBE, '-v', 'error', '-show_format', '-show_streams', '-of', 'json', path],
                                          capture_output=True, text=True, check=True).stdout)
-        v = [s for s in info['streams'] if s['codec_type'] == 'video'][0]
-        inputs[role] = {'path': path, 'bytes': os.path.getsize(path), 'sha256': None if a.no_hash else sha256(path),
+        vs = [s for s in info['streams'] if s['codec_type'] == 'video']
+        if stream is not None and len(vs) < 2:
+            raise SystemExit(f'{path}: --dual-stream needs two video streams, found {len(vs)}')
+        v = vs[stream or 0]
+        inputs[role] = ({'stream': stream} if stream is not None else {})
+        inputs[role].update({'path': path, 'bytes': os.path.getsize(path), 'sha256': None if a.no_hash else sha256(path),
                         'codec': v['codec_name'], 'width': v['width'], 'height': v['height'], 'fps': v['avg_frame_rate'],
-                        'frames': int(v.get('nb_frames', 0)), 'duration': float(info['format']['duration'])}
+                        'frames': int(v.get('nb_frames', 0)), 'duration': float(info['format']['duration'])})
+        if stream is not None and role == 'back':
+            inputs[role]['sha256'] = inputs['front']['sha256']
     trailer = {}; imu_summary = None; calib = []; fov = None; fov_err = None
     with open(inputs['front']['path'], 'rb') as f:
         idx = core.parse_trailer_index(f, inputs['front']['bytes'])
@@ -108,13 +142,16 @@ def cmd_probe(a):
                 ft = arrays['frame_times_ms']; imu_summary['frameTimestamps'] = int(len(ft))
                 imu_summary['frameIntervalMedianMs'] = float(np.median(np.diff(ft)))
                 imu_summary['captureSpanSeconds'] = float((ft[-1] - ft[0]) / 1000)
-    if calib:
+    if calib and not a.fov:
         fov, fov_err = core.equidistant_fov_from_mei(calib[0], inputs['front']['width'])
     probe = {'schema': 'raw360-probe/1', 'inputs': inputs, 'trailer': trailer, 'lensCalibration': calib,
-             'stitchFovDeg': round(fov, 3) if fov else a.default_fov,
-             'stitchFovSource': 'equidistant least-squares fit to INSV trailer Mei calibration (theta<=90 deg)' if fov else 'default; no calibration found',
+             'stitchFovDeg': a.fov if a.fov else round(fov, 3) if fov else a.default_fov,
+             'stitchFovSource': ('explicit --fov: ' + (a.fov_source or 'no source given')) if a.fov else
+                                'equidistant least-squares fit to INSV trailer Mei calibration (theta<=90 deg)' if fov else 'default; no calibration found',
              'equidistantModelMaxErrorPx': fov_err, 'imu': imu_summary,
-             'notes': ['Lens files are separate streams; frame index n is assumed simultaneous in both files.',
+             'lensOps': [o.strip() for o in a.lens_ops.split(',')] if a.lens_ops else ['transpose=1', 'transpose=2'],
+             'notes': [('Single INSV with both lenses as video streams 0 (_00_ role) and 1 (_10_ role); frame index n assumed simultaneous.'
+                        if a.dual_stream else 'Lens files are separate streams; frame index n is assumed simultaneous in both files.'),
                        f"Frame counts front/back: {inputs['front']['frames']}/{inputs['back']['frames']}.",
                        'Trailer layout is interpreted from observed bytes, not a vendor specification.'],
              'tools': tool_versions(), 'seconds': round(time.time() - t0, 2)}
@@ -126,8 +163,8 @@ def cmd_probe(a):
 def ffmpeg_frames(probe, start, end, size, gray=True):
     """Stream low-res stitched equirect frames [start, end) as numpy arrays."""
     front, back = lens_paths(probe); w, h = size
-    fg = stitch_filter(probe['stitchFovDeg'], w, h, gray=gray).replace('[0:v]', f"[0:v]trim=start_frame={start}:end_frame={end},setpts=PTS-STARTPTS,scale=1440:1440,", 1)
-    fg = fg.replace('[1:v]', f"[1:v]trim=start_frame={start}:end_frame={end},setpts=PTS-STARTPTS,scale=1440:1440,", 1)
+    fg = stitch_filter(probe['stitchFovDeg'], w, h, gray=gray, ops=lens_ops(probe)).replace('[0:v]', f"[0:v]trim=start_frame={start}:end_frame={end},setpts=PTS-STARTPTS,scale=1440:1440,", 1)
+    fg = with_streams(fg.replace('[1:v]', f"[1:v]trim=start_frame={start}:end_frame={end},setpts=PTS-STARTPTS,scale=1440:1440,", 1), probe)
     cmd = [FFMPEG, '-v', 'error', '-i', front, '-i', back, '-filter_complex', fg, '-f', 'rawvideo', '-pix_fmt', 'gray', '-fps_mode', 'passthrough', '-']
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE); n = w * h
     while True:
@@ -139,14 +176,20 @@ def ffmpeg_frames(probe, start, end, size, gray=True):
         raise RuntimeError('ffmpeg scoring pass failed')
 
 
+def frame_chunks(frames, size=60):
+    frames = sorted(int(f) for f in frames)
+    return [frames[i:i + size] for i in range(0, len(frames), size)]
+
+
 def stitch_full(probe, frames, out_dir, width):
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     tmp = out_dir / '_tmp'; shutil.rmtree(tmp, ignore_errors=True); tmp.mkdir()
-    front, back = lens_paths(probe)
-    fg = stitch_filter(probe['stitchFovDeg'], width, width // 2, frames=frames)
-    subprocess.run([FFMPEG, '-v', 'error', '-i', front, '-i', back, '-filter_complex', fg, '-fps_mode', 'passthrough',
-                    '-q:v', '2', str(tmp / '%05d.jpg')], check=True)
-    made = sorted(tmp.glob('*.jpg'))
+    front, back = lens_paths(probe); made = []
+    for k, chunk in enumerate(frame_chunks(frames)):  # ffmpeg's expression parser fails (ENOMEM) on ~>100 eq() terms
+        fg = with_streams(stitch_filter(probe['stitchFovDeg'], width, width // 2, frames=chunk, ops=lens_ops(probe)), probe)
+        subprocess.run([FFMPEG, '-v', 'error', '-i', front, '-i', back, '-filter_complex', fg, '-fps_mode', 'passthrough',
+                        '-q:v', '2', str(tmp / f'c{k:03d}_%05d.jpg')], check=True)
+        made += sorted(tmp.glob(f'c{k:03d}_*.jpg'))
     if len(made) != len(frames):
         raise RuntimeError(f'Stitched {len(made)} images for {len(frames)} requested frames')
     names = []
@@ -256,12 +299,16 @@ def fisheye_rig_views(probe, frames, work, a):
     size = a.fisheye_size; front, back = lens_paths(probe); fov = probe['stitchFovDeg']
     f = size / math.radians(fov); c = size / 2
     rig = []
-    for k, (path, tr) in enumerate([(front, 1), (back, 2)]):
+    ops = [o if o and o != 'none' else 'null' for o in lens_ops(probe)]
+    for k, (path, tr, st) in enumerate([(front, ops[0], lens_streams(probe)[0]), (back, ops[1], lens_streams(probe)[1])]):
         d = work / 'views' / f'lens{k}'; d.mkdir(parents=True, exist_ok=True)
-        sel = "'" + '+'.join(f'eq(n\\,{n})' for n in frames) + "'"
-        subprocess.run([FFMPEG, '-v', 'error', '-i', path, '-vf', f'select={sel},transpose={tr},scale={size}:{size}', '-fps_mode', 'passthrough',
-                        '-q:v', '2', str(d / '_%05d.jpg')], check=True)
-        for fr, src in zip(frames, sorted(d.glob('_*.jpg'))):
+        made = []
+        for ci, chunk in enumerate(frame_chunks(frames)):
+            sel = "'" + '+'.join(f'eq(n\\,{n})' for n in chunk) + "'"
+            subprocess.run([FFMPEG, '-v', 'error', '-i', path, '-map', f'0:v:{st}', '-vf', f'select={sel},{tr},scale={size}:{size}', '-fps_mode', 'passthrough',
+                            '-q:v', '2', str(d / f'_c{ci:03d}_%05d.jpg')], check=True)
+            made += sorted(d.glob(f'_c{ci:03d}_*.jpg'))
+        for fr, src in zip(sorted(frames), made):
             src.rename(d / f'f{fr:06d}.jpg')
         yy, xx = np.mgrid[:size, :size]; r = np.hypot(xx - c + 0.5, yy - c + 0.5)
         m = r < f * math.radians(88)
@@ -388,8 +435,11 @@ def main():
     p = argparse.ArgumentParser(description=__doc__); sub = p.add_subparsers(dest='cmd', required=True)
     def w(sp):
         sp.add_argument('--work', required=True, help='work directory, e.g. work/raw360/sep17-smoke')
-    s = sub.add_parser('probe'); w(s); s.add_argument('--front', required=True, help='..._00_NNN.insv'); s.add_argument('--back', required=True, help='..._10_NNN.insv')
+    s = sub.add_parser('probe'); w(s); s.add_argument('--front', help='..._00_NNN.insv'); s.add_argument('--back', help='..._10_NNN.insv')
+    s.add_argument('--dual-stream', help='single ..._00_NNN.insv holding both lenses as video streams 0 and 1 (no _10_ file)')
     s.add_argument('--no-hash', action='store_true'); s.add_argument('--default-fov', type=float, default=197.0)
+    s.add_argument('--fov', type=float, help='override the stitch FOV (e.g. when the trailer calibration is for another sensor mode)'); s.add_argument('--fov-source')
+    s.add_argument('--lens-ops', help="per-lens upright filter for stream/file 0,1 (default 'transpose=1,transpose=2'; 'none,none' for upright Oct 18 streams)")
     s = sub.add_parser('frames'); w(s)
     s.add_argument('--start-frame', type=int, default=0); s.add_argument('--end-frame', type=int); s.add_argument('--max-seconds', type=float)
     s.add_argument('--count', type=int); s.add_argument('--step', type=float); s.add_argument('--window', type=float, default=0.35)

@@ -104,7 +104,7 @@ def build_database(work, meta, a):
 
 def _map_incremental(db, image_path, out, meta, a):
     import pycolmap
-    o = pycolmap.IncrementalPipelineOptions(); o.num_threads = a.threads; o.max_runtime_seconds = a.max_runtime
+    o = pycolmap.IncrementalPipelineOptions(); o.num_threads = a.threads; o.max_runtime_seconds = int(a.max_runtime)
     fisheye = meta['viewMode'] == 'fisheye-rig'
     o.ba_refine_focal_length = fisheye; o.ba_refine_principal_point = False; o.ba_refine_extra_params = fisheye
     o.ba_refine_sensor_from_rig = fisheye

@@ -55,7 +55,7 @@ on BIM sections, elevation before/after with slabs, video B points over BIM sect
   (`grimes-floor` message -> `setElementFloor`). The capture picker itself is unchanged; May/Sep/Oct 18 Level 1 behave as before.
 - Not walk-connected: Level 3 stations 740-772 (11, west/north) - a 75-frame gap (772 -> 775) and a BIM wall between 744/747 and 775; reach them
   with the station picker. The Level 1 -> Level 3 stairs were not filmed (video B starts on Level 3), so the walk goes up the atrium stair
-  Level 1 -> Level 2 -> Level 3. The BIM pane's architectural interior is Level 1 only.
+  Level 1 -> Level 2 -> Level 3. The BIM pane's architectural interior follows the element floor since 2026-10-27 (below).
 
 Tests: `tests/test_multifloor.py`, `tests/multifloor-viewer.test.cjs`, headless `tests/multifloor-walk-smoke.cjs` (screenshots in
 `work/web-matrix/floors/`; `VIEW=overlay` for the overlay).
@@ -67,3 +67,65 @@ frame, Oct 18 provisional registration copy, no seed mesh because the Ground `sc
 `work/multifloor/2026-10-18/gaussian-upper-preset.json`, then `python scripts/run_gaussian_pipeline.py --capture 2026-10-18-upper --mask-nadir`.
 Expected: no more superimposed Level 1 / Level 3 images, so the streaking should go; quality stays limited by 32 sparse views and random
 initialisation. Not measured.
+
+## Per-floor previews and raw INSV upper floors (2026-10-27, local, uncommitted)
+
+- Raw `VID_20261018_153400_00_477.insv` (video B, 463 frames) is a single `_00_` file holding both lenses as video streams 0/1,
+  already upright, no IMU/frame-time records, and a trailer calibration for a 16000x6000 photo mode. `scripts/raw360_pipeline.py probe
+  --dual-stream <file> --lens-ops none,none --fov 196.6` (Sep 17 fit) handles it; frame selection is chunked (ffmpeg's `select`
+  expression fails with > ~100 terms). Cupix name `(N)` = 0-based frame N (image correlation, 6 frames).
+- 143 keyframes, fisheye-rig incremental SfM: submodels of 78 / 39 / 17 panoramas. `scripts/multifloor_review.py place-raw` fits each
+  submodel (levelled 4-DoF similarity) to the Cupix video-B stations of `grimes-oct18-floors` by frame number: fit median 0.086 / 0.040 /
+  0.041 m, leave-one-out 0.093 / 0.057 / 0.090 m (16 / 5 / 3 matches); headings within ~1 deg of the Cupix panoramas (20 frames). Frames
+  further than 15 frames from a submodel's matches are dropped (an unsupported tail came out 180 deg off). 108 placed; frames 6-31 and
+  136-213 (Level 3 west/north) unplaced; `--relaxed` and a targeted 110-230 run gave broken fits (6.6-9 m) and were not used.
+  Camera height above the BIM floor comes out 1.8-2.2 m on both floors, independently of the Cupix ICP.
+- `VID_20261018_153237_00_476.insv` (542 frames, audio): camera held near the face and tilted at two spots by the atrium; no walk. Not used.
+- `scripts/multifloor_review.py floors` builds `capture-local/grimes-L2-2026-10-18-v2` and `grimes-L3-2026-10-18-v2` (54 + 54 blurred
+  panoramas, `--raw-placed`; the 32-panorama Cupix version is `grimes-L{2,3}-2026-10-18-cupix32`) and the training package
+  `grimes-UPPER-2026-10-18-raw477`. Stair stations go with the floor at the top of their flight. Privacy:
+  `capture-local/grimes-UPPER-2026-10-18-raw477-blurred` (automatic, manual review required).
+- Viewer: `scan-compare.html?capture=2026-10-18&floors=L2` / `floors=L3` (localhost only; Floor menu next to the Levels 1-3 button).
+  Tests: `tests/multifloor-viewer.test.cjs`, headless `tests/multifloor-floor-shots.cjs` (screenshots `work/web-matrix/floors/floor-*.png`).
+
+## Per-floor BIM interior (2026-10-27, uncommitted)
+
+- `scripts/prepare_interior_levels.py` (rules of the 2026-09-10 Level 1 slicer `Grimes_360_Pilot/scripts/prepare-interior.py`, read-only
+  source `Grimes_360_Pilot/interior/source.glb` + `source.elements.json`) writes `interior/{furniture,enclosure,floors,ceilings}-l2.*` and
+  `-l3.*`. Draco bufferViews copied byte-verbatim; output payload set == source payload set, asserted per group. It regenerates Level 1
+  in memory and refuses to continue unless it equals the published `-l1.*` (GLB bytes identical, sidecar content identical).
+- Floor = viewer-frame height slice (walls / mullions have no Revit level in the source). Furniture/casework by bounding-box centre in
+  `[sliceY0, sliceY1)`; walls/doors/mullions, floors/stairs/railings and ceilings when their box overlaps the slice, clipped to the slice at
+  runtime, so a stair flight or wall crossing a slab is listed on both floors. Slices: L1 `[4.3, 10.3]` (legacy, unchanged), L2
+  `[9.23, 14.3]`, L3 `[14.13, 19.3]` (slab top - 0.27 m to next slab top - 0.1 m; L3 stops under the roof penthouse).
+  Cross-check with the Revit level where one exists (`revitLevelCheck`): L2 furniture 971/971, L3 830/830 on the same floor.
+
+| Floor | furniture | enclosure | floors | ceilings | GLB total |
+|---|---|---|---|---|---|
+| L1 (legacy) | 2,163 (11.0 MB) | 2,289 (3.8 MB) | 424 (3.3 MB) | 75 (0.13 MB) | 18.3 MB |
+| L2 | 982 (6.6 MB) | 5,213 (2.2 MB; 4,585 mullions, 626 walls) | 243 (1.7 MB) | 27 (0.05 MB) | 10.6 MB |
+| L3 | 834 (3.3 MB) | 9,019 (2.7 MB; 8,570 mullions, 448 walls) | 42 (0.28 MB) | 47 (0.08 MB) | 6.3 MB |
+
+- `interior/manifest.json`: legacy fields (schema `grimes-interior/1`, scope, frame, sliceY, sourceSurvival, groups = Level 1) unchanged;
+  added `levels.{L1,L2,L3}` (sliceY, slabTopY, scope "... source design geometry, not surveyed as-built", groups with sha256 of GLB /
+  sidecar, Draco payload-set digest, revitLevelCheck) and `provenance` (source hashes, assignment rules).
+- `scan-bim.html`: one floor's interior in memory. Level 1 uses the legacy fields, so May / Sep / Oct 18 Level 1 views load the same four
+  files. `setElementFloor` (Element floor menu, scan-compare `grimes-floor`) to L1/L2/L3 swaps the interior: the old floor is disposed, the
+  new one loads lazily; a `run` token makes in-flight loads drop their result. All floors / other floors keep the current interior. In
+  Overlay the interior stays unloaded until the Overlay is turned off. The Overlay wall occluder uses the element floor's walls
+  (All floors / L1 = `enclosure-l1` as before; L2 / L3 their own; other floors none). Status line and scan-compare header say
+  "source design geometry, not surveyed as-built".
+- Known gaps: the Level 1 slice's 10.3 m top is 0.8 m above the Level 2 slab, so `furniture-l1` also holds 915 Level 2 furniture elements
+  (clipped at runtime) and `floors-l1` some Level 2 slabs - published, left unchanged. Thin in the source model itself: L2 ceilings (27),
+  L3 floors (18 Floors elements; 42 in the group), L3 stairs (2). Cancelled loads are not aborted (the download finishes, the result is
+  discarded).
+- Tests: `tests/test_interior_levels.py`, `tests/interior-levels.test.cjs`; headless `tests/multifloor-floor-shots.cjs` now asserts the
+  floor's interior (Compare) / walls occluder (`VIEW=overlay`), screenshots `work/web-matrix/floors/floor-L{2,3}-*.png` and
+  `floor-L{2,3}-overlay-*.png`.
+
+## Cupix-free route for the Oct 28 re-scan (2026-10-27, local, uncommitted)
+
+`scripts/raw360_bim.py` + `scripts/capture_upper_floors.py` place raw INSV SfM in the BIM frame without Cupix. It uses photo links to registered Level 1 panoramas and between submodels, then point-to-plane ICP to BIM and visibility / camera-height / wall checks.
+A dry run on video 477 with Cupix withheld gave `capture-local/grimes-L2-2026-10-18-nocupix` (54 stations) and `-L3-` (25 stations); view them with `scan-compare.html?capture=2026-10-18-nocupix&floors=L2`.
+Against the Cupix-based v2 packages, 79 frames differ by a median of 0.09 m (max 0.31 m). The Level 3 east loop (frames 39–178) could not be placed without Cupix: there is no Level 1 link, and SfM breaks at frames 179–215.
+Method and numbers: `docs/RAW360_PIPELINE.md`. Field protocol: `docs/FIELD_CAPTURE_L2_L3.md`.

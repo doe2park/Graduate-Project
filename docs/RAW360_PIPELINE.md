@@ -190,3 +190,54 @@ Privacy defaults (updated 2026-10-18 after the first real run): face score 0.85 
 (at score 0.6 YuNet returned 45-68 deg 'faces' on ceiling arcs and seat rows in the auditorium); the cone within 35 deg
 of straight down is always blurred because the operator stands there and was missed by detection in 7 of 20 test images.
 Smoke result on 20 Sep 17 panoramas: 0 face boxes, 21 person boxes, operator covered in the images viewed; 82 s on CPU.
+
+## Cupix-free placement in the BIM frame and one-command runner (2026-10-27, local, uncommitted)
+
+`scripts/raw360_bim.py` places SfM submodels directly in the BIM viewer frame with no Cupix input.
+`scripts/capture_upper_floors.py` runs the whole day's chain. The field protocol is `docs/FIELD_CAPTURE_L2_L3.md` (PDF beside it).
+
+```sh
+python3 scripts/capture_upper_floors.py --date 2026-10-28 --camera-height <measured> "<RAW>/VID_20261028_<time>_00_<NNN>.insv"
+# -> capture-local/grimes-L1|L2|L3-<date>/, grimes-UPPER-<date>/, work/raw360/<date>/run-report.json
+# open http://localhost:8893/scan-compare.html?capture=<date>&floors=L2 (L3, L1); localhost only
+```
+
+Each INSV goes through probe → frames → sfm → `raw360_bim.py dump` → `anchor` → `place` → privacy. The whole day then goes through `package`, plus `--gaussian` if wanted.
+
+- **Settings:** stages that already finished are skipped (`--redo STAGE` forces a stage and everything after it). On failure the runner stops and prints the stage, the log tail and the fallback.
+- **Keyframes:** the count and the gap guards come from the real frame rate. Time-lapse (no audio) uses frames / (file mtime − start time in the name), or 0.5 s if those times are implausible. Normal video (audio track) uses its playback rate. Roughly one keyframe per 1.5 s of walking.
+- **SfM:** strict incremental mapper. `--relaxed` falsely merged parts of video 477, see below.
+
+How `place` works, per submodel:
+
+1. **Level and scale.** Gravity comes from the panoramas' mean up axis. The camera height above the floor is the **mode of log(point height below camera)**, pooled over the submodel. The old lowest-layer rule picked floors seen through the atrium and got Level 3 scale wrong by 3.4×. Implied heights on 477 were 1.97–2.07 m against the Cupix metric, so the stick is at about 2.0 m.
+2. **Coarse pose from photo links.** `anchor` matches RootSIFT on equirects (essential matrix on bearings, as in `multifloor_link.py`) for every keyframe:
+   - against registered Level 1 panoramas (Oct 18 L1 package and May 6, prefiltered by a yaw-invariant descriptor, top 6);
+   - against keyframes of *other* submodels within 15 frames ("bridges").
+   A frame registered in two submodels is a "shared" link (position equality). Yaw comes from the consensus of `aR Rᵀ (L bR)ᵀ`. Translation comes from least squares over the rays, which needs at least 2 rays whose horizontal directions are at least 8° apart. Level 1 links are placed first, then bridges and shared frames to already placed parts, repeating until nothing changes.
+3. **Fine pose.** Trimmed ICP against BIM arch+struct surfaces (`work/floorplans/arch-struct.f32`, Levels 1–3 band). First point-to-point, then **point-to-plane** with BIM normals: yaw + XYZ + scale, with scale bounded to ±12 % of the camera-height scale.
+4. **Checks.** A submodel is dropped if it fails any of these:
+   - held-out (every 3rd point) median ≤ 0.30 m and ≥ 45 % of points within 0.25 m;
+   - camera height above the ray-cast BIM floor between 1.55 and 2.45 m, with IQR ≤ 0.30 m;
+   - at most 15 % of stations inside BIM walls;
+   - scale not at the bound;
+   - ICP moves at most 2 m / 6° from the photo seed;
+   - **visibility**: the share of (point, observing panorama) sight lines in the wall band that do not cross a BIM wall section must be ≥ 45 % per model.
+   Segments of 10 keyframes are also flagged when their share is below max(0.35, 0.5 × the model median). Flagged frames are dropped, and so is anything beyond a flagged block on the far side of the link frames.
+5. **No photo link.** Seeds from walking continuity or a global FFT search against the floor sections are tried and reported, but **not accepted** unless `--accept-unlinked` is given. On 477, wrong poses fitted the BIM as well as the right one: held-out 0.17 vs 0.18–0.26 m, and visibility did not separate them on glass-walled Level 3.
+
+`package` writes stations directly in the BIM viewer frame with an **identity** `registration.json` (status `project-frame-provisional`, `registrationKind` identity). `scan-compare.html` opens such packages for unpublished dates on localhost (`localFloorSelection`). `compare` is validation only: per-frame differences against another placement, exact frames or interpolated within 6 frames.
+
+**Dry run on Oct 18 video 477, Cupix withheld** (`--date 2026-10-18-nocupix`; 477 starts on Level 3 and never starts on Level 1):
+
+- **Placed:** 79/144 keyframes (Level 2 45, Level 3 15, stairs 19). This is one submodel, frames 216–462 (Level 3 stair top → stairs → Level 2 → Level 1 stair foot → Level 2). It was seeded by 5 Level 1 links at the stair foot (frames 315–331 ↔ May 83697689/83697690 and Oct 18 stations 636/638, 55–149 inliers; ray miss median 0.14 m).
+- **Fit for that submodel:** ICP held-out median 0.198 m, camera above BIM floor median 2.05 m, 0 stations in walls, 83 % clear sight lines. Scale went from 1.973 (2.0 m height) to 2.034 after ICP, i.e. an implied camera height of 2.06 m.
+- **Versus the Cupix-based placement** (`grimes-L2/L3-2026-10-18-v2`, validation only), 79 frames: position median 0.09 m, p90 0.15 m, max 0.31 m (horizontal median 0.05 m, vertical 0.07 m). Heading on the 29 exact frames: median 0.18°, max 0.23°.
+- **Not placed:** the Level 3 submodel (frames 39–178, 45 keyframes). It has no Level 1 link and no bridge, because frames 179–215 are not registered at all. Global search gave only unverifiable candidates, all rejected. The Cupix route had placed 30 of those frames.
+- **Time:** about 15 min wall time, of which privacy blur took 6 min. Work folder 0.5 GB.
+
+So without Cupix, Oct 18 Level 2 and the stairs would have been usable, but most of Level 3 would not. Hence the field protocol: start and end at the Level 1 stair foot, and walk the stairs both ways.
+
+The relaxed mapper on the same video gave one 138-frame model. It passed every model-level check, yet frames 48–134 were 15–36 m off. The segment visibility check and the "beyond a flagged block" rule remove them; what was left matched Cupix at a 0.125 m median (78 frames). The runner nevertheless uses the strict mapper.
+
+Tests: `python3 -m unittest tests.test_raw360_bim` (synthetic data); `node --test tests/multifloor-viewer.test.cjs`. Headless check: `CAPTURE=<date> node tests/multifloor-floor-shots.cjs`.

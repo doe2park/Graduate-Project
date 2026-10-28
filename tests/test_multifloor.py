@@ -110,5 +110,42 @@ class FloorAndRouteTests(unittest.TestCase):
         self.assertFalse(mr.segment_blocked([-1, 0], [1, 0], np.zeros((0, 2, 2))))
 
 
+    def test_package_floor_assignment(self):
+        self.assertEqual(mr.package_floor('L3', 14.4), 'L3'); self.assertEqual(mr.package_floor('L2', 9.5), 'L2')
+        self.assertEqual(mr.package_floor('stairs', 12.65), 'L3')   # upper flight goes with Level 3 (its top)
+        self.assertEqual(mr.package_floor(None, 12.57), 'L3')
+        self.assertEqual(mr.package_floor('stairs', 7.92), 'L2')    # lower flight goes with Level 2
+        self.assertEqual(mr.package_floor('stairs', 5.96), 'L2')    # stair foot on Level 1: Level 1 has its own package
+        self.assertEqual(mr.package_floor('stairs', 9.3), 'L3')     # first step above Level 2 belongs to the flight up
+        self.assertIsNone(mr.package_floor('stairs', None)); self.assertIsNone(mr.package_floor('stairs', 18.0))
+
+    def test_subset_edges_components_default(self):
+        st = [{'id': 'a', 'position': [0, 16.3, 0], 'level': 'L3'}, {'id': 'b', 'position': [4, 16.3, 0], 'level': 'L3'},
+              {'id': 'c', 'position': [6, 14.6, 0], 'level': 'stairs'}, {'id': 'd', 'position': [9, 11.4, 0], 'level': 'L2'},
+              {'id': 'e', 'position': [40, 16.3, 0], 'level': 'L3'}, {'id': 'f', 'position': [42, 16.3, 0], 'level': 'L3'}, {'id': 'x', 'position': [44, 16.3, 0], 'level': 'L3'}]
+        e = mr.build_route(st, (), ())
+        sub = mr.subset_edges(e, {'a', 'b', 'c', 'e', 'f', 'x'})
+        self.assertNotIn('d', sub); self.assertNotIn('d', sub['c'])   # cross-floor link dropped
+        self.assertEqual(sub['b']['c'], 'stairs')
+        groups = mr.components(['a', 'b', 'c', 'e', 'f', 'x'], sub)
+        self.assertEqual([sorted(g) for g in groups], [['a', 'b', 'c'], ['e', 'f', 'x']])
+        rows = [s for s in st if s['id'] != 'd']
+        self.assertIn(mr.default_station(rows, sub), ('a', 'b'))       # medoid of the (first) largest group, stair 'c' skipped
+        stairy = [{**r, 'position': [1, 16.3, 0]} if r['id'] == 'c' else r for r in rows]
+        self.assertNotEqual(mr.default_station(stairy, sub), 'c')      # never opens on a stair station when the floor has others
+        for a_, nb in sub.items():
+            for b_ in nb: self.assertIn(a_, sub[b_])                 # symmetric
+    def test_source_frame_and_levelled_similarity(self):
+        self.assertEqual(mr.source_frame('VID_20261018_153400_00_477(287).jpg'), 287)
+        rng = np.random.default_rng(3); src = rng.uniform(-5, 5, (8, 3)); src[:, 2] *= 0.1
+        a = math.radians(5.0); L = np.array([[1, 0, 0], [0, math.cos(a), -math.sin(a)], [0, math.sin(a), math.cos(a)]])  # SfM frame tilted 5 deg
+        y = math.radians(81.5); Rz = np.array([[math.cos(y), -math.sin(y), 0], [math.sin(y), math.cos(y), 0], [0, 0, 1]])
+        up_sfm = L.T @ np.array([0, 0, 1.0]); src_t = src @ L                         # points as seen in the tilted SfM frame
+        dst = 1.9 * (src @ Rz.T) + np.array([10, -3, 14])
+        s, R, t = mr.fit_levelled_similarity(src_t, dst, up_sfm)
+        self.assertAlmostEqual(s, 1.9, places=6)
+        self.assertTrue(np.allclose((s * (R @ src_t.T)).T + t, dst, atol=1e-6))
+
+
 if __name__ == '__main__':
     unittest.main()
