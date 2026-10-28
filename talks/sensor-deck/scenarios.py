@@ -10,7 +10,7 @@ import json as _json, pathlib as _pl
 _PRIMARY = _json.loads((_pl.Path(__file__).resolve().parent.parent.parent / 'twin' / 'sensors' / 'registry.json').read_text())['primary']
 def live(scene, at): return LENS.format(scene=scene, focus=_PRIMARY[scene]) + at
 FOOT = 'Concept mockup — no sensors are installed; values are illustrative.'
-def foot(capture): return FOOT + ' Live twin: public May 6, 2026 capture ' + str(capture) + '; demo sensors anchored to real BIM elements.'
+def foot(capture, where=''): return (where + ' ' if where else '') + FOOT + ' Live twin: public May 6, 2026 capture ' + str(capture) + '; demo sensors anchored to real BIM elements.'
 
 # ---------- 1. leak ceiling (DTS pipe) -- original view, capture 35
 OFF = 11; _dx, _dy = 905 - 330, 619 - 176; _L = math.hypot(_dx, _dy)
@@ -48,8 +48,8 @@ S1 = dict(
  steps=[dict(head='Reading', text='Analyzer: 31 °C at 33 m along the cable'), dict(head='Map to BIM', text='33 m → Pipe219763 (cable route survey)'),
         dict(head='Show', text='Colour and alert on that pipe, in the Lens and the headset')],
 )
-S1.update(title='Concept 1 · Leak detection on a sprinkler main', subtitle='Live twin: drag to look around · hover a numbered card to point at its sensor · BIM element Pipe219763',
-          footnote=foot(35),
+S1.update(title='Test install 1 · Fiber temperature on a sprinkler main', subtitle='If installed here: a warm spot on the pipe points to a leak before anyone opens a tile · BIM element Pipe219763',
+          footnote=foot(35, 'Sprinkler main above a Level 1 ceiling.'),
           notes='This is a concept of how the sensors would look in the twin. The view on the left is the live viewer: the May 6 capture with the BIM in the Lens, and you can drag to look around; the demo sensors stay attached to their BIM elements. Nothing is installed and the values are made up. Marker one is the fiber temperature line on the sprinkler main, element Pipe219763: the pipe itself is coloured from blue for cool to red for hot. Marker two is an alert ring where the line is warmer than expected, which could mean a leak. Marker three is a wireless vibration node, and marker four is a leak sensor on the tile below the warm spot, to confirm water. It would work in three steps. The analyzer reports a temperature at a distance along the cable. We map that distance to the BIM pipe element using a survey of the cable route. Then the viewer colours that pipe and shows the alert, both in the Lens on the computer and in the headset. If the live view does not load, the Static view button shows a screenshot.')
 
 
@@ -60,8 +60,8 @@ SPK_NIGHT = [0, 0, 0, 0, 0, 0, 0, 0.05, 0.02, 0, 0, 0, 0.1, 0.05, 0, 0, 0, 0.06,
 S2 = dict(
  id='twin-hvac', slug='hvac', base='b-hvac.jpg', fallback='', anim='',
  live=live('air', '-20.475,6.642,0.696,0.2418,-0.6645,0.2418,0.6645,75.0'),
- title='Concept 2 · Airflow and comfort at a supply duct',
- subtitle='Spiral supply-duct branches above a Level 1 ceiling · the ducts are real BIM elements, the sensors are not',
+ title='Test install 2 · Airflow and comfort at a supply duct',
+ subtitle='If installed here: shows whether this room gets its design airflow, and which duct to check when it does not',
  bg=zone(235, 345, 190, 105, '#FF7A1A', .5, -10, True) + zone(190, 250, 90, 55, '#FFC14D', .35, -10),
  elements=[
   dict(k=1, sid='hvac-airflow', col='#087F8C', title='Airflow + supply-air temperature', row='Duct probe: airflow and air temperature in the branch',
@@ -82,15 +82,15 @@ S2 = dict(
  legend=[('#FFC14D', 'slightly warm'), ('#FF7A1A', 'above setpoint'), ('#7C3AED', 'room node')],
  steps=[dict(head='Measure', text='Duct airflow, room CO2 and temperature'), dict(head='Map to BIM', text='Probe → duct ID; node → room / space ID'),
         dict(head='Show', text='Tint the room, flag a duct that under-delivers')],
- footnote=foot(43),
+ footnote=foot(43, 'Spiral supply-duct branches above a Level 1 ceiling: the ducts are real BIM elements, the sensors are not.'),
  notes='Concept two is air and comfort. The view looks up at a Level 1 ceiling where the model shows branches off a supply duct. Marker one is an airflow and supply air temperature probe in a branch, so we can see whether it delivers its design airflow. Marker two is a small CO2, temperature and humidity node on the ceiling below. Marker three tints the room on the model when it runs warmer than its setpoint. Marker four is not a new sensor: the damper position from the building automation system, if Facilities shares it. Each reading would map to a BIM duct or space element ID. This is an illustrative location and every number is made up.')
 
 # ---------- 3. Plumbing branch: ultrasonic flow + leak puck + night-flow alert  (capture 1, station 83697575, yaw 0 / pitch 40)
 S3 = dict(
  id='twin-water', slug='water', base='b-plumb.jpg', fallback='', anim='',
  live=live('water', '-14.906,6.632,13.671,0.3420,0.0000,0.0000,0.9397,75.0'),
- title='Concept 3 · Flow and leaks on a plumbing branch',
- subtitle='Cast-iron no-hub pipe and coupling (BIM plumbing) above the Level 1 lobby · illustrative sensor location',
+ title='Test install 3 · Flow on a plumbing branch',
+ subtitle='If installed here: flow at night, when the building is empty, reveals hidden leaks on this branch',
  bg=link(615, 300, 715, 148, '#fff', 2, '5 5'),
  elements=[
   dict(k=1, sid='water-flow', col='#087F8C', title='Clamp-on ultrasonic flow meter', row='Strapped on the branch pipe: no cutting, no shutdown',
@@ -109,7 +109,7 @@ S3 = dict(
  legend=None,
  steps=[dict(head='Measure', text='Flow on the branch; water on the slats'), dict(head='Compare', text='Night flow vs the Grimes building water meter'),
         dict(head='Show', text='Alert on that pipe in the Lens and the dashboard')],
- footnote=foot(1),
+ footnote=foot(1, 'Cast-iron no-hub pipe and coupling (BIM plumbing) above the Level 1 lobby; sensor location illustrative.'),
  notes='Concept three is a water branch. The view looks up at the Level 1 lobby ceiling, where the BIM shows a cast iron no hub pipe and coupling in the plumbing model. Cast iron no hub is usually drain piping, so a real flow meter would go on a copper supply branch; treat the location as illustrative. Marker one is a clamp on ultrasonic flow meter, which measures flow without cutting the pipe. Marker two is a leak puck on the slats below the fittings. Marker three is the night flow alert: if the branch flows between one and four in the morning when the building is empty, we compare it with the Grimes water meter on the campus energy dashboard. The alert shows on that pipe in the Lens. All values are illustrative.')
 
 # ---------- 4. Electrical: CT sub-meter + panel monitor, rolled up to the building meter  (capture 43, station 83697643, yaw 180 / pitch 40)
@@ -117,8 +117,8 @@ SPK_KW = [8, 7.5, 7.2, 7, 7.4, 9, 12, 15, 17, 18, 17.5, 18, 17, 17.5, 16.5, 15, 
 S4 = dict(
  id='twin-power', slug='power', base='b-elec.jpg', fallback='', anim='',
  live=live('elec', '-20.475,6.642,0.696,0.0000,0.9397,-0.3420,0.0000,75.0'),
- title='Concept 4 · Power at VAV terminal units',
- subtitle='Price SDV5 VAV box and coil kit (BIM) above a Level 1 ceiling · no conduit is modelled in this view',
+ title='Test install 4 · Power at VAV terminal units',
+ subtitle='If installed here: shows which equipment uses the power, and whether sub-meters add up to the building meter',
  bg=link(535, 330, 700, 205, '#FDB515', 2.5, '6 5', .95) + link(705, 378, 700, 205, '#FDB515', 2.5, '6 5', .95),
  elements=[
   dict(k=1, sid='power-ct', col='#E8590C', title='CT power sub-meter', row='Clip-on current sensor on the circuit feeding these units',
@@ -136,7 +136,7 @@ S4 = dict(
  legend=None,
  steps=[dict(head='Measure', text='kW per circuit; unit current'), dict(head='Roll up', text='Sub-meters vs the building meter'),
         dict(head='Show', text='Load on each circuit, in the viewer')],
- footnote=foot(43),
+ footnote=foot(43, 'Price SDV5 VAV box and coil kit (BIM) above a Level 1 ceiling; no conduit is modelled in this view.'),
  notes='Concept four is electrical. The view shows two VAV terminal units in a Level 1 ceiling: in the BIM they are a Price SDV5 box and a coil kit. No conduit is modelled in this view, so the circuit is illustrative. Marker one is a clip on current transformer on the circuit feeding these units, giving kilowatts, and the card shows a small day profile. Marker two is a small monitor on the VAV box with controller and actuator current. Marker three is the link to the building meter, which already reports whole building electricity every fifteen minutes. The idea is that circuit sub meters add up toward that total, so we can see where the load is. Each reading maps to a BIM element ID. Values are made up.')
 
 # ---------- 5. Rotating equipment: vibration + bearing temperature + trend alert  (capture 22, station 83697587, yaw 180 / pitch 40)
@@ -144,8 +144,8 @@ SPK_VIB = [1.1, 1.2, 1.1, 1.2, 1.3, 1.2, 1.4, 1.5, 1.5, 1.7, 1.8, 2.0, 2.1]
 S5 = dict(
  id='twin-fan', slug='fan', base='b-fan.jpg', fallback='', anim='',
  live=live('rotating', '-23.391,6.497,12.169,0.0000,0.9397,-0.3420,0.0000,75.0'),
- title='Concept 5 · Vibration on a duct run fed by a fan',
- subtitle='Straight rectangular duct by the Level 1 windows · the fan itself is not in the scan (illustrative)',
+ title='Test install 5 · Vibration on a duct run fed by a fan',
+ subtitle='If installed here: vibration rising over weeks warns of fan wear before it fails',
  bg='',
  elements=[
   dict(k=1, sid='fan-vibration', col='#087F8C', title='Vibration node', row='Wireless MEMS accelerometer on the duct run',
@@ -163,7 +163,7 @@ S5 = dict(
  legend=None,
  steps=[dict(head='Measure', text='Vibration and bearing temperature'), dict(head='Trend', text='Rising over weeks, not one spike'),
         dict(head='Show', text='Alert on that duct run in the Lens')],
- footnote=foot(22),
+ footnote=foot(22, 'Straight rectangular duct by the Level 1 windows; the fan itself is not in the scan.'),
  notes='Concept five is rotating equipment. The fans, pumps and air handlers are in plant rooms that are not in this scan, so this is an illustrative location: a duct run fed by a fan. In the BIM the element is a straight rectangular duct near the Level 1 windows, not a fan box. Marker one is a wireless vibration node on the duct, which picks up the vibration of the fan that feeds it, with its trend on the card. Marker two is a bearing temperature probe; on a real system it sits on the fan bearing, and here it is shown on the duct because the fan is not in view. Marker three is a trend alert: vibration climbing steadily over weeks, so maintenance can be planned before the fan fails. Each reading maps to a BIM element ID. All values are illustrative.')
 
 for _s, _n in ((S2, 'twin-hvac'), (S3, 'twin-water'), (S4, 'twin-power'), (S5, 'twin-fan')):

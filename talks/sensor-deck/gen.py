@@ -69,9 +69,27 @@ EXTRA.update({
    subtitle='Level 1 entrance by the auditorium doors: our 360° walk passed under the open tiles',
    footnote='Oct 18 capture, ceiling only, no people. Model overlay uses a provisional alignment (not surveyed); offsets read from screenshots. Pipes deeper in the plenum were too dark to check.',
    notes='Before the concepts, a real case. On October 18 the ceiling at the Level 1 entrance was open for a leak repair, and our 360 walk passed right under it. On the right is the same view with the building model on top. The supply diffuser, the flex duct and the sprinkler head line up within a few centimetres. The fire-alarm device in the tile is about 0.7 metres from where the model puts it, so it was installed in a different spot than the drawings show. Two lessons for sensors. First, today a leak is found when water shows on a tile, and the ceiling has to be opened to find the source. Second, if we attach sensors to BIM elements, the model has to match what is installed, and an opening like this is the chance to check it. The next slides show how sensors in the twin would point to the pipe before anyone opens a tile.'),
+ 'test-installs': dict(id='test-installs', kind='figure', title='Five test installs: where, what, and what we would learn',
+   subtitle='Each one is a small trial on a real BIM element above a Level 1 ceiling; the next five slides show how each would look in the twin',
+   takeaway='Ask: one location, an owner and a short install window for a first test',
+   footnote='Concept stage: no sensor is installed. Scale is indicative only; no costs have been estimated. Locations are BIM elements seen in the public May 6 capture.',
+   notes='Here is the proposal in one table. Five small test installs, each on a real BIM element above a Level 1 ceiling. One: a fiber temperature cable on a sprinkler main, with a leak sensor below it. It would point to a leak on the pipe before anyone opens a tile, like the repair we just saw. Two: an airflow probe in a supply duct and a room comfort node, to see whether a room gets its design airflow. Three: a clamp-on flow meter on a plumbing branch. Flow at night, when the building is empty, reveals hidden leaks, and we can check it against the building water meter. Four: clip-on current sensors on the circuit feeding the VAV terminal units, to see which equipment uses the power. Five: a wireless vibration node on a fan-fed duct run, to catch fan wear weeks before it fails. Nothing is installed and we have not estimated costs. What we need is one location, an owner, and a short window to try the first one.'),
+ 'part-A': dict(id='part-A', kind='divider', number='A', title='Appendix: how the sensors work',
+   subtitle='Fiber sensing, the CE278 DAS example, MEMS nodes and wireless networks',
+   notes='Background slides, for questions.'),
 })
 CS.update(EXTRA)
-ORDER = ['cover', 'part-0', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'part-1', 'bms', 'part-2', 'sensing', 'fiber', 'ce278', 'mems', 'wsn', 'pilot', 'open-ceiling'] + [sc['id'] for sc in SCENARIOS] + ['ready', 'thanks']
+CS['part-2'] = dict(CS['part-2'], title='Test installs', subtitle='Where a first sensor could go, what it would show, and what we would learn',
+   notes='Part three: test installs. Which sensors suit Grimes, a real case, and five small trials, each on a real BIM element, with what we would learn from it.')
+CS['thanks'] = dict(CS['thanks'], notes='Thank you. Three questions to leave with you: can we get SkySpark meter data before the November 16 presentations, can we run the mixed-reality test in the Grimes foyer with the Quest 3 this week, and where could we try a first test install?')
+CS['pilot'] = dict(CS['pilot'], title='Start small: fiber temperature (DTS) on one riser, linked to BIM')
+_EFFECT = {'twin-concept': 'If we installed a fiber temperature cable on this sprinkler main, a warm spot would point to a leak before anyone opens a tile.',
+           'twin-hvac': 'If we installed an airflow probe here and a comfort node in the room, we would see whether the room gets its design airflow, and which duct to check when it does not.',
+           'twin-water': 'If we clamped a flow meter on this branch, flow at night, when the building is empty, would reveal hidden leaks.',
+           'twin-power': 'If we clipped current sensors on this circuit, we would see which equipment uses the power, and whether the sub-meters add up to the building meter.',
+           'twin-fan': 'If we put a vibration node on this duct run, vibration rising over weeks would warn of fan wear before it fails.'}
+for _k, _t in _EFFECT.items(): CS[_k] = dict(CS[_k], notes=_t + ' ' + CS[_k]['notes'])
+ORDER = ['cover', 'part-0', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'part-1', 'bms', 'part-2', 'sensing', 'open-ceiling', 'test-installs'] + [sc['id'] for sc in SCENARIOS] + ['pilot', 'ready', 'thanks', 'part-A', 'fiber', 'ce278', 'mems', 'wsn']
 SLIDES = [CS[i] for i in ORDER]
 
 # ---------------------------------------------------------------- primitives (same as v1)
@@ -386,7 +404,7 @@ def open_ceiling():
     out += card(7.45, 3.61, 2.0, .44, 'As-built check before sensors', '', head_size=9.5, middle=True)
     out += box(.55, 4.15, 8.9, .72, 'card navy')
     out += text(.7, 4.15, 1.9, .72, P('With sensors', size=17, bold=True, color=GOLD), anchor='middle')
-    return out + text(2.55, 4.15, 6.8, .72, P('The warm or wet spot shows on the BIM pipe before anyone opens a tile. Next: five concepts of how that looks in the twin', size=12, color='#fff'), anchor='middle')
+    return out + text(2.55, 4.15, 6.8, .72, P('The warm or wet spot shows on the BIM pipe before anyone opens a tile. Next: five small test installs and what each would show', size=12, color='#fff'), anchor='middle')
 
 def ask_bar(t, y=4.15, h=.72):
     out = box(.55, y, 8.9, h, 'card navy')
@@ -457,12 +475,30 @@ def week_asks():
         out += text(7.6, y, 1.8, rh, P(when, size=11.5, bold=True, color=hc), anchor='middle')
     return out
 
+def test_installs():
+    rows = [('1', 'Fiber temperature (DTS) + leak sensor', 'Sprinkler main (Pipe219763)', 'Where a leak is on the pipe, before a tile is opened', 'One cable run, analyzer loan'),
+            ('2', 'Duct airflow probe + room comfort node', 'Supply-duct branch and diffuser', 'Whether the room gets its design airflow; which duct to check', '1 probe, 1 node, 1 BAS point'),
+            ('3', 'Clamp-on ultrasonic flow meter', 'Cast-iron plumbing branch, lobby', 'Night flow when empty: hidden leaks, vs the building meter', '1 meter; no cutting or shutdown'),
+            ('4', 'Clip-on current (CT) sub-meters', 'Circuit feeding VAV terminal units', 'Which equipment uses the power; sub-meters vs building meter', 'Panel access, electrician'),
+            ('5', 'Wireless vibration node', 'Duct run fed by a fan', 'Fan wear weeks before it fails: planned repair', '1–2 battery nodes, IT approval')]
+    out = ''; y0 = 1.17; rh = .56
+    for x, w, t in [(1.15, 3.35, 'Sensor · where'), (4.6, 3.1, 'What we would learn'), (7.8, 1.6, 'Scale (indicative)')]:
+        out += text(x, y0, w, .26, P(t.upper(), size=8.5, bold=True, color=TEAL))
+    for i, (n, sen, where, learn, scale) in enumerate(rows):
+        y = y0 + .3 + i * (rh + .06)
+        out += box(.55, y, 8.9, rh, 'card')
+        out += f'<div class="circ" style="{pos(.68,y+rh/2-.16,.32,.32)};background:{NAVY};font-size:{12*PT:.1f}px">{n}</div>'
+        out += text(1.15, y, 3.35, rh, [[(sen, dict(bold=True, size=11, color=NAVY))], [(where, dict(size=9.5))]], anchor='middle', gap=1)
+        out += text(4.6, y, 3.1, rh, P(learn, size=10), anchor='middle')
+        out += text(7.8, y, 1.6, rh, P(scale, size=9.5, color=MUTED), anchor='middle')
+    return out
+
 def thanks_extra():
     out = ''
-    qs = ['Can we get SkySpark meter data before the Nov 16 presentations?', 'Can we test mixed reality in the Grimes foyer with the Quest 3 this week?']
+    qs = ['Can we get SkySpark meter data before the Nov 16 presentations?', 'Can we test mixed reality in the Grimes foyer with the Quest 3 this week?', 'Where could we try a first test install?']
     for i, q in enumerate(qs):
-        out += box(1.2 + 3.9 * i, 3.35, 3.7, .9, 'card')
-        out += text(1.35 + 3.9 * i, 3.35, 3.4, .9, [[('QUESTION ' + str(i + 1), dict(bold=True, size=8, color=TEAL))], [(q, dict(size=12.5, color=NAVY, bold=True))]], anchor='middle', gap=2)
+        out += box(.7 + 2.95 * i, 3.35, 2.75, 1.0, 'card')
+        out += text(.82 + 2.95 * i, 3.35, 2.5, 1.0, [[('QUESTION ' + str(i + 1), dict(bold=True, size=8, color=TEAL))], [(q, dict(size=11.5, color=NAVY, bold=True))]], anchor='middle', gap=2)
     return out
 
 def slide(s, n):
@@ -486,6 +522,7 @@ def slide(s, n):
         elif sid == 'sensing': body += sensing_table()
         elif sid == 'pilot': body += pilot(s)
         elif sid == 'open-ceiling': body += open_ceiling()
+        elif sid == 'test-installs': body += test_installs()
         elif sid == 'fiber': body += fiber_slide()
         elif sid == 'ce278': body += ce278_slide()
         elif sid == 'mems': body += mems_slide()
