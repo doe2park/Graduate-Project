@@ -63,7 +63,7 @@ def build_twin(sc, U, x, y, h):
     # LIVE layer on top of the static figure: the local viewer with ?sensors=demo, loaded only while this slide is active
     # (deck.js: data-nopreload). The static image + SVG underneath stays as the fallback (Static view, or iframe failure).
     out += (f'<div class="live twlive" data-live="sensor" data-nopreload="1" data-clean="1" data-scale="0.72" data-src="{e(sc["live"])}" style="{pos(x,y,w,h)}">'
-            '<div class="vp"></div><span class="loading">Loading live twin…</span><span class="badge-live">LIVE 3D · drag to look</span></div>')
+            '<div class="vp"></div><span class="loading">Loading live twin…</span><span class="badge-live">INTERACTIVE TWIN · SIMULATED DATA · drag to look</span></div>')
     out += (f'<div style="{pos(x,y+h+.1,w+2,.32)};display:flex;gap:10px"><button class="btn tw-btn tw-toggle" aria-pressed="true">Sensors: on</button>'
             '<button class="btn tw-btn tw-mode" aria-pressed="false">Static view</button>'
             f'<a class="btn tw-btn" href="{e(sc["live"])}" target="_blank" rel="noopener">Open in viewer ↗</a></div>')
@@ -79,7 +79,7 @@ const live=sl.querySelector('.twlive'),mode=sl.querySelector('.tw-mode'),SID={};
 const liveOn=()=>live&&!live.hidden&&!live.classList.contains('failed');
 const liveFrame=()=>{const f=live&&live.querySelector('iframe');return liveOn()&&f&&f.contentWindow?f:null};
 function focusLive(){const f=liveFrame();if(!f)return;const k=pinned||hover;try{f.contentWindow.postMessage({type:'grimes-sensor-demo-focus',id:(on&&k&&SID[k])||null},location.origin)}catch(_){}}
-function setMode(stat){if(!live)return;live.hidden=stat;live.dataset.off=stat?'1':'';mode.setAttribute('aria-pressed',String(stat));mode.textContent=stat?'Live 3D view':'Static view';
+function setMode(stat){if(!live)return;live.hidden=stat;live.dataset.off=stat?'1':'';mode.setAttribute('aria-pressed',String(stat));mode.textContent=stat?'Interactive view':'Static view';
   if(stat)unloadLive(live);else if(sl.classList.contains('active'))loadLive(live);mode.blur()}
 if(mode)mode.addEventListener('click',()=>setMode(!live.hidden));
 if(live)new MutationObserver(()=>{if(live.classList.contains('failed')&&mode){mode.textContent='Live view unavailable';mode.disabled=true}}).observe(live,{attributes:true,attributeFilter:['class']});

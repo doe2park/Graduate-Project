@@ -41,9 +41,9 @@ EXTRA = {
    footnote='Diagram drawn for this deck. Design points summarised from ' + COURSE + ', Lecture 2-4.',
    notes='A wireless sensor network is a set of nodes that measure and send data by radio to a gateway, and from there to the cloud. The diagram shows how it would sit in Grimes: battery nodes in the ceiling plenums, a gateway on each floor, and the campus network carrying the data to the building management system and the twin. Four things limit the design. Topology: a star is simple, a mesh relays around obstacles. Battery: a tilt node reading hourly on one D cell can in theory last twenty to twenty-five years, but a vibration node sampling at a kilohertz cannot run continuously, so it records short bursts when triggered. Radio: walls, floors, people and metal ducts weaken the signal. For Grimes that means nodes in the ceiling plenums, a gateway per floor, triggered vibration recordings, and IT approval for the radio.'),
   'ready': dict(id='ready', kind='figure', title='Ready for real sensors',
-   subtitle='Every source is turned into one feed format and tied to a BIM element: attaching a real sensor only changes the source',
-   footnote='Today every value in the twin’s sensor layer is simulated (labelled “Simulated”); no sensor is installed. Brick class names are candidates, not yet verified.',
-   notes='This slide is about what happens after the demo. Whatever the source is, a building automation point, a campus meter (moving from BMO to SkySpark), a wireless gateway or a fiber analyzer, a small adapter turns it into one common feed format: sensor, time, value, unit, quality and source. A registry ties each sensor to its BIM element by the element GUID, with a Brick class, its units and its alert rule. The Lens, the headset and the dashboard read only that feed and registry. Today the feed is a simulator that runs in the browser and is clearly labelled Simulated. When a real sensor is installed, we add its row, switch its source, and it appears with a Live badge, under the same rules for missing and stale data.'),
+   subtitle='One feed format, each source tied to a BIM element; real feeds need an adapter, verified mapping and commissioning',
+   footnote='Today every value in the twin’s sensor layer is simulated (labelled “Simulated”); no sensor is installed. Brick class names are candidates, not yet verified. Headset and dashboard connections are proposed, not demonstrated.',
+   notes='This slide is about what happens after the demo. Whatever the source is, a building automation point, a campus meter (BMO now, SkySpark requested), a wireless gateway or a fiber analyzer, a small adapter turns it into one common feed format: sensor, time, value, unit, quality and source. A registry ties each sensor to its BIM element by the element GUID, with a Brick class, its units and its alert rule. The Lens, the headset and the dashboard read only that feed and registry. Today the feed is a simulator that runs in the browser and is clearly labelled Simulated. A real feed is not a simple switch: it needs an adapter, a verified mapping to the right equipment and commissioning. Once those are done it would appear with a Live badge, under the same rules for missing and stale data. The headset and dashboard connections on the right are proposed, not yet demonstrated.'),
 }
 EXTRA.update({
  'part-0': dict(id='part-0', kind='divider', number='01', title='This week: updates and asks',
@@ -52,44 +52,45 @@ EXTRA.update({
  'week-energy': dict(id='week-energy', kind='figure', title='Campus energy data: moving to the Facilities source',
    subtitle='Facilities recommends SkySpark over BMO; the class needs hourly data covering the whole main campus',
    footnote='Requested interval and period are from the utility side of the email thread (Oct 26). Dashboard values from BMO are shown for reference until the SkySpark feed is connected.',
-   notes='First, campus energy data. Facilities told us this week that BMO, which the dashboard reads today, is no longer their source of truth: the platform is outdated and new meters cannot be added. They recommend SkySpark, which they actively manage, and they are setting up an intake form so students can pull hourly data themselves. On the class side, the request is hourly electricity data, ideally at least twelve months so winter and summer are both covered. One student group wants to do an energy balance of the main campus, so coverage matters. The dashboard today covers 37 buildings from BMO. Some main-campus buildings are not listed yet, for example the Valley Life Sciences Building, and some buildings may be fed or sub-metered from a neighbour. What we need: SkySpark access, or the intake form, before the student presentations in the week of November 16; a confirmed interval, period and building list; and which buildings are fed from others. Once access is set, the dashboard switches its meter source to SkySpark.'),
+   notes='First, campus energy data. Facilities told us this week that BMO, which the dashboard reads today, is no longer their source of truth: the platform is outdated and new meters cannot be added. They recommend SkySpark, which they actively manage, and they are setting up an intake form so students can pull hourly data themselves. On the class side, the request is hourly electricity data, a target of twelve months so winter and summer are both covered. One student group wants to do an energy balance of the main campus, so coverage matters. The dashboard today covers 37 buildings from BMO. Some main-campus buildings are not listed yet, for example the Valley Life Sciences Building, and some buildings may be fed or sub-metered from a neighbour. What we need: SkySpark access, or the intake form, before the student presentations in the week of November 16; a confirmed interval, period and building list; and which buildings are fed from others. Once access is set, the dashboard switches its meter source to SkySpark.'),
  'week-facilities': dict(id='week-facilities', kind='figure', title='Facilities follow-up: three requests from the Oct 22 meeting',
    subtitle='Asked of building operations a week ago; the team is sending one combined follow-up with the final list',
    footnote='Status as of Oct 26: no decision yet on any of the three requests.',
    notes='Second, the follow-up from our meeting with building operations on October 22. We asked for three things. One, floor plans or building data for older campus buildings, which usually have no BIM: plans let us place the 360 captures and build a basic model. Two, whether sensors can be installed, so readings link to a room or a system instead of the whole-building meter. Three, permission to film with a drone, for the exterior and roof. None has a decision yet. This week the team is collecting each member\'s slides and sending one combined follow-up with the final list of requests. What we need is an owner and an approval process for each request, and a first candidate building.'),
  'week-quest': dict(id='week-quest', kind='figure', title='Quest 3 test this week: what is ready',
    subtitle='Mixed reality on the real ceiling, plus the redesigned VR controls, prepared for a lab Quest 3',
-   footnote='Desktop and emulated-headset tests only; nothing has run on a Quest 3 yet. Landmarks are BIM-derived candidates, not surveyed. RMS measures touch consistency, not survey accuracy.',
-   notes='Third, the headset. We can borrow a Quest 3 from the lab this week, and three things are ready for it. Mixed reality: you stand in the real building and see the BIM services through the ceiling. You align it by touching four landmarks, column faces and wall corners, plus the floor; the page fits a rotation and a shift and reports the error. Two Level 1 areas are prepared, the auditorium foyer with its open ceiling and the east entrance. Then we check real sprinkler heads and a diffuser against their BIM positions, in centimetres. The target is three centimetres RMS and five at worst. Second, the VR controls were redesigned after the first headset try: point and go, a visible laser, and a five-button menu. Third, the black screen we saw on a Quest 2 is fixed and passes an emulated headset test. None of this has run on a Quest 3 yet. The Quest 3 matters because its passthrough is in colour and it builds a room mesh, so touching corners and ceiling devices is more precise. What we need: the headset this week, a quiet time in the Level 1 foyer, and after a pass, permission to put it on the public link.'),
+   footnote='Desktop and emulated-headset tests only; nothing has run on a Quest 3 yet, and the Quest 2 black-screen fix passes emulation only. 3 cm / 5 cm are proposed test targets. Landmarks are BIM-derived candidates, not surveyed. RMS measures touch consistency, not survey accuracy.',
+   notes='Third, the headset. We can borrow a Quest 3 from the lab this week, and three things are ready for it. Mixed reality: you stand in the real building and see the BIM services through the ceiling. You align it by touching four landmarks, column faces and wall corners, plus the floor; the page fits a rotation and a shift and reports the error. Two Level 1 areas are prepared, the auditorium foyer with its open ceiling and the east entrance. Then we check real sprinkler heads and a diffuser against their BIM positions, in centimetres. The proposed test targets are three centimetres RMS and five at worst; they are targets to test, not results. To check them we compare real ceiling devices against their BIM positions, separately from the landmark fit, and re-check after a ten metre walk to see drift. Second, the VR controls were redesigned after the first headset try: point and go, a visible laser, and a five-button menu. Third, the black screen we saw on a Quest 2 has a fix that passes an emulated headset test only; it is not confirmed on hardware. None of this has run on a Quest 3 yet. The Quest 3 matters because its passthrough is in colour and it builds a room mesh, which we expect to help with touching corners and ceiling devices; that is to be evaluated. What we need: the headset this week, a quiet time in the Level 1 foyer, and after a pass, permission to put it on the public link.'),
  'week-asks': dict(id='week-asks', kind='figure', title='What we need',
-   subtitle='Four asks, in order of urgency',
-   footnote='Asks 1 and 2 go to Facilities through the existing email threads; ask 3 is within the lab.',
-   notes='To sum up, four asks in order of urgency. One, SkySpark meter data for the main campus, hourly, twelve months, before the November 16 presentations. Two, owners and processes for floor plans, sensor installs and drone filming. Three, the lab Quest 3 and a quiet time in the Grimes foyer this week. Four, later, a read-only building automation trend export and point list once the first three are moving.'),
+   subtitle='Decisions requested, in order of urgency',
+   footnote='Asks 1 and 2 go to Facilities through the existing email threads; ask 3 is within the lab. Roles only; no dates have been agreed.',
+   notes='To sum up, four asks in order of urgency. One, SkySpark meter data for the main campus, hourly, with a twelve month target, before the November 16 presentations. Two, an owner and a process for floor plans, sensor installs and drone filming, plus one location, an owner and a short window for the first test install. Three, the lab Quest 3 and a quiet time in the Grimes foyer this week. Four, later, a read-only building automation trend export and point list once the first three are moving.'),
  'open-ceiling': dict(id='open-ceiling', kind='figure', title='Oct 18: a leak repair opened this ceiling',
    subtitle='Level 1 entrance by the auditorium doors: our 360° walk passed under the open tiles',
-   footnote='Oct 18 capture, ceiling only, no people. Model overlay uses a provisional alignment (not surveyed); offsets read from screenshots. Pipes deeper in the plenum were too dark to check.',
-   notes='Before the concepts, a real case. On October 18 the ceiling at the Level 1 entrance was open for a leak repair, and our 360 walk passed right under it. On the right is the same view with the building model on top. The supply diffuser, the flex duct and the sprinkler head line up within a few centimetres. The fire-alarm device in the tile is about 0.7 metres from where the model puts it, so it was installed in a different spot than the drawings show. Two lessons for sensors. First, today a leak is found when water shows on a tile, and the ceiling has to be opened to find the source. Second, if we attach sensors to BIM elements, the model has to match what is installed, and an opening like this is the chance to check it. The next slides show how sensors in the twin would point to the pipe before anyone opens a tile.'),
+   footnote='Oct 18 capture, ceiling only, no people. Model overlay uses a provisional alignment (not surveyed); offsets are read from screenshots and are not survey measurements. Pipes deeper in the plenum were too dark to check.',
+   notes='Before the concepts, a real case. On October 18 the ceiling at the Level 1 entrance was open for a leak repair, and our 360 walk passed right under it. On the right is the same view with the building model on top. The supply diffuser, the flex duct and the sprinkler head look visually close to the model in this view. The fire-alarm device in the tile appears about 0.7 metres from where the model puts it. That is an apparent mismatch in a screenshot with a provisional alignment, so it has to be verified on site before we say the device was installed away from the drawings. Two lessons for sensors. First, today a leak is found when water shows on a tile, and the ceiling has to be opened to find the source. Second, if we attach sensors to BIM elements, the model has to match what is installed, and an opening like this is the chance to check it on site. The next slides show how sensors in the twin would point to the pipe before anyone opens a tile.'),
  'test-installs': dict(id='test-installs', kind='figure', title='Five test installs: where, what, and what we would learn',
    subtitle='Each one is a small trial on a real BIM element above a Level 1 ceiling; the next five slides show how each would look in the twin',
    takeaway='Ask: one location, an owner and a short install window for a first test',
    footnote='Concept stage: no sensor is installed. Scale is indicative only; no costs have been estimated. Locations are BIM elements seen in the public May 6 capture.',
-   notes='Here is the proposal in one table. Five small test installs, each on a real BIM element above a Level 1 ceiling. One: a fiber temperature cable on a sprinkler main, with a leak sensor below it. It would point to a leak on the pipe before anyone opens a tile, like the repair we just saw. Two: an airflow probe in a supply duct and a room comfort node, to see whether a room gets its design airflow. Three: a clamp-on flow meter on a plumbing branch. Flow at night, when the building is empty, reveals hidden leaks, and we can check it against the building water meter. Four: clip-on current sensors on the circuit feeding the VAV terminal units, to see which equipment uses the power. Five: a wireless vibration node on a fan-fed duct run, to catch fan wear weeks before it fails. Nothing is installed and we have not estimated costs. What we need is one location, an owner, and a short window to try the first one.'),
+   notes='Here is the proposal in one table. Five small test installs, each on a real BIM element above a Level 1 ceiling, each with a narrow question. One: can a controlled temperature change along the sprinkler main be detected by a fiber cable and mapped to the right BIM pipe segment, with a wetness sensor below checking for water. Two: compare measured airflow in a supply branch with a verified design value, and its trend with one representative room reading. Three: a wetness sensor below a pipe coupling, to test detection of water at that fitting; a flow meter is only a later option on a verified supply branch. Four: after confirming the circuit, a power meter to measure the load profile of the VAV terminal units and compare operating and idle periods. Five: a vibration node on a fan-fed duct, to test whether vibration changes reproducibly with the fan operating state. Nothing is installed and we have not estimated costs. What we need is one location, an owner, and a short window to try the first one.'),
  'part-A': dict(id='part-A', kind='divider', number='A', title='Appendix: how the sensors work',
-   subtitle='Fiber sensing, the CE278 DAS example, MEMS nodes and wireless networks',
-   notes='Background slides, for questions.'),
+   subtitle='Sensing options, fiber sensing, the CE278 DAS example, MEMS nodes and wireless networks',
+   notes='Background slides, for questions. The first is the survey of sensing options for Grimes.'),
 })
 CS.update(EXTRA)
-CS['part-2'] = dict(CS['part-2'], title='Test installs', subtitle='Where a first sensor could go, what it would show, and what we would learn',
-   notes='Part three: test installs. Which sensors suit Grimes, a real case, and five small trials, each on a real BIM element, with what we would learn from it.')
+CS['part-2'] = dict(CS['part-2'], title='Test installs', subtitle='A real case, then where a first sensor could go, what it would show, and what we would learn',
+   notes='Part three: test installs. A real case from the open ceiling, then five small trials, each on a real BIM element, with what we would learn from it. The survey of sensing options is in the appendix.')
+CS['part-1'] = dict(CS['part-1'], notes='Part two: the building data that already exists.')
 CS['thanks'] = dict(CS['thanks'], notes='Thank you. Three questions to leave with you: can we get SkySpark meter data before the November 16 presentations, can we run the mixed-reality test in the Grimes foyer with the Quest 3 this week, and where could we try a first test install?')
-CS['pilot'] = dict(CS['pilot'], title='Start small: fiber temperature (DTS) on one riser, linked to BIM')
-_EFFECT = {'twin-concept': 'If we installed a fiber temperature cable on this sprinkler main, a warm spot would point to a leak before anyone opens a tile.',
-           'twin-hvac': 'If we installed an airflow probe here and a comfort node in the room, we would see whether the room gets its design airflow, and which duct to check when it does not.',
-           'twin-water': 'If we clamped a flow meter on this branch, flow at night, when the building is empty, would reveal hidden leaks.',
-           'twin-power': 'If we clipped current sensors on this circuit, we would see which equipment uses the power, and whether the sub-meters add up to the building meter.',
-           'twin-fan': 'If we put a vibration node on this duct run, vibration rising over weeks would warn of fan wear before it fails.'}
+CS['pilot'] = dict(CS['pilot'], title='First test and its success criterion: fiber temperature on Pipe219763')
+_EFFECT = {'twin-concept': 'Test: whether a controlled temperature change along Pipe219763 can be detected and mapped to the right BIM pipe segment; a separate wetness sensor below checks for water.',
+           'twin-hvac': 'Test: compare measured airflow in branch 401233 with a verified design value, and compare its trend with one representative room temperature / CO2 reading.',
+           'twin-water': 'Test: place a leak (wetness) sensor below coupling 423698 to test detection of water at this fitting. A flow meter is only a later option on a verified supply branch.',
+           'twin-power': 'Test: after confirming the circuit, measure its load profile with a power meter (current + voltage) and compare operating and idle periods.',
+           'twin-fan': 'Test: whether vibration on duct 399665 changes reproducibly with the upstream fan’s operating state.'}
 for _k, _t in _EFFECT.items(): CS[_k] = dict(CS[_k], notes=_t + ' ' + CS[_k]['notes'])
-ORDER = ['cover', 'part-0', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'part-1', 'bms', 'part-2', 'sensing', 'open-ceiling', 'test-installs'] + [sc['id'] for sc in SCENARIOS] + ['pilot', 'ready', 'thanks', 'part-A', 'fiber', 'ce278', 'mems', 'wsn']
+ORDER = ['cover', 'part-0', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'part-1', 'bms', 'part-2', 'open-ceiling', 'test-installs'] + [sc['id'] for sc in SCENARIOS] + ['pilot', 'ready', 'thanks', 'part-A', 'sensing', 'fiber', 'ce278', 'mems', 'wsn']
 SLIDES = [CS[i] for i in ORDER]
 
 # ---------------------------------------------------------------- primitives (same as v1)
@@ -138,7 +139,7 @@ def chrome(s, n):
     out += text(.73, .27, 8.6, .5, P(s['title'], size=21, color=NAVY, bold=True), anchor='middle')
     if s.get('subtitle'): out += text(.85, .86, 8.5, .26, P(s['subtitle'], size=10.5 if len(s['subtitle'])>110 else 12))
     if s.get('takeaway'): out += text(.85, 4.82, 8.4, .3, P(s['takeaway'], size=13, color=NAVY, bold=True))
-    if s.get('footnote'): out += text(.85, 5.12, 8.0, .4, P(s['footnote'], size=7.5, color=MUTED))
+    if s.get('footnote'): out += text(.85, 5.12, 8.0, .4, P(s['footnote'], size=8.5, color=MUTED))
     out += text(9.0, 5.3, .5, .2, P(str(n), size=9, color=MUTED), align='right')
     return out
 
@@ -331,7 +332,7 @@ def ready_svg():
         if sub: o.append(f'<text x="{x+w/2}" y="{y+h/2+22}" font-size="19" fill="{sc}" text-anchor="middle" dominant-baseline="middle">{sub}</text>')
     def ar(x1, y1, x2, y2): o.append(f'<path d="M{x1} {y1} L{x2} {y2}" stroke="#FDB515" stroke-width="5" marker-end="url(#ah)"/>')
     o.append('<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#FDB515"/></marker></defs>')
-    srcs = [('BAS / BACnet', 'Facilities points'), ('Meters', 'SkySpark (was BMO)'), ('Wireless gateway', 'MEMS nodes'), ('Fiber analyzer', 'DTS / DAS')]
+    srcs = [('BAS / BACnet', 'Facilities points'), ('Meters', 'BMO now → SkySpark requested'), ('Wireless gateway', 'MEMS nodes'), ('Fiber analyzer', 'DTS / DAS')]
     for i, (t, sb) in enumerate(srcs):
         y = 20 + i * 132; bx(20, y, 300, 108, '#EEF3F8', t, sb, tc='#003262', sc='#5B7089'); ar(325, y + 54, 395, y + 54)
     o.append('<rect x="400" y="20" width="230" height="504" rx="14" fill="#087F8C"/>'
@@ -349,8 +350,8 @@ def ready_svg():
 
 def ready_slide():
     out = f'<div style="{pos(.55,1.12,8.9,2.62)}">{ready_svg()}</div>'
-    out += box(.55, 3.82, 8.9, .38, 'card') + text(.7, 3.82, 8.6, .38, [[('Today: ', dict(bold=True, color=TEAL, size=11)), ('simulated feed in the browser, labelled “Simulated”', dict(size=11)), ('   →   Tomorrow: ', dict(bold=True, color=NAVY, size=11)), ('add the row, switch the source → “Live”', dict(size=11))]], anchor='middle')
-    items = ['Registry: 17 demo sensors tied to real BIM element GUIDs, with units, intervals, alert rules and Brick classes',
+    out += box(.55, 3.82, 8.9, .38, 'card') + text(.7, 3.82, 8.6, .38, [[('Today: ', dict(bold=True, color=TEAL, size=11)), ('simulated feed in the browser, labelled “Simulated”', dict(size=11)), ('   →   Next: ', dict(bold=True, color=NAVY, size=11)), ('adapter + verified mapping + commissioning → “Live”', dict(size=11))]], anchor='middle')
+    items = ['Registry: 17 demo entries (13 sensor/source entries + 4 derived indicators), tied to real BIM element GUIDs, with units, rules and Brick classes',
              'One feed format and shared rules: missing is never zero, stale after 3 intervals, units must match',
              'Adapters: simulator live today; BMS, meter, gateway and fiber stubs ready to be filled in (meter adapter to target SkySpark)']
     out += text(.6, 4.28, 8.8, .7, [[('✓ ', dict(bold=True, color=TEAL, size=10)), (t, dict(size=10))] for t in items], gap=0)
@@ -399,12 +400,12 @@ def open_ceiling():
     out += pill(.65, 1.27, 1.6, .26, 'Photo · ceiling open', size=9)
     out += pill(5.6, 1.27, 1.6, .26, 'Same view + model', size=9)
     out += text(.55, 3.78, 6.75, .3, P('1 supply diffuser · 2 flex duct · 3 sprinkler head · 4 fire-alarm device (model position)', size=10, color=MUTED), anchor='middle')
-    out += card(7.45, 1.17, 2.0, 1.12, '1–3  Match', 'Diffuser, flex duct and sprinkler head line up within a few cm', head_size=11.5, size=9.5)
-    out += card(7.45, 2.39, 2.0, 1.12, '4  Moved', 'Fire-alarm device ≈0.7 m from its modelled spot', head_size=11.5, size=9.5)
+    out += card(7.45, 1.17, 2.0, 1.12, '1–3  Visually close', 'Diffuser, flex duct and sprinkler head look close in this view', head_size=11.5, size=9.5)
+    out += card(7.45, 2.39, 2.0, 1.12, '4  Apparent mismatch', '~0.7 m in this view: verify on site', head_size=11.5, size=9.5)
     out += card(7.45, 3.61, 2.0, .44, 'As-built check before sensors', '', head_size=9.5, middle=True)
     out += box(.55, 4.15, 8.9, .72, 'card navy')
     out += text(.7, 4.15, 1.9, .72, P('With sensors', size=17, bold=True, color=GOLD), anchor='middle')
-    return out + text(2.55, 4.15, 6.8, .72, P('The warm or wet spot shows on the BIM pipe before anyone opens a tile. Next: five small test installs and what each would show', size=12, color='#fff'), anchor='middle')
+    return out + text(2.55, 4.15, 6.8, .72, P('A sensor could point to the BIM pipe before anyone opens a tile; the model must match what is installed. Next: five small test installs and what each would show', size=12, color='#fff'), anchor='middle')
 
 def ask_bar(t, y=4.15, h=.72):
     out = box(.55, y, 8.9, h, 'card navy')
@@ -416,7 +417,7 @@ def week_energy():
         'Facilities: BMO is outdated and cannot add meters; it is no longer their source of truth',
         'Recommended source: SkySpark, actively managed by Facilities',
         'An intake form is being set up so students can pull hourly data themselves',
-        'Class need: hourly electricity, ideally 12 months (winter and summer)'], size=11)
+        'Class need: hourly electricity, target 12 months (winter and summer)'], size=11)
     out += bullets_card(5.1, 1.2, 4.35, 2.85, 'The dashboard today', [
         '37 buildings, read from BMO; values shown for reference',
         'Some main-campus buildings are not listed yet (e.g. Valley Life Sciences)',
@@ -441,16 +442,16 @@ def week_facilities():
 
 def week_quest():
     st = [dict(head='Align', text='Touch 4 landmarks (columns, wall corners) + floor; fit rotation + shift'),
-          dict(head='Check', text='Real sprinkler heads and a diffuser vs BIM, offset in cm'),
-          dict(head='Target', text='RMS ≤ 3 cm, worst point ≤ 5 cm; re-check after a 10 m walk')]
+          dict(head='Check', text='Real sprinkler heads and a diffuser vs BIM, offset in cm (separate from the fit)'),
+          dict(head='Proposed targets', text='RMS ≤ 3 cm, worst ≤ 5 cm (to be tested); re-check after a 10 m walk')]
     out = text(.6, 1.17, 4.4, .3, P('Mixed reality: BIM services through the real ceiling', size=12.5, bold=True, color=NAVY))
     out += numsteps(.55, 1.5, 5.6, 1.35, st, head_size=11.5, size=10, arrow=.18)
     out += bullets_card(6.3, 1.17, 3.15, 1.68, 'Also ready', [
         'Two Level 1 areas: auditorium foyer (open ceiling), east entrance',
         'VR controls redesigned: point-and-go, laser, 5-button menu',
-        'Quest 2 black-screen fix; passes an emulated headset test'], head_size=12, size=9.5)
+        'Quest 2 black-screen fix: passes an emulated headset test only'], head_size=12, size=9.5)
     out += bullets_card(.55, 2.97, 5.6, 1.08, 'Why the Quest 3', [
-        'Colour, sharper passthrough and a room mesh: touching corners and ceiling devices is more precise',
+        'Colour passthrough and a room mesh: expected to help with touching corners and ceiling devices; to be evaluated',
         'More GPU headroom for extra service layers'], head_size=12, size=10)
     out += box(6.3, 2.97, 3.15, 1.08, 'card')
     out += text(6.44, 2.97, 2.9, 1.08, [[('10-minute protocol', dict(bold=True, color=NAVY, size=12))], [('Align → check 3 heads + 1 diffuser → walk 10 m → re-enter; log saved on the headset', dict(size=9.5))]], anchor='middle', gap=2)
@@ -458,10 +459,10 @@ def week_quest():
     return out + ask_bar('The lab Quest 3 this week · a quiet time in the Level 1 foyer · after a pass, permission to put it on the public link')
 
 def week_asks():
-    rows = [('1', 'SkySpark meter data for the main campus', 'hourly, 12 months, full building list', 'Facilities energy', 'Before Nov 16'),
-            ('2', 'Owner + process: floor plans, sensors, drone', 'and a first candidate building', 'Facilities operations', 'Reply to follow-up'),
-            ('3', 'Quest 3 + a quiet time in the Grimes foyer', 'mixed-reality alignment test', 'Lab', 'This week'),
-            ('4', 'Read-only BAS trend export + point list', 'tagged so points link to BIM elements', 'Facilities controls', 'Later')]
+    rows = [('1', 'SkySpark meter data for the main campus', 'hourly, target 12 months, full building list', 'Facilities energy / data owner', 'Before Nov 16'),
+            ('2', 'Owner + process: floor plans, sensors, drone', 'and a first candidate building; one location for the first test install', 'Facilities operations (contact + approver)', 'Contact named in the combined follow-up'),
+            ('3', 'Quest 3 + a quiet time in the Grimes foyer', 'mixed-reality alignment test; headset custodian and foyer-access contact', 'Lab (headset custodian)', 'Slot this week'),
+            ('4', 'Read-only BAS trend export + point list', 'tagged so points link to BIM elements', 'Facilities controls', 'After asks 1–3 are moving')]
     out = ''; y0 = 1.2; rh = .78
     for c, (x, w, t) in enumerate([(1.15, 4.25, 'Ask'), (5.5, 2.0, 'From'), (7.6, 1.85, 'When')]):
         out += text(x, y0, w, .28, P(t.upper(), size=8.5, bold=True, color=TEAL))
@@ -471,16 +472,16 @@ def week_asks():
         col = '#fff' if i == 0 else DARK; hc = GOLD if i == 0 else NAVY
         out += f'<div class="circ" style="{pos(.68,y+rh/2-.19,.38,.38)};background:{GOLD if i == 0 else NAVY};color:{NAVY if i == 0 else "#fff"};font-size:{14*PT:.1f}px">{n}</div>'
         out += text(1.15, y, 4.25, rh, [[(a, dict(bold=True, size=13, color=hc))], [(sub, dict(size=10, color=col))]], anchor='middle', gap=1)
-        out += text(5.5, y, 2.0, rh, P(frm, size=11.5, color=col), anchor='middle')
-        out += text(7.6, y, 1.8, rh, P(when, size=11.5, bold=True, color=hc), anchor='middle')
+        out += text(5.5, y, 2.0, rh, P(frm, size=10.5, color=col), anchor='middle')
+        out += text(7.6, y, 1.8, rh, P(when, size=10.5, bold=True, color=hc), anchor='middle')
     return out
 
 def test_installs():
-    rows = [('1', 'Fiber temperature (DTS) + leak sensor', 'Sprinkler main (Pipe219763)', 'Where a leak is on the pipe, before a tile is opened', 'One cable run, analyzer loan'),
-            ('2', 'Duct airflow probe + room comfort node', 'Supply-duct branch and diffuser', 'Whether the room gets its design airflow; which duct to check', '1 probe, 1 node, 1 BAS point'),
-            ('3', 'Clamp-on ultrasonic flow meter', 'Cast-iron plumbing branch, lobby', 'Night flow when empty: hidden leaks, vs the building meter', '1 meter; no cutting or shutdown'),
-            ('4', 'Clip-on current (CT) sub-meters', 'Circuit feeding VAV terminal units', 'Which equipment uses the power; sub-meters vs building meter', 'Panel access, electrician'),
-            ('5', 'Wireless vibration node', 'Duct run fed by a fan', 'Fan wear weeks before it fails: planned repair', '1–2 battery nodes, IT approval')]
+    rows = [('1', 'Fiber temperature (DTS) + wetness sensor', 'Sprinkler main (Pipe219763)', 'Can a controlled temperature change be detected and mapped to the right BIM pipe segment?', 'One cable run, analyzer loan, contained thermal test'),
+            ('2', 'Duct airflow probe + one room reading', 'Supply branch 401233 and nearby diffuser', 'Measured branch airflow vs a verified design value; its trend vs one room temperature / CO2 reading', '1 probe, 1 node; design value to verify'),
+            ('3', 'Leak (wetness) sensor', 'No-hub coupling 423698, lobby', 'Is water at this fitting detected? (Flow meter: a later option on a verified supply branch)', '1 sensor; no cutting or shutdown'),
+            ('4', 'Power meter (current + voltage)', 'Circuit feeding VAV units (to confirm)', 'Load profile of the confirmed circuit: operating vs idle periods', 'Panel access, electrician'),
+            ('5', 'Wireless vibration node', 'Duct 399665, fed by a fan', 'Does duct vibration change reproducibly with the fan’s operating state?', '1 battery node, IT approval')]
     out = ''; y0 = 1.17; rh = .56
     for x, w, t in [(1.15, 3.35, 'Sensor · where'), (4.6, 3.1, 'What we would learn'), (7.8, 1.6, 'Scale (indicative)')]:
         out += text(x, y0, w, .26, P(t.upper(), size=8.5, bold=True, color=TEAL))

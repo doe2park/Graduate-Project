@@ -24,7 +24,7 @@
    "number": "02",
    "title": "Building data",
    "subtitle": "What Grimes already measures, and what we could ask Facilities for",
-   "notes": "Part one: the building data that already exists."
+   "notes": "Part two: the building data that already exists."
   },
   {
    "id": "bms",
@@ -88,7 +88,7 @@
    "number": "03",
    "title": "Sensing",
    "subtitle": "Options, how fiber and MEMS sensing work, one pilot, and how it would look in the twin",
-   "notes": "Part two: new sensing. The options, a small pilot, and a concept of how the readings would appear on the BIM."
+   "notes": "Part three: test installs. A real case, then five small trials, each on a real BIM element."
   },
   {
    "id": "sensing",
@@ -168,7 +168,7 @@
    "id": "pilot",
    "kind": "figure",
    "layout": "free",
-   "title": "Pilot idea: fiber temperature (DTS) on one riser, linked to BIM",
+   "title": "First test and its success criterion: fiber temperature on Pipe219763",
    "blocks": [
     {
      "type": "numsteps",
@@ -181,8 +181,8 @@
      "arrow": 0.2,
      "steps": [
       {
-       "head": "Fiber on a riser",
-       "text": "Fiber cable along one riser"
+       "head": "Fiber on the pipe",
+       "text": "Fiber cable along the sprinkler main (Pipe219763)"
       },
       {
        "head": "Temperature",
@@ -190,15 +190,15 @@
       },
       {
        "head": "Map to BIM",
-       "text": "Map cable distance to BIM pipe element IDs"
+       "text": "Map cable distance to BIM pipe segments"
       },
       {
        "head": "Show in twin",
        "text": "Show temperature on the pipe in the twin viewer"
       },
       {
-       "head": "Validate",
-       "text": "Validate with a controlled warm-water release"
+       "head": "Test",
+       "text": "Apply a contained, controlled thermal test and check the result"
       }
      ]
     },
@@ -208,13 +208,13 @@
      "y": 2.95,
      "w": 4.35,
      "h": 1.45,
-     "head": "Why it matters",
+     "head": "Success criterion",
      "head_size": 13,
      "size": 11,
      "items": [
-      "Joins Soga lab sensing with this project's BIM link",
-      "Tests the full chain: sensor → BIM element → viewer",
-      "No building-MEP deployment by the lab found: a publishable gap"
+      "The test temperature change is detected and located on the correct BIM segment",
+      "A wetness sensor below checks for water",
+      "Tests the full chain: sensor → BIM element → viewer"
      ]
     },
     {
@@ -223,19 +223,19 @@
      "y": 2.95,
      "w": 4.35,
      "h": 1.45,
-     "head": "Needs",
+     "head": "Needs (to confirm)",
      "head_size": 13,
      "size": 11,
      "items": [
-      "Facilities approval",
-      "A riser with access",
+      "Facilities approval and pipe access",
+      "A safe, contained way to apply the test change",
       "DTS analyzer loan",
-      "BAS supply/return temperatures to compare"
+      "Reference temperatures (BAS or handheld probe)"
      ]
     }
    ],
-   "notes": "The pilot is small. Run a fiber cable along one riser. The analyzer gives a temperature about every meter along the cable. We map each cable distance to a BIM pipe element ID, so the temperature shows on that pipe in the twin viewer. We then validate with a controlled warm-water release. It matters because it joins the Soga lab's sensing with this project's BIM link, it tests the whole chain from sensor to BIM element to viewer, and since we found no building MEP deployment by the lab, it is publishable. We need Facilities approval, a riser we can access, a loan of a DTS analyzer, and the building automation supply and return temperatures to compare against.",
-   "takeaway": "Small and low-risk: one riser, one cable, one controlled test."
+   "notes": "This is the first test, on the same location as test install one: the sprinkler main, Pipe219763. Run a fiber cable along it. The analyzer gives a temperature about every meter along the cable. We map each cable distance to a BIM pipe segment, so the temperature shows on that pipe in the twin viewer. Then we apply a contained, controlled thermal test, with the method agreed with Facilities. The success criterion is concrete: the test temperature change is detected and located on the correct BIM segment, and a wetness sensor below checks for water. It also tests the whole chain from sensor to BIM element to viewer. We need Facilities approval, access to the pipe, a safe way to apply the test change, a loan of a DTS analyzer, and reference temperatures to compare against.",
+   "takeaway": "One pipe, one cable, one contained test, with a stated pass criterion."
   },
   {
    "id": "twin-concept",
