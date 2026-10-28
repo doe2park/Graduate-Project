@@ -422,7 +422,7 @@ body[data-pane="bim"] #twinPanel{top:calc(8px + var(--tb-h) + 6px)}
   <div class="hint">Calibration auto-loads from <b>data/cupix_calib.json</b> (same registration grimes-xr uses: yaw −135°, swap+flip, camMat). Local tweaks persist in this browser.</div>
 </div>
 
-<div id="scanQuickActions"><button id="scanObjects" type="button">Objects</button><button type="button" onclick="document.getElementById('layersBtn').click()">Layers</button><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate" aria-label="Walk or look around the BIM" title="Walk or look around the BIM">Walk</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><details id="interiorTools" aria-label="View settings"><summary>View settings</summary><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ.</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></details><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script src="twin/overlay-visibility.js"></script>
+<div id="scanQuickActions"><button id="scanObjects" type="button">Objects</button><button type="button" onclick="document.getElementById('layersBtn').click()">Layers</button><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate" aria-label="Walk or look around the BIM" title="Walk or look around the BIM">Walk</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><details id="interiorTools" aria-label="View settings"><summary>View settings</summary><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ. Source design geometry, not surveyed as-built; the interior follows the element floor (Levels 1–3, one floor at a time).</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></details><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script src="twin/overlay-visibility.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -1594,7 +1594,7 @@ document.addEventListener('keydown', e => {
 /* Type filter — chips = the type taxonomy of every VISIBLE layer, ordered by
    count. A chip hides everything else across layers. */
 let equipLevelFilter = null;
-window.setElementFloor = value => { equipLevelFilter = value || null; applyEquipFilter(); buildEquipFilter(); };
+window.setElementFloor = value => { equipLevelFilter = value || null; applyEquipFilter(); buildEquipFilter(); syncInteriorFloor(equipLevelFilter); };
 let equipTypeFilter = null;   // null = all
 const layerOn = m => { const st = layerState[m.userData.layer]; return st && st.group && st.group.visible; };
 raycaster.params.Line = { threshold: 0.15 };   // 2D-symbol elements are pickable within 15 cm
@@ -2562,10 +2562,42 @@ function refreshScanLayerStatus(){const entries=Object.entries(LAYERS),loaded=en
 document.getElementById('loadAllScanLayers').onclick=()=>toggleAllElements();
 // Begin the existing sequential loader after initialization. No user click required.
 // Interior design context uses the same established BIM frame, never the scan transform.
-// Original dbIds and Draco payloads are retained in the Level 1 subsets.
-const interiorState={ready:false,loading:false,mode:'room',groups:{},stats:{drawCalls:0,sourceTriangles:0,renderTriangles:0},error:null};
+// Original dbIds and Draco payloads are retained in the per-floor subsets (scripts/prepare_interior_levels.py).
+/* Per-floor interior (2026-10-27): one floor's groups are in memory at a time. Level 1 = the legacy manifest fields
+   (groups / sliceY), so every Level 1 view loads exactly what it did before; Level 2 / Level 3 come from manifest.levels
+   and load only when the element floor changes to them (Element floor menu, or scan-compare's grimes-floor message).
+   A floor switch bumps interiorState.run: an in-flight load notices after each await, frees what it built and stops. */
+const interiorState={ready:false,loading:false,mode:'room',groups:{},stats:{drawCalls:0,sourceTriangles:0,renderTriangles:0},error:null,level:'L1',loadedLevel:null,run:0,wanted:false};
+const INTERIOR_LEVELS={L1:'Level 1',L2:'Level 2',L3:'Level 3'},INTERIOR_HONESTY='source design geometry, not surveyed as-built';
+/* Level 1 (or a floor the manifest does not list) -> the legacy top-level fields */
+function interiorSpec(manifest,level){
+ const lv=manifest.levels?.[level];
+ if(level!=='L1'&&lv?.groups&&Array.isArray(lv.sliceY))return {level,label:lv.label||INTERIOR_LEVELS[level],sliceY:lv.sliceY,groups:lv.groups};
+ return {level:'L1',label:'Level 1',sliceY:manifest.sliceY,groups:manifest.groups};
+}
+function disposeInteriorObject(root){
+ root.traverse(o=>{o.geometry?.dispose();for(const m of [].concat(o.material||[]))m.dispose?.();});
+}
+function disposeInteriorGroups(){
+ for(const st of Object.values(interiorState.groups)){scene.remove(st.group);disposeInteriorObject(st.group);if(st.json)delete _jsonCache[st.json];}
+ interiorState.groups={};for(const k of Object.keys(interiorState.stats))interiorState.stats[k]=0;
+}
+/* the element floor drives the interior floor; All floors / other floors keep the current interior */
+function syncInteriorFloor(value){
+ if(Object.hasOwn(INTERIOR_LEVELS,value))setInteriorLevel(value);
+ if(typeof ovSyncOccluderLevel==='function')ovSyncOccluderLevel();
+}
+window.setInteriorLevel=level=>{
+ if(!Object.hasOwn(INTERIOR_LEVELS,level)||level===interiorState.level)return false;
+ interiorState.level=level;interiorState.run++;interiorState.loading=false;interiorState.ready=false;interiorState.error=null;interiorState.loadedLevel=null;
+ disposeInteriorGroups();
+ document.getElementById('interiorStatus').textContent=`Loading ${INTERIOR_LEVELS[level]} interior…`;
+ // Overlay hides the interior: it loads when the Overlay is turned off (setOverlay -> loadInterior), not now.
+ if(interiorState.wanted&&!overlayOn)loadInterior();
+ return true;
+};
 const interiorVisible={furniture:true,enclosure:true,floors:true,ceilings:true};
-window.interiorInspection=()=>({ready:interiorState.ready,loading:interiorState.loading,mode:interiorState.mode,error:interiorState.error,stats:{...interiorState.stats},groups:Object.fromEntries(Object.entries(interiorState.groups).map(([key,v])=>[key,{elements:v.elements,visible:v.group.visible,drawCalls:v.stats.drawCalls}]))});
+window.interiorInspection=()=>({ready:interiorState.ready,loading:interiorState.loading,mode:interiorState.mode,error:interiorState.error,level:interiorState.level,loadedLevel:interiorState.loadedLevel,stats:{...interiorState.stats},groups:Object.fromEntries(Object.entries(interiorState.groups).map(([key,v])=>[key,{elements:v.elements,visible:v.group.visible,drawCalls:v.stats.drawCalls}]))});
 function applyInteriorVisibility(){
  for(const [key,st]of Object.entries(interiorState.groups))st.group.visible=interiorVisible[key];
  for(const input of document.querySelectorAll('[data-interior]'))input.checked=interiorVisible[input.dataset.interior];
@@ -2598,21 +2630,26 @@ document.getElementById('electricalFocus').onclick=async()=>{
 };
 for(const input of document.querySelectorAll('[data-interior]'))input.onchange=()=>{interiorVisible[input.dataset.interior]=input.checked;interiorState.mode='custom';applyInteriorVisibility()};
 async function loadInterior(){
+ interiorState.wanted=true;
  if(interiorState.ready||interiorState.loading)return;
+ const run=++interiorState.run,level=interiorState.level,live=()=>run===interiorState.run;
  interiorState.loading=true;const status=document.getElementById('interiorStatus');
  try{
   const manifest=await cachedJson('interior/manifest.json');
+  if(!live())return;
+  const spec=interiorSpec(manifest,level);
   renderer.localClippingEnabled=true;
-  const clip=[new THREE.Plane(new THREE.Vector3(0,1,0),-manifest.sliceY[0]),new THREE.Plane(new THREE.Vector3(0,-1,0),manifest.sliceY[1])];
+  const clip=[new THREE.Plane(new THREE.Vector3(0,1,0),-spec.sliceY[0]),new THREE.Plane(new THREE.Vector3(0,-1,0),spec.sliceY[1])];
   for(const key of ['enclosure','floors','ceilings','furniture']){
-   const entry=manifest.groups[key];
+   const entry=spec.groups[key];
    if(interiorState.groups[key])continue;
-   status.textContent=`Loading Level 1 ${key}…`;
+   status.textContent=`Loading ${spec.label} ${key}…`;
    document.getElementById('bimLoadProgress').textContent=key==='furniture'?'Room visible · loading furniture…':`Loading ${key}…`;
    let gltf;
    try{
     const [metadata,loaded]=await Promise.all([cachedJson(entry.json),loader.loadAsync(entry.glb)]);
     gltf=loaded;const meta=metadata.elements;
+    if(!live())return;
     gltf.scene.rotation.y=Math.PI;gltf.scene.position.set(EQUIP_OFFSET.x,EQUIP_OFFSET.y,EQUIP_OFFSET.z);gltf.scene.updateMatrixWorld(true);
     bindElementSourceIds(gltf);
     const built=await buildElementRenderTier(THREE,gltf.scene,meta,'interior-'+key);
@@ -2626,16 +2663,19 @@ async function loadInterior(){
      if('metalness'in mesh.material){mesh.material.metalness=0;mesh.material.roughness=Math.max(.65,mesh.material.roughness);}
      group.add(mesh);
     }
-    scene.add(group);interiorState.groups[key]={group,stats:built.stats,elements:entry.elements,meta};
+    if(!live()){disposeInteriorObject(group);return;}   // floor changed while this group was being built
+    scene.add(group);interiorState.groups[key]={group,stats:built.stats,elements:entry.elements,meta,json:entry.json};
     for(const stat of Object.keys(interiorState.stats))interiorState.stats[stat]+=built.stats[stat]||0;
     applyInteriorVisibility();
    }finally{releaseElementSource(gltf)}
   }
-  interiorState.ready=true;
+  interiorState.ready=true;interiorState.loadedLevel=spec.level;
   document.getElementById('bimLoadProgress').textContent='';
-  status.textContent=`Level 1 · ${manifest.groups.furniture.elements.toLocaleString()} furniture / casework elements · Design context`;
- }catch(e){interiorState.error=String(e.message||e);document.getElementById('bimLoadProgress').textContent='Room incomplete · open Controls → Room view to retry';status.textContent='Interior load failed · click Room view to retry';document.getElementById('interiorRoom').onclick=()=>{setInteriorMode('room');loadInterior()};console.error('Interior load failed',e)}
- finally{interiorState.loading=false}
+  status.textContent=`${spec.label} · ${spec.groups.furniture.elements.toLocaleString()} furniture / casework elements · Design context`;
+  if(spec.level!=='L1')status.textContent+=` · ${INTERIOR_HONESTY}`;
+  status.title=`${spec.label} interior: ${INTERIOR_HONESTY}; floor = height slice ${spec.sliceY.join('–')} m`;
+ }catch(e){if(!live())return;interiorState.error=String(e.message||e);document.getElementById('bimLoadProgress').textContent='Room incomplete · open Controls → Room view to retry';status.textContent='Interior load failed · click Room view to retry';document.getElementById('interiorRoom').onclick=()=>{setInteriorMode('room');loadInterior()};console.error('Interior load failed',e)}
+ finally{if(live())interiorState.loading=false}
 }
 window.setAllElementContext=show=>{for(const key of Object.keys(interiorVisible))interiorVisible[key]=show;interiorState.mode='custom';applyInteriorVisibility();};
 // Keep full-building element layers available through Layers / Show all, not automatic.
@@ -2644,13 +2684,15 @@ window.setAllElementContext=show=>{for(const key of Object.keys(interiorVisible)
    and sets the iframe opacity, so alpha here is the full-strength BIM image. Architecture/furniture stay hidden. */
 /* ══════════ OVERLAY REALISTIC VISIBILITY (2026-10-20; twin/overlay-visibility.js) ══════════
    Distance fade (per fragment, Range preset from the parent: near / room / all) and wall occlusion from a depth-only
-   pre-pass of the Level 1 BIM Walls (interior/enclosure-l1.glb, Walls category only), in this pane's own BIM frame, so the
-   occluder is aligned with the services by construction for every capture. Active only while the Overlay is on.
-   Upper floors have no wall geometry here (Level 1 interior only): there the fade applies without occlusion. */
+   pre-pass of the element floor's BIM Walls (Level 1 / All floors: interior/enclosure-l1.glb (Walls) as before; Level 2 /
+   Level 3: enclosure-l2 / -l3 from interior/manifest.json levels, 2026-10-27), in this pane's own BIM frame, so the
+   occluder is aligned with the services by construction for every capture. Active only while the Overlay is on. One
+   floor's occluder at a time; other floors (Lower, Mezzanine, Level 4, Roof) have no walls here: fade only. */
 const OV=globalThis.OverlayVisibility;
 const OV_UNIFORMS={ovOn:{value:0},ovFade:{value:new THREE.Vector2(OV.FAR_NONE,OV.FAR_NONE*2)},ovOcc:{value:0},ovDepth:{value:null},ovRes:{value:new THREE.Vector2(1,1)},ovClip:{value:new THREE.Vector2(.05,2000)},ovOccK:{value:new THREE.Vector3(OV.OCCLUSION.marginM,OV.OCCLUSION.hidden,OV.OCCLUSION.lens)},ovLens:{value:new THREE.Vector4(0,0,0,0)}};
 let ovPreset=OV.preset(OV.DEFAULT_RANGE),ovLensCss={on:false,x:0,y:0,r:0},ovPatched=0;
-const ovOcc={state:'idle',mesh:null,scene:new THREE.Scene(),rt:null,triangles:0,elements:0,error:null};
+const ovOcc={state:'idle',mesh:null,scene:new THREE.Scene(),rt:null,triangles:0,elements:0,error:null,level:null,source:null,run:0};
+const OV_OCC_L1_SOURCE='interior/enclosure-l1.glb (Walls)';
 function ovPatchMaterial(material){
  if(!material||material.userData?.ovPatched)return;material.userData.ovPatched=true;ovPatched++;
  const prev=material.onBeforeCompile,prevKey=material.customProgramCacheKey.bind(material);
@@ -2661,13 +2703,31 @@ function ovSetRange(key){
  ovPreset=OV.preset(key);const u=OV.uniformValues(ovPreset);OV_UNIFORMS.ovFade.value.set(u.fade[0],u.fade[1]);
  if(overlayOn&&ovPreset.occlude)loadWallOccluder();lensPickCache.sig='';_kick();
 }
-/* walls exist for Level 1 only; on L2/L3 (multi-floor preview) the L1 walls would only add wrong occlusion */
-function ovOccluderFloorOk(){return !equipLevelFilter||equipLevelFilter==='L1';}
+/* walls of the element floor: All floors / Level 1 -> Level 1 walls (unchanged); Level 2 / 3 -> that floor's walls; others none */
+function ovOccluderLevel(){return !equipLevelFilter?'L1':Object.hasOwn(INTERIOR_LEVELS,equipLevelFilter)?equipLevelFilter:null;}
+function ovOccluderFloorOk(){const l=ovOccluderLevel();return !!l&&ovOcc.level===l;}
+function ovDropOccluder(){
+ ovOcc.run++;if(ovOcc.mesh){ovOcc.scene.remove(ovOcc.mesh);ovOcc.mesh.geometry.dispose();ovOcc.mesh.material.dispose();ovOcc.mesh=null;}
+ Object.assign(ovOcc,{state:'idle',triangles:0,elements:0,error:null,level:null,source:null});
+}
+/* element floor changed: swap the occluder to that floor's walls (now if the Overlay needs it, else on next use) */
+function ovSyncOccluderLevel(){
+ const want=ovOccluderLevel();if(ovOcc.level===want&&ovOcc.state!=='failed')return;
+ if(ovOcc.state==='idle'&&!ovOcc.level)return void(overlayOn&&ovPreset.occlude&&loadWallOccluder());
+ ovDropOccluder();lensPickCache.sig='';
+ if(overlayOn&&ovPreset.occlude)loadWallOccluder();
+}
 async function loadWallOccluder(){
- if(ovOcc.state!=='idle'&&ovOcc.state!=='failed')return;ovOcc.state='loading';ovOcc.error=null;let gltf=null;
+ const level=ovOccluderLevel();if(!level)return;
+ if(ovOcc.level===level&&ovOcc.state!=='idle'&&ovOcc.state!=='failed')return;
+ if(ovOcc.level&&ovOcc.level!==level)ovDropOccluder();
+ const run=++ovOcc.run;ovOcc.state='loading';ovOcc.error=null;ovOcc.level=level;let gltf=null;
  try{
-  const manifest=await cachedJson('interior/manifest.json'),entry=manifest.groups.enclosure;
+  const manifest=await cachedJson('interior/manifest.json'),spec=interiorSpec(manifest,level),entry=spec.groups.enclosure;
+  if(run!==ovOcc.run)return;
+  if(spec.level!==level)throw Error(`no ${level} walls in interior/manifest.json`);
   const [metadata,loaded]=await Promise.all([cachedJson(entry.json),loader.loadAsync(entry.glb)]);gltf=loaded;const meta=metadata.elements||{};
+  if(run!==ovOcc.run)return;   // element floor changed during the download
   gltf.scene.rotation.y=Math.PI;gltf.scene.position.set(EQUIP_OFFSET.x,EQUIP_OFFSET.y,EQUIP_OFFSET.z);gltf.scene.updateMatrixWorld(true);
   bindElementSourceIds(gltf);
   const parts=[],ids=new Set(),v=new THREE.Vector3();let total=0;
@@ -2683,8 +2743,8 @@ async function loadWallOccluder(){
   const material=new THREE.MeshBasicMaterial({colorWrite:false,side:THREE.DoubleSide});
   material.onBeforeCompile=shader=>OV.patchOccluderShader(shader);material.customProgramCacheKey=()=>'ov-occluder';
   ovOcc.mesh=new THREE.Mesh(geometry,material);ovOcc.mesh.name='overlay-wall-occluder';ovOcc.mesh.matrixAutoUpdate=false;ovOcc.scene.add(ovOcc.mesh);
-  ovOcc.triangles=total/9;ovOcc.elements=ids.size;ovOcc.state='ready';lensPickCache.sig='';_kick();
- }catch(e){ovOcc.state='failed';ovOcc.error=String(e?.message||e);console.warn('[overlay] wall occluder unavailable, distance fade only',e);}
+  ovOcc.triangles=total/9;ovOcc.elements=ids.size;ovOcc.source=level==='L1'?OV_OCC_L1_SOURCE:entry.glb+' (Walls)';ovOcc.state='ready';lensPickCache.sig='';_kick();
+ }catch(e){if(run!==ovOcc.run)return;ovOcc.state='failed';ovOcc.error=String(e?.message||e);console.warn('[overlay] wall occluder unavailable, distance fade only',e);}
  finally{releaseElementSource(gltf);}
 }
 const _ovSize=new THREE.Vector2();
@@ -2842,7 +2902,7 @@ window.overlayCullInspection=()=>{
  return o;
 };
 window.overlayVisibilityInspection=()=>({on:overlayOn,range:ovPreset.key,fade:[ovPreset.fadeStart,ovPreset.fadeEnd],occlude:ovPreset.occlude,patchedMaterials:ovPatched,
- occluder:{state:ovOcc.state,source:'interior/enclosure-l1.glb (Walls)',elements:ovOcc.elements,triangles:ovOcc.triangles,active:OV_UNIFORMS.ovOcc.value===1,floorOk:ovOccluderFloorOk(),error:ovOcc.error},lens:{...ovLensCss}});
+ occluder:{state:ovOcc.state,source:ovOcc.source||OV_OCC_L1_SOURCE,level:ovOcc.level,wantLevel:ovOccluderLevel(),elements:ovOcc.elements,triangles:ovOcc.triangles,active:OV_UNIFORMS.ovOcc.value===1,floorOk:ovOccluderFloorOk(),error:ovOcc.error},lens:{...ovLensCss}});
 /* Test-only measurement hook (tests/overlay-culling-bench.cjs). Does nothing until called: renders synchronously at a
    pose (wall pre-pass + scene), waits for the GPU with a 1-pixel readPixels and reports renderer.info for both passes. */
 window.overlayBench={

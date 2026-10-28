@@ -4,7 +4,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const photo=read('scan-photo.html'),compare=read('scan-compare.html'),bim=read('scan-bim.html');
 function photoFns(){const a=photo.match(/function chooseWalkNeighbor\([\s\S]*?\n}/)[0],b=photo.match(/function chooseStairNeighbor\([\s\S]*?\n}/)[0],c=photo.match(/function readNavLimits\([^\n]*/)[0];const ctx={};vm.createContext(ctx);vm.runInContext(a+b+c+';this.walk=chooseWalkNeighbor;this.stair=chooseStairNeighbor;this.limits=readNavLimits;',ctx);return ctx}
-function floorBlock(){const m=compare.match(/\/\* MULTI-FLOOR PREVIEW[\s\S]*?\*\/([\s\S]*?)\/\* END MULTI-FLOOR PREVIEW \*\//);assert.ok(m,'multi-floor block exists');const ctx={URLSearchParams};vm.createContext(ctx);vm.runInContext(m[1]+';this.sel=multiFloorSelection;this.floor=floorForHeight;this.path=FLOORS_MANIFEST;',ctx);return ctx}
+function floorBlock(){const m=compare.match(/\/\* MULTI-FLOOR PREVIEW[\s\S]*?\*\/([\s\S]*?)\/\* END MULTI-FLOOR PREVIEW \*\//);assert.ok(m,'multi-floor block exists');const ctx={URLSearchParams};vm.createContext(ctx);vm.runInContext(m[1]+';this.sel=multiFloorSelection;this.floor=floorForHeight;this.path=FLOORS_MANIFEST;this.per=FLOOR_MANIFESTS;this.local=localFloorSelection;',ctx);return ctx}
 const nodes=()=>[{position:[0,16.3,0],neighbors:[1,2],stairs:[2]},{position:[0,16.3,-4]},{position:[0,14.6,3.5],neighbors:[0,3],stairs:[0,3]},{position:[0,12.6,7]},{position:[0,7,-1],neighbors:[5]},{position:[0,7,-7]}];
 
 test('without stair flags or limits the original 5.5 m / 1.5 m rule is unchanged',()=>{const f=photoFns(),n=nodes();delete n[0].stairs;
@@ -42,3 +42,30 @@ test('local multi-floor package (if built) is labelled provisional, keeps Level 
  // reachability: from the default Level 1 station, every level is reachable through the graph
  const seen=new Set([m.stations.findIndex(s=>s.id===m.defaultStation)]),q=[...seen];while(q.length){const i=q.shift();for(const n of m.stations[i].neighbors)if(!seen.has(n)){seen.add(n);q.push(n)}}
  for(const l of ['L2','L3'])assert.ok([...seen].some(i=>m.stations[i].level===l),'reachable '+l)});
+test('one-floor preview (?floors=L2 / L3) is Oct 18 + localhost only and points into ignored capture-local',()=>{const c=floorBlock();
+ for(const f of ['L2','L3']){const s=c.sel('?capture=2026-10-18&floors='+f,'127.0.0.1',{date:'2026-10-18'});assert.equal(s.photo,c.per[f]);assert.equal(s.floors,f);assert.match(s.photo,/^capture-local\//);
+  assert.equal(c.sel('?capture=2026-10-18&floors='+f,'doe2park.github.io',{date:'2026-10-18'}),null);assert.equal(c.sel('?capture=2026-09-17&floors='+f,'localhost',{date:'2026-09-17'}),null)}
+ assert.equal(c.sel('?capture=2026-10-18&floors=L1','localhost',{date:'2026-10-18'}),null);assert.equal(c.sel('?capture=2026-10-18&floors=toString','localhost',{date:'2026-10-18'}),null);
+ assert.equal(c.sel('?capture=2026-10-18&floors=all','localhost',{date:'2026-10-18'}).floors,'all');
+ assert.match(compare,/id='floorsJump'/)});
+test('local per-floor packages (if built) hold one floor, symmetric edges, provisional labels',()=>{
+ for(const f of ['L2','L3']){const p=path.join(__dirname,'..','capture-local/grimes-'+f+'-2026-10-18-v2/panoramas/manifest.json');if(!fs.existsSync(p))continue;
+  const m=JSON.parse(fs.readFileSync(p,'utf8'));assert.equal(m.level,f);assert.equal(m.status,'local-preview');assert.match(m.alignment,/provisional, not surveyed/);assert.equal(m.exportedStations,m.stations.length);
+  assert.ok(m.stations.some(s=>s.id===m.defaultStation));assert.notEqual(m.stations.find(s=>s.id===m.defaultStation).level,'stairs');
+  for(const [i,s] of m.stations.entries()){assert.equal(s.packageFloor,f);assert.ok([f,'stairs'].includes(s.level));for(const n of s.neighbors)assert.ok(m.stations[n].neighbors.includes(i),'symmetric '+i+'-'+n)}
+  const reg=JSON.parse(fs.readFileSync(path.join(path.dirname(p),'..','registration.json'),'utf8'));assert.equal(reg.status,'candidate-not-surveyed')}});
+test('Cupix-free local captures (?capture=<unpublished date>&floors=L1|L2|L3) are localhost-only and point into capture-local',()=>{const c=floorBlock(),pub=['2026-10-18','2026-09-17','2026-05-06'];
+ const s=c.local('?capture=2026-10-28&floors=L2','localhost',pub);assert.equal(s.photo,'capture-local/grimes-L2-2026-10-28/panoramas/manifest.json');assert.equal(s.registration,'capture-local/grimes-L2-2026-10-28/registration.json');assert.equal(s.date,'2026-10-28');
+ assert.equal(c.local('?capture=2026-10-18-nocupix&floors=L3','127.0.0.1',pub).photo,'capture-local/grimes-L3-2026-10-18-nocupix/panoramas/manifest.json');
+ assert.equal(c.local('?capture=2026-10-28&floors=L2','doe2park.github.io',pub),null);
+ assert.equal(c.local('?capture=2026-10-18&floors=L2','localhost',pub),null,'published dates keep their own preview');
+ assert.equal(c.local('?capture=2026-10-28&floors=all','localhost',pub),null);
+ for(const bad of ['../x','2026-10-28/../../etc','2026-10-28-UPPER','2026-1-28'])assert.equal(c.local('?capture='+encodeURIComponent(bad)+'&floors=L2','localhost',pub),null,bad);
+ assert.match(compare,/localFloorSelection\(location\.search,location\.hostname,Object\.keys\(CAPTURE_SHORT\)\)/)});
+test('local Cupix-free packages (if built) carry an identity registration the viewer accepts and stay labelled provisional',()=>{
+ const dir=path.join(__dirname,'..','capture-local');if(!fs.existsSync(dir))return;
+ for(const d of fs.readdirSync(dir).filter(n=>/^grimes-L[123]-\d{4}-\d{2}-\d{2}-nocupix$/.test(n)||/^grimes-L[123]-2026-10-28/.test(n))){
+  const reg=JSON.parse(fs.readFileSync(path.join(dir,d,'registration.json'),'utf8')),m=JSON.parse(fs.readFileSync(path.join(dir,d,'panoramas/manifest.json'),'utf8'));
+  assert.equal(reg.status,'project-frame-provisional');assert.equal(reg.rotationYDegrees,0);assert.deepEqual(reg.translation,[0,0,0]);assert.match(reg.label,/provisional, not surveyed/);
+  assert.equal(m.status,'local-preview');assert.equal(m.exportedStations,m.stations.length);assert.ok(m.stations.some(s=>s.id===m.defaultStation));
+  for(const [i,s] of m.stations.entries()){assert.deepEqual(s.position,s.positionBIM);for(const n of s.neighbors)assert.ok(m.stations[n].neighbors.includes(i),d+' symmetric '+i+'-'+n)}}});
