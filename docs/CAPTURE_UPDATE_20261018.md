@@ -1,4 +1,4 @@
-# October 18 Grimes Level 1 capture (prepared 2026-10-19, not yet published)
+# October 18 Grimes Level 1 capture (prepared 2026-10-19, photos published 2026-10-28)
 
 Third capture date in `scan-compare.html` and `scan-xr.html`, after May 6 (registered baseline) and Sep 17. Package:
 `scan-assets/captures/2026-10-18/` (109 MB, 203 files: 100 blurred 4096 x 2048 panoramas, 100 mobile 2048 x 1024
@@ -21,6 +21,11 @@ below -50 degrees). Report totals: 1 face, 444 raw person detections (about 130 
 detection, 0 images flagged, blurred pixel fraction 19.4-23.9 %. Published files are the blurred copies; their
 sha256 is `sha256`, the original E57 image hash is `originalSha256`. Automatic detection can miss people; the
 contact sheets and report must be reviewed by a person before publishing (manualReviewRequired).
+
+**Published 2026-10-28.** A person reviewed contact sheets covering all 100 blurred panoramas and the owner approved
+publishing (automatic blur + manual contact-sheet review; `provenance.json` `privacy.manualReview`). The published
+full-resolution files are byte-identical to the reviewed blurred set. Not a claim of full anonymisation. The Oct 18
+Gaussian zones stay local: off localhost `scan-compare.html` shows "no Gaussian for this capture" for Oct 18.
 
 ## Route and coordinates
 

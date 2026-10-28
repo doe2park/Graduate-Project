@@ -86,6 +86,7 @@ class Oct18Package(unittest.TestCase):
         self.assertEqual(len(p['rawFiles'][0]['sha256']), 64)
         pr = p['privacy']
         self.assertTrue(pr['manualReviewRequired']); self.assertEqual(len(pr['reportSha256']), 64)
+        self.assertEqual(pr['manualReview']['status'], 'done'); self.assertEqual(pr['manualReview']['publishApproved'], '2026-10-28')
         self.assertEqual(pr['params']['alwaysBlurNadirDeg'], 35.0); self.assertEqual(pr['params']['faceScore'], 0.85)
         self.assertIsNone(p['mesh'])
         self.assertFalse(list(self.base.rglob('*.glb')), 'mesh view is retired; no GLB in the package')

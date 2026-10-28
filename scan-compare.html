@@ -106,6 +106,11 @@ function captureSelection(search){
  const date=CAPTURE_DATES.includes(asked)?asked:wantsSplat?'2026-05-06':'2026-09-17',old=date==='2026-05-06',g=CAPTURE_GAUSSIAN[date]||null;
  return {date,provisional:!old,gaussian:g?{kind:g.kind,path:g.path}:null,display:wantsSplat&&g?'splat':'photo',splatRefused:wantsSplat&&!g,photo:old?'scan-assets/panoramas/manifest.json':'scan-assets/captures/'+date+'/panoramas/manifest.json',registration:old?'alignment-analysis/accepted-registration.json':'scan-assets/captures/'+date+'/registration.json',mesh:'scan-bim.html?pane=scan&capture='+date+'&revision=walk-cameras2'};
 }
+/* Gaussian scenes kept on the owner's machine only (2026-10-28: Oct 18 zones are not published; zone B shows seated people).
+ Off localhost the capture is reported as having no Gaussian (option disabled, ?mode=splat falls back to photos with a note)
+ instead of requesting an index that 404s. Localhost keeps the local zones. */
+const LOCAL_ONLY_GAUSSIAN=['2026-10-18'];
+function captureForHost(c,host){if(!c.gaussian||!LOCAL_ONLY_GAUSSIAN.includes(c.date)||['localhost','127.0.0.1'].includes(host))return c;return {...c,gaussian:null,display:'photo',splatRefused:c.display==='splat'||c.splatRefused,gaussianLocalOnly:true};}
 function gaussianOptionLabel(c){if(!c.gaussian)return 'Gaussian · no Gaussian for this capture';return 'Gaussian · '+CAPTURE_SHORT[c.date]+(c.gaussian.kind==='zones'?' zones':'')+' (experimental)';}
 /* zones/index.json -> trained zones and an honest note; throws on anything the splat viewer would refuse */
 function gaussianZoneSummary(index){
@@ -129,7 +134,7 @@ function floorForHeight(y){return !Number.isFinite(y)?null:y>=14.3+.5?'L3':y>=9.
    opens capture-local/grimes-<floor>-<date>/: stations already in the BIM viewer frame, identity registration.json. */
 function localFloorSelection(search,host,published){const q=new URLSearchParams(search),d=q.get('capture'),f=q.get('floors');if(!['localhost','127.0.0.1'].includes(host)||!d||(published||[]).includes(d)||!/^\d{4}-\d{2}-\d{2}(-[a-z0-9]{1,24})?$/.test(d)||!['L1','L2','L3'].includes(f))return null;const dir='capture-local/grimes-'+f+'-'+d+'/';return {date:d,floors:f,photo:dir+'panoramas/manifest.json',registration:dir+'registration.json',local:true};}
 /* END MULTI-FLOOR PREVIEW */
-const capture=captureSelection(location.search),capturePicker=document.getElementById('captureDate');capturePicker.value=capture.date;
+const capture=captureForHost(captureSelection(location.search),location.hostname),capturePicker=document.getElementById('captureDate');capturePicker.value=capture.date;
 const localCapture=localFloorSelection(location.search,location.hostname,Object.keys(CAPTURE_SHORT));
 if(localCapture){Object.assign(capture,{date:localCapture.date,provisional:true,gaussian:null,display:'photo',splatRefused:false,registration:localCapture.registration});capturePicker.add(new Option(localCapture.date+' (local)',localCapture.date));capturePicker.value=localCapture.date;}
 const floorsPreview=multiFloorSelection(location.search,location.hostname,capture)||(localCapture&&{photo:localCapture.photo,floors:localCapture.floors,local:true});if(floorsPreview)capture.photo=floorsPreview.photo;
@@ -291,7 +296,7 @@ let gaussianSource=capture.gaussian,gaussianPreview=false,gaussianNote='',gaussi
 // A local run can be previewed with ?manifest=work/gaussian/...; the override is honoured on localhost only and labelled.
 {const o=['localhost','127.0.0.1'].includes(location.hostname)?new URLSearchParams(location.search).get('manifest'):null;if(o&&/^[\w.\/-]+\.json$/.test(o)&&!o.includes('..')){gaussianSource={kind:'manifest',path:o};gaussianPreview=true;}}
 const splatOption=mode.querySelector('[value=splat]');splatOption.textContent=gaussianOptionLabel({...capture,gaussian:gaussianSource});
-if(!gaussianSource)splatOption.title='No Gaussian for this capture';
+if(!gaussianSource)splatOption.title=capture.gaussianLocalOnly?'No Gaussian published for this capture':'No Gaussian for this capture';
 function scanNoteText(){
  if(gaussianFailed)return 'Gaussian unavailable \u00b7 showing 360\u00b0 photos';
  if(capture.splatRefused)return 'No Gaussian for '+CAPTURE_SHORT[capture.date]+' \u00b7 showing 360\u00b0 photos';

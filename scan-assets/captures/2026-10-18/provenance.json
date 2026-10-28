@@ -1,0 +1,166 @@
+{
+  "captureDate": "2026-10-18",
+  "exportOptions": {
+    "e57": "With Pano",
+    "useCoordinatesFromSourceData": false
+  },
+  "observations": "100 exported images from VID_20261018_141325_00_474. Not a claim of complete capture inventory. Selected as Level 1 in Cupix.",
+  "rawFiles": [
+    {
+      "name": "Point cloud test_Level 1_pointcloud_Oct 18, 2026.e57",
+      "bytes": 154780672,
+      "sha256": "b8faf124948470ff0101ee7a9b4ecc3bb92824e11769cc7f9d3d8caba2394de1",
+      "role": "E57 with 100 spherical images and poses (source of this package)"
+    },
+    {
+      "name": "Point cloud test_Level 1_pointcloud_Oct 18, 2026 (1).e57",
+      "bytes": 54235136,
+      "sha256": "510cb34e84c55776911011c08a3f543894e42c1072243449ea9623e84e0612fe",
+      "role": "companion export; not published"
+    },
+    {
+      "name": "Point cloud test_Level 1_pointcloud_Oct 18, 2026 (2).e57",
+      "bytes": 30443520,
+      "sha256": "693b2bfa456bc5635968bf9a7f4305018fb0b6ff18800c50ae8f2424cf1484f2",
+      "role": "companion export; not published"
+    },
+    {
+      "name": "Point cloud test_Level 1_mesh_Oct 18, 2026.glb",
+      "bytes": 102140908,
+      "sha256": "0eb0c482631e7efffded121ba77aebe757b830126fe3f63f839faa2cb39d32b0",
+      "role": "companion export; not published"
+    }
+  ],
+  "privacy": {
+    "tool": "scripts/raw360_pipeline.py privacy (scripts/raw360_privacy.py)",
+    "reportSchema": "raw360-privacy/1",
+    "reportSha256": "7431ad00942057aad63c1c1e1ea4e75b4e1287fe7322d384eaa4633946ca5be4",
+    "reportLocation": "local only (capture-local/), not published",
+    "params": {
+      "faceScore": 0.85,
+      "personScore": 0.4,
+      "crop": 1024,
+      "views": [
+        [
+          "h000",
+          0,
+          0.0,
+          100.0
+        ],
+        [
+          "h060",
+          60,
+          0.0,
+          100.0
+        ],
+        [
+          "h120",
+          120,
+          0.0,
+          100.0
+        ],
+        [
+          "h180",
+          180,
+          0.0,
+          100.0
+        ],
+        [
+          "h240",
+          240,
+          0.0,
+          100.0
+        ],
+        [
+          "h300",
+          300,
+          0.0,
+          100.0
+        ],
+        [
+          "up",
+          0.0,
+          90.0,
+          110.0
+        ],
+        [
+          "down",
+          0.0,
+          -90.0,
+          120.0
+        ],
+        [
+          "low000",
+          0,
+          -50.0,
+          100.0
+        ],
+        [
+          "low120",
+          120,
+          -50.0,
+          100.0
+        ],
+        [
+          "low240",
+          240,
+          -50.0,
+          100.0
+        ]
+      ],
+      "faceMargin": 0.5,
+      "personMargin": 0.15,
+      "nadirFlagDeg": 50.0,
+      "alwaysBlurNadirDeg": 35.0
+    },
+    "maxFaceAngularSizeDeg": 25.0,
+    "models": {
+      "face": {
+        "file": "face_detection_yunet_2023mar.onnx",
+        "bytes": 232589,
+        "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+      },
+      "person": {
+        "file": "object_detection_yolox_2022nov.onnx",
+        "bytes": 35858002,
+        "sha256": "c5c2d13e59ae883e6af3b45daea64af4833a4951c92d116ec270d9ddbe998063"
+      }
+    },
+    "totals": {
+      "rawFaceDetections": 1,
+      "rawPersonDetections": 444,
+      "uniqueFacesApprox": 1,
+      "uniquePersonsApprox": 130,
+      "imagesWithAnyDetection": 100,
+      "imagesFlaggedForManualReview": 0
+    },
+    "flaggedImages": [],
+    "manualReviewRequired": true,
+    "note": "Cupix exports already blur bystander faces; this step adds automatic person/face blur and a fixed nadir cone for the camera operator. Detection can miss people; not a claim of complete anonymisation.",
+    "manualReview": {
+      "status": "done",
+      "method": "automatic blur + manual contact-sheet review: a person inspected contact sheets covering all 100 blurred panoramas (review files local only, capture-local/, not published)",
+      "publishedFilesVerified": "published panoramas are byte-identical to the reviewed blurred set (file map checked pixel-for-pixel)",
+      "publishApproved": "2026-10-28",
+      "approvedBy": "owner",
+      "scope": "Detection and review can miss people; not a claim of full anonymisation."
+    }
+  },
+  "derivatives": "panoramas/mobile: 2048x1024 LANCZOS, JPEG quality 88, made from the blurred image",
+  "mesh": null,
+  "routeEdges": 97,
+  "routeGaps": [
+    {
+      "from": 87,
+      "to": 88,
+      "metres": 11.511106733670779,
+      "heightDifference": 0.8002041531000508
+    },
+    {
+      "from": 98,
+      "to": 99,
+      "metres": 5.510708121187451,
+      "heightDifference": 0.008204221728336236
+    }
+  ]
+}

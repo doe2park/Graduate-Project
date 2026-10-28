@@ -1,10 +1,12 @@
-/* Public-site smoke: what a visitor to GitHub Pages gets, without the captures still under privacy review.
+/* Public-site smoke: what a visitor to GitHub Pages gets. Oct 18 Level 1 photos are published (2026-10-28, after manual
+   contact-sheet review); its Gaussian zones and the upper-floor previews stay local-only.
    Run against the live site or a clean export of HEAD (git archive HEAD | tar -x) served under /Graduate-Project/:
      PLAYWRIGHT_MODULE=/path/to/playwright-core VIEWER_BASE_URL=https://doe2park.github.io/Graduate-Project node tests/public-site-smoke.cjs
    A local export needs a non-localhost host name (localhost-only previews would otherwise switch on), e.g.
      HOST_RULES='MAP pages.emu 127.0.0.1' VIEWER_BASE_URL=http://pages.emu:8811/Graduate-Project
-   Checks: only published captures are listed/cycled (no Oct 18), stale Oct 18 / floors=all links fall back with a note,
-   Overlay + Lens card + Range (Near/Room/All, distance culling) on May 6 and Sep 17 photos and the May 6 Gaussian,
+   Checks: the three published captures are listed/cycled, Oct 18 Gaussian / floors=all links stay on Oct 18 photos with no
+   local preview (Gaussian option reads "no Gaussian for this capture"), Overlay + Lens card + Range (Near/Room/All,
+   distance culling) on May 6, Sep 17 and Oct 18 photos and the May 6 Gaussian,
    BIM pose follows the scan, /vr/ opens scan-xr.html in desktop mode, campus dashboard loads (water panel hidden until
    the collector publishes water.usage). Real published meter data (no fixtures). Screenshots: VALIDATION_OUTPUT
    (default work/web-matrix/public). Headless desktop only: no frame-rate, phone or Quest claim. */
@@ -12,7 +14,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const ROOT=path.join(__dirname,'..'),OUT=process.env.VALIDATION_OUTPUT||path.join(ROOT,'work','web-matrix','public');
 const BASE=(process.env.VIEWER_BASE_URL||'https://doe2park.github.io/Graduate-Project').replace(/\/$/,'');
-const PUBLIC=['2026-09-17','2026-05-06'],SERVICE=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety'];
+const PUBLIC=['2026-10-18','2026-09-17','2026-05-06'],SERVICE=['equipment','lighting','conduit','duct','hydronic','plumbing','lifesafety'];
 fs.mkdirSync(OUT,{recursive:true});
 const report={base:BASE,started:new Date().toISOString(),checks:{}};
 (async()=>{
@@ -63,25 +65,27 @@ const report={base:BASE,started:new Date().toISOString(),checks:{}};
   /* 2-4. Overlay on the public captures and the May Gaussian */
   await overlay('may-photo-overlay','scan-compare.html?capture=2026-05-06&view=overlay','photo');
   await overlay('sep-photo-overlay','scan-compare.html?capture=2026-09-17&view=overlay','photo');
+  await overlay('oct-photo-overlay','scan-compare.html?capture=2026-10-18&view=overlay','photo');
   await overlay('may-gaussian-overlay','scan-compare.html?capture=2026-05-06&mode=splat&view=overlay','splat');
-  /* 5. stale links to the unpublished capture fall back with a note */
-  for(const [tag,url,date] of [['oct18-link','scan-compare.html?capture=2026-10-18&view=overlay','2026-09-17'],['oct18-floors-link','scan-compare.html?capture=2026-10-18&floors=all','2026-09-17'],['oct18-gaussian-link','scan-compare.html?capture=2026-10-18&mode=splat','2026-05-06']]){
-   const p=await open(url);await p.waitForFunction(d=>typeof capture!=='undefined'&&capture.date===d&&document.getElementById('captureMissingNote'),date,{timeout:60000});
-   const r=await p.evaluate(()=>({href:location.href,date:capture.date,note:document.getElementById('captureMissingNote').textContent,floors:!!document.getElementById('floorsToggle')}));
-   assert.match(r.note,/Oct 18 capture not published/);assert.equal(r.floors,false);assert.doesNotMatch(r.href,/capture=2026-10-18|floors=|missing=/);
-   report.checks[tag]=r;console.log(tag,JSON.stringify(r));await p.close();}
+  /* 5. Oct 18 is published as photos only: Gaussian and multi-floor links stay on its photos, nothing local switches on */
+  for(const [tag,url] of [['oct18-gaussian-link','scan-compare.html?capture=2026-10-18&mode=splat'],['oct18-floors-link','scan-compare.html?capture=2026-10-18&floors=all']]){
+   const p=await open(url);await ready(p,'photo',false);
+   const r=await p.evaluate(()=>({date:capture.date,photo:capture.photo,gaussian:capture.gaussian,label:document.querySelector('#scanMode [value=splat]').textContent,disabled:document.querySelector('#scanMode [value=splat]').disabled,note:document.getElementById('captureMissingNote')?.textContent||null,floors:!!document.getElementById('floorsToggle')}));
+   assert.equal(r.date,'2026-10-18');assert.equal(r.photo,'scan-assets/captures/2026-10-18/panoramas/manifest.json');assert.equal(r.gaussian,null);assert.equal(r.label,'Gaussian · no Gaussian for this capture');assert.equal(r.disabled,true);assert.equal(r.note,null);assert.equal(r.floors,false);
+   r.errors=pageErrors(p);assert.deepEqual(r.errors,[]);report.checks[tag]=r;console.log(tag,JSON.stringify(r));await p.close();}
   /* 6. VR page through the short /vr/ URL, desktop mode */
   {const p=await open('vr/');await p.waitForFunction(()=>window.xrInspection?.().ready,null,{timeout:120000});
    await p.waitForFunction(()=>{const l=Object.values(xrInspection().layers);return l.length>=7&&l.every(x=>x.loaded||x.error);},null,{timeout:300000,polling:500});
    const i=await p.evaluate(()=>xrInspection()),r={href:p.url(),capture:i.capture.date,available:i.availableCaptures,options:await p.evaluate(()=>[...document.querySelectorAll('#capture option')].map(o=>o.value)),note:await p.locator('#xrNote').textContent(),layerErrors:Object.entries(i.layers).filter(([,l])=>l.error).map(([k])=>k)};
-   assert.match(r.href,/scan-xr\.html/);assert.equal(r.capture,'2026-05-06');assert.deepEqual(r.available,['2026-05-06','2026-09-17']);assert.deepEqual(r.options,['2026-05-06','2026-09-17']);assert.deepEqual(r.layerErrors,[]);
+   assert.match(r.href,/scan-xr\.html/);assert.equal(r.capture,'2026-05-06');assert.deepEqual(r.available,['2026-05-06','2026-09-17','2026-10-18']);assert.deepEqual(r.options,['2026-05-06','2026-09-17','2026-10-18']);assert.deepEqual(r.layerErrors,[]);
    await p.screenshot({path:path.join(OUT,'vr-desktop-may.png')});
    await p.evaluate(()=>xrDebug.menuAction(5));await p.waitForFunction(()=>xrInspection().capture.date==='2026-09-17'&&xrInspection().ready,null,{timeout:60000});
    await p.waitForTimeout(800);await p.screenshot({path:path.join(OUT,'vr-desktop-sep.png')});
+   await p.evaluate(()=>xrDebug.menuAction(5));await p.waitForFunction(()=>xrInspection().capture.date==='2026-10-18'&&xrInspection().ready,null,{timeout:60000});
    await p.evaluate(()=>xrDebug.menuAction(5));await p.waitForFunction(()=>xrInspection().capture.date==='2026-05-06'&&xrInspection().ready,null,{timeout:60000});
-   r.cycle='May -> Sep -> May';r.errors=pageErrors(p);assert.deepEqual(r.errors,[]);report.checks.vr=r;console.log('vr',JSON.stringify(r));await p.close();}
+   r.cycle='May -> Sep -> Oct -> May';r.errors=pageErrors(p);assert.deepEqual(r.errors,[]);report.checks.vr=r;console.log('vr',JSON.stringify(r));await p.close();}
   {const p=await open('scan-xr.html?capture=2026-10-18');await p.waitForFunction(()=>window.xrInspection?.().ready,null,{timeout:120000});
-   const r={capture:await p.evaluate(()=>xrInspection().capture.date),note:await p.locator('#xrNote').textContent()};assert.equal(r.capture,'2026-05-06');assert.match(r.note,/Oct 18, 2026 capture not published/);
+   const r={capture:await p.evaluate(()=>xrInspection().capture.date),note:await p.locator('#xrNote').textContent()};assert.equal(r.capture,'2026-10-18');assert.doesNotMatch(r.note,/not published/);
    r.errors=pageErrors(p);assert.deepEqual(r.errors,[]);report.checks['vr-oct18-link']=r;console.log('vr-oct18-link',JSON.stringify(r));await p.close();}
   {const p=await open('scan-xr.html?scene=gaussian');await p.waitForFunction(()=>{const i=window.xrInspection?.();return i&&i.ready&&(i.scene.splatVisible||i.scene.error);},null,{timeout:240000,polling:250});
    const i=await p.evaluate(()=>xrInspection()),r={mode:i.scene.mode,file:i.scene.file,splats:i.scene.splats,error:i.scene.error};assert.equal(r.error,null);assert.equal(r.mode,'gaussian');
