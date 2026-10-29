@@ -16,7 +16,7 @@
    "org": "UNIVERSITY OF CALIFORNIA, BERKELEY",
    "dept": "Civil & Environmental Engineering",
    "presenter": "Yoonsung",
-   "notes": "This is a short update and discussion about data for the Grimes digital twin. First, this week's updates and what we need: campus energy data, the facilities follow-up and the Quest 3 test. Then the building data Grimes already has, a real case from an open ceiling, five small test installs and a first pilot. Background on data feeds and how the sensors work is in the appendix."
+   "notes": "This is a short update and discussion in two parts; the tag above each title shows the part. First the campus energy dashboard: the data source and what the class needs. Then the Grimes twin: the facilities follow-up, the Quest 3 test, the building data Grimes already has, a real case from an open ceiling, five small test installs and a first test. I close with what we need. Background on data feeds and how the sensors work is in the appendix."
   },
   {
    "id": "bms",
@@ -31,12 +31,12 @@
      "y": 1.25,
      "w": 4.35,
      "h": 2.45,
-     "head": "Meters: BMO → SkySpark",
+     "head": "Meters: BMO today",
      "head_size": 20,
      "size": 16,
      "items": [
       "Electricity, water, steam every 15 min",
-      "BMO outdated; Facilities recommends SkySpark"
+      "SkySpark suggested, not decided"
      ],
      "tag": "Utility meters"
     },
@@ -64,10 +64,10 @@
      "head": "What we need",
      "head_size": 13,
      "size": 11.5,
-     "text": "SkySpark meter data, then a read-only BAS trend export + point list"
+     "text": "SkySpark access if approved, then BAS trend export + point list"
     }
    ],
-   "notes": "The campus energy dashboard currently reads the Obvius meter loggers on Building Manager Online, BMO: whole-building electricity, water and steam every 15 minutes. On October 26 Facilities told us that BMO is no longer their source of truth: the platform is outdated and new meter points cannot be added. They recommend SkySpark, which they actively manage, and they are setting up an intake form so students can pull hourly data themselves. So the meter side of the dashboard will move to SkySpark; until then the BMO values are shown for reference. These are utility meters, not a building automation system. The campus standard for building automation is Automated Logic WebCTRL over BACnet, and new projects use it, so Grimes very likely has it, but we have not confirmed that. Grimes opened in April 2025, designed by SOM and Stantec, with a LEED Platinum target, a heat-recovery chiller and radiant panels. We have not confirmed the Grimes BAS vendor, and we did not find the campus controls standard, Division 25, publicly. If it exists it would add temperatures, airflow, CO2, valve positions and equipment status. Access needs a CalNet login, an operational need and a Facilities work order, which may be charged back. What we need: first SkySpark access for the meter data, then a read-only trend export, the point list and the sequences of operation, tagged to equipment so each point can link to a BIM element ID.",
+   "notes": "Next, the building data Grimes already has. The campus energy dashboard currently reads the Obvius meter loggers on Building Manager Online, BMO: whole-building electricity, water and steam every 15 minutes. On October 26 Facilities told us that BMO is no longer their source of truth: the platform is outdated and new meter points cannot be added. They suggested SkySpark, which they actively manage, as a possible source, and mentioned an intake form so students could pull hourly data themselves. Nothing is decided; until then the BMO values are shown for reference. These are utility meters, not a building automation system. The campus standard for building automation is Automated Logic WebCTRL over BACnet, and new projects use it, so Grimes very likely has it, but we have not confirmed that. Grimes opened in April 2025, designed by SOM and Stantec, with a LEED Platinum target, a heat-recovery chiller and radiant panels. We have not confirmed the Grimes BAS vendor, and we did not find the campus controls standard, Division 25, publicly. If it exists it would add temperatures, airflow, CO2, valve positions and equipment status. Access needs a CalNet login, an operational need and a Facilities work order, which may be charged back. What we need: first SkySpark access for the meter data, if approved, then a read-only trend export, the point list and the sequences of operation, tagged to equipment so each point can link to a BIM element ID.",
    "sub_size": 15
   },
   {
@@ -383,7 +383,7 @@
    "lines": [
     "Yoonsung"
    ],
-   "notes": "Thank you. The two most urgent questions: can we get SkySpark meter data before the November 16 presentations, and can we run the mixed-reality test in the Grimes foyer with the Quest 3 this week?"
+   "notes": "Thank you. The two most urgent questions: can we get a decision on SkySpark meter access before the November 16 presentations, and can we run the mixed-reality test in the Grimes foyer with the Quest 3 this week?"
   }
  ]
 }

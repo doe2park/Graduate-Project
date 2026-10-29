@@ -128,7 +128,7 @@ S4 = dict(
        what='Small monitor at the VAV box: controller supply and damper-actuator current.', val='24 VAC controller; actuator 0.6 A',
        maps='BIM VAV terminal unit (Price SDV5), element 396073', badge=(705, 380), hit=(705, 380, 26), draw=pin(2, 705, 380, '#087F8C')),
   dict(k=3, sid='power-bmo', col='#003262', title='Building-level context', row='Whole-building meter, shown for context only',
-       what='The whole-building meter reports every 15 minutes (BMO now; SkySpark requested). It is context only: this small trial is not expected to add up to it.', val='Building 212 kW (context only)',
+       what='The whole-building meter reports every 15 minutes (BMO now; SkySpark suggested, not decided). It is context only: this small trial is not expected to add up to it.', val='Building 212 kW (context only)',
        maps='Building meter channel (building-level)', badge=(700, 205), hit=(700, 205, 26), draw=pin(3, 700, 205, '#003262')),
  ],
  legend=None,

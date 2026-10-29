@@ -64,7 +64,7 @@ def build_twin(sc, U, x, y, h):
     return out, w
 
 def callouts(sc, U, x, y, h, chart_for):
-    """Callout layer over the image / live view (slides 9-13): one compact card per numbered sensor (title, SIMULATED tag,
+    """Callout layer over the image / live view (slides 8-12): one compact card per numbered sensor (title, SIMULATED tag,
     the simulated reading, a small chart when the registry or the demo feed has a matching series, charts.py). deck JS
     places the selected card BESIDE its marker or live pin with a leader line, clear of the other markers, the selected
     sensor's pipe / cable and the slide text (place.js). data-ob: badge [x, y, r] and drawn shapes per marker, base-image px."""

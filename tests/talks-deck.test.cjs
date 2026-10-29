@@ -145,10 +145,10 @@ test('live views: the viewer loads a scene\'s anchor layers first (deck speed-up
   assert.match(bim, /for\(const key of await ovLayerOrder\(\)\)/);
 });
 
-test('slide order (Oct 29 talk): 15 main slides without section dividers, then one appendix divider and the backup slides', () => {
+test('slide order (Oct 29 talk): 15 main slides in two tagged parts without section dividers, then one appendix divider and the backup slides', () => {
   const ids = [...html.matchAll(/<section class="slide" id="([^"]+)">/g)].map(m => m[1]);
-  assert.deepEqual(ids, ['cover', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'bms', 'open-ceiling', 'test-installs',
-    'twin-concept', 'twin-hvac', 'twin-water', 'twin-power', 'twin-fan', 'pilot', 'thanks',
+  assert.deepEqual(ids, ['cover', 'week-energy', 'week-facilities', 'week-quest', 'bms', 'open-ceiling', 'test-installs',
+    'twin-concept', 'twin-hvac', 'twin-water', 'twin-power', 'twin-fan', 'pilot', 'week-asks', 'thanks',
     'part-A', 'ready', 'sensing', 'fiber', 'ce278', 'mems', 'wsn']);
   const notes = JSON.parse(html.match(/const NOTES=(\[.*?\]);\n/s)[1]);
   assert.equal(notes.length, ids.length, 'one notes entry per slide');
@@ -156,4 +156,16 @@ test('slide order (Oct 29 talk): 15 main slides without section dividers, then o
   /* the follow-up email has not been sent: it goes out after the meeting; no "team / combined follow-up" wording */
   assert.ok(html.includes('Follow-up email with the final request list goes out after today’s meeting'));
   assert.ok(!/combined follow-up|each member|existing email threads/i.test(html));
+  /* parts are header tags, not slides: Dashboard = the energy slide, Grimes = facilities … pilot */
+  const sec = Object.fromEntries([...html.matchAll(/<section class="slide" id="([^"]+)">([\s\S]*?)<\/section>/g)].map(m => [m[1], m[2]]));
+  const tag = id => (sec[id].match(/>(DASHBOARD|GRIMES) · /) || [])[1] || null;
+  assert.equal(tag('week-energy'), 'DASHBOARD');
+  for (const id of ids.slice(2, 13)) assert.equal(tag(id), 'GRIMES', 'Grimes tag on ' + id);
+  for (const id of ['cover', 'thanks', ...ids.slice(15)]) assert.equal(tag(id), null, 'no part tag on ' + id);
+  assert.equal((sec['week-asks'].match(/>(DASHBOARD|GRIMES)</g) || []).length, 4, 'each ask tagged by part');
+  /* SkySpark is suggested by Facilities, not decided */
+  assert.ok(!/moving to SkySpark|recommends SkySpark|BMO → SkySpark|SkySpark requested|switches its meter source/i.test(html));
+  assert.match(sec['week-energy'], /Suggested by Facilities; nothing decided yet/);
+  assert.match(sec['week-quest'], /Not tested yet · waiting for the device/);
+  assert.ok(!/3\u00a0cm|Check in cm/.test(sec['week-quest'].replace(/&nbsp;/g, '\u00a0')), 'accuracy targets are in the notes only');
 });

@@ -2,10 +2,10 @@
 
 "Building Data and Sensing for the Grimes Twin": a 22-slide HTML deck (15 main slides + an appendix), served by GitHub Pages at
 `https://doe2park.github.io/Graduate-Project/talks/sensor-deck/` and locally at `http://127.0.0.1:8790/talks/sensor-deck/`
-(a static server at the repository root). `#9` jumps to slide 9.
+(a static server at the repository root). `#8` jumps to slide 8. The main talk has two parts, shown as a tag above each title (DASHBOARD, GRIMES; `PARTS` in `gen.py`), not as divider slides.
 
 - **Keys:** ←/→ or Space change slides, also while a live view has focus; Esc returns focus to the deck. Home/End, F fullscreen, N speaker notes.
-- **Test-install (concept) slides 9–13** embed the live twin viewer in a same-origin iframe:
+- **Test-install (concept) slides 8–12** embed the live twin viewer in a same-origin iframe:
   `../../scan-compare.html?view=overlay&capture=2026-05-06&mode=photo&style=lens&sensors=demo&scene=<leak|air|water|elec|rotating>&at=<pose>`.
   - The URL is relative, so the same file works locally and on Pages.
   - Each slide loads only its own scenario's demo sensors (`scene=`), from `twin/sensors/registry.json`. Nothing is installed; every value is illustrative.
