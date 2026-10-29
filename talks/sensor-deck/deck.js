@@ -5,7 +5,10 @@ addEventListener('resize',fit);
 
 /* ---------- live frames: load on the active slide, pre-warm the next slide's frame (hidden), unload the rest ---------- */
 const CLEAN_CSS='header,#overlayBar{display:none!important}';
-const CLEAN_CSS_SENSOR=CLEAN_CSS+'#lensCard{display:none!important}';   /* live twin slides: the sensor pins and cards carry the story */
+/* live twin slides: the sensor pins carry the story; the deck shows the selected sensor's details beside the view, so the
+   viewer's own floating cards (#lensCard, #sdCard) never cover a pin */
+const CLEAN_CSS_SENSOR=CLEAN_CSS+'#lensCard,#sdCard{display:none!important}'
+  +'#sdLayer .sd-pin.on{outline:6px solid #FDB515!important;outline-offset:3px!important;box-shadow:0 0 0 12px rgba(253,181,21,.35),0 2px 8px rgba(0,0,0,.55)!important}#sdLayer .sd-chip.on{outline:3px solid #FDB515!important;background:#FDB515!important;color:#1F2A37!important}';   /* the selected sensor stands out at slide scale */
 /* live twin slides: also hide the capture / Walk controls of the nested scan (photo) frame, same origin; re-applied when it reloads */
 const NESTED_CLEAN_CSS='#tools{display:none!important}';
 function cleanNested(el,f){if(el.dataset.live!=='sensor')return;const apply=n=>{try{const d=n.contentDocument;if(!d||!d.head)return;let s=d.getElementById('deck-clean-nested');const on=el.dataset.clean==='1';
@@ -29,7 +32,7 @@ function loadLive(el){
       if(el.dataset.clean==='1'||el.querySelector('[data-toggle-chrome]'))applyClean(el,f);
       f.style.visibility='visible';el.classList.remove('failed');hookKeys(f.contentWindow);
       if(k==='sensor'){let n=0;const iv=setInterval(()=>{let ok=false;try{const w=f.contentWindow;ok=!!(w&&w.sensorDemoInspection&&w.sensorDemoInspection().pins.length)}catch(_){}
-        if(ok||++n>90||!f.isConnected){clearInterval(iv);el.classList.remove('busy')}},500)}   /* live twin: busy until its demo sensors are drawn (max 45 s) */
+        if(ok||++n>180||!f.isConnected){clearInterval(iv);el.classList.remove('busy');el.classList.add('ready')}},250)}   /* live twin: hidden (static view shown) until its demo sensors are drawn (max 45 s) */
       else setTimeout(()=>el.classList.remove('busy'),k==='lens'?2500:800);
       if(k==='energy')focusEnergy(f);
     }catch(e){fail()}
@@ -42,7 +45,7 @@ function focusEnergy(f){let n=0;const t=setInterval(()=>{try{const d=f.contentDo
   if(sel&&sel.options.length&&!f._sel){const o=[...sel.options].find(o=>/grimes/i.test(o.textContent));if(o){f._sel=1;sel.value=o.value;sel.dispatchEvent(new Event('change',{bubbles:true}))}}
   if(w&&!w.hidden){d.documentElement.scrollTop=w.getBoundingClientRect().top+d.documentElement.scrollTop-8;clearInterval(t)}}catch(e){clearInterval(t)}
   if(++n>40)clearInterval(t)},500)}
-function unloadLive(el){const f=el.querySelector('iframe');if(f){f.src='about:blank';f.remove()}el.classList.remove('failed','busy')}
+function unloadLive(el){const f=el.querySelector('iframe');if(f){f.src='about:blank';f.remove()}el.classList.remove('failed','busy','ready')}
 
 /* ---------- keys inside same-origin frames (and their nested frames) still drive the deck ---------- */
 const FWD=['ArrowLeft','ArrowRight','PageUp','PageDown','n','N','f','F'];
@@ -82,12 +85,18 @@ function curXF(){const b=slides[cur]&&slides[cur].querySelector('.xf');return b?
 function show(i,noHash){i=Math.max(0,Math.min(slides.length-1,i));if(i===cur)return;
   if(cur>=0)slides[cur].classList.remove('active');
   cur=i;slides[i].classList.add('active');
+  /* live frames load on the active slide and warm up, hidden, on the next one, so they are ready on arrival; every other
+     frame is unloaded (at most two live 3D twins at a time). */
   const keep=new Set([slides[i],slides[i+1]].filter(Boolean));
-  /* data-nopreload frames (the heavy live 3D twin) load only on their own slide and unload as soon as it is left */
-  const warm=s=>!!s&&!!s.querySelector('.live:not([data-nopreload])');
-  slides.forEach(s=>{s.classList.toggle('preload',s===slides[i+1]&&warm(s));if(!keep.has(s))s.querySelectorAll('.live').forEach(unloadLive);else if(s!==slides[i])s.querySelectorAll('.live[data-nopreload]').forEach(unloadLive)});
+  const warm=s=>!!s&&!!s.querySelector('.live');
+  slides.forEach(s=>{s.classList.toggle('preload',s===slides[i+1]&&warm(s));if(!keep.has(s))s.querySelectorAll('.live').forEach(unloadLive)});
   slides[i].querySelectorAll('.live').forEach(loadLive);
-  if(slides[i+1])slides[i+1].querySelectorAll('.live:not([data-nopreload])').forEach(loadLive);   /* warm the next demo so it is ready on arrival */
+  /* warm the next slide's live view so it is ready on arrival, but only once this slide's own live twin is ready: the two
+     would otherwise share the bandwidth and the GPU and both arrive late */
+  const warmNext=()=>{if(cur!==i||!slides[i+1])return;
+    if([...slides[i].querySelectorAll('.live[data-live="sensor"]')].some(l=>!l.hidden&&l.dataset.off!=='1'&&l.querySelector('iframe')&&!l.classList.contains('ready')&&!l.classList.contains('failed')))return setTimeout(warmNext,300);
+    slides[i+1].querySelectorAll('.live').forEach(loadLive)};
+  warmNext();
   document.getElementById('count').textContent=(i+1)+' / '+slides.length;
   document.getElementById('notes-text').textContent=NOTES[i];
   if(!noHash)history.replaceState(null,'','#'+(i+1));

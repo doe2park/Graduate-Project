@@ -2928,6 +2928,14 @@ const OVERLAY_LAYER_KEYS=['equipment','lighting','conduit','duct','hydronic','pl
 const overlayAtLoad=splitPane==='bim'&&new URLSearchParams(location.search).get('overlay')==='1';
 const normalBackground=scene.background;let overlayOn=false,overlayRun=0;
 window.overlayInspection=()=>({on:overlayOn,background:scene.background,layers:Object.fromEntries(Object.keys(LAYERS).map(k=>[k,{loaded:!!layerState[k]?.group,visible:!!layerState[k]?.group?.visible}])),interior:{...interiorVisible}});
+/* ?sensors=demo&scene=<scenario> (the sensor deck's live views): load the layers that hold that scenario's demo-sensor
+   anchors first, so its pins attach after one layer instead of after all eight; the other layers follow in the usual order */
+async function ovLayerOrder(){
+ const q=new URLSearchParams(location.search),scene=q.get('scene');
+ if(q.get('sensors')!=='demo'||!/^[a-z0-9-]{1,30}$/.test(scene||''))return OVERLAY_LAYER_KEYS;
+ try{const reg=await cachedJson('twin/sensors/registry.json'),first=new Set((reg.sensors||[]).filter(s=>s.scenario===scene).map(s=>s.anchor?.layer));
+  return [...OVERLAY_LAYER_KEYS].sort((a,b)=>first.has(b)-first.has(a));}catch(_){return OVERLAY_LAYER_KEYS;}
+}
 async function setOverlay(enabled){
  enabled=!!enabled&&splitPane==='bim';if(enabled===overlayOn)return;overlayOn=enabled;const run=++overlayRun;
  document.documentElement.classList.toggle('overlay-mode',enabled);document.body.classList.toggle('overlay-mode',enabled);
@@ -2941,7 +2949,7 @@ async function setOverlay(enabled){
  for(const key of Object.keys(interiorVisible))interiorVisible[key]=false;interiorState.mode='custom';applyInteriorVisibility();
  if(mepModel)mepModel.visible=false;
  for(const key of Object.keys(LAYERS)){const st=layerState[key];if(!OVERLAY_LAYER_KEYS.includes(key)&&st?.group?.visible){st.group.visible=false;st.desiredVisible=false;document.getElementById('layerBtn-'+key)?.classList.remove('active');}}
- for(const key of OVERLAY_LAYER_KEYS){
+ for(const key of await ovLayerOrder()){
   if(run!==overlayRun)return;
   if(key==='fire'&&mobileQuality)continue; // 86 MB of piping: skipped on phones to protect memory
   const st=layerState[key]||(layerState[key]={});st.desiredVisible=true;

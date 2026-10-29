@@ -31,7 +31,7 @@ S1 = dict(
  elements=[
   dict(k=1, sid='leak-dts', col='#1E50DC', title='Fiber temperature line (DTS)', row='Colour = temperature every ~1 m along the pipe',
        what='Fiber cable strapped along the pipe; an analyzer reads a temperature about every metre.', val='22 °C baseline, 31 °C at 33 m along the cable (simulated test change)',
-       maps='BIM pipe Pipe219763 (fire main, element 278123); cable metres → pipe via the route survey', badge=(500, 238), hit=(500, 238, 16),
+       maps='BIM pipe Pipe219763 (fire main, element 278123); cable metres → pipe via the route survey', badge=(500, 238), hit=(500, 238, 16), under=True,
        draw=(f'<line {_L1} stroke="#fff" stroke-opacity=".95" stroke-width="11" stroke-linecap="round"/><line {_L1} stroke="url(#g1)" stroke-width="7" stroke-linecap="round"/>'
              f'{flowline([P0, P1], "#fff", 3, "3 52")}<line {_L1} stroke="rgba(0,0,0,.001)" stroke-width="30"/>' + badge(1, 500, 238, '#1E50DC')), ),
   dict(k=2, sid='leak-alert', col='#C81E1E', title='Temperature anomaly (test)', row='Controlled temperature change above the expected value',
@@ -96,7 +96,6 @@ S3 = dict(
  elements=[
   dict(k=1, sid='water-flow', col='#087F8C', title='Flow meter (later option)', row='Not in this trial: only on a verified domestic supply branch',
        what='Later option: clamp-on ultrasonic meter on a verified domestic supply branch. This cast-iron no-hub pipe is likely drainage, so it is shown only for orientation.', val='Illustrative: 0.0 L/s normally; 0.6 L/s between 1 and 4 am',
-       spark=spark(SPK_NIGHT, '#087F8C'), spark_note='24 h from 00:00; raised 01:00 to 04:00',
        maps='BIM cast-iron no-hub pipe, element 418392 (P-PIPE); location illustrative', badge=(615, 300), hit=(615, 300, 26),
        draw='<rect x="596" y="288" width="38" height="24" rx="4" fill="#fff" stroke="#003262" stroke-width="3"/>' + pin(1, 615, 300, '#087F8C', 16)),
   dict(k=2, sid='water-puck', col='#003262', title='Leak (wetness) sensor', row='This trial: puck below coupling 423698',
@@ -124,14 +123,12 @@ S4 = dict(
  elements=[
   dict(k=1, sid='power-ct', col='#E8590C', title='Power meter (current + voltage)', row='On the circuit feeding these units, once confirmed',
        what='Power meter with current and voltage inputs (a current clamp alone does not give true kW), on the circuit that feeds the terminal units once membership is confirmed.', val='0.42 kW now (peak 0.55 kW at 11:00)',
-       spark=spark(SPK_KW, '#E8590C'), spark_note='one illustrative day from 00:00, kW',
        maps='BIM terminal unit (coil kit), element 381444; circuit unconfirmed, no conduit modelled', badge=(535, 335), hit=(535, 335, 26), draw=pin(1, 535, 335, '#E8590C')),
   dict(k=2, sid='power-unit', col='#087F8C', title='Unit power monitor', row='Controller and actuator current at the VAV terminal unit',
        what='Small monitor at the VAV box: controller supply and damper-actuator current.', val='24 VAC controller; actuator 0.6 A',
        maps='BIM VAV terminal unit (Price SDV5), element 396073', badge=(705, 380), hit=(705, 380, 26), draw=pin(2, 705, 380, '#087F8C')),
   dict(k=3, sid='power-bmo', col='#003262', title='Building-level context', row='Whole-building meter, shown for context only',
        what='The whole-building meter reports every 15 minutes (BMO now; SkySpark requested). It is context only: this small trial is not expected to add up to it.', val='Building 212 kW (context only)',
-       spark=spark([180, 176, 172, 175, 190, 205, 220, 230, 224, 212], '#003262'), spark_note='building meter, last 2.5 h',
        maps='Building meter channel (building-level)', badge=(700, 205), hit=(700, 205, 26), draw=pin(3, 700, 205, '#003262')),
  ],
  legend=None,
@@ -151,7 +148,6 @@ S5 = dict(
  elements=[
   dict(k=1, sid='fan-vibration', col='#087F8C', title='Vibration node', row='Wireless MEMS accelerometer on the duct run',
        what='Wireless MEMS node on the duct: vibration spectrum and overall level, carried from the fan that feeds it.', val='2.1 mm/s RMS, up from 1.2 four weeks ago (illustrative)',
-       spark=spark(SPK_VIB, '#C81E1E'), spark_note='13 weeks, mm/s RMS, illustrative',
        maps='BIM straight rectangular duct, element 399665 (M-HVAC-DUCT)', badge=(540, 338), hit=(540, 338, 26), draw=pin(1, 540, 338, '#087F8C')),
   dict(k=2, sid='fan-bearing', col='#E8590C', title='Bearing temp. (separate future test)', row='Not in this proposal: a later fan-mounted probe',
        what='Separate future test: a surface probe mounted on the fan bearing itself. Shown on the duct only because the fan is not in this scan.', val='Illustrative: 58 °C; reference 45 to 50 °C',

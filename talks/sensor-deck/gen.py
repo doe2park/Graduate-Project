@@ -194,7 +194,8 @@ def sensing_table():
     return out
 
 # --- interactive twin concept slides (generic; scenarios in scenarios.py)
-from twin_lib import build_twin, TWIN_JS, TWIN_CSS
+from twin_lib import build_twin, info_panel, TWIN_JS, TWIN_CSS
+from charts import chart_for
 SC = {sc['id']: sc for sc in SCENARIOS}
 
 # Sensor type look (icon, colour, short label) shared with the viewer: ../../twin/sensors/registry.json
@@ -211,7 +212,7 @@ def twin_slide(sc):
     x, y, h = .55, 1.2, 3.3
     out, w = build_twin(sc, U, x, y, h)
     rx = x + w + .3; rw = 9.45 - rx; yy = 1.2; els = sc['elements']
-    pitch = min(.66, 2.0 / len(els)); rowh = pitch - .04
+    pitch = min(.6, 1.9 / len(els)); rowh = pitch - .04
     for el in els:
         k = el['k']
         out += (f'<div class="twrow card" data-m="{k}" data-sid="{e(el.get("sid",""))}" style="{pos(rx,yy,rw,rowh)};border-radius:{.06*rowh*U:.1f}px;cursor:pointer"></div>'
@@ -220,9 +221,12 @@ def twin_slide(sc):
         yy += pitch
     if sc.get('legend'):
         lg = ''.join(f'<span style="display:inline-flex;align-items:center;margin-right:{.18*U:.0f}px"><i style="display:inline-block;width:{.13*U:.0f}px;height:{.13*U:.0f}px;background:{c};margin-right:{.06*U:.0f}px"></i>{n}</span>' for c, n in sc['legend'])
-        out += f'<div class="tx" style="{pos(rx,yy+.02,rw,.22)};flex-direction:row;font-size:{9*PT:.1f}px;align-items:center">{lg}</div>'
-    yy = 3.54
-    out += numsteps(rx, yy, rw, 4.7 - yy, sc['steps'], head_size=10, size=9, arrow=.18, compact=True)
+        out += f'<div class="tx" style="{pos(rx,yy+.0,rw,.22)};flex-direction:row;font-size:{9*PT:.1f}px;align-items:center">{lg}</div>'
+        yy += .26
+    # selected sensor: details + simulated chart in this column, in place of the steps (never on top of the image)
+    out += info_panel(sc, U, rx, yy + .04, rw, 4.95 - yy - .04, chart_for)
+    sy = 3.54
+    out += '<div class="twsteps">' + numsteps(rx, sy, rw, 4.7 - sy, sc['steps'], head_size=10, size=9, arrow=.18, compact=True) + '</div>'
     return out
 
 def fig(p, x, y, w, h, frame=False):

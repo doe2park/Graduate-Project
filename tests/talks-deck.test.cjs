@@ -34,7 +34,8 @@ test('live views: relative viewer URL, sensors=demo, one known scene per concept
   }
   assert.deepEqual(seen, ['leak', 'air', 'water', 'elec', 'rotating']);
   for (const p of lives) assert.ok(fs.existsSync(path.join(deck, p.split('?')[0])), 'viewer resolves from the deck folder');
-  assert.ok(html.includes('data-nopreload="1"'), 'live views lazy-load only on their slide');
+  assert.equal((html.match(/class="live twlive" data-live="sensor"/g) || []).length, 5, 'one live twin per concept slide');
+  assert.match(html, /const keep=new Set\(\[slides\[i\],slides\[i\+1\]\]/, 'live views load on their slide and one slide ahead only');
 });
 
 test('nothing private, local-only or personal in the public folder', () => {
@@ -75,4 +76,23 @@ test('provenance: every image is listed in img/SOURCES.md and used; lecture figu
   assert.equal((visible.match(/Lab track record/g) || []).length, 1, 'track record framed in one line');
   assert.match(html, /own CE278 final project/);
   assert.ok(fs.readFileSync(path.join(deck, 'fonts', 'OFL.txt'), 'utf8').includes('SIL OPEN FONT LICENSE Version 1.1'));
+});
+
+test('test-install slides: sensor details sit beside the image (never on it), with simulated charts from the registry / feed', () => {
+  const panels = [...html.matchAll(/<div class="twpanel" style="left:([\d.]+)px;top:([\d.]+)px;width:([\d.]+)px;height:([\d.]+)px">/g)].map(m => m.slice(1).map(Number));
+  const figs = [...html.matchAll(/<div class="tw" data-slug="[^"]+"[^>]*style="left:([\d.]+)px;top:([\d.]+)px;width:([\d.]+)px;height:([\d.]+)px">/g)].map(m => m.slice(1).map(Number));
+  assert.equal(panels.length, 5); assert.equal(figs.length, 5);
+  panels.forEach(([pl, pt, pw, ph], i) => { const [fl, , fw] = figs[i]; assert.ok(pl >= fl + fw, 'panel right of the image on concept slide ' + (i + 1)); assert.ok(pt + ph <= 1080 * 5.0 / 5.625, 'panel above the footnote'); });
+  assert.ok(!/class="twcard/.test(html), 'no floating popup on the screenshot');
+  const charts = html.match(/<svg class="twc"/g) || [];
+  assert.ok(charts.length >= 12, 'charts for the main sensors: ' + charts.length);
+  assert.equal((html.match(/aria-label="[^"]*\(simulated\)"/g) || []).length, charts.length, 'every chart is labelled simulated');
+  for (const s of ['31 °C at 33 m', '+9 °C at 33 m', 'peak 0.55', 'now 0.42', '0.6 L/s, 01:00–04:00', 'design ref. 450 (to verify)', '>1.2<', '>2.1<', 'dry all day']) assert.ok(html.includes(s), 'chart label ' + s);
+  assert.equal((html.match(/SIMULATED · not installed/g) || []).length, CFG.sensors.length, 'every info panel says simulated / not installed');
+});
+
+test('live views: the viewer loads a scene\'s anchor layers first (deck speed-up)', () => {
+  const bim = fs.readFileSync(path.join(root, 'scan-bim.html'), 'utf8');
+  assert.match(bim, /async function ovLayerOrder\(\)/);
+  assert.match(bim, /for\(const key of await ovLayerOrder\(\)\)/);
 });
