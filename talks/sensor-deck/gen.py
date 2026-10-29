@@ -56,7 +56,7 @@ EXTRA.update({
    subtitle='Asked at the Oct 22 meeting; no decision yet',
    notes='The second part is the Grimes twin. First, the follow-up from our meeting with building operations on October 22. We asked for three things. One, floor plans or building data for older campus buildings, which usually have no BIM: plans let us place the 360 captures and build a basic model. Two, whether sensors can be installed, so readings link to a room or a system instead of the whole-building meter; that means locations, approval, an installer and data access. Three, permission to film with a drone, for the exterior and roof, to complete the model; that means the approval process, forms and lead time. As of October 26 none has a decision yet. The follow-up email with the final list of requests goes out after today\'s meeting, once the final comments are collected. What we need is an owner and an approval process for each request, and a first candidate building.'),
  'week-quest': dict(id='week-quest', kind='figure', title='Quest 3: expected mixed-reality benefits', part='grimes',
-   notes='Next, the headset, and this is what we expect, not a result: we have not received the lab Quest 3 yet, so nothing has run on it. The picture is a concept mockup: our own twin view of the Level 1 ceiling from the public May 6 capture, with the BIM overlay and the simulated demo sensors; it is not a Quest 3 capture. With mixed reality you see the real surroundings through the headset. That means you can actually walk around inside the building without tripping or falling, while the BIM services hidden above the ceiling, the pipes and ducts, appear in place, and sensor readings appear at the element they belong to. Today those readings are simulated. The Quest 3 matters because its passthrough is in colour and it builds a room mesh; we expect that to help, but it is to be evaluated. How we would check it: you align the model by touching four landmarks, column faces and wall corners, plus the floor; the page fits a rotation and a shift and reports the error. Two Level 1 areas are prepared, the auditorium foyer with its open ceiling and the east entrance. Then we check real sprinkler heads and a diffuser against their BIM positions, in centimetres. The proposed test targets are three centimetres RMS and five at worst; they are targets to test, not results. We compare real ceiling devices against their BIM positions separately from the landmark fit, and re-check after a ten metre walk to see drift. The protocol takes about ten minutes, and the log is saved on the headset. The landmarks are BIM-derived candidates, not surveyed points, and the RMS measures how consistently the landmarks were touched, not survey accuracy. Also ready: the VR controls were redesigned after the first headset try, with point and go, a visible laser and a five-button menu; and the black screen we saw on a Quest 2 has a fix that passes an emulated headset test only, not confirmed on hardware. So far everything is tested on the desktop and an emulated headset only. What we need: the headset this week, a quiet time in the Level 1 foyer, and after a pass, permission to put it on the public link.'),
+   notes='Next, the headset, and this is what we expect, not a result: we have not received the lab Quest 3 yet, so nothing has run on it. The two pictures show the difference. On the left is VR today: the scan recorded on May 6, our own twin view of a Level 1 ceiling with the BIM overlay and the simulated demo sensors. You see the scan, not the room as it is now. On the right is what we expect from mixed reality, as a drawn illustration, not a Quest 3 capture: the passthrough cameras show the real room live, its current state, people, furniture and obstacles, and the BIM and sensors are drawn on top of that live view. With mixed reality you see the real surroundings through the headset. That means you can actually walk around inside the building without tripping or falling, while the BIM services hidden above the ceiling, the pipes and ducts, appear in place, and sensor readings appear at the element they belong to. Today those readings are simulated. The Quest 3 matters because its passthrough is in colour and it builds a room mesh; we expect that to help, but it is to be evaluated. How we would check it: you align the model by touching four landmarks, column faces and wall corners, plus the floor; the page fits a rotation and a shift and reports the error. Two Level 1 areas are prepared, the auditorium foyer with its open ceiling and the east entrance. Then we check real sprinkler heads and a diffuser against their BIM positions, in centimetres. The proposed test targets are three centimetres RMS and five at worst; they are targets to test, not results. We compare real ceiling devices against their BIM positions separately from the landmark fit, and re-check after a ten metre walk to see drift. The protocol takes about ten minutes, and the log is saved on the headset. The landmarks are BIM-derived candidates, not surveyed points, and the RMS measures how consistently the landmarks were touched, not survey accuracy. Also ready: the VR controls were redesigned after the first headset try, with point and go, a visible laser and a five-button menu; and the black screen we saw on a Quest 2 has a fix that passes an emulated headset test only, not confirmed on hardware. So far everything is tested on the desktop and an emulated headset only. What we need: the headset this week, a quiet time in the Level 1 foyer, and after a pass, permission to put it on the public link.'),
  'week-asks': dict(id='week-asks', kind='figure', title='What we need',
    subtitle='Decisions requested, in order of urgency; tagged by part',
    footnote='Asks 1 and 2 go to Facilities in the follow-up email after this meeting; ask 3 is within the lab. Roles only; no dates agreed.',
@@ -437,15 +437,47 @@ def week_facilities():
     out += text(.75, 3.55, 8.5, .5, P('Follow-up email with the final request list goes out after today’s meeting', size=15, bold=True, color=TEAL), anchor='middle')
     return out + ask_bar('Owner + approval process per request; a first candidate building', size=15)
 
+def mr_svg():
+    """Schematic 'MR expected' illustration (drawn, not a capture): 1 live camera view of a room (neutral line drawing),
+    2 BIM pipe + duct in the twin's colours, 3 sensor pins with a SIMULATED value tag."""
+    g = '#8A939E'; lg = '#C9CED5'
+    room = (f'<rect width="320" height="180" fill="#EEF0F2"/>'
+            # ceiling grid in perspective + back wall, floor, door
+            f'<path d="M0 0 L320 0 L250 70 L70 70 Z" fill="#F7F8F9" stroke="{lg}"/>'
+            + ''.join(f'<path d="M{x} 0 L{70 + (x / 320) * 180:.0f} 70" stroke="{lg}" stroke-width="1"/>' for x in (64, 128, 192, 256))
+            + ''.join(f'<path d="M{y} {y} L{320 - y} {y}" stroke="{lg}" stroke-width="1"/>' for y in (22, 46))
+            + f'<rect x="70" y="70" width="180" height="80" fill="#E3E6E9" stroke="{g}"/>'
+            f'<path d="M0 180 L70 150 L250 150 L320 180 Z" fill="#D9DDE1" stroke="{g}"/>'
+            f'<rect x="196" y="92" width="30" height="58" fill="#F4F5F6" stroke="{g}"/>'
+            # table + chair (obstacles) and a faceless person silhouette, all neutral gray
+            f'<rect x="92" y="122" width="52" height="6" fill="{g}"/><path d="M96 128v22M140 128v22" stroke="{g}" stroke-width="3"/>'
+            f'<path d="M152 132h16v18M152 132v18M152 120v12" stroke="{g}" stroke-width="3" fill="none"/>'
+            f'<circle cx="268" cy="104" r="8" fill="{g}"/><path d="M256 162 L258 122 Q268 114 278 122 L280 162 Z" fill="{g}"/>')
+    bim = ('<path d="M18 8 L300 52" stroke="#E0493A" stroke-width="5" stroke-linecap="round"/>'
+           '<path d="M40 34 L290 20" stroke="#1E50DC" stroke-opacity=".45" stroke-width="12" stroke-linecap="round"/>')
+    pin = lambda x, y, c, n: f'<circle cx="{x}" cy="{y}" r="7" fill="{c}" stroke="#fff" stroke-width="2"/><text x="{x}" y="{y + 3}" font-size="8" font-weight="700" fill="#fff" text-anchor="middle">{n}</text>'
+    sens = (pin(110, 25, '#C81E1E', 1) + pin(230, 44, '#087F8C', 2)
+            + '<rect x="122" y="58" width="78" height="16" rx="4" fill="#1F2A37"/><path d="M112 32 L126 58" stroke="#1F2A37" stroke-width="1.2"/>'
+            '<text x="127" y="69" font-size="7" font-weight="700" fill="#C9B6FF">SIMULATED</text><text x="171" y="69" font-size="8" font-weight="700" fill="#fff">31 °C</text>')
+    lab = lambda x, y, t, w: f'<rect x="{x}" y="{y}" width="{w}" height="13" rx="6.5" fill="#fff" fill-opacity=".92" stroke="{g}" stroke-width=".6"/><text x="{x + 6}" y="{y + 9.3}" font-size="7.5" font-weight="700" fill="#3A4654">{t}</text>'
+    labels = lab(6, 160, '1 · Live camera view (now)', 112) + lab(250, 4, '2 · BIM', 40) + lab(6, 40, '3 · Sensors', 52)
+    return f'<svg viewBox="0 0 320 180" style="width:100%;height:100%;display:block" xmlns="http://www.w3.org/2000/svg" font-family="Carlito, sans-serif">{room}{bim}{sens}{labels}</svg>'
+
 def week_quest():
-    # Left ~55 %: concept mockup of the mixed-reality view (own screenshot of the public twin viewer, see img/SOURCES.md).
-    out = f'<img src="img/quest-mr-mockup.jpg" alt="Concept mockup: twin view of a Level 1 ceiling with BIM pipes and simulated sensor readings" style="{pos(.55,1.28,4.45,2.5)};border-radius:{.16*U:.0f}px;outline:6px solid {DARK};outline-offset:-3px;object-fit:cover">'
-    out += text(.55, 3.8, 4.45, .25, P('Concept mockup: 360° photo + BIM overlay from the twin; not a Quest 3 capture', size=8.5, color=MUTED, italic=True))
-    cards = [('Walk the real building', 'Real surroundings, safe to walk'),
-             ('See hidden BIM', 'Pipes, ducts above the ceiling'),
-             ('Sensor readings on site', 'At each element (simulated)')]
-    for i, (h, b) in enumerate(cards):
-        out += card(5.2, 1.28 + i * .93, 4.25, .85, h, b, head_size=17, size=13.5, middle=True)
+    """VR today (recorded scan) vs MR expected (live room + overlay, schematic). Cards on the right."""
+    pw, ph, y0 = 2.85, 1.6, 1.58; frame = f'border-radius:{.12*U:.0f}px;outline:5px solid {DARK};outline-offset:-2px;overflow:hidden'
+    out = ''
+    for k, (x, head, cap) in enumerate([(.55, 'VR today', 'Recorded scan (May 6), not the room now'),
+                                        (3.6, 'MR expected', 'Illustration — not a Quest 3 capture')]):
+        out += text(x, 1.26, pw, .3, P(head, size=14, bold=True, color=NAVY if k == 0 else TEAL))
+        if k == 0: out += f'<img src="img/vr-scan-view.jpg" alt="VR today: the recorded May 6 scan with the BIM overlay and simulated sensors" style="{pos(x,y0,pw,ph)};{frame};object-fit:cover">'
+        else: out += f'<div role="img" aria-label="Illustration of the expected mixed-reality view: the live room with BIM and simulated sensors on top" style="position:absolute;{pos(x,y0,pw,ph)};{frame}">{mr_svg()}</div>'
+        out += text(x, y0 + ph + .03, pw, .25, P(cap, size=9, color=MUTED, italic=True))
+    out += box(.55, 3.5, 5.9, .5, 'card')
+    out += text(.7, 3.5, 5.6, .5, P('MR = the real building, live + BIM + sensors', size=15, bold=True, color=TEAL), anchor='middle')
+    out += card(6.65, 1.28, 2.8, 1.15, 'See the real space, live', 'Passthrough, not a scan; safe to walk', head_size=15, size=12.5, middle=True)
+    out += card(6.65, 2.53, 2.8, .66, 'Hidden BIM in place', '', head_size=15, middle=True)
+    out += card(6.65, 3.29, 2.8, .66, 'Sensor readings on site', '', head_size=15, middle=True)
     out += pill(.85, .86, 3.6, .32, 'Not tested yet · waiting for the device', bg=RED, size=12)
     return out + ask_bar('Lab Quest 3 · Level 1 foyer time', size=16)
 
