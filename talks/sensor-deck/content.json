@@ -64,7 +64,7 @@
      "head": "What we need",
      "head_size": 13,
      "size": 11.5,
-     "text": "SkySpark access if approved, then BAS trend export + point list"
+     "text": "SkySpark meter data, if approved; later a read-only BAS trend export and point list"
     }
    ],
    "notes": "Next, the building data Grimes already has. The campus energy dashboard currently reads the Obvius meter loggers on Building Manager Online, BMO: whole-building electricity, water and steam every 15 minutes. On October 26 Facilities told us that BMO is no longer their source of truth: the platform is outdated and new meter points cannot be added. They suggested SkySpark, which they actively manage, as a possible source, and mentioned an intake form so students could pull hourly data themselves. Nothing is decided; until then the BMO values are shown for reference. These are utility meters, not a building automation system. The campus standard for building automation is Automated Logic WebCTRL over BACnet, and new projects use it, so Grimes very likely has it, but we have not confirmed that. Grimes opened in April 2025, designed by SOM and Stantec, with a LEED Platinum target, a heat-recovery chiller and radiant panels. We have not confirmed the Grimes BAS vendor, and we did not find the campus controls standard, Division 25, publicly. If it exists it would add temperatures, airflow, CO2, valve positions and equipment status. Access needs a CalNet login, an operational need and a Facilities work order, which may be charged back. What we need: first SkySpark access for the meter data, if approved, then a read-only trend export, the point list and the sequences of operation, tagged to equipment so each point can link to a BIM element ID.",
@@ -214,8 +214,7 @@
      ]
     }
    ],
-   "notes": "This is the first test, on the same location as test install one: the sprinkler main, Pipe219763. Run a fiber cable along it. The analyzer gives a temperature about every meter along the cable. We map each cable distance to a BIM pipe segment, so the temperature shows on that pipe in the twin viewer. Then we apply a contained, controlled thermal test, with the method agreed with Facilities. The success criterion is concrete: the test temperature change is detected and located on the correct BIM segment, and a wetness sensor below checks for water. It also tests the whole chain from sensor to BIM element to viewer. We need Facilities approval, access to the pipe, a safe way to apply the test change, a loan of a DTS analyzer, and reference temperatures to compare against.",
-   "takeaway": "One pipe, one cable, one contained test, with a stated pass criterion."
+   "notes": "This is the first test, on the same location as test install one: the sprinkler main, Pipe219763. Run a fiber cable along it. The analyzer gives a temperature about every meter along the cable. We map each cable distance to a BIM pipe segment, so the temperature shows on that pipe in the twin viewer. Then we apply a contained, controlled thermal test, with the method agreed with Facilities. The success criterion: the test temperature change is detected and located on the correct BIM segment, and a wetness sensor below checks for water. It also tests the whole chain from sensor to BIM element to viewer. We need Facilities approval, access to the pipe, a safe way to apply the test change, a loan of a DTS analyzer, and reference temperatures to compare against."
   },
   {
    "id": "twin-concept",
@@ -371,7 +370,7 @@
      ]
     }
    ],
-   "footnote": "Concept mockup — no sensors are installed; values are illustrative. Base: public Lens overlay of the May 6, 2026 capture (own screenshot); graphics added.",
+   "footnote": "Nothing installed; values simulated. Base: public Lens overlay of the May 6, 2026 capture (own screenshot); graphics added.",
    "notes": "This is a concept of how the sensors would look in the twin. The base is the public Lens overlay of the Level 1 leak ceiling from the May 6 capture. Nothing is installed and the values are made up. Marker one is the fiber temperature line, coloured from blue for cool to red for hot along the sprinkler main. Marker two is an alert ring where the line is warmer than expected, which could mean a leak. Marker three is a wireless vibration node, and marker four is a leak sensor on the tile below the warm spot, to confirm water. It would work in three steps. The analyzer reports a temperature at a distance along the cable. We map that distance to a BIM pipe element ID using a survey of the cable route. Then the viewer colours that pipe and shows the alert, both in the Lens on the computer and in the headset."
   },
   {
@@ -383,7 +382,7 @@
    "lines": [
     "Yoonsung"
    ],
-   "notes": "Thank you. The two most urgent questions: can we get a decision on SkySpark meter access before the November 16 presentations, and can we run the mixed-reality test in the Grimes foyer with the Quest 3 this week?"
+   "notes": "Thank you. My questions: can the class get SkySpark meter data, can we test the Quest 3 in the Level 1 foyer, and where could a first sensor go?"
   }
  ]
 }

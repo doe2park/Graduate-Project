@@ -10,7 +10,7 @@ import json as _json, pathlib as _pl
 _PRIMARY = _json.loads((_pl.Path(__file__).resolve().parent.parent.parent / 'twin' / 'sensors' / 'registry.json').read_text())['primary']
 _REG = {x['id']: x for x in _json.loads((_pl.Path(__file__).resolve().parent.parent.parent / 'twin' / 'sensors' / 'registry.json').read_text())['sensors']}
 def live(scene, at): return LENS.format(scene=scene, focus=_PRIMARY[scene]) + at
-FOOT = 'Concept mockup — no sensors are installed; values are illustrative.'
+FOOT = 'Nothing installed; values simulated.'
 def foot(capture, where=''): return (where + ' ' if where else '') + FOOT + ' Live twin: May 6, 2026 capture ' + str(capture) + '; demo sensors on real BIM elements.'
 
 # ---------- 1. leak ceiling (DTS pipe) -- original view, capture 35
@@ -49,7 +49,7 @@ S1 = dict(
  steps=[dict(head='Test', text='Controlled change; analyzer reads 31 °C at 33 m'), dict(head='Map to BIM', text='33 m → Pipe219763 segment (route survey)'),
         dict(head='Check', text='Right segment? Wetness sensor checks water')],
 )
-S1.update(title='Test install 1 · Fiber temperature on a sprinkler main', subtitle='Can a controlled temperature change on Pipe219763 be detected and mapped to the right BIM pipe segment?',
+S1.update(title='Test install 1: Fiber temperature on a sprinkler main', subtitle='Can a controlled temperature change on Pipe219763 be detected and mapped to the right BIM pipe segment?',
           footnote=foot(35, 'Sprinkler main above a Level 1 ceiling.'),
           notes='This is a concept of how the test would look in the twin. The view on the left is the interactive viewer: the May 6 capture with the BIM in the Lens, and you can drag to look around; the demo sensors stay attached to their BIM elements. Nothing is installed and the values are simulated. The question is narrow: can a controlled temperature change along the sprinkler main, element Pipe219763, be detected and mapped to the right BIM pipe segment? We are not claiming that a real leak would make a measurable warm spot on this pipe; that is something the test would have to establish. Marker one is the fiber temperature line, with the pipe coloured from blue for cool to red for hot. Marker two flags a temperature anomaly during the test. Marker three is a wireless vibration node on the same pipe. Marker four is a separate wetness sensor on the tile below, which checks for water independently of the fiber. The steps: apply a contained, controlled temperature change; the analyzer reports a temperature at a distance along the cable; we map that distance to the pipe segment using a survey of the cable route and check that it is the right segment. If the interactive view does not load, the Static view button shows a screenshot.')
 
@@ -61,7 +61,7 @@ SPK_NIGHT = _REG['water-flow']['reading']['series']   # 24 hourly values from 00
 S2 = dict(
  id='twin-hvac', slug='hvac', base='b-hvac.jpg', fallback='', anim='',
  live=live('air', '-20.475,6.642,0.696,0.2418,-0.6645,0.2418,0.6645,75.0'),
- title='Test install 2 · Airflow in a supply branch vs design',
+ title='Test install 2: Airflow in a supply branch vs design',
  subtitle='Compare measured airflow in branch 401233 with a verified design value and its trend with one room reading',
  bg=zone(235, 345, 190, 105, '#FF7A1A', .22, -10) + zone(190, 250, 90, 55, '#FFC14D', .16, -10),
  elements=[
@@ -90,7 +90,7 @@ S2 = dict(
 S3 = dict(
  id='twin-water', slug='water', base='b-plumb.jpg', fallback='', anim='',
  live=live('water', '-14.906,6.632,13.671,0.3420,0.0000,0.0000,0.9397,75.0'),
- title='Test install 3 · Wetness sensor at a pipe coupling',
+ title='Test install 3: Wetness sensor at a pipe coupling',
  subtitle='Place a leak (wetness) sensor below coupling 423698 to test detection of water at this fitting; a flow meter is a later option',
  bg=link(615, 300, 715, 148, '#fff', 2, '5 5'),
  elements=[
@@ -117,7 +117,7 @@ SPK_KW = _REG['power-ct']['reading']['series']   # one illustrative day, hourly 
 S4 = dict(
  id='twin-power', slug='power', base='b-elec.jpg', fallback='', anim='',
  live=live('elec', '-20.475,6.642,0.696,0.0000,0.9397,-0.3420,0.0000,75.0'),
- title='Test install 4 · Power on a VAV circuit',
+ title='Test install 4: Power on a VAV circuit',
  subtitle='After confirming the circuit, measure its load profile with a power meter (current + voltage); compare operating and idle periods',
  bg=link(535, 330, 700, 205, '#FDB515', 2.5, '6 5', .95) + link(705, 378, 700, 205, '#FDB515', 2.5, '6 5', .95),
  elements=[
@@ -142,7 +142,7 @@ SPK_VIB = _REG['fan-vibration']['reading']['series']   # 13 weekly values: 1.2 f
 S5 = dict(
  id='twin-fan', slug='fan', base='b-fan.jpg', fallback='', anim='',
  live=live('rotating', '-23.391,6.497,12.169,0.0000,0.9397,-0.3420,0.0000,75.0'),
- title='Test install 5 · Vibration on a fan-fed duct run',
+ title='Test install 5: Vibration on a fan-fed duct run',
  subtitle='Test whether vibration on duct 399665 changes reproducibly with the upstream fan’s operating state',
  bg='',
  elements=[

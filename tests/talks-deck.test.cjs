@@ -56,7 +56,7 @@ test('nothing private, local-only or personal in the public folder', () => {
   const OCT18_OK = ['oct18-ceiling-open-photo.jpg', 'oct18-ceiling-open-model.jpg'];
   for (const f of fs.readdirSync(path.join(deck, 'img')).filter(f => /oct.?18|10-?18/i.test(f))) assert.ok(OCT18_OK.includes(f), 'Oct 18 image not approved for public use: ' + f);
   assert.match(sources, /approved public use on 2026-10-27/);
-  assert.match(html, /Concept mockup — no sensors are installed; values are illustrative\./);
+  assert.ok((html.match(/Nothing installed; values simulated\./g) || []).length >= 6, 'plain not-installed / simulated note on the test-install slides');
   assert.ok(!/>Ask</.test(html) && html.includes('What we need'), 'slide 3 label is "What we need"');
 });
 
@@ -158,7 +158,7 @@ test('slide order (Oct 29 talk): 15 main slides in two tagged parts without sect
   assert.ok(!/combined follow-up|each member|existing email threads/i.test(html));
   /* parts are header tags, not slides: Dashboard = the energy slide, Grimes = facilities … pilot */
   const sec = Object.fromEntries([...html.matchAll(/<section class="slide" id="([^"]+)">([\s\S]*?)<\/section>/g)].map(m => [m[1], m[2]]));
-  const tag = id => (sec[id].match(/>(DASHBOARD|GRIMES) · /) || [])[1] || null;
+  const tag = id => (sec[id].match(/class="pill" style="left:140\.2px;top:19\.2px[^>]*>(DASHBOARD|GRIMES)</) || [])[1] || null;
   assert.equal(tag('week-energy'), 'DASHBOARD');
   for (const id of ids.slice(2, 13)) assert.equal(tag(id), 'GRIMES', 'Grimes tag on ' + id);
   for (const id of ['cover', 'thanks', ...ids.slice(15)]) assert.equal(tag(id), null, 'no part tag on ' + id);
@@ -166,6 +166,14 @@ test('slide order (Oct 29 talk): 15 main slides in two tagged parts without sect
   /* SkySpark is suggested by Facilities, not decided */
   assert.ok(!/moving to SkySpark|recommends SkySpark|BMO → SkySpark|SkySpark requested|switches its meter source/i.test(html));
   assert.match(sec['week-energy'], /Suggested by Facilities; nothing decided yet/);
-  assert.match(sec['week-quest'], /Not tested yet · waiting for the device/);
+  assert.match(sec['week-quest'], /Not tested yet: headset not received/);
+  /* no dates or deadlines as the author's needs, no "Ask:" / urgency phrasing on the main slides (owner, Oct 29) */
+  const vis = id => sec[id].replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&');
+  for (const id of ids.slice(0, 15)) {
+    const v = vis(id);
+    assert.ok(!/Nov(ember)?\s*16|this week|in order of urgency|Concept stage|\bAsk:|What we would learn/i.test(v), 'plain wording on ' + id);
+  }
+  const n14 = notes[ids.indexOf('week-asks')] + notes[ids.indexOf('thanks')] + notes[ids.indexOf('week-energy')].split('For context')[0];
+  assert.ok(!/November|Nov 16|this week|Three questions/i.test(n14), 'no deadline in the asks / questions notes');
   assert.ok(!/3\u00a0cm|Check in cm/.test(sec['week-quest'].replace(/&nbsp;/g, '\u00a0')), 'accuracy targets are in the notes only');
 });

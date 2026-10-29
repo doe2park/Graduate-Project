@@ -57,7 +57,7 @@ def build_twin(sc, U, x, y, h):
     # slide ahead (deck.js). It stays invisible until its demo sensors are drawn, so the static image + SVG underneath shows
     # at once and remains the fallback (Static view, or iframe failure).
     out += (f'<div class="live twlive" data-live="sensor" data-clean="1" data-scale="0.72" data-src="{e(sc["live"])}" style="{pos(x,y,w,h)}">'
-            '<div class="vp"></div><span class="badge-live">INTERACTIVE TWIN · SIMULATED DATA · drag to look</span></div>')
+            '<div class="vp"></div><span class="badge-live">Interactive twin, simulated data. Drag to look</span></div>')
     out += (f'<div style="{pos(x,y+h+.1,w,.32)};display:flex;gap:10px;align-items:center"><button class="btn tw-btn tw-toggle" aria-pressed="true">Sensors: on</button>'
             '<button class="btn tw-btn tw-mode" aria-pressed="false">Static view</button>'
             f'<a class="btn tw-btn" href="{e(sc["live"])}" target="_blank" rel="noopener">Open in viewer ↗</a><span class="tw-status" aria-live="polite"></span></div>')
