@@ -142,7 +142,10 @@ def build(check_only):
                                 'sha256': sha256(MANUAL / 'manual-boxes.json')},
                 'manualReview': {'status': 'done', 'scope': 'every image of the upper-floor set (108) reviewed by a person',
                                  'reviewDocumentSha256': sha256(REVIEW_PDF), 'reviewDocumentLocation': 'local only, not published',
-                                 'publishApproved': APPROVED, 'approvedBy': 'owner'},
+                                 'publishApproved': APPROVED, 'approvedBy': 'owner',
+                                 'supplementaryPass': '2026-10-28, after publishing: 39 more boxes on small distant people '
+                                                      '(far balcony / atrium / through glass) in 36 images, found by a second '
+                                                      'full-resolution look at the horizon band of all 108 images; counts above include them'},
                 'publishedFilesVerified': 'full-resolution panoramas are byte-identical to the approved manual-blur set '
                                           '(sha256 per file below); mobile copies are resized from them',
                 'statement': 'Detection and review can miss people; not a claim of full anonymisation.'},

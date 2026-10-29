@@ -135,7 +135,7 @@ class Oct18UpperFloors(unittest.TestCase):
             self.assertEqual(pr['manualReview']['publishApproved'], '2026-10-28'); self.assertEqual(pr['automaticBlur']['params']['personScore'], 0.15)
             self.assertEqual(pr['automaticBlur']['params']['crop'], 1536); self.assertFalse(p['placementCupixFree'])
             self.assertEqual(p['registration']['file'], '../../registration.json')
-        self.assertEqual(total_boxes, 1241)
+        self.assertEqual(total_boxes, 1280)  # 1,241 reviewed + 39 supplementary (2026-10-28)
         self.assertFalse([f for f in (ROOT / 'scan-assets/captures/2026-10-18/floors').rglob('*') if f.suffix in ('.glb', '.ply', '.ksplat', '.splat', '.e57')])
 
 

@@ -138,7 +138,8 @@ Method and numbers: `docs/RAW360_PIPELINE.md`. Field protocol: `docs/FIELD_CAPTU
   published file), `panoramas/manifest.json` (stations, route and floor assignment from the v2 package; `sha256` / `mobileSha256` of the
   published files; `status: published-provisional`) and `provenance.json` (per-file hashes, privacy record, placement, what is not published).
 - Privacy: automatic blur (strict: person score 0.15, crop 1536; `grimes-UPPER-2026-10-18-raw477-blurred-v2/privacy-report.json`) +
-  1,241 manual blur boxes (L2 665, L3 576) after manual review of every image; publishing approved by the owner on 2026-10-28. Not a claim
+  1,280 manual blur boxes (L2 684, L3 596: 1,241 from the review plus 39 added the same day for small distant people on the far
+  balcony / atrium in 36 images) after manual review of every image; publishing approved by the owner on 2026-10-28. Not a claim
   of full anonymisation. The v2 packages still display the older automatic blur (`-raw477-blurred`), which missed seated people: never publish it.
 - Placement, stated honestly: the images are raw-video frames of `VID_20261018_153400_00_477` (not a Cupix export), but the v2 positions are
   local SfM fitted by frame number to the Cupix-placed stations of the same video (`placementCupixFree: false`). The Cupix-free dry run
