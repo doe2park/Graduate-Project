@@ -144,3 +144,16 @@ test('live views: the viewer loads a scene\'s anchor layers first (deck speed-up
   assert.match(bim, /async function ovLayerOrder\(\)/);
   assert.match(bim, /for\(const key of await ovLayerOrder\(\)\)/);
 });
+
+test('slide order (Oct 29 talk): 15 main slides without section dividers, then one appendix divider and the backup slides', () => {
+  const ids = [...html.matchAll(/<section class="slide" id="([^"]+)">/g)].map(m => m[1]);
+  assert.deepEqual(ids, ['cover', 'week-energy', 'week-facilities', 'week-quest', 'week-asks', 'bms', 'open-ceiling', 'test-installs',
+    'twin-concept', 'twin-hvac', 'twin-water', 'twin-power', 'twin-fan', 'pilot', 'thanks',
+    'part-A', 'ready', 'sensing', 'fiber', 'ce278', 'mems', 'wsn']);
+  const notes = JSON.parse(html.match(/const NOTES=(\[.*?\]);\n/s)[1]);
+  assert.equal(notes.length, ids.length, 'one notes entry per slide');
+  assert.ok(!/SECTION 0\d|Part (one|two|three)/i.test(html), 'no leftover section numbers or "part N" notes');
+  /* the follow-up email has not been sent: it goes out after the meeting; no "team / combined follow-up" wording */
+  assert.ok(html.includes('Follow-up email with the final request list goes out after today’s meeting'));
+  assert.ok(!/combined follow-up|each member|existing email threads/i.test(html));
+});
