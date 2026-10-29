@@ -5,8 +5,8 @@ addEventListener('resize',fit);
 
 /* ---------- live frames: load on the active slide, pre-warm the next slide's frame (hidden), unload the rest ---------- */
 const CLEAN_CSS='header,#overlayBar{display:none!important}';
-/* live twin slides: the sensor pins carry the story; the deck shows the selected sensor's details beside the view, so the
-   viewer's own floating cards (#lensCard, #sdCard) never cover a pin */
+/* live twin slides: the deck draws the selected sensor's callout (with its simulated chart) beside the clicked pin, placed
+   clear of the other pins (TWIN_JS + place.js), so the viewer's own floating cards (#lensCard, #sdCard) are hidden */
 const CLEAN_CSS_SENSOR=CLEAN_CSS+'#lensCard,#sdCard{display:none!important}'
   +'#sdLayer .sd-pin.on{outline:6px solid #FDB515!important;outline-offset:3px!important;box-shadow:0 0 0 12px rgba(253,181,21,.35),0 2px 8px rgba(0,0,0,.55)!important}#sdLayer .sd-chip.on{outline:3px solid #FDB515!important;background:#FDB515!important;color:#1F2A37!important}';   /* the selected sensor stands out at slide scale */
 /* live twin slides: also hide the capture / Walk controls of the nested scan (photo) frame, same origin; re-applied when it reloads */
@@ -32,7 +32,8 @@ function loadLive(el){
       if(el.dataset.clean==='1'||el.querySelector('[data-toggle-chrome]'))applyClean(el,f);
       f.style.visibility='visible';el.classList.remove('failed');hookKeys(f.contentWindow);
       if(k==='sensor'){let n=0;const iv=setInterval(()=>{let ok=false;try{const w=f.contentWindow;ok=!!(w&&w.sensorDemoInspection&&w.sensorDemoInspection().pins.length)}catch(_){}
-        if(ok||++n>180||!f.isConnected){clearInterval(iv);el.classList.remove('busy');el.classList.add('ready')}},250)}   /* live twin: hidden (static view shown) until its demo sensors are drawn (max 45 s) */
+        if(!f.isConnected){clearInterval(iv);return}   /* unloaded (Static view / slide change): not ready */
+        if(ok||++n>180){clearInterval(iv);el.classList.remove('busy');el.classList.add('ready')}},250)}   /* live twin: hidden (static view shown) until its demo sensors are drawn (max 45 s) */
       else setTimeout(()=>el.classList.remove('busy'),k==='lens'?2500:800);
       if(k==='energy')focusEnergy(f);
     }catch(e){fail()}
@@ -52,7 +53,7 @@ const FWD=['ArrowLeft','ArrowRight','PageUp','PageDown','n','N','f','F'];
 function hookKeys(w){try{if(!w||w._deckHooked)return;w._deckHooked=1;
   const nested=()=>{try{w.document.querySelectorAll('iframe').forEach(n=>{if(n._deckHk)return;n._deckHk=1;n.addEventListener('load',()=>hookKeys(n.contentWindow));hookKeys(n.contentWindow)})}catch(_){}};
   nested();const iv=setInterval(()=>{try{if(w.closed){clearInterval(iv);return}nested()}catch(_){clearInterval(iv)}},1500);
-  w.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();window.focus();document.activeElement&&document.activeElement.blur();return}
+  w.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();window.focus();document.activeElement&&document.activeElement.blur();document.dispatchEvent(new Event('deck-esc'));return}
     if(e.target&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;if(e.ctrlKey||e.metaKey||e.altKey)return;
     if(FWD.includes(e.key)){e.preventDefault();e.stopImmediatePropagation();handle(e)}},true)}catch(_){}}
 

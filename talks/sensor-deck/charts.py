@@ -1,4 +1,4 @@
-# Small inline-SVG charts for the test-install info panels (slides 12-16). PUBLIC.
+# Small inline-SVG charts for the test-install callouts (slides 12-16). PUBLIC.
 # Every series comes from twin/sensors/registry.json or the deterministic demo feed (tools/sensor_sim.py, same math as
 # twin/sensors/feed.js). Nothing here is measured: each chart carries a "SIMULATED" tag. The checks in chart_for() keep the
 # drawn numbers consistent with the card text (0.42 / 0.55 kW, 1.2 -> 2.1 mm/s, night flow 01:00-04:00, +9 degC at 33 m).

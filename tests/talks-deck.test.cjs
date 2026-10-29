@@ -78,17 +78,65 @@ test('provenance: every image is listed in img/SOURCES.md and used; lecture figu
   assert.ok(fs.readFileSync(path.join(deck, 'fonts', 'OFL.txt'), 'utf8').includes('SIL OPEN FONT LICENSE Version 1.1'));
 });
 
-test('test-install slides: sensor details sit beside the image (never on it), with simulated charts from the registry / feed', () => {
-  const panels = [...html.matchAll(/<div class="twpanel" style="left:([\d.]+)px;top:([\d.]+)px;width:([\d.]+)px;height:([\d.]+)px">/g)].map(m => m.slice(1).map(Number));
+test('test-install slides: a callout card per sensor over the image, with simulated charts from the registry / feed', () => {
+  const layers = [...html.matchAll(/<div class="twco" data-ob='([^']+)' style="left:([\d.]+)px;top:([\d.]+)px;width:([\d.]+)px;height:([\d.]+)px">/g)];
   const figs = [...html.matchAll(/<div class="tw" data-slug="[^"]+"[^>]*style="left:([\d.]+)px;top:([\d.]+)px;width:([\d.]+)px;height:([\d.]+)px">/g)].map(m => m.slice(1).map(Number));
-  assert.equal(panels.length, 5); assert.equal(figs.length, 5);
-  panels.forEach(([pl, pt, pw, ph], i) => { const [fl, , fw] = figs[i]; assert.ok(pl >= fl + fw, 'panel right of the image on concept slide ' + (i + 1)); assert.ok(pt + ph <= 1080 * 5.0 / 5.625, 'panel above the footnote'); });
-  assert.ok(!/class="twcard/.test(html), 'no floating popup on the screenshot');
+  assert.equal(layers.length, 5); assert.equal(figs.length, 5);
+  layers.forEach((m, i) => {
+    assert.deepEqual(m.slice(2).map(Number), figs[i], 'callout layer covers exactly the image on concept slide ' + (i + 1));
+    const ob = JSON.parse(m[1]);
+    for (const [k, o] of Object.entries(ob)) { assert.equal(o.b.length, 3, 'badge x, y, r for marker ' + k); assert.ok(Array.isArray(o.geo) && Array.isArray(o.area)); }
+  });
+  assert.ok(!/class="twpanel|class="twinfo|class="twcard/.test(html), 'no duplicate details panel in the right column, no old popup');
+  assert.ok(!/\.slide\.tw-sel \.twsteps\{display:none\}/.test(html), 'the steps stay visible while a sensor is selected');
   const charts = html.match(/<svg class="twc"/g) || [];
   assert.ok(charts.length >= 12, 'charts for the main sensors: ' + charts.length);
   assert.equal((html.match(/aria-label="[^"]*\(simulated\)"/g) || []).length, charts.length, 'every chart is labelled simulated');
   for (const s of ['31 °C at 33 m', '+9 °C at 33 m', 'peak 0.55', 'now 0.42', '0.6 L/s, 01:00–04:00', 'design ref. 450 (to verify)', '>1.2<', '>2.1<', 'dry all day']) assert.ok(html.includes(s), 'chart label ' + s);
-  assert.equal((html.match(/SIMULATED · not installed/g) || []).length, CFG.sensors.length, 'every info panel says simulated / not installed');
+  assert.equal((html.match(/SIMULATED · not installed/g) || []).length, CFG.sensors.length, 'every callout says simulated / not installed');
+  assert.ok(html.includes(read('place.js').trim().slice(0, 200)), 'place.js is inlined');
+});
+
+/* place.js: the pure callout placement used on the test-install slides */
+const TP = require(path.join(deck, 'place.js'));
+const ov = (a, b) => TP.area(a, b) > 0;
+const dot = (x, y, r) => [x - r, y - r, x + r, y + r];
+test('callout placement: beside the marker, inside the image, clear of other markers', () => {
+  const B = [0, 0, 780, 630], sizes = [{w: 420, h: 330}, {w: 350, h: 280}, {w: 290, h: 240}];
+  const c = TP.place({anchor: {x: 200, y: 300}, sizes, bounds: B, hard: [dot(200, 300, 34)], gap: 46});
+  assert.equal(c.stage, 1); assert.equal(c.tier, 0); assert.equal(c.x, 246, 'first choice: right of the marker'); assert.equal(c.hard, 0);
+  // near the right edge it flips to the left
+  const r = TP.place({anchor: {x: 700, y: 300}, sizes, bounds: B, hard: [dot(700, 300, 34)], gap: 46});
+  assert.ok(r.x + r.w <= 700 - 46 + .01 && r.x >= 0, 'left of the marker');
+  // another marker on the right and below: the card goes elsewhere, never on it
+  const others = [dot(330, 300, 26), dot(200, 420, 26)];
+  const o = TP.place({anchor: {x: 200, y: 300}, sizes, bounds: B, hard: [dot(200, 300, 34), ...others], gap: 46});
+  const rect = [o.x, o.y, o.x + o.w, o.y + o.h];
+  assert.equal(o.hard, 0); for (const m of others) assert.ok(!ov(rect, m)); assert.ok(rect[0] >= 0 && rect[1] >= 0 && rect[2] <= 780 && rect[3] <= 630);
+  // a crowded image: smaller card or a nearby grid spot, still no hard overlap
+  const crowd = [dot(260, 300, 26), dot(140, 300, 26), dot(200, 240, 26), dot(200, 360, 26)];
+  const q = TP.place({anchor: {x: 200, y: 300}, sizes, bounds: B, hard: [dot(200, 300, 34), ...crowd], gap: 46});
+  assert.equal(q.hard, 0); assert.ok(q.stage >= 1);
+  // impossible: least overlap, reported as stage 3
+  const z = TP.place({anchor: {x: 50, y: 50}, sizes: [{w: 100, h: 100}], bounds: [0, 0, 120, 120], hard: [[0, 0, 120, 120]]});
+  assert.equal(z.stage, 3); assert.ok(z.hard > 0);
+});
+test('callout placement: a diagonal pipe blocks only its own path, soft shapes only when there is a choice, prefer keeps the spot', () => {
+  const pipe = TP.shapeRects([['seg', 0, 0, 600, 600, 6]]);
+  assert.ok(pipe.length >= 30, 'cut into pieces');
+  assert.ok(!pipe.some(r => ov(r, [400, 50, 600, 200])), 'the empty corner above a diagonal is free');
+  assert.equal(TP.shapeRects([['ring', 100, 100, 50, 5]]).length, 24);
+  assert.deepEqual(TP.shapeRects([['dot', 10, 10, 4]], 2), [[12, 12, 28, 28]]);
+  const sizes = [{w: 200, h: 120}], B = [0, 0, 600, 600];
+  const c = TP.place({anchor: {x: 300, y: 300}, sizes, bounds: B, hard: [dot(300, 300, 30), ...pipe], gap: 40});
+  assert.equal(c.hard, 0); assert.ok(!pipe.some(r => ov(r, [c.x, c.y, c.x + c.w, c.y + c.h])), 'card off the selected pipe');
+  const s = TP.place({anchor: {x: 300, y: 300}, sizes, bounds: B, hard: [dot(300, 300, 30)], soft: [[330, 200, 600, 420]], gap: 40});
+  assert.equal(s.soft, 0, 'soft area avoided when a clean spot exists');
+  const p = TP.place({anchor: {x: 300, y: 300}, sizes, bounds: B, hard: [dot(300, 300, 30)], gap: 40, prefer: {tier: 0, dx: -240, dy: -60}});
+  assert.equal(p.stage, 0); assert.equal(p.x, 60);
+  const ln = TP.leader({x: 340, y: 240, w: 200, h: 120}, 300, 300, 30);
+  assert.deepEqual(ln.slice(2), [340, 300]); assert.ok(Math.abs(ln[0] - 330) < 1e-9);
+  assert.equal(TP.leader({x: 280, y: 280, w: 50, h: 50}, 300, 300, 30), null, 'no leader when the card touches the marker');
 });
 
 test('live views: the viewer loads a scene\'s anchor layers first (deck speed-up)', () => {

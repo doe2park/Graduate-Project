@@ -1,5 +1,5 @@
 # Generic interactive "twin concept" slide machinery (live SVG on a clean Lens base image). Used by gen.py.
-import html, math
+import html, json, math
 def e(s): return html.escape(s, quote=True)
 IMG_W, IMG_H = 775, 630
 
@@ -63,54 +63,100 @@ def build_twin(sc, U, x, y, h):
             f'<a class="btn tw-btn" href="{e(sc["live"])}" target="_blank" rel="noopener">Open in viewer ↗</a><span class="tw-status" aria-live="polite"></span></div>')
     return out, w
 
-def info_panel(sc, U, x, y, w, h, chart_for):
-    """Sensor details OUTSIDE the image (right column, in place of the steps while a sensor is selected): never covers a
-    marker, the pipe or the live view. One block per numbered sensor, with a small simulated chart when the registry or
-    the demo feed has a series that matches the card (charts.py)."""
+def callouts(sc, U, x, y, h, chart_for):
+    """Callout layer over the image / live view (slides 12-16): one compact card per numbered sensor (title, SIMULATED tag,
+    the simulated reading, a small chart when the registry or the demo feed has a matching series, charts.py). deck JS
+    places the selected card BESIDE its marker or live pin with a leader line, clear of the other markers, the selected
+    sensor's pipe / cable and the slide text (place.js). data-ob: badge [x, y, r] and drawn shapes per marker, base-image px."""
+    w = h * IMG_W / IMG_H
     px = lambda v: f'{v*U:.1f}px'
-    out = f'<div class="twpanel" style="left:{px(x)};top:{px(y)};width:{px(w)};height:{px(h)}">'
+    ob = {el['k']: dict(b=[*el['badge'], el.get('br', 20)], geo=el.get('geo', []), area=el.get('area', [])) for el in sc['elements']}
+    out = (f'<div class="twco" data-ob=\'{json.dumps(ob, separators=(",", ":"))}\' style="left:{px(x)};top:{px(y)};width:{px(w)};height:{px(h)}">'
+           '<svg class="twlead" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible" aria-hidden="true"><line class="twl0"/><line class="twl1"/><circle r="5"/></svg>')
     for el in sc['elements']:
         k = el['k']; ch = chart_for(el.get('sid', ''))
-        out += (f'<div class="twinfo{" haschart" if ch else ""}" data-m="{k}" hidden><div class="twh" style="background:{el["col"]}"><span>{k}</span><em>{e(el["title"])}</em>'
-                f'<i>SIMULATED · not installed</i></div><div class="twib"><div class="twit"><p><b>Simulated reading</b>{e(el["val"])}</p>'
-                f'<p><b>What it is</b>{e(el["what"])}</p><p><b>Maps to</b>{e(el.get("maps","BIM element ID"))}</p></div>'
-                + (f'<div class="twch">{ch}</div>' if ch else '') + '</div></div>')
+        out += (f'<div class="twcall{" haschart" if ch else ""}" data-m="{k}" role="note" hidden><div class="twh" style="background:{el["col"]}"><span>{k}</span>'
+                f'<div><em>{e(el["title"])}</em><i>SIMULATED · not installed</i></div></div><p class="twcv">{e(el["val"])}</p>'
+                + (f'<div class="twch">{ch}</div>' if ch else '') + '</div>')
     return out + '</div>'
 
 TWIN_JS = r"""
 document.querySelectorAll('.tw').forEach(tw=>{
 const sl=tw.closest('.slide'),base=tw.querySelector('.tw-base'),svg=tw.querySelector('.tw-svg'),
-  infos=[...sl.querySelectorAll('.twinfo')],rows=[...sl.querySelectorAll('.twrow')],mks=[...tw.querySelectorAll('.mk')],halos=[...tw.querySelectorAll('.halo')],
-  tg=sl.querySelector('.tw-toggle'),grp=tw.querySelector('.tw-sensors'),status=sl.querySelector('.tw-status');
+  rows=[...sl.querySelectorAll('.twrow')],mks=[...tw.querySelectorAll('.mk')],halos=[...tw.querySelectorAll('.halo')],
+  tg=sl.querySelector('.tw-toggle'),grp=tw.querySelector('.tw-sensors'),status=sl.querySelector('.tw-status'),
+  co=sl.querySelector('.twco'),calls=[...co.querySelectorAll('.twcall')],lead=co.querySelector('.twlead'),
+  OB=JSON.parse(co.dataset.ob),FS=parseFloat(tw.style.width)/(+tw.dataset.w);
 base.addEventListener('error',()=>{if(base.dataset.fallback){base.src=base.dataset.fallback}svg.remove();tw.classList.add('fallback')},{once:true});
 /* selection: pinned (click) > hover (deck) > liveSel (a pin hovered / clicked inside the live view) */
-let pinned=null,hover=null,liveSel=null,on=true,cardObs=null;
+let pinned=null,hover=null,liveSel=null,on=true,cardObs=null,pinObs=null,shown=null,prefer=null,raf=0;
 const live=sl.querySelector('.twlive'),mode=sl.querySelector('.tw-mode'),SID={},KOF={};rows.forEach(r=>{if(r.dataset.sid){SID[+r.dataset.m]=r.dataset.sid;KOF[r.dataset.sid]=+r.dataset.m}});
 const liveOn=()=>!!live&&!live.hidden&&live.classList.contains('ready')&&!live.classList.contains('failed');
 const liveFrame=()=>{const f=live&&live.querySelector('iframe');return liveOn()&&f&&f.contentWindow?f:null};
 function focusLive(){const f=liveFrame();if(!f)return;const k=pinned||hover;try{f.contentWindow.postMessage({type:'grimes-sensor-demo-focus',id:(on&&k&&SID[k])||null},location.origin)}catch(_){}}
 /* the viewer's own card (#sdCard) is hidden in the deck; its state tells us which pin the audience is looking at */
 function watchCard(){if(cardObs){cardObs.disconnect();cardObs=null}const f=liveFrame();let c=null;try{c=f&&f.contentDocument.getElementById('sdCard')}catch(_){}
-  if(!c)return;const sync=()=>{const id=c.classList.contains('show')?c.dataset.sensor:'';const k=KOF[id]||null;if(k!==liveSel){liveSel=k;render(true)}};
+  if(!c)return;const sync=()=>{const id=c.classList.contains('show')?c.dataset.sensor:'';const k=KOF[id]||null;
+    if(!k&&pinned&&liveSel)pinned=null;   /* clicked elsewhere in the view: the deck selection closes too */
+    if(k!==liveSel){liveSel=k;render(true)}};
   cardObs=new MutationObserver(sync);cardObs.observe(c,{attributes:true,attributeFilter:['class','data-sensor']});sync()}
+/* the callout follows its pin while the view moves (pins are re-positioned by the viewer on every frame) */
+function watchPins(){if(pinObs){pinObs.disconnect();pinObs=null}const f=liveFrame();let L=null;try{L=f&&f.contentDocument.getElementById('sdLayer')}catch(_){}
+  if(!L)return;pinObs=new MutationObserver(()=>{if(shown&&!raf)raf=requestAnimationFrame(()=>{raf=0;placeCall(true)})});
+  pinObs.observe(L,{attributes:true,subtree:true,attributeFilter:['style','hidden']})}
 function setStatus(){if(!status||!live)return;const busy=!live.hidden&&!live.classList.contains('ready')&&!live.classList.contains('failed')&&sl.classList.contains('active');
   status.textContent=busy?'Live 3D view loading… static view shown':'';status.hidden=!busy}
 function setMode(stat){if(!live)return;live.hidden=stat;live.dataset.off=stat?'1':'';mode.setAttribute('aria-pressed',String(stat));mode.textContent=stat?'Interactive view':'Static view';
   if(stat)unloadLive(live);else if(sl.classList.contains('active'))loadLive(live);liveSel=null;setStatus();render();mode.blur()}
-if(mode)mode.addEventListener('click',()=>setMode(!live.hidden));
+if(mode)mode.addEventListener('click',ev=>{ev.stopPropagation();setMode(!live.hidden)});
 if(live)new MutationObserver(()=>{if(live.classList.contains('failed')&&mode){mode.textContent='Live view unavailable';mode.disabled=true}
-  if(liveOn()){watchCard();focusLive()}else{if(cardObs){cardObs.disconnect();cardObs=null}liveSel=null}setStatus();render(true)}).observe(live,{attributes:true,attributeFilter:['class','hidden']});
+  if(liveOn()){watchCard();watchPins();focusLive()}else{if(cardObs){cardObs.disconnect();cardObs=null}if(pinObs){pinObs.disconnect();pinObs=null}liveSel=null}setStatus();render(true)}).observe(live,{attributes:true,attributeFilter:['class','hidden']});
 if(sl)new MutationObserver(setStatus).observe(sl,{attributes:true,attributeFilter:['class']});
+/* ---- callout beside the selected marker / pin (place.js: clear of the other markers, the selected pipe / cable, the text) */
+const W=parseFloat(co.style.width),H=parseFloat(co.style.height),BOUNDS=[6,6,W-6,H-6],TIERS=['t0','t1','t2'];
+const rel=(r,o)=>[r.left-o.left,r.top-o.top,r.right-o.left,r.bottom-o.top];
+function sizes(c){const out=[];TIERS.forEach(t=>{c.classList.remove(...TIERS);c.classList.add(t);out.push({w:c.offsetWidth,h:c.offsetHeight})});return out}
+function staticScene(k){const hard=[],soft=[];
+  for(const [m,o] of Object.entries(OB)){const [bx,by,br]=o.b;
+    if(+m===k){hard.push(...TwPlace.shapeRects([['dot',bx,by,34]],FS),...TwPlace.shapeRects(o.geo,FS))}
+    else{hard.push(...TwPlace.shapeRects([['dot',bx,by,br+6]],FS));soft.push(...TwPlace.shapeRects(o.geo,FS))}
+    soft.push(...TwPlace.shapeRects(o.area,FS))}
+  const [ax,ay]=OB[k].b;return {anchor:{x:ax*FS,y:ay*FS},r0:30*FS,hard,soft}}
+function liveScene(k){const f=liveFrame();if(!f)return null;let d;try{d=f.contentDocument}catch(_){return null}if(!d)return null;
+  const sc=+live.dataset.scale||1,fo={left:0,top:0},S=r=>[r[0]*sc,r[1]*sc,r[2]*sc,r[3]*sc],pad=(r,p)=>[r[0]-p,r[1]-p,r[2]+p,r[3]+p];
+  const hard=[],soft=[],sid=SID[k];let anchor=null,r0=18;
+  d.querySelectorAll('#sdLayer .sd-pin').forEach(p=>{if(p.hidden)return;const r=S(rel(p.getBoundingClientRect(),fo));
+    if(p.dataset.sensor===sid){const a=p.dataset.type==='alert'?18:12;hard.push(pad(r,a));anchor={x:(r[0]+r[2])/2,y:(r[1]+r[3])/2};r0=(r[2]-r[0])/2+a-4}
+    else hard.push(pad(r,5))});
+  d.querySelectorAll('#sdLayer .sd-chip').forEach(c=>{if(!c.hidden)soft.push(S(rel(c.getBoundingClientRect(),fo)))});
+  const sv=d.querySelector('#sdLayer svg');if(sv){const o=sv.getBoundingClientRect(),own=sid==='leak-dts';
+    sv.querySelectorAll('line').forEach(l=>{const q=TwPlace.shapeRects([['seg',+l.getAttribute('x1')+o.left,+l.getAttribute('y1')+o.top,+l.getAttribute('x2')+o.left,+l.getAttribute('y2')+o.top,5]],sc);(own?hard:soft).push(...q)})}
+  const bd=d.getElementById('sdBadge');if(bd&&bd.offsetWidth)hard.push(S(rel(bd.getBoundingClientRect(),fo)));
+  const bl=live.querySelector('.badge-live');if(bl&&bl.offsetWidth)hard.push([bl.offsetLeft,bl.offsetTop,bl.offsetLeft+bl.offsetWidth,bl.offsetTop+bl.offsetHeight]);
+  if(!anchor){const [ax,ay]=OB[k].b;anchor={x:ax*FS,y:ay*FS,off:true}}   /* pin out of view: the card sits near the sensor's usual spot, no leader */
+  return {anchor,r0,hard,soft}}
+function placeCall(keep){const k=shown;if(!k)return;const c=calls.find(x=>+x.dataset.m===k);if(!c)return;
+  const S=liveOn()?liveScene(k):staticScene(k);if(!S)return;
+  const sz=sizes(c),p=TwPlace.place({anchor:S.anchor,sizes:sz,bounds:BOUNDS,hard:S.hard,soft:S.soft,gap:S.r0+16,prefer:keep?prefer:null});
+  prefer={tier:p.tier,dx:p.dx,dy:p.dy};c.classList.remove(...TIERS);c.classList.add(TIERS[p.tier]);
+  c.style.left=p.x.toFixed(1)+'px';c.style.top=p.y.toFixed(1)+'px';c.dataset.stage=p.stage;c.dataset.hard=Math.round(p.hard);c.dataset.soft=Math.round(p.soft);
+  const ln=S.anchor.off?null:TwPlace.leader(p,S.anchor.x,S.anchor.y,S.r0);lead.style.display=ln?'':'none';
+  if(ln){lead.querySelectorAll('line').forEach(l=>{l.setAttribute('x1',ln[0]);l.setAttribute('y1',ln[1]);l.setAttribute('x2',ln[2]);l.setAttribute('y2',ln[3])});
+    const cc=lead.querySelector('circle');cc.setAttribute('cx',ln[0]);cc.setAttribute('cy',ln[1])}}
+function showCall(k){if(k!==shown)prefer=null;shown=k;calls.forEach(c=>{c.hidden=+c.dataset.m!==k});co.classList.toggle('on',!!k);if(k)placeCall(false);else lead.style.display='none'}
 function render(noFocus){const k=on?(pinned||hover||(liveOn()?liveSel:null)):null;
-  infos.forEach(c=>{c.hidden=+c.dataset.m!==k});sl.classList.toggle('tw-sel',!!k);tw.classList.toggle('sel',!!k);
+  showCall(k);sl.classList.toggle('tw-sel',!!k);tw.classList.toggle('sel',!!k);
   rows.forEach(r=>r.classList.toggle('on',+r.dataset.m===k));
   mks.forEach(g=>g.classList.toggle('on',+g.dataset.m===k));halos.forEach(g=>g.classList.toggle('on',+g.dataset.m===k));if(!noFocus)focusLive()}
 function wire(el,m){el.addEventListener('mouseenter',()=>{hover=m;render()});el.addEventListener('mouseleave',()=>{hover=null;render()});
   el.addEventListener('click',ev=>{ev.stopPropagation();pinned=pinned===m?null:m;render()});
   el.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.stopPropagation();pinned=pinned===m?null:m;render()}})}
 mks.forEach(g=>wire(g,+g.dataset.m));rows.forEach(r=>wire(r,+r.dataset.m));
-tw.addEventListener('click',()=>{pinned=null;render()});
-if(tg)tg.addEventListener('click',()=>{on=!on;grp.style.display=on?'':'none';
+calls.forEach(c=>c.addEventListener('click',ev=>ev.stopPropagation()));   /* clicking the card itself keeps it open */
+sl.addEventListener('click',ev=>{if(ev.target.closest('.tw-btn,a'))return;if(pinned){pinned=null;render()}});   /* click elsewhere closes */
+const esc=()=>{if(!sl.classList.contains('active'))return;pinned=null;hover=null;render();try{const f=liveFrame();f&&f.contentWindow.postMessage({type:'grimes-sensor-demo-focus',id:null},location.origin)}catch(_){}};
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape')esc()});document.addEventListener('deck-esc',esc);
+if(tg)tg.addEventListener('click',ev=>{ev.stopPropagation();on=!on;grp.style.display=on?'':'none';
   try{const f=liveFrame(),b=f&&f.contentDocument.getElementById('sdToggle');if(b&&(b.getAttribute('aria-pressed')==='true')!==on)b.click()}catch(_){}tg.textContent='Sensors: '+(on?'on':'off');tg.setAttribute('aria-pressed',on);tg.blur();if(!on)pinned=null;render()});
 addEventListener('hashchange',()=>{pinned=null;hover=null;render()});
 setStatus();
@@ -134,19 +180,23 @@ TWIN_CSS = """
 .tw.sel .mk:not(.on){opacity:.45}
 .tw .halo{display:none;pointer-events:none}.tw .halo.on{display:inline}
 .twrow{transition:background .15s,outline-color .15s;outline:3px solid transparent;outline-offset:-1px}.twrow.on{background:#FFF3D6;outline-color:#FDB515}
-.slide.tw-sel .twsteps{display:none}
 .twsteps>*{position:absolute}
-.twpanel{pointer-events:none}
-.twinfo{position:absolute;inset:0;background:#fff;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.25);outline:3px solid #FDB515;outline-offset:-1px;overflow:hidden;color:#1F2A37;display:flex;flex-direction:column}
-.twinfo[hidden]{display:none}
-.twh{color:#fff;font-weight:700;font-size:23px;padding:6px 14px;display:flex;align-items:center;gap:12px;flex:none}
-.twh span{background:#fff;color:#1F2A37;border-radius:50%;width:34px;height:34px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:21px}
-.twh em{font-style:normal;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.twh i{font-style:normal;font-size:14px;letter-spacing:.05em;background:rgba(255,255,255,.2);border-radius:5px;padding:2px 7px;flex:none}
-.twib{display:flex;gap:14px;padding:6px 14px 10px;flex:1;min-height:0}
-.twit{flex:1;min-width:0;font-size:21px;line-height:1.2}
-.twit p{margin:0 0 3px}.twit b{color:#003262;display:block;font-size:15px;text-transform:uppercase;letter-spacing:.05em}
-.twch{flex:none;width:400px;align-self:center}.twc{display:block;width:400px;height:236px;font-family:Calibri,Carlito,Arial,sans-serif}
+/* callout layer: same box as the image, above the live view; only the card itself takes clicks */
+.twco{z-index:4;pointer-events:none;overflow:hidden}
+.twlead{display:none}.twco.on .twlead{display:block}
+.twlead line.twl0{stroke:#fff;stroke-width:8;stroke-linecap:round}.twlead line.twl1{stroke:#FDB515;stroke-width:4;stroke-linecap:round}.twlead circle{fill:#FDB515;stroke:#fff;stroke-width:2.5}
+.twcall{position:absolute;left:0;top:0;pointer-events:auto;background:#fff;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.35);outline:3px solid #FDB515;outline-offset:-1px;overflow:hidden;color:#1F2A37;cursor:default}
+.twcall[hidden]{display:none}
+.twcall.t0{width:420px}.twcall.t1{width:350px}.twcall.t2{width:290px}
+.twcall:not(.haschart).t0{width:340px}.twcall:not(.haschart).t1{width:300px}.twcall:not(.haschart).t2{width:260px}
+.twh{color:#fff;font-weight:700;padding:6px 12px;display:flex;align-items:center;gap:10px}
+.twh span{background:#fff;color:#1F2A37;border-radius:50%;width:32px;height:32px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:20px}
+.twh div{min-width:0;display:flex;flex-direction:column}
+.twh em{font-style:normal;font-size:20px;line-height:1.12}
+.twh i{font-style:normal;font-size:13px;letter-spacing:.05em;opacity:.95;margin-top:1px}
+.twcv{margin:0;padding:6px 12px 2px;font-size:19px;line-height:1.2}
+.t2 .twcv{font-size:17px}.t2 .twh em{font-size:18px}
+.twch{padding:0 10px 6px}.twc{display:block;width:100%;height:auto;font-family:Calibri,Carlito,Arial,sans-serif}
 .tw-btn{font-size:19px;padding:5px 16px;display:inline-flex;align-items:center}
 .tw-btn[disabled]{opacity:.55;cursor:default}
 .tw-status{font:700 17px Calibri,Carlito,Arial,sans-serif;color:#003262;background:#FFF3D6;border-radius:999px;padding:4px 12px;white-space:nowrap}

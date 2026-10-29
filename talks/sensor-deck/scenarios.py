@@ -166,3 +166,21 @@ S5 = dict(
 for _s, _n in ((S2, 'twin-hvac'), (S3, 'twin-water'), (S4, 'twin-power'), (S5, 'twin-fan')):
     _s['kind'] = 'figure'
 SCENARIOS = [S1, S2, S3, S4, S5]
+
+# ---------- drawn geometry per marker, for the callout placement (place.js; base-image px). 'geo' is avoided when that
+# marker is selected (hard) and when another one is (soft); 'area' (tints) is only ever soft. Shapes: seg / ring / box / dot.
+GEO = {
+ ('leak', 1): dict(geo=[('seg', *P0, *P1, 9)]),
+ ('leak', 2): dict(geo=[('ring', round(HOT[0], 1), round(HOT[1], 1), 40, 6), ('seg', round(HOT[0], 1), round(HOT[1], 1), *LEAK, 3)]),
+ ('hvac', 1): dict(geo=[('seg', 585, 335, 585, 190, 5)]),
+ ('hvac', 3): dict(area=[('box', 45, 250, 425, 440)]),
+ ('water', 1): dict(geo=[('box', 594, 286, 636, 314)]),
+ ('water', 3): dict(geo=[('ring', 615, 300, 46, 6), ('seg', 615, 300, 715, 148, 3)]),
+ ('power', 1): dict(geo=[('seg', 535, 330, 700, 205, 3)]),
+ ('power', 2): dict(geo=[('seg', 705, 378, 700, 205, 3)]),
+ ('power', 3): dict(geo=[('seg', 535, 330, 700, 205, 3), ('seg', 705, 378, 700, 205, 3)]),
+ ('fan', 3): dict(geo=[('ring', 540, 330, 98, 6)]),
+}
+for _s in SCENARIOS:
+    for _el in _s['elements']:
+        _el.update(GEO.get((_s['slug'], _el['k']), {}))

@@ -194,7 +194,7 @@ def sensing_table():
     return out
 
 # --- interactive twin concept slides (generic; scenarios in scenarios.py)
-from twin_lib import build_twin, info_panel, TWIN_JS, TWIN_CSS
+from twin_lib import build_twin, callouts, TWIN_JS, TWIN_CSS
 from charts import chart_for
 SC = {sc['id']: sc for sc in SCENARIOS}
 
@@ -223,10 +223,10 @@ def twin_slide(sc):
         lg = ''.join(f'<span style="display:inline-flex;align-items:center;margin-right:{.18*U:.0f}px"><i style="display:inline-block;width:{.13*U:.0f}px;height:{.13*U:.0f}px;background:{c};margin-right:{.06*U:.0f}px"></i>{n}</span>' for c, n in sc['legend'])
         out += f'<div class="tx" style="{pos(rx,yy+.0,rw,.22)};flex-direction:row;font-size:{9*PT:.1f}px;align-items:center">{lg}</div>'
         yy += .26
-    # selected sensor: details + simulated chart in this column, in place of the steps (never on top of the image)
-    out += info_panel(sc, U, rx, yy + .04, rw, 4.95 - yy - .04, chart_for)
     sy = 3.54
     out += '<div class="twsteps">' + numsteps(rx, sy, rw, 4.7 - sy, sc['steps'], head_size=10, size=9, arrow=.18, compact=True) + '</div>'
+    # selected sensor: a callout card beside its marker / live pin, placed clear of the other markers and the text (place.js)
+    out += callouts(sc, U, x, y, h, chart_for)
     return out
 
 def fig(p, x, y, w, h, frame=False):
@@ -543,7 +543,7 @@ def slide(s, n):
 slides_html = '\n'.join(slide(s, i + 1) for i, s in enumerate(SLIDES))
 notes = json.dumps([s.get('notes', '') for s in SLIDES], ensure_ascii=False)
 css = (ROOT / 'deck.css').read_text() + TWIN_CSS + DIV_CSS
-js = (ROOT / 'deck.js').read_text()
+js = (ROOT / 'deck.js').read_text() + '\n' + (ROOT / 'place.js').read_text()
 doc = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Building Data and Sensing for the Grimes Twin</title>
