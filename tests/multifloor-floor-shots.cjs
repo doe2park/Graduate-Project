@@ -2,7 +2,7 @@
    2026-10-27). For each floor: the page opens the floor's own package, every station is on that floor (or its stairs),
    the photo label and the BIM floor filter follow, the Floor menu is offered, and a few stations are photographed
    looking up (ceiling/space views, people are below the horizon and blurred anyway).
-   Needs capture-local/grimes-L{2,3}-2026-10-18-v2 (scripts/multifloor_review.py floors) and python3 -m http.server.
+   Oct 18: the published packages scan-assets/captures/2026-10-18/floors/L{2,3} (2026-10-28); needs python3 -m http.server.
    PLAYWRIGHT_MODULE=/path/to/playwright-core node tests/multifloor-floor-shots.cjs
    Env: VIEWER_BASE_URL (default http://127.0.0.1:8790), CHROME_EXECUTABLE, VALIDATION_OUTPUT (default work/web-matrix/floors),
    FLOORS (default L2,L3), SHOTS (stations per floor, default 4), PITCH (radians, default 0.45 = looking up),
@@ -14,14 +14,16 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const ROOT=path.join(__dirname,'..'),OUT=process.env.VALIDATION_OUTPUT||path.join(ROOT,'work','web-matrix','floors'),BASE=process.env.VIEWER_BASE_URL||'http://127.0.0.1:8790';
 const FLOORS=(process.env.FLOORS||'L2,L3').split(','),SHOTS=+(process.env.SHOTS||4),PITCH=+(process.env.PITCH||0.45),VIEW=process.env.VIEW||'both';
 /* 2026-10-27: CAPTURE=<date> checks a Cupix-free local capture (scripts/capture_upper_floors.py -> capture-local/grimes-<L>-<date>) */
-const CAPTURE=process.env.CAPTURE||'2026-10-18',PKG=CAPTURE==='2026-10-18'?'-v2':'',TAG=CAPTURE==='2026-10-18'?'':'-'+CAPTURE;
+const CAPTURE=process.env.CAPTURE||'2026-10-18',TAG=CAPTURE==='2026-10-18'?'':'-'+CAPTURE;
+/* 2026-10-28: Oct 18 Level 2 / Level 3 are published (scan-assets/captures/2026-10-18/floors/<L>, scripts/publish_upper_floors.py) */
+const manifestFor=floor=>CAPTURE==='2026-10-18'?`scan-assets/captures/2026-10-18/floors/${floor}/panoramas/manifest.json`:`capture-local/grimes-${floor}-${CAPTURE}/panoramas/manifest.json`;
 (async()=>{
  fs.mkdirSync(OUT,{recursive:true});
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=metal']});
  const report={base:BASE,floors:{}},errors=[];let ran=0;
  try{
   for(const floor of FLOORS){
-   const man=path.join(ROOT,`capture-local/grimes-${floor}-${CAPTURE}${PKG}/panoramas/manifest.json`);
+   const man=path.join(ROOT,manifestFor(floor));
    if(!fs.existsSync(man)){console.log('SKIP',floor,'package not built');continue;}
    const m=JSON.parse(fs.readFileSync(man,'utf8'));ran++;
    const page=await browser.newPage({viewport:{width:1280,height:800}});page.setDefaultTimeout(120000);page.on('pageerror',e=>errors.push(floor+': '+e.message));
@@ -36,7 +38,7 @@ const CAPTURE=process.env.CAPTURE||'2026-10-18',PKG=CAPTURE==='2026-10-18'?'-v2'
    const state=()=>page.evaluate(()=>{const f=[...document.querySelectorAll('iframe')],p=f[0].contentWindow.photoInspection();
     return{active:p.active,id:p.station.id,level:p.station.level||null,count:p.count,label:f[0].contentWindow.document.getElementById('loading').textContent,
      bimFloorFilter:f[1].contentWindow.document.getElementById('elementFloor').value,note:document.getElementById('floorsNote')?.textContent||null,
-     jump:[...(document.getElementById('floorsJump')?.options||[])].map(o=>o.value)}});
+     jump:[...(document.getElementById('floorsJump')||document.getElementById('floorPicker'))?.options||[]].map(o=>o.value)}});
    await settle();
    /* the BIM pane swaps to this floor's interior (Compare) or this floor's walls as occluder (Overlay) */
    const interior=VIEW==='overlay'
@@ -46,7 +48,7 @@ const CAPTURE=process.env.CAPTURE||'2026-10-18',PKG=CAPTURE==='2026-10-18'?'-v2'
    if(VIEW==='overlay'){assert.equal(interiorState.source,`interior/enclosure-${floor.toLowerCase()}.glb (Walls)`);assert.ok(interiorState.elements>0);}
    else{assert.equal(interiorState.level,floor);assert.equal(Object.keys(interiorState.groups).length,4);
     const status=await bim().evaluate(()=>document.getElementById('interiorStatus').textContent);assert.match(status,/not surveyed as-built/);interiorState.status=status;}
-   const first=await state();assert.equal(first.id,m.defaultStation,'opens on the default station');assert.match(first.note||'',new RegExp(floor.replace('L','Level ')+' only'));
+   const first=await state();assert.equal(first.id,m.defaultStation,'opens on the default station');assert.match(first.note||'',new RegExp(floor.replace('L','Level ')+' (only|\u00b7 provisional)'));
    /* spread SHOTS stations over the largest walk group (ordered by frame), never stairs */
    const group=m.walkGroups[0].map(id=>m.stations.findIndex(s=>s.id===id)).filter(i=>m.stations[i].level===floor);
    const picks=[...new Set(Array.from({length:SHOTS},(_,k)=>group[Math.round(k*(group.length-1)/Math.max(1,SHOTS-1))]))];

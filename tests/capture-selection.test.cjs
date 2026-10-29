@@ -57,3 +57,22 @@ test('the published Oct 18 package records the manual review and approval, never
  assert.match(m.privacy,/manual contact-sheet review/);assert.match(m.privacy,/2026-10-28/);assert.match(m.privacy,/not a claim of full anonymisation/);assert.doesNotMatch(m.privacy,/review required before publishing/);
  assert.equal(pr.manualReview.status,'done');assert.equal(pr.manualReview.publishApproved,'2026-10-28');assert.match(pr.manualReview.method,/automatic blur \+ manual contact-sheet review/);
  assert.doesNotMatch(JSON.stringify(pr)+m.privacy,/fully anonymi[sz]ed/i)});
+
+/* Oct 18 Level 2 / Level 3 published (2026-10-28): off localhost ?floors=L2 / L3 open the published per-floor packages with the
+   Oct 18 provisional registration; floors=all and the Oct 18 Gaussian stay local; captureSelection itself is unchanged */
+function floorHostBlock(){const a=src.match(/\/\* CAPTURE SELECTION \*\/([\s\S]*?)\/\* END CAPTURE SELECTION \*\//),b=src.match(/\/\* MULTI-FLOOR PREVIEW[\s\S]*?\*\/([\s\S]*?)\/\* END MULTI-FLOOR PREVIEW \*\//);const c={URLSearchParams};vm.createContext(c);vm.runInContext(a[1]+b[1]+';this.captureForHost=captureForHost;this.multiFloorSelection=multiFloorSelection;',c);return c}
+test('public hosts: ?capture=2026-10-18&floors=L2|L3 open the published floor packages, photos only, Oct 18 registration',()=>{const c=floorHostBlock(),p=require('node:path');
+ for(const host of ['doe2park.github.io','pages.emu','localhost.test'])for(const f of ['L2','L3'])for(const extra of ['','&mode=splat','&view=overlay']){
+  const q='?capture=2026-10-18&floors='+f+extra,cap=c.captureForHost(c.captureSelection(q),host),fl=c.multiFloorSelection(q,host,cap);
+  assert.equal(cap.date,'2026-10-18');assert.equal(cap.gaussian,null);assert.equal(cap.display,'photo');assert.equal(cap.registration,'scan-assets/captures/2026-10-18/registration.json');
+  assert.equal(fl.photo,'scan-assets/captures/2026-10-18/floors/'+f+'/panoramas/manifest.json');assert.equal(fl.floors,f);
+  const m=JSON.parse(fs.readFileSync(p.join(__dirname,'..',fl.photo),'utf8'));assert.equal(m.level,f);assert.equal(m.status,'published-provisional');assert.equal(m.exportedStations,m.stations.length)}
+ for(const host of ['doe2park.github.io','pages.emu']){assert.equal(c.multiFloorSelection('?capture=2026-10-18&floors=all',host,c.captureSelection('?capture=2026-10-18')),null);
+  assert.equal(c.multiFloorSelection('?capture=2026-09-17&floors=L2',host,c.captureSelection('?capture=2026-09-17')),null)}
+ assert.equal(c.captureSelection('?capture=2026-10-18&floors=L3').photo,'scan-assets/captures/2026-10-18/panoramas/manifest.json','captureSelection ignores floors')});
+test('the published floor packages record the privacy method and owner approval, never "fully anonymised", and an honest placement',()=>{const p=require('node:path');
+ for(const f of ['L2','L3']){const d=p.join(__dirname,'../scan-assets/captures/2026-10-18/floors',f),m=JSON.parse(fs.readFileSync(p.join(d,'panoramas/manifest.json'),'utf8')),pr=JSON.parse(fs.readFileSync(p.join(d,'provenance.json'),'utf8'));
+  assert.match(m.privacy,/^automatic blur \(strict\) \+ manual blur boxes after manual review of every image; publishing approved by the owner on 2026-10-28; not a claim of full anonymisation/);
+  assert.equal(pr.privacy.manualReview.status,'done');assert.equal(pr.privacy.manualReview.publishApproved,'2026-10-28');assert.equal(pr.sourceVideo,'VID_20261018_153400_00_477.insv');
+  assert.equal(pr.placementCupixFree,false);assert.match(m.placement,/fitted by frame number to the Cupix-placed stations/);assert.match(m.alignment,/provisional, not surveyed/);
+  assert.doesNotMatch(JSON.stringify(pr)+JSON.stringify(m),/fully anonymi[sz]ed|\/Users\/|raw477-blurred\//i)}});

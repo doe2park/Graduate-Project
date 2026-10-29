@@ -129,3 +129,22 @@ initialisation. Not measured.
 A dry run on video 477 with Cupix withheld gave `capture-local/grimes-L2-2026-10-18-nocupix` (54 stations) and `-L3-` (25 stations); view them with `scan-compare.html?capture=2026-10-18-nocupix&floors=L2`.
 Against the Cupix-based v2 packages, 79 frames differ by a median of 0.09 m (max 0.31 m). The Level 3 east loop (frames 39–178) could not be placed without Cupix: there is no Level 1 link, and SfM breaks at frames 179–215.
 Method and numbers: `docs/RAW360_PIPELINE.md`. Field protocol: `docs/FIELD_CAPTURE_L2_L3.md`.
+
+## Level 2 and Level 3 published (2026-10-28)
+
+- `scripts/publish_upper_floors.py` writes `scan-assets/captures/2026-10-18/floors/L2/` and `L3/` (54 + 54 stations; `--check` rebuilds
+  in memory and compares). Each package: `panoramas/f000NNN.jpg` (4096 x 2048, byte copies of the approved
+  `capture-local/grimes-UPPER-2026-10-18-raw477-manual` set), `panoramas/mobile/` (2048 x 1024 LANCZOS, JPEG quality 88, made from the
+  published file), `panoramas/manifest.json` (stations, route and floor assignment from the v2 package; `sha256` / `mobileSha256` of the
+  published files; `status: published-provisional`) and `provenance.json` (per-file hashes, privacy record, placement, what is not published).
+- Privacy: automatic blur (strict: person score 0.15, crop 1536; `grimes-UPPER-2026-10-18-raw477-blurred-v2/privacy-report.json`) +
+  1,241 manual blur boxes (L2 665, L3 576) after manual review of every image; publishing approved by the owner on 2026-10-28. Not a claim
+  of full anonymisation. The v2 packages still display the older automatic blur (`-raw477-blurred`), which missed seated people: never publish it.
+- Placement, stated honestly: the images are raw-video frames of `VID_20261018_153400_00_477` (not a Cupix export), but the v2 positions are
+  local SfM fitted by frame number to the Cupix-placed stations of the same video (`placementCupixFree: false`). The Cupix-free dry run
+  differs by a median 0.09 m (max 0.31 m) over 79 frames. Stations are in the Level 1 scan frame; `positionBIM` equals the published Oct 18
+  provisional registration applied to `position` (checked: 0.0 m difference on all 108), so `registration.json` is shared. Provisional, not surveyed.
+- Viewer: `scan-compare.html?capture=2026-10-18&floors=L2` / `floors=L3` on every host (also localhost, which now opens the published
+  packages instead of v2). A Floor picker (Level 1 / Level 2 · provisional / Level 3 · provisional) sits next to the Oct 18 date; the scan
+  header reads "Level N · provisional, not surveyed" with the method in its tooltip; the BIM element floor and interior follow the photo
+  floor. `floors=all`, the Oct 18 Gaussian, meshes and the raw477 Gaussian stay local.

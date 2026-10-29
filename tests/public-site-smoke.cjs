@@ -1,12 +1,14 @@
 /* Public-site smoke: what a visitor to GitHub Pages gets. Oct 18 Level 1 photos are published (2026-10-28, after manual
-   contact-sheet review); its Gaussian zones and the upper-floor previews stay local-only.
+   contact-sheet review), and Oct 18 Level 2 / Level 3 photos (2026-10-28, strict automatic blur + manual blur boxes after
+   manual review of every image); the Oct 18 Gaussian zones and the combined floors=all preview stay local-only.
    Run against the live site or a clean export of HEAD (git archive HEAD | tar -x) served under /Graduate-Project/:
      PLAYWRIGHT_MODULE=/path/to/playwright-core VIEWER_BASE_URL=https://doe2park.github.io/Graduate-Project node tests/public-site-smoke.cjs
    A local export needs a non-localhost host name (localhost-only previews would otherwise switch on), e.g.
      HOST_RULES='MAP pages.emu 127.0.0.1' VIEWER_BASE_URL=http://pages.emu:8811/Graduate-Project
    Checks: the three published captures are listed/cycled, Oct 18 Gaussian / floors=all links stay on Oct 18 photos with no
    local preview (Gaussian option reads "no Gaussian for this capture"), Overlay + Lens card + Range (Near/Room/All,
-   distance culling) on May 6, Sep 17 and Oct 18 photos and the May 6 Gaussian,
+   distance culling) on May 6, Sep 17 and Oct 18 photos and the May 6 Gaussian, Oct 18 Level 2 / Level 3 via the floor picker
+   (floor package, provisional label, BIM floor follows over three stations),
    BIM pose follows the scan, /vr/ opens scan-xr.html in desktop mode, campus dashboard loads (water panel hidden until
    the collector publishes water.usage). Real published meter data (no fixtures). Screenshots: VALIDATION_OUTPUT
    (default work/web-matrix/public). Headless desktop only: no frame-rate, phone or Quest claim. */
@@ -72,6 +74,21 @@ const report={base:BASE,started:new Date().toISOString(),checks:{}};
    const p=await open(url);await ready(p,'photo',false);
    const r=await p.evaluate(()=>({date:capture.date,photo:capture.photo,gaussian:capture.gaussian,label:document.querySelector('#scanMode [value=splat]').textContent,disabled:document.querySelector('#scanMode [value=splat]').disabled,note:document.getElementById('captureMissingNote')?.textContent||null,floors:!!document.getElementById('floorsToggle')}));
    assert.equal(r.date,'2026-10-18');assert.equal(r.photo,'scan-assets/captures/2026-10-18/panoramas/manifest.json');assert.equal(r.gaussian,null);assert.equal(r.label,'Gaussian · no Gaussian for this capture');assert.equal(r.disabled,true);assert.equal(r.note,null);assert.equal(r.floors,false);
+   r.errors=pageErrors(p);assert.deepEqual(r.errors,[]);report.checks[tag]=r;console.log(tag,JSON.stringify(r));await p.close();}
+  /* 5b. Oct 18 Level 2 / Level 3 (published 2026-10-28): floor picker, the floor's own package, BIM floor follows the photo floor */
+  for(const floor of ['L2','L3']){const tag='oct18-'+floor.toLowerCase()+'-overlay',p=await open('scan-compare.html?capture=2026-10-18&view=overlay&floors='+floor);await ready(p,'photo');
+   const man='scan-assets/captures/2026-10-18/floors/'+floor+'/panoramas/manifest.json',m=await p.evaluate(u=>fetch(u).then(r=>r.json()),man);
+   await scanFrame(p).waitForFunction(n=>photoInspection().count===n,m.stations.length);
+   const r=await p.evaluate(()=>({date:capture.date,photo:capture.photo,registration:capture.registration,picker:[...document.querySelectorAll('#floorPicker option')].map(o=>[o.value,o.textContent]),value:document.getElementById('floorPicker')?.value,note:document.getElementById('floorsNote')?.textContent||null,toggle:!!document.getElementById('floorsToggle')}));
+   assert.equal(r.date,'2026-10-18');assert.equal(r.photo,man);assert.equal(r.registration,'scan-assets/captures/2026-10-18/registration.json');assert.equal(r.value,floor);assert.equal(r.toggle,false,'no Levels 1-3 button off localhost');
+   assert.deepEqual(r.picker.map(o=>o[0]),['L1','L2','L3']);assert.match(r.picker[1][1],/provisional/);assert.match(r.note,new RegExp(floor.replace('L','Level ')+' · provisional, not surveyed'));
+   assert.equal(m.status,'published-provisional');assert.match(m.privacy,/manual review of every image/);
+   const group=m.walkGroups[0].map(id=>m.stations.findIndex(s=>s.id===id)).filter(i=>m.stations[i].level===floor),picks=[group[0],group[Math.floor(group.length/2)],group[group.length-1]];r.steps=[];
+   for(const i of picks){await scanFrame(p).selectOption('#station',String(i));await scanFrame(p).waitForFunction(()=>!photoInspection().loading&&!photoInspection().transitioning);
+    await bimFrame(p).waitForFunction(f=>document.getElementById('elementFloor').value===f,floor,{timeout:60000});await p.waitForTimeout(1200);
+    const s=await p.evaluate(()=>{const f=[...document.querySelectorAll('iframe')];return{id:f[0].contentWindow.photoInspection().station.id,bimFloor:f[1].contentWindow.document.getElementById('elementFloor').value};});
+    assert.equal(s.id,m.stations[i].id);assert.equal(s.bimFloor,floor);r.steps.push(s);await p.screenshot({path:path.join(OUT,tag+'-'+s.id.slice(-7)+'.png')});}
+   r.pose=await poseCheck(p);assert.ok(r.pose&&r.pose.positionErrorM<.01&&r.pose.rotationErrorDeg<.2,tag+' BIM pose follows scan '+JSON.stringify(r.pose));
    r.errors=pageErrors(p);assert.deepEqual(r.errors,[]);report.checks[tag]=r;console.log(tag,JSON.stringify(r));await p.close();}
   /* 6. VR page through the short /vr/ URL, desktop mode */
   {const p=await open('vr/');await p.waitForFunction(()=>window.xrInspection?.().ready,null,{timeout:120000});

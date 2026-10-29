@@ -1,0 +1,3455 @@
+{
+ "building": "Grimes",
+ "schema": "grimes-captured-panoramas/1",
+ "level": "L3",
+ "captureDate": "2026-10-18",
+ "exportedStations": 54,
+ "defaultStation": "raw477_f000088",
+ "frame": "Level 1 scan frame of the Oct 18 capture, Y-up metres (upper-floor video placed via the upper-walk candidate and, for raw INSV frames, a per-submodel fit to the Cupix video-B stations by frame number); the Oct 18 provisional registration then maps every station to BIM (positionBIM).",
+ "projection": "equirectangular",
+ "navigation": "Upper-video edges restricted to this floor: consecutive placed frames <= 7.7 m and rise <= 1.5 m = route; across a slab = stairs; non-consecutive same-floor links only when no BIM wall lies between stations <= 4 m apart (link-bim-clear, inferred from design walls). No links to other floors or to Level 1.",
+ "navigationLimits": {
+  "maxStep": 7.7,
+  "maxRise": 1.5,
+  "stairStep": 9.0,
+  "stairRise": 4.6
+ },
+ "levels": {
+  "L3": 45,
+  "stairs": 9
+ },
+ "walkGroups": [
+  [
+   "raw477_f000048",
+   "raw477_f000054",
+   "raw477_f000056",
+   "raw477_f000059",
+   "raw477_f000064",
+   "raw477_f000067",
+   "raw477_f000069",
+   "raw477_f000071",
+   "raw477_f000073",
+   "raw477_f000075",
+   "raw477_f000081",
+   "raw477_f000083",
+   "raw477_f000086",
+   "raw477_f000088",
+   "raw477_f000090",
+   "raw477_f000092",
+   "raw477_f000096",
+   "raw477_f000100",
+   "raw477_f000104",
+   "raw477_f000107",
+   "raw477_f000110",
+   "raw477_f000113",
+   "raw477_f000115",
+   "raw477_f000119",
+   "raw477_f000122",
+   "raw477_f000124",
+   "raw477_f000127",
+   "raw477_f000129",
+   "raw477_f000132",
+   "raw477_f000134"
+  ],
+  [
+   "raw477_f000216",
+   "raw477_f000218",
+   "raw477_f000221",
+   "raw477_f000225",
+   "raw477_f000228",
+   "raw477_f000231",
+   "raw477_f000234",
+   "raw477_f000237",
+   "raw477_f000239",
+   "raw477_f000242",
+   "raw477_f000244",
+   "raw477_f000246",
+   "raw477_f000249",
+   "raw477_f000251",
+   "raw477_f000255",
+   "raw477_f000258",
+   "raw477_f000262",
+   "raw477_f000264",
+   "raw477_f000268",
+   "raw477_f000271",
+   "raw477_f000274",
+   "raw477_f000276",
+   "raw477_f000279",
+   "raw477_f000282"
+  ]
+ ],
+ "floorAssignment": {
+  "rule": "Level from the highest near-horizontal BIM surface under the station (L2/L3 within 0.45 m of the slab, else stairs). Stair stations go with the floor at the top of their flight: lowest slab above that BIM floor. Slabs (viewer frame, m): {\"L1\": 5.2, \"L2\": 9.4, \"L3\": 14.3}.",
+  "excludedStations": [
+   {
+    "id": "raw477_f000285",
+    "frame": 285,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000287",
+    "frame": 287,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000289",
+    "frame": 289,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000291",
+    "frame": 291,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000294",
+    "frame": 294,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000297",
+    "frame": 297,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000300",
+    "frame": 300,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000302",
+    "frame": 302,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000306",
+    "frame": 306,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000311",
+    "frame": 311,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000317",
+    "frame": 317,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000323",
+    "frame": 323,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000325",
+    "frame": 325,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000329",
+    "frame": 329,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000332",
+    "frame": 332,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000335",
+    "frame": 335,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000338",
+    "frame": 338,
+    "packageFloor": "L2",
+    "level": "stairs"
+   },
+   {
+    "id": "raw477_f000342",
+    "frame": 342,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000344",
+    "frame": 344,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000346",
+    "frame": 346,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000348",
+    "frame": 348,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000350",
+    "frame": 350,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000353",
+    "frame": 353,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000355",
+    "frame": 355,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000360",
+    "frame": 360,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000365",
+    "frame": 365,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000367",
+    "frame": 367,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000369",
+    "frame": 369,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000373",
+    "frame": 373,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000376",
+    "frame": 376,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000379",
+    "frame": 379,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000381",
+    "frame": 381,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000385",
+    "frame": 385,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000387",
+    "frame": 387,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000407",
+    "frame": 407,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000411",
+    "frame": 411,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000413",
+    "frame": 413,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000415",
+    "frame": 415,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000417",
+    "frame": 417,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000420",
+    "frame": 420,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000425",
+    "frame": 425,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000428",
+    "frame": 428,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000430",
+    "frame": 430,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000435",
+    "frame": 435,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000437",
+    "frame": 437,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000439",
+    "frame": 439,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000441",
+    "frame": 441,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000444",
+    "frame": 444,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000447",
+    "frame": 447,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000449",
+    "frame": 449,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000451",
+    "frame": 451,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000454",
+    "frame": 454,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000458",
+    "frame": 458,
+    "packageFloor": "L2",
+    "level": "L2"
+   },
+   {
+    "id": "raw477_f000462",
+    "frame": 462,
+    "packageFloor": "L2",
+    "level": "L2"
+   }
+  ]
+ },
+ "coverage": "partial: one upper-floor video (VID_20261018_153400). Level 3: only the walked corridors; see walkGroups for disconnected parts.",
+ "status": "published-provisional",
+ "alignment": "provisional, not surveyed",
+ "placement": "Frames from the raw 360-degree video VID_20261018_153400_00_477 (not a Cupix export). Positions: local structure-from-motion submodels fitted by frame number to the Cupix-placed stations of the same video (upper-walk candidate: photo matching to Level 1 + yaw/XYZ ICP to BIM), moved into the Level 1 scan frame; the provisional Oct 18 registration then maps them to BIM. A Cupix-free placement dry run (scripts/raw360_bim.py) differs by a median 0.09 m (max 0.31 m) over 79 frames. Provisional, not surveyed.",
+ "privacy": "automatic blur (strict) + manual blur boxes after manual review of every image; publishing approved by the owner on 2026-10-28; not a claim of full anonymisation. Strict automatic blur = person score 0.15, crop 1536, fixed nadir cone. sha256 = published file.",
+ "source": {
+  "kind": "raw-insv-local-sfm",
+  "video": "VID_20261018_153400_00_477",
+  "panoramasInVideo": 108,
+  "models": [
+   {
+    "model": 1,
+    "frames": 78,
+    "frameRange": [
+     216,
+     462
+    ],
+    "status": "placed",
+    "scale": 1.9888051593591975,
+    "fitResidualMetres": {
+     "n": 16,
+     "median": 0.08602101476625937,
+     "p90": 0.12107980768635082,
+     "max": 0.22167774895773704,
+     "mean": 0.0861878327677756
+    },
+    "leaveOneOutMetres": {
+     "n": 16,
+     "median": 0.09273092681074262,
+     "p90": 0.13343862684068836,
+     "max": 0.24748149995354557,
+     "mean": 0.09557075972173788
+    }
+   },
+   {
+    "model": 2,
+    "frames": 39,
+    "frameRange": [
+     31,
+     210
+    ],
+    "status": "placed",
+    "scale": 1.6724329271460652,
+    "fitResidualMetres": {
+     "n": 5,
+     "median": 0.039903884431258495,
+     "p90": 0.04702325416522846,
+     "max": 0.049502131187834926,
+     "mean": 0.03909542271198324
+    },
+    "leaveOneOutMetres": {
+     "n": 5,
+     "median": 0.057267288623145805,
+     "p90": 0.08342422772896292,
+     "max": 0.08746734646877474,
+     "mean": 0.06147941372121972
+    }
+   },
+   {
+    "model": 3,
+    "frames": 17,
+    "frameRange": [
+     86,
+     136
+    ],
+    "status": "placed",
+    "scale": 0.9285729842628752,
+    "fitResidualMetres": {
+     "n": 3,
+     "median": 0.04149973790867513,
+     "p90": 0.04739249692304083,
+     "max": 0.048865686676632256,
+     "mean": 0.035317920501829636
+    },
+    "leaveOneOutMetres": {
+     "n": 3,
+     "median": 0.08970354991432934,
+     "p90": 0.3859004779109178,
+     "max": 0.4599497099100649,
+     "mean": 0.2118313758763001
+    }
+   }
+  ],
+  "heldOutAfterIcp": {
+   "medianMetres": 0.11201108064702829,
+   "p80Metres": 0.21723781314144064,
+   "within010": 0.419588828549263,
+   "within025": 0.8204422032583398,
+   "within05": 0.9528316524437549,
+   "points": 25780,
+   "distancesCappedAt": 4.0
+  },
+  "heldOutAfterIcpThisFloor": {
+   "medianMetres": 0.12556697436457437,
+   "p80Metres": 0.3968699689673136,
+   "within010": 0.3718181818181818,
+   "within025": 0.7243939393939394,
+   "within05": 0.9275757575757576,
+   "points": 13200,
+   "distancesCappedAt": 4.0
+  },
+  "metricsNote": "Internal consistency only (fit to Cupix-placed stations; ICP residuals are distances to BIM design surfaces). Not surveyed accuracy."
+ },
+ "stations": [
+  {
+   "id": "raw477_f000048",
+   "file": "f000048.jpg",
+   "sourceName": "raw477 frame 48",
+   "video": "B",
+   "sourceFrame": 48,
+   "frameOrder": 0,
+   "position": [
+    29.17808656270671,
+    15.879846935444949,
+    16.797647432507617
+   ],
+   "positionBIM": [
+    -6.030648787624649,
+    16.50696684300781,
+    -8.350814004520075
+   ],
+   "e57Quaternion": [
+    -0.037042618454596464,
+    0.03931655039723012,
+    -0.11839251854824448,
+    0.9914964774696342
+   ],
+   "sha256": "2dfba53f966c010647f2b0f5909e4332adec3f56b2c3f09ed674d7d6a405ed16",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1037781375634736,
+   "neighbors": [
+    1,
+    2
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "1": "route",
+    "2": "link-bim-clear"
+   },
+   "mobileSha256": "1d5fe079c059854ed991bd2a763d3b285a626f4042257ebba766cb7a9975fc66",
+   "manualBlurBoxes": 6
+  },
+  {
+   "id": "raw477_f000054",
+   "file": "f000054.jpg",
+   "sourceName": "raw477 frame 54",
+   "video": "B",
+   "sourceFrame": 54,
+   "frameOrder": 1,
+   "position": [
+    26.518273636604608,
+    15.898996438198594,
+    16.806456858967575
+   ],
+   "positionBIM": [
+    -8.690446450405524,
+    16.52611634576145,
+    -8.338212380823485
+   ],
+   "e57Quaternion": [
+    -0.055207424569162236,
+    0.0348703802679056,
+    -0.1597356257722538,
+    0.9849978308156615
+   ],
+   "sha256": "112070a34d35773b008110c48bcb936b53bd59a01d5e5664b5895b72fe967cdd",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1229276403171156,
+   "neighbors": [
+    0,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "0": "route",
+    "2": "route",
+    "3": "link-bim-clear",
+    "4": "link-bim-clear",
+    "5": "link-bim-clear",
+    "6": "link-bim-clear"
+   },
+   "mobileSha256": "5859468e5ab54a54ead1fdd602e76d5933ebcd343845a354aa43b08c23a88c27",
+   "manualBlurBoxes": 8
+  },
+  {
+   "id": "raw477_f000056",
+   "file": "f000056.jpg",
+   "sourceName": "raw477 frame 56",
+   "video": "B",
+   "sourceFrame": 56,
+   "frameOrder": 2,
+   "position": [
+    25.670368868760125,
+    15.867065748663702,
+    16.87168386474494
+   ],
+   "positionBIM": [
+    -9.538257359603069,
+    16.494185656226563,
+    -8.2717765481598
+   ],
+   "e57Quaternion": [
+    0.02009433929223001,
+    0.0466364686704891,
+    -0.15324136636997188,
+    0.9868831445269594
+   ],
+   "sha256": "bffe11b8b6c1a84153b2c03769a56a0359d265ecbe4e1df7b71a7a089b909bd9",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.090996950782227,
+   "neighbors": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    6
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "0": "link-bim-clear",
+    "1": "route",
+    "3": "route",
+    "4": "link-bim-clear",
+    "5": "link-bim-clear",
+    "6": "link-bim-clear"
+   },
+   "mobileSha256": "72f894c90d220de9f64f7f405c98942ee769b3457e5ae6d58e62c772ba69f3cc",
+   "manualBlurBoxes": 9
+  },
+  {
+   "id": "raw477_f000059",
+   "file": "f000059.jpg",
+   "sourceName": "raw477 frame 59",
+   "video": "B",
+   "sourceFrame": 59,
+   "frameOrder": 3,
+   "position": [
+    24.408611723498087,
+    15.876497991424648,
+    16.772756722224123
+   ],
+   "positionBIM": [
+    -10.800154267004618,
+    16.503617898987507,
+    -8.368904650362758
+   ],
+   "e57Quaternion": [
+    0.008297848939593936,
+    0.026269995832177623,
+    -0.15340682624132396,
+    0.9877790130816292
+   ],
+   "sha256": "16b79f229380d0750d6a0775d973c5f815755a21066a04694ea4f2b3ca14ceb8",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.100429193543171,
+   "neighbors": [
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "1": "link-bim-clear",
+    "2": "route",
+    "4": "route",
+    "5": "link-bim-clear",
+    "6": "link-bim-clear",
+    "7": "link-bim-clear",
+    "8": "link-bim-clear"
+   },
+   "mobileSha256": "e5aaf71c1615e49148f6c4def76dda14e3c730c7509b1385312537e68dd8bf57",
+   "manualBlurBoxes": 9
+  },
+  {
+   "id": "raw477_f000064",
+   "file": "f000064.jpg",
+   "sourceName": "raw477 frame 64",
+   "video": "B",
+   "sourceFrame": 64,
+   "frameOrder": 4,
+   "position": [
+    23.08111585444617,
+    15.876669063300579,
+    16.78032372232324
+   ],
+   "positionBIM": [
+    -12.127637998241735,
+    16.50378897086344,
+    -8.359444991743757
+   ],
+   "e57Quaternion": [
+    -0.07063118497001747,
+    0.034156436556895355,
+    0.45030185594142386,
+    0.8894227409321033
+   ],
+   "sha256": "d9023d127c0233c783a4b3a11ef89e6a66b3bef956ccae3328bd89031f2df521",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1006002654191036,
+   "neighbors": [
+    1,
+    2,
+    3,
+    5,
+    6,
+    7,
+    8
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "1": "link-bim-clear",
+    "2": "link-bim-clear",
+    "3": "route",
+    "5": "route",
+    "6": "link-bim-clear",
+    "7": "link-bim-clear",
+    "8": "link-bim-clear"
+   },
+   "mobileSha256": "4c149916dca03c51162e9654621566c134f9cf79b89047806c8517bd591013a6",
+   "manualBlurBoxes": 10
+  },
+  {
+   "id": "raw477_f000067",
+   "file": "f000067.jpg",
+   "sourceName": "raw477 frame 67",
+   "video": "B",
+   "sourceFrame": 67,
+   "frameOrder": 5,
+   "position": [
+    22.998681563801565,
+    15.851257121217442,
+    17.16031162136496
+   ],
+   "positionBIM": [
+    -12.20953044051123,
+    16.4783770287803,
+    -7.979339948905125
+   ],
+   "e57Quaternion": [
+    -0.03187463445230259,
+    -0.008906355782902248,
+    0.5649633358847777,
+    0.8244520080702966
+   ],
+   "sha256": "49401cfe530e0bbbe58d10e661372cf89ddaef71ece6064a6e971b17ce57e912",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.075188323335965,
+   "neighbors": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    7,
+    8,
+    9
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "1": "link-bim-clear",
+    "2": "link-bim-clear",
+    "3": "link-bim-clear",
+    "4": "route",
+    "6": "route",
+    "7": "link-bim-clear",
+    "8": "link-bim-clear",
+    "9": "link-bim-clear"
+   },
+   "mobileSha256": "631ca679d523e57ea09607481e94feb96ce19a02fd4fe972b56617b37744458d",
+   "manualBlurBoxes": 7
+  },
+  {
+   "id": "raw477_f000069",
+   "file": "f000069.jpg",
+   "sourceName": "raw477 frame 69",
+   "video": "B",
+   "sourceFrame": 69,
+   "frameOrder": 6,
+   "position": [
+    22.955045092683324,
+    15.839546976306094,
+    17.998851155348838
+   ],
+   "positionBIM": [
+    -12.251971326501959,
+    16.466666883868953,
+    -7.1407390528515435
+   ],
+   "e57Quaternion": [
+    0.012993358870076941,
+    -0.021492631038110183,
+    0.566012897578684,
+    0.8240137372707539
+   ],
+   "sha256": "d0678329ce5c7a75a6c4d43ff3611bc4e06f2b2625456e071d29f68f31a24653",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.0634781784246172,
+   "neighbors": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    9
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "1": "link-bim-clear",
+    "2": "link-bim-clear",
+    "3": "link-bim-clear",
+    "4": "link-bim-clear",
+    "5": "route",
+    "7": "route",
+    "8": "link-bim-clear",
+    "9": "link-bim-clear"
+   },
+   "mobileSha256": "6bdbc7ae54c608a3d353223b40b3ad72ddff3db0bbde35e4d0f061b4ad8c70b9",
+   "manualBlurBoxes": 9
+  },
+  {
+   "id": "raw477_f000071",
+   "file": "f000071.jpg",
+   "sourceName": "raw477 frame 71",
+   "video": "B",
+   "sourceFrame": 71,
+   "frameOrder": 7,
+   "position": [
+    22.908762662354107,
+    15.80222268594459,
+    18.860881661775117
+   ],
+   "positionBIM": [
+    -12.297024676955516,
+    16.42934259350745,
+    -6.278643435776711
+   ],
+   "e57Quaternion": [
+    1.0130719495231043e-05,
+    -0.023278327816920102,
+    0.5417935096242267,
+    0.8401892121900159
+   ],
+   "sha256": "9dd3fe067e76b16d897ec2c183bed66755ee6f044020548bede21bc1ceccadb8",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.0261538880631136,
+   "neighbors": [
+    3,
+    4,
+    5,
+    6,
+    8,
+    9
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "3": "link-bim-clear",
+    "4": "link-bim-clear",
+    "5": "link-bim-clear",
+    "6": "route",
+    "8": "route",
+    "9": "link-bim-clear"
+   },
+   "mobileSha256": "2c31f351bda6340672c12058743e70944c716616b8002ae48d4a57aa8b1b9bfc",
+   "manualBlurBoxes": 14
+  },
+  {
+   "id": "raw477_f000073",
+   "file": "f000073.jpg",
+   "sourceName": "raw477 frame 73",
+   "video": "B",
+   "sourceFrame": 73,
+   "frameOrder": 8,
+   "position": [
+    22.88503843908495,
+    15.858108237248272,
+    19.95263435540138
+   ],
+   "positionBIM": [
+    -12.31919231877589,
+    16.48522814481113,
+    -5.186858027161058
+   ],
+   "e57Quaternion": [
+    0.05417178384691212,
+    -0.029131263288819043,
+    0.4143534054267825,
+    0.9080352651440743
+   ],
+   "sha256": "0298bbe6598b89a786cf312ae1644844ad25cb481374c9a22484f139d78a5555",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.0820394393667954,
+   "neighbors": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    9
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "3": "link-bim-clear",
+    "4": "link-bim-clear",
+    "5": "link-bim-clear",
+    "6": "link-bim-clear",
+    "7": "route",
+    "9": "route"
+   },
+   "mobileSha256": "68fffaf7a9ad2e093c9366b09533c17fb8f8d05ad075dd9ab74b6fe8179fc44e",
+   "manualBlurBoxes": 11
+  },
+  {
+   "id": "raw477_f000075",
+   "file": "f000075.jpg",
+   "sourceName": "raw477 frame 75",
+   "video": "B",
+   "sourceFrame": 75,
+   "frameOrder": 9,
+   "position": [
+    22.856031301148587,
+    15.863773256539881,
+    20.913450781440204
+   ],
+   "positionBIM": [
+    -12.346829551190197,
+    16.49089316410274,
+    -4.226001220981406
+   ],
+   "e57Quaternion": [
+    0.008041996352038222,
+    -0.006879703003121344,
+    0.41421789835812084,
+    0.9101162171179262
+   ],
+   "sha256": "64e5ccec81d5822963f584a8bc6a73237ff99d26583e050e18982abaa3521b78",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.087704458658404,
+   "neighbors": [
+    5,
+    6,
+    7,
+    8,
+    10
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "5": "link-bim-clear",
+    "6": "link-bim-clear",
+    "7": "link-bim-clear",
+    "8": "route",
+    "10": "route"
+   },
+   "mobileSha256": "639486c0c5cfed6d7f829390efd1796a1016b8ee3b3e9317de8cf7339ad9458a",
+   "manualBlurBoxes": 9
+  },
+  {
+   "id": "raw477_f000081",
+   "file": "f000081.jpg",
+   "sourceName": "raw477 frame 81",
+   "video": "B",
+   "sourceFrame": 81,
+   "frameOrder": 10,
+   "position": [
+    22.858139657593693,
+    15.862089925588666,
+    23.981565076468826
+   ],
+   "positionBIM": [
+    -12.340346858411792,
+    16.489209833151527,
+    -1.1578930502644411
+   ],
+   "e57Quaternion": [
+    0.025427933742993777,
+    -0.008068244393838525,
+    0.4150809081574778,
+    0.9093932940709024
+   ],
+   "sha256": "f9cccb65d04a92d7866ab41905411a8b7538c45cde12485ad7a9cbd03ccf70cb",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.086021127707191,
+   "neighbors": [
+    9,
+    11,
+    12,
+    13,
+    29
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "9": "route",
+    "11": "route",
+    "12": "link-bim-clear",
+    "13": "link-bim-clear",
+    "29": "link-bim-clear"
+   },
+   "mobileSha256": "cf1e8627ebfc5b4a2e82c08a087bcb20cdc869225adc8e39647b107a7faef631",
+   "manualBlurBoxes": 10
+  },
+  {
+   "id": "raw477_f000083",
+   "file": "f000083.jpg",
+   "sourceName": "raw477 frame 83",
+   "video": "B",
+   "sourceFrame": 83,
+   "frameOrder": 11,
+   "position": [
+    22.84597346965331,
+    15.853260126435599,
+    24.97790959501558
+   ],
+   "positionBIM": [
+    -12.351092504063914,
+    16.480380033998458,
+    -0.1615321985311553
+   ],
+   "e57Quaternion": [
+    0.018220770836548935,
+    -0.018072870165476953,
+    0.41267080637681003,
+    0.9105186326695447
+   ],
+   "sha256": "4980ac79fa2f0be990c2a71c60668596cfc566bd9de875b3a85fe12ea53771ed",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.0771913285541217,
+   "neighbors": [
+    10,
+    12,
+    13,
+    14,
+    28,
+    29
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "10": "route",
+    "12": "route",
+    "13": "link-bim-clear",
+    "14": "link-bim-clear",
+    "28": "link-bim-clear",
+    "29": "link-bim-clear"
+   },
+   "mobileSha256": "3daaf8db89129c7ce88bc9094da7d8b5f94ed6eb0a52b8069fbd2abf515fe805",
+   "manualBlurBoxes": 10
+  },
+  {
+   "id": "raw477_f000086",
+   "file": "f000086.jpg",
+   "sourceName": "raw477 frame 86",
+   "video": "B",
+   "sourceFrame": 86,
+   "frameOrder": 12,
+   "position": [
+    22.873257933319692,
+    15.88572824761456,
+    26.47584860256591
+   ],
+   "positionBIM": [
+    -12.321672394028667,
+    16.51284815517742,
+    1.3363663859611172
+   ],
+   "e57Quaternion": [
+    0.01450866766511212,
+    0.0053196137708420655,
+    0.4061415587349794,
+    0.9136795031849153
+   ],
+   "sha256": "20f0bced9118f06b16a59207093ae935948df3df7595ce404185bf9de5e36cb6",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1096594497330834,
+   "neighbors": [
+    10,
+    11,
+    13,
+    14,
+    15,
+    27,
+    28,
+    29
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "10": "link-bim-clear",
+    "11": "route",
+    "13": "route",
+    "14": "link-bim-clear",
+    "15": "link-bim-clear",
+    "27": "link-bim-clear",
+    "28": "link-bim-clear",
+    "29": "link-bim-clear"
+   },
+   "mobileSha256": "19428a713b212a7c613ab57253035da04f7ba266cf577592b676ffd2305f879a",
+   "manualBlurBoxes": 8
+  },
+  {
+   "id": "raw477_f000088",
+   "file": "f000088.jpg",
+   "sourceName": "raw477 frame 88",
+   "video": "B",
+   "sourceFrame": 88,
+   "frameOrder": 13,
+   "position": [
+    22.920574491949058,
+    15.870908706741977,
+    27.451613301827045
+   ],
+   "positionBIM": [
+    -12.272964695073963,
+    16.498028614304836,
+    2.3120626322935713
+   ],
+   "e57Quaternion": [
+    -0.004622785974290006,
+    0.001296232159197394,
+    0.36333092815094586,
+    0.9316477801621156
+   ],
+   "sha256": "6d6b164bf765cb2757c96f1a4d8c8f00944b87daee7ca4fe14a66eaa6e51cb44",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.0948399088605,
+   "neighbors": [
+    10,
+    11,
+    12,
+    14,
+    15,
+    26,
+    27,
+    28,
+    29
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "10": "link-bim-clear",
+    "11": "link-bim-clear",
+    "12": "route",
+    "14": "route",
+    "15": "link-bim-clear",
+    "26": "link-bim-clear",
+    "27": "link-bim-clear",
+    "28": "link-bim-clear",
+    "29": "link-bim-clear"
+   },
+   "mobileSha256": "4909b1d3331f12d6dd4c5e1261928ede46a9b2316cae045f6114a2e6ae18984c",
+   "manualBlurBoxes": 13
+  },
+  {
+   "id": "raw477_f000090",
+   "file": "f000090.jpg",
+   "sourceName": "raw477 frame 90",
+   "video": "B",
+   "sourceFrame": 90,
+   "frameOrder": 14,
+   "position": [
+    23.022222780107175,
+    15.912033000081964,
+    28.47446338264134
+   ],
+   "positionBIM": [
+    -12.169858190219948,
+    16.539152907644823,
+    3.3347667493108375
+   ],
+   "e57Quaternion": [
+    0.020749885564575406,
+    0.010130970572607824,
+    0.3409614694619054,
+    0.939793638000754
+   ],
+   "sha256": "c9197473a9112a632544a62672d9bd26b25c06df955d08c8cd4311a4945af52f",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.135964202200487,
+   "neighbors": [
+    11,
+    12,
+    13,
+    15,
+    16,
+    26,
+    27,
+    28,
+    29
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "11": "link-bim-clear",
+    "12": "link-bim-clear",
+    "13": "route",
+    "15": "route",
+    "16": "link-bim-clear",
+    "26": "link-bim-clear",
+    "27": "link-bim-clear",
+    "28": "link-bim-clear",
+    "29": "link-bim-clear"
+   },
+   "mobileSha256": "70ec6f3d30ca10fa07d6be019f7cbb2ffe8d618006daaad6d75490682ff92f35",
+   "manualBlurBoxes": 8
+  },
+  {
+   "id": "raw477_f000092",
+   "file": "f000092.jpg",
+   "sourceName": "raw477 frame 92",
+   "video": "B",
+   "sourceFrame": 92,
+   "frameOrder": 15,
+   "position": [
+    23.03090564137326,
+    15.910567653364112,
+    29.493454656907467
+   ],
+   "positionBIM": [
+    -12.159722519432062,
+    16.53768756092697,
+    4.353744608387252
+   ],
+   "e57Quaternion": [
+    0.004082383602029924,
+    -0.006981568571485072,
+    0.33032593478958017,
+    0.9438322778173025
+   ],
+   "sha256": "940f2d83bbb4c272b4111a18c9cbfbc87e6796c11bce02c0d194e69258db08dc",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.134498855482633,
+   "neighbors": [
+    12,
+    13,
+    14,
+    16,
+    17,
+    25,
+    26,
+    27,
+    28,
+    29
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "12": "link-bim-clear",
+    "13": "link-bim-clear",
+    "14": "route",
+    "16": "route",
+    "17": "link-bim-clear",
+    "25": "link-bim-clear",
+    "26": "link-bim-clear",
+    "27": "link-bim-clear",
+    "28": "link-bim-clear",
+    "29": "link-bim-clear"
+   },
+   "mobileSha256": "e0826e35683050d12c4762c6b10ef5f41d7116f81b048de0346f89f5eaae5121",
+   "manualBlurBoxes": 6
+  },
+  {
+   "id": "raw477_f000096",
+   "file": "f000096.jpg",
+   "sourceName": "raw477 frame 96",
+   "video": "B",
+   "sourceFrame": 96,
+   "frameOrder": 16,
+   "position": [
+    22.878017671461595,
+    15.876962031019222,
+    31.541581049768475
+   ],
+   "positionBIM": [
+    -12.309690234757536,
+    16.504081938582083,
+    6.402086898347019
+   ],
+   "e57Quaternion": [
+    -0.014707520741677011,
+    -0.012721466273154501,
+    0.2688953282960264,
+    0.9629730814254708
+   ],
+   "sha256": "bbfc27ec4c5ff1f3407ce3170e04f28c8ddf54beb7da287d80c6db46a4cb03ec",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1008932331377466,
+   "neighbors": [
+    14,
+    15,
+    17,
+    24,
+    25,
+    26,
+    27,
+    28
+   ],
+   "sfmModel": 2,
+   "edgeKinds": {
+    "14": "link-bim-clear",
+    "15": "route",
+    "17": "route",
+    "24": "link-bim-clear",
+    "25": "link-bim-clear",
+    "26": "link-bim-clear",
+    "27": "link-bim-clear",
+    "28": "link-bim-clear"
+   },
+   "mobileSha256": "3064aeaf429643f649c6736c06957a1a049707c5b4f31b65a3cf1af207e999b5",
+   "manualBlurBoxes": 8
+  },
+  {
+   "id": "raw477_f000100",
+   "file": "f000100.jpg",
+   "sourceName": "raw477 frame 100",
+   "video": "B",
+   "sourceFrame": 100,
+   "frameOrder": 17,
+   "position": [
+    22.29102364432209,
+    15.8156238824071,
+    33.25608653197743
+   ],
+   "positionBIM": [
+    -12.894239223341103,
+    16.44274378996996,
+    8.117427539843028
+   ],
+   "e57Quaternion": [
+    0.014708022633889574,
+    -0.019064214130295524,
+    -0.1696215671183785,
+    0.985215079958737
+   ],
+   "sha256": "b90f7def82676790bbcc62103eb462285fb988172120929d5a9b8708bbcb074a",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.039555084525624,
+   "neighbors": [
+    15,
+    16,
+    18,
+    19,
+    23,
+    24,
+    25,
+    26,
+    27
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "15": "link-bim-clear",
+    "16": "route",
+    "18": "route",
+    "19": "link-bim-clear",
+    "23": "link-bim-clear",
+    "24": "link-bim-clear",
+    "25": "link-bim-clear",
+    "26": "link-bim-clear",
+    "27": "link-bim-clear"
+   },
+   "mobileSha256": "16e5b266baea03067bcf5eaeba258569b550d761d78c4df190bb6a556cbd6eae",
+   "manualBlurBoxes": 7
+  },
+  {
+   "id": "raw477_f000104",
+   "file": "f000104.jpg",
+   "sourceName": "raw477 frame 104",
+   "video": "B",
+   "sourceFrame": 104,
+   "frameOrder": 18,
+   "position": [
+    20.586305639188925,
+    15.813384584451875,
+    33.63808793309428
+   ],
+   "positionBIM": [
+    -14.59841086052447,
+    16.440504492014732,
+    8.501859040243573
+   ],
+   "e57Quaternion": [
+    -0.005247859666750875,
+    0.00469365166199215,
+    -0.32359893136921514,
+    0.9461681463776384
+   ],
+   "sha256": "6761949e5d783f3635c9d6df7097875c678a7dd9ca092eb90ce49f08be59c354",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.037315786570396,
+   "neighbors": [
+    17,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "17": "route",
+    "19": "route",
+    "20": "link-bim-clear",
+    "21": "link-bim-clear",
+    "22": "link-bim-clear",
+    "23": "link-bim-clear",
+    "24": "link-bim-clear",
+    "25": "link-bim-clear"
+   },
+   "mobileSha256": "75c50f49feb9fdd9edd03b04448ee47d11a8508e9aff75402c3b721ab3260b21",
+   "manualBlurBoxes": 5
+  },
+  {
+   "id": "raw477_f000107",
+   "file": "f000107.jpg",
+   "sourceName": "raw477 frame 107",
+   "video": "B",
+   "sourceFrame": 107,
+   "frameOrder": 19,
+   "position": [
+    19.23786382721201,
+    15.869790281452293,
+    33.681647822299404
+   ],
+   "positionBIM": [
+    -15.94678919683502,
+    16.496910189015153,
+    8.547341414890653
+   ],
+   "e57Quaternion": [
+    -0.002630798148530492,
+    0.03219659253595979,
+    -0.3594233241898412,
+    0.932615318530904
+   ],
+   "sha256": "ff1839e08fddfbc3457d8fa328ae677805a24446b6b9840415422e479bd162d4",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.0937214835708176,
+   "neighbors": [
+    17,
+    18,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "17": "link-bim-clear",
+    "18": "route",
+    "20": "route",
+    "21": "link-bim-clear",
+    "22": "link-bim-clear",
+    "23": "link-bim-clear",
+    "24": "link-bim-clear",
+    "25": "link-bim-clear"
+   },
+   "mobileSha256": "4be23bf9e0e35c776a4eacba8d59d409d0ec75a1694aa16b1b03a3c27d270279",
+   "manualBlurBoxes": 6
+  },
+  {
+   "id": "raw477_f000110",
+   "file": "f000110.jpg",
+   "sourceName": "raw477 frame 110",
+   "video": "B",
+   "sourceFrame": 110,
+   "frameOrder": 20,
+   "position": [
+    17.92840069994831,
+    15.839442075371908,
+    33.52266510636402
+   ],
+   "positionBIM": [
+    -17.25647766148634,
+    16.466561982934767,
+    8.390225816719479
+   ],
+   "e57Quaternion": [
+    0.024046964066283608,
+    -0.011769592021061044,
+    -0.474358387053851,
+    0.8799246222572258
+   ],
+   "sha256": "998fe8304f0f33900dae562e501b1da425d56d1bc1edfe556e31b3ac87dbbe6a",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.063373277490431,
+   "neighbors": [
+    18,
+    19,
+    21,
+    22,
+    23,
+    24
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "18": "link-bim-clear",
+    "19": "route",
+    "21": "route",
+    "22": "link-bim-clear",
+    "23": "link-bim-clear",
+    "24": "link-bim-clear"
+   },
+   "mobileSha256": "92f6420cc918ffd37538ac191be5f20725e4f15c0ca069dd5027241e920afa4a",
+   "manualBlurBoxes": 3
+  },
+  {
+   "id": "raw477_f000113",
+   "file": "f000113.jpg",
+   "sourceName": "raw477 frame 113",
+   "video": "B",
+   "sourceFrame": 113,
+   "frameOrder": 21,
+   "position": [
+    17.369568990275106,
+    15.852672002799343,
+    33.29921982418261
+   ],
+   "positionBIM": [
+    -17.815627378435053,
+    16.479791910362202,
+    8.167577511310299
+   ],
+   "e57Quaternion": [
+    0.042314942175970406,
+    -0.020288831415158283,
+    -0.6940395178020615,
+    0.7184058440168297
+   ],
+   "sha256": "1f2523cdc0d541989e8c39d11ee98b9c3fc8e41299ed3874325609a350383358",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.076603204917866,
+   "neighbors": [
+    18,
+    19,
+    20,
+    22,
+    23
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "18": "link-bim-clear",
+    "19": "link-bim-clear",
+    "20": "route",
+    "22": "route",
+    "23": "link-bim-clear"
+   },
+   "mobileSha256": "c07e59933fff2de5219970204e298bb28393fe118d9c31ff22d4ade274fd7ff5",
+   "manualBlurBoxes": 1
+  },
+  {
+   "id": "raw477_f000115",
+   "file": "f000115.jpg",
+   "sourceName": "raw477 frame 115",
+   "video": "B",
+   "sourceFrame": 115,
+   "frameOrder": 22,
+   "position": [
+    17.927070488353998,
+    15.828628761199463,
+    33.27613572794091
+   ],
+   "positionBIM": [
+    -17.258159358942585,
+    16.455748668762322,
+    8.143698585399619
+   ],
+   "e57Quaternion": [
+    0.049714946109353106,
+    -0.02292942067696027,
+    -0.9493449239587438,
+    0.3094299293128091
+   ],
+   "sha256": "75962bdc739e76dac4a980be02add7b46068e6ba973895a9acc5b2ffda59bc53",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.052559963317986,
+   "neighbors": [
+    18,
+    19,
+    20,
+    21,
+    23,
+    24
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "18": "link-bim-clear",
+    "19": "link-bim-clear",
+    "20": "link-bim-clear",
+    "21": "route",
+    "23": "route",
+    "24": "link-bim-clear"
+   },
+   "mobileSha256": "e87df0b45c38a73b0c26c350a860892b5cef3e73dbcedd2df9841b95bd4ae9ac",
+   "manualBlurBoxes": 3
+  },
+  {
+   "id": "raw477_f000119",
+   "file": "f000119.jpg",
+   "sourceName": "raw477 frame 119",
+   "video": "B",
+   "sourceFrame": 119,
+   "frameOrder": 23,
+   "position": [
+    20.154361098837484,
+    15.788319001097488,
+    33.338478324114504
+   ],
+   "positionBIM": [
+    -15.030782127772163,
+    16.41543890866035,
+    8.202865577119283
+   ],
+   "e57Quaternion": [
+    -0.032041562910278244,
+    -0.032495246376839974,
+    -0.9988191885078327,
+    0.016662109042065772
+   ],
+   "sha256": "5c07b62acd56df878b6f8bf6a812405e8b45fae8a7019196fdf0bc5d6e0464df",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.012250203216013,
+   "neighbors": [
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    24,
+    25
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "17": "link-bim-clear",
+    "18": "link-bim-clear",
+    "19": "link-bim-clear",
+    "20": "link-bim-clear",
+    "21": "link-bim-clear",
+    "22": "route",
+    "24": "route",
+    "25": "link-bim-clear"
+   },
+   "mobileSha256": "d8b94cd575de9af2136860b222872ad8b9f44e6acb093bed6f879d74330e7512",
+   "manualBlurBoxes": 4
+  },
+  {
+   "id": "raw477_f000122",
+   "file": "f000122.jpg",
+   "sourceName": "raw477 frame 122",
+   "video": "B",
+   "sourceFrame": 122,
+   "frameOrder": 24,
+   "position": [
+    21.76132089242645,
+    15.749371038838332,
+    33.08507733964946
+   ],
+   "positionBIM": [
+    -13.42418525179842,
+    16.37649094640119,
+    7.947173740623157
+   ],
+   "e57Quaternion": [
+    -0.040766977472096684,
+    -0.03147643344908192,
+    -0.9917705530996285,
+    0.11721116708561614
+   ],
+   "sha256": "83fdcb7dc7521ed102e9448811eb8488a5e99575127fce7ca8160eeb90176472",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 1.9733022409568548,
+   "neighbors": [
+    16,
+    17,
+    18,
+    19,
+    20,
+    22,
+    23,
+    25,
+    26
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "16": "link-bim-clear",
+    "17": "link-bim-clear",
+    "18": "link-bim-clear",
+    "19": "link-bim-clear",
+    "20": "link-bim-clear",
+    "22": "link-bim-clear",
+    "23": "route",
+    "25": "route",
+    "26": "link-bim-clear"
+   },
+   "mobileSha256": "78b717908d941730beddb5afbbbf59588ebc1c6568ef569827c16394c6cff415",
+   "manualBlurBoxes": 6
+  },
+  {
+   "id": "raw477_f000124",
+   "file": "f000124.jpg",
+   "sourceName": "raw477 frame 124",
+   "video": "B",
+   "sourceFrame": 124,
+   "frameOrder": 25,
+   "position": [
+    22.477559120606145,
+    15.750173274478415,
+    32.45409672126516
+   ],
+   "positionBIM": [
+    -12.708847366958437,
+    16.377293182041274,
+    7.315172592843126
+   ],
+   "e57Quaternion": [
+    0.0011458383688502923,
+    -0.03602058682683381,
+    -0.9489246305558658,
+    0.3134377927173057
+   ],
+   "sha256": "2e385d784c90eae3552f761e089a4e07fffcfd50c2b4eb8b2f5e3886b10b9b8b",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 1.9741044765969384,
+   "neighbors": [
+    15,
+    16,
+    17,
+    18,
+    19,
+    23,
+    24,
+    26,
+    27
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "15": "link-bim-clear",
+    "16": "link-bim-clear",
+    "17": "link-bim-clear",
+    "18": "link-bim-clear",
+    "19": "link-bim-clear",
+    "23": "link-bim-clear",
+    "24": "route",
+    "26": "route",
+    "27": "link-bim-clear"
+   },
+   "mobileSha256": "ac2c281fe1ed185f0f5b6d4ae52c9b0aa8692eccc7027e76d3ad9c8945d10c4a",
+   "manualBlurBoxes": 4
+  },
+  {
+   "id": "raw477_f000127",
+   "file": "f000127.jpg",
+   "sourceName": "raw477 frame 127",
+   "video": "B",
+   "sourceFrame": 127,
+   "frameOrder": 26,
+   "position": [
+    23.011110985535698,
+    15.800391962183824,
+    30.962117080655204
+   ],
+   "positionBIM": [
+    -12.177423221897165,
+    16.42751186974668,
+    5.822433761496427
+   ],
+   "e57Quaternion": [
+    -0.02600706629917357,
+    -0.041643835405459906,
+    -0.9042431686629352,
+    0.4241859443706827
+   ],
+   "sha256": "04973af97d53c53f7dd9463693284c18d3d0d1cbe73e2f7bb31dbb24504853f9",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.024323164302345,
+   "neighbors": [
+    13,
+    14,
+    15,
+    16,
+    17,
+    24,
+    25,
+    27,
+    28,
+    29
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "13": "link-bim-clear",
+    "14": "link-bim-clear",
+    "15": "link-bim-clear",
+    "16": "link-bim-clear",
+    "17": "link-bim-clear",
+    "24": "link-bim-clear",
+    "25": "route",
+    "27": "route",
+    "28": "link-bim-clear",
+    "29": "link-bim-clear"
+   },
+   "mobileSha256": "1748d90e1596bfdb630afd318ce88a7a8827f49734aae75f5a3ba85449e1d85b",
+   "manualBlurBoxes": 5
+  },
+  {
+   "id": "raw477_f000129",
+   "file": "f000129.jpg",
+   "sourceName": "raw477 frame 129",
+   "video": "B",
+   "sourceFrame": 129,
+   "frameOrder": 27,
+   "position": [
+    23.053612459607095,
+    15.840136497265641,
+    30.05405744546867
+   ],
+   "positionBIM": [
+    -12.136216449506644,
+    16.4672564048285,
+    4.914314453110961
+   ],
+   "e57Quaternion": [
+    0.016687690109741662,
+    0.02077321173511711,
+    -0.8156255006968238,
+    0.5779662942473937
+   ],
+   "sha256": "4c65bead3aeafe9aefc5fb68468f289539ee1457a4c8c121643cb56bbafb37ed",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.0640676993841645,
+   "neighbors": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    25,
+    26,
+    28,
+    29
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "12": "link-bim-clear",
+    "13": "link-bim-clear",
+    "14": "link-bim-clear",
+    "15": "link-bim-clear",
+    "16": "link-bim-clear",
+    "17": "link-bim-clear",
+    "25": "link-bim-clear",
+    "26": "route",
+    "28": "route",
+    "29": "link-bim-clear"
+   },
+   "mobileSha256": "b69bef9831db3d5be501fb66b547dd8b0b1ec0aa39569708c186215f7d739636",
+   "manualBlurBoxes": 7
+  },
+  {
+   "id": "raw477_f000132",
+   "file": "f000132.jpg",
+   "sourceName": "raw477 frame 132",
+   "video": "B",
+   "sourceFrame": 132,
+   "frameOrder": 28,
+   "position": [
+    23.115971454779164,
+    15.91493809096362,
+    28.48770000550826
+   ],
+   "positionBIM": [
+    -12.076090738826196,
+    16.54205799852648,
+    3.347869697330097
+   ],
+   "e57Quaternion": [
+    0.009626795147630714,
+    0.030029479012179183,
+    -0.9003899274070479,
+    0.4339395508931788
+   ],
+   "sha256": "e06f3747a0721c6ebf3c1f7b278c3476929f9b03b0faba8da7a39013782b0de5",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.138869293082145,
+   "neighbors": [
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    26,
+    27,
+    29
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "11": "link-bim-clear",
+    "12": "link-bim-clear",
+    "13": "link-bim-clear",
+    "14": "link-bim-clear",
+    "15": "link-bim-clear",
+    "16": "link-bim-clear",
+    "26": "link-bim-clear",
+    "27": "route",
+    "29": "route"
+   },
+   "mobileSha256": "0305c69c2972705007a06bcdd244c03a1aa516aac59f21745461ad85e010116c",
+   "manualBlurBoxes": 12
+  },
+  {
+   "id": "raw477_f000134",
+   "file": "f000134.jpg",
+   "sourceName": "raw477 frame 134",
+   "video": "B",
+   "sourceFrame": 134,
+   "frameOrder": 29,
+   "position": [
+    23.226517578011613,
+    15.90125779351957,
+    27.34931649924213
+   ],
+   "positionBIM": [
+    -11.967167768779582,
+    16.528377701082427,
+    2.2093297378659074
+   ],
+   "e57Quaternion": [
+    -0.02742815964885381,
+    0.01830256261909113,
+    -0.9139142837104507,
+    0.40456568600150106
+   ],
+   "sha256": "1cf4baf3b06339057edf14ec34c97e7d19311de227fab8934a421140c17ecceb",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1251889956380907,
+   "neighbors": [
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    26,
+    27,
+    28
+   ],
+   "sfmModel": 3,
+   "edgeKinds": {
+    "10": "link-bim-clear",
+    "11": "link-bim-clear",
+    "12": "link-bim-clear",
+    "13": "link-bim-clear",
+    "14": "link-bim-clear",
+    "15": "link-bim-clear",
+    "26": "link-bim-clear",
+    "27": "link-bim-clear",
+    "28": "route"
+   },
+   "mobileSha256": "c6281308e0de0e2a04f774bae23d29668c376ccf787947ff6d698d8155b91b07",
+   "manualBlurBoxes": 13
+  },
+  {
+   "id": "raw477_f000216",
+   "file": "f000216.jpg",
+   "sourceName": "raw477 frame 216",
+   "video": "B",
+   "sourceFrame": 216,
+   "frameOrder": 30,
+   "position": [
+    42.08425952354586,
+    16.03354177889826,
+    29.565061764275246
+   ],
+   "positionBIM": [
+    6.893714090717957,
+    16.66066168646112,
+    4.398186481911825
+   ],
+   "e57Quaternion": [
+    -0.027637300370990787,
+    -0.00637370210195209,
+    -0.02864326713179531,
+    0.9991872291006005
+   ],
+   "sha256": "5789a77f74ee7dd7b840a133b7e22c33aeda819fbb5dde691333abf182e9ea58",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.2574729810167824,
+   "neighbors": [
+    31,
+    32
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "31": "route",
+    "32": "link-bim-clear"
+   },
+   "mobileSha256": "82e3308cbabc8a66709afc1e2db9c1aafc95e9ec77d00e5253f5f576803ce18b",
+   "manualBlurBoxes": 7
+  },
+  {
+   "id": "raw477_f000218",
+   "file": "f000218.jpg",
+   "sourceName": "raw477 frame 218",
+   "video": "B",
+   "sourceFrame": 218,
+   "frameOrder": 31,
+   "position": [
+    41.47826447060447,
+    16.026977938558673,
+    30.091102841332198
+   ],
+   "positionBIM": [
+    6.288469652388848,
+    16.65409784612153,
+    4.925091016730384
+   ],
+   "e57Quaternion": [
+    -0.023733020495763407,
+    0.045915854882232134,
+    -0.41065491121649,
+    0.9103246793877217
+   ],
+   "sha256": "56e9745401251abdd8916089871bf3b5b452cb47b241f8a5a5cf5bde20aac4f4",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.2509091406771944,
+   "neighbors": [
+    30,
+    32,
+    33
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "30": "route",
+    "32": "route",
+    "33": "link-bim-clear"
+   },
+   "mobileSha256": "2e7451c8060ccaca1a768534577a7810a67b805fcaf4deb69828496b6bfe592d",
+   "manualBlurBoxes": 13
+  },
+  {
+   "id": "raw477_f000221",
+   "file": "f000221.jpg",
+   "sourceName": "raw477 frame 221",
+   "video": "B",
+   "sourceFrame": 221,
+   "frameOrder": 32,
+   "position": [
+    39.7741897317382,
+    15.940262041421157,
+    30.113451936289394
+   ],
+   "positionBIM": [
+    4.584428509529907,
+    16.567381948984014,
+    4.949869659379619
+   ],
+   "e57Quaternion": [
+    0.011698963928567079,
+    0.005470858795496162,
+    -0.5661029397128813,
+    0.8242333805394391
+   ],
+   "sha256": "e540db5ee839dff27594f175eb83f00aac5c16c944aeb1636f3109a9115295f5",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1641932435396782,
+   "neighbors": [
+    30,
+    31,
+    33,
+    34
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "30": "link-bim-clear",
+    "31": "route",
+    "33": "route",
+    "34": "link-bim-clear"
+   },
+   "mobileSha256": "1a77f6745905de5c7efe70046928e82c89379abf4bd73005974d513539445726",
+   "manualBlurBoxes": 14
+  },
+  {
+   "id": "raw477_f000225",
+   "file": "f000225.jpg",
+   "sourceName": "raw477 frame 225",
+   "video": "B",
+   "sourceFrame": 225,
+   "frameOrder": 33,
+   "position": [
+    37.53568716378689,
+    15.94075436811714,
+    30.18882280780621
+   ],
+   "positionBIM": [
+    2.3460356761200387,
+    16.567874275679998,
+    5.02843198073775
+   ],
+   "e57Quaternion": [
+    0.0036301015870537495,
+    -0.0005185424053784047,
+    -0.4967357311300957,
+    0.8678940988939208
+   ],
+   "sha256": "3d32441d186fc42aad8a0ac740b7a847c89dc5d178f1093728273f336fd9fa44",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1646855702356618,
+   "neighbors": [
+    31,
+    32,
+    34,
+    35,
+    36,
+    37
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "31": "link-bim-clear",
+    "32": "route",
+    "34": "route",
+    "35": "link-bim-clear",
+    "36": "link-bim-clear",
+    "37": "link-bim-clear"
+   },
+   "mobileSha256": "676be98b718e494e1ff197aabee668ba68d3799c2ed6d0da410cb18b51bc2d44",
+   "manualBlurBoxes": 9
+  },
+  {
+   "id": "raw477_f000228",
+   "file": "f000228.jpg",
+   "sourceName": "raw477 frame 228",
+   "video": "B",
+   "sourceFrame": 228,
+   "frameOrder": 34,
+   "position": [
+    35.976438111635616,
+    15.89371715114901,
+    30.120399197352846
+   ],
+   "positionBIM": [
+    0.7866906543486891,
+    16.52083705871187,
+    4.96223152621501
+   ],
+   "e57Quaternion": [
+    0.01710403318709392,
+    -0.005305240217520861,
+    -0.5196682150227381,
+    0.8541804567947282
+   ],
+   "sha256": "3edf0050a5b4b355d1746d5c2999602d5d703f4a6c9c404305a0fc4d56675924",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1176483532675334,
+   "neighbors": [
+    32,
+    33,
+    35,
+    36,
+    37
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "32": "link-bim-clear",
+    "33": "route",
+    "35": "route",
+    "36": "link-bim-clear",
+    "37": "link-bim-clear"
+   },
+   "mobileSha256": "d135320a049eeea7d0fc93a635d5ef584cf933f811dd2140a06171359f055fbd",
+   "manualBlurBoxes": 6
+  },
+  {
+   "id": "raw477_f000231",
+   "file": "f000231.jpg",
+   "sourceName": "raw477 frame 231",
+   "video": "B",
+   "sourceFrame": 231,
+   "frameOrder": 35,
+   "position": [
+    34.8020530339445,
+    15.898606379320455,
+    30.01589934555983
+   ],
+   "positionBIM": [
+    -0.3878422195282667,
+    16.525726286883312,
+    4.859406150404059
+   ],
+   "e57Quaternion": [
+    -0.00869886797796905,
+    0.05579217007629711,
+    -0.6059773147217034,
+    0.7934753036464042
+   ],
+   "sha256": "fb654aaad4be3e280cb39af7ea9c5cf334d34868604ca49d371d208ecb8da831",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.1225375814389764,
+   "neighbors": [
+    33,
+    34,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "33": "link-bim-clear",
+    "34": "route",
+    "36": "route",
+    "37": "link-bim-clear",
+    "38": "link-bim-clear",
+    "39": "link-bim-clear",
+    "40": "link-bim-clear",
+    "41": "link-bim-clear"
+   },
+   "mobileSha256": "b07faa370e91cf0d2955f7788f41fdf7bf9e5f71c8445daee4eb77f742fcd0a6",
+   "manualBlurBoxes": 13
+  },
+  {
+   "id": "raw477_f000234",
+   "file": "f000234.jpg",
+   "sourceName": "raw477 frame 234",
+   "video": "B",
+   "sourceFrame": 234,
+   "frameOrder": 36,
+   "position": [
+    34.317306788512155,
+    15.895992807051508,
+    29.7592218440556
+   ],
+   "positionBIM": [
+    -0.8729539280950931,
+    16.523112714614367,
+    4.603420032712911
+   ],
+   "e57Quaternion": [
+    -0.0027342543325978427,
+    0.017576220529300964,
+    -0.8269016027729161,
+    0.5620652450176336
+   ],
+   "sha256": "92b4901d2f522366b0b8e582da20724324c5e3e6f0a20b88cbcd73f2db27d846",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.119924009170031,
+   "neighbors": [
+    33,
+    34,
+    35,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "33": "link-bim-clear",
+    "34": "link-bim-clear",
+    "35": "route",
+    "37": "route",
+    "38": "link-bim-clear",
+    "39": "link-bim-clear",
+    "40": "link-bim-clear",
+    "41": "link-bim-clear",
+    "42": "link-bim-clear",
+    "43": "link-bim-clear"
+   },
+   "mobileSha256": "506f27f7262903cdb963de3baaec67e863d5e252a0d2877b9dd8ea4fdaafde7d",
+   "manualBlurBoxes": 18
+  },
+  {
+   "id": "raw477_f000237",
+   "file": "f000237.jpg",
+   "sourceName": "raw477 frame 237",
+   "video": "B",
+   "sourceFrame": 237,
+   "frameOrder": 37,
+   "position": [
+    34.41496544142356,
+    15.83358254301616,
+    29.36008727327379
+   ],
+   "positionBIM": [
+    -0.7758644372406138,
+    16.46070245057902,
+    4.204146631586234
+   ],
+   "e57Quaternion": [
+    -0.026495786276556996,
+    0.01641042052258297,
+    -0.9438499639249153,
+    0.3289010748033444
+   ],
+   "sha256": "f529a8f960edbf77b06b33e7802603d557b487e8a1e333678048f355aeac9a88",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.403188705444336,
+   "cameraAboveBimFloor": 2.0575137451346848,
+   "neighbors": [
+    33,
+    34,
+    35,
+    36,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "33": "link-bim-clear",
+    "34": "link-bim-clear",
+    "35": "link-bim-clear",
+    "36": "route",
+    "38": "route",
+    "39": "link-bim-clear",
+    "40": "link-bim-clear",
+    "41": "link-bim-clear",
+    "42": "link-bim-clear",
+    "43": "link-bim-clear"
+   },
+   "mobileSha256": "94b1ce37b3b6723601b93ffd5cd1603f5c1c32a913e20ba44a30babb2b24eefd",
+   "manualBlurBoxes": 14
+  },
+  {
+   "id": "raw477_f000239",
+   "file": "f000239.jpg",
+   "sourceName": "raw477 frame 239",
+   "video": "B",
+   "sourceFrame": 239,
+   "frameOrder": 38,
+   "position": [
+    34.4636625473208,
+    15.884233177809293,
+    28.829527507537723
+   ],
+   "positionBIM": [
+    -0.7279238220174804,
+    16.51135308537215,
+    3.6735179756009906
+   ],
+   "e57Quaternion": [
+    0.0024686605555428436,
+    0.032526366059936196,
+    -0.992718402727779,
+    0.11595738058271177
+   ],
+   "sha256": "a1d076cebc5b1a4f1ebdfbe316f1c37ca91396b3691bfc1e84d690a834c37ccc",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.393991470336914,
+   "cameraAboveBimFloor": 2.117361615035236,
+   "neighbors": [
+    35,
+    36,
+    37,
+    39,
+    40,
+    41,
+    42,
+    43
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "35": "link-bim-clear",
+    "36": "link-bim-clear",
+    "37": "route",
+    "39": "route",
+    "40": "link-bim-clear",
+    "41": "link-bim-clear",
+    "42": "link-bim-clear",
+    "43": "link-bim-clear"
+   },
+   "mobileSha256": "b53520a574b98e270d4a2e15c761f97c886ea3ceb7270c94a6a0a77e5fdae933",
+   "manualBlurBoxes": 10
+  },
+  {
+   "id": "raw477_f000242",
+   "file": "f000242.jpg",
+   "sourceName": "raw477 frame 242",
+   "video": "B",
+   "sourceFrame": 242,
+   "frameOrder": 39,
+   "position": [
+    34.300342774827655,
+    15.833581645775663,
+    27.9208037008871
+   ],
+   "positionBIM": [
+    -0.8925390339378723,
+    16.460701553338524,
+    2.7650279443594705
+   ],
+   "e57Quaternion": [
+    -0.10648945525177311,
+    0.01762365061043007,
+    -0.8664323156476611,
+    0.4874878924248005
+   ],
+   "sha256": "d15024e9fea992abe8ddb15e3d22e42e1c8d006d3895efdbf5d45b055a33a043",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.393991470336914,
+   "cameraAboveBimFloor": 2.0667100830016096,
+   "neighbors": [
+    35,
+    36,
+    37,
+    38,
+    40,
+    41,
+    42,
+    43,
+    44
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "35": "link-bim-clear",
+    "36": "link-bim-clear",
+    "37": "link-bim-clear",
+    "38": "route",
+    "40": "route",
+    "41": "link-bim-clear",
+    "42": "link-bim-clear",
+    "43": "link-bim-clear",
+    "44": "link-bim-clear"
+   },
+   "mobileSha256": "21d965c9af329bc193acd5399780d469e11b2e89bab1249bad28b51a8c09b9e4",
+   "manualBlurBoxes": 11
+  },
+  {
+   "id": "raw477_f000244",
+   "file": "f000244.jpg",
+   "sourceName": "raw477 frame 244",
+   "video": "B",
+   "sourceFrame": 244,
+   "frameOrder": 40,
+   "position": [
+    34.068807542031166,
+    15.882013960514513,
+    27.620739166806384
+   ],
+   "positionBIM": [
+    -1.1245018459263463,
+    16.50913386807737,
+    2.465293824690722
+   ],
+   "e57Quaternion": [
+    -0.021780979776125916,
+    0.05330308770365421,
+    -0.9051705120590806,
+    0.42113028133815106
+   ],
+   "sha256": "adc37a70b352821933cd1438b627713603194648a7352c887b17cc158d01240b",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.393991470336914,
+   "cameraAboveBimFloor": 2.115142397740456,
+   "neighbors": [
+    35,
+    36,
+    37,
+    38,
+    39,
+    41,
+    42,
+    43,
+    44
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "35": "link-bim-clear",
+    "36": "link-bim-clear",
+    "37": "link-bim-clear",
+    "38": "link-bim-clear",
+    "39": "route",
+    "41": "route",
+    "42": "link-bim-clear",
+    "43": "link-bim-clear",
+    "44": "link-bim-clear"
+   },
+   "mobileSha256": "ede5b5ce2a67c4f949c8fc3ada811c3c1ffe753d8d2c39b6e42c27917fb8c5a4",
+   "manualBlurBoxes": 19
+  },
+  {
+   "id": "raw477_f000246",
+   "file": "f000246.jpg",
+   "sourceName": "raw477 frame 246",
+   "video": "B",
+   "sourceFrame": 246,
+   "frameOrder": 41,
+   "position": [
+    34.117283543854384,
+    15.887770896561877,
+    27.436263599032653
+   ],
+   "positionBIM": [
+    -1.0762889078814197,
+    16.514890804124736,
+    2.2807493301554445
+   ],
+   "e57Quaternion": [
+    -0.042661112132068656,
+    0.005306593073731126,
+    0.9923983195401371,
+    0.11531454789191602
+   ],
+   "sha256": "b48ebf43581b343502dab78e7c8758bc0ba21a7e70dbd4c9b08ae4c9da1cdae7",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.393991470336914,
+   "cameraAboveBimFloor": 2.120899333787822,
+   "neighbors": [
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    42,
+    43,
+    44
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "35": "link-bim-clear",
+    "36": "link-bim-clear",
+    "37": "link-bim-clear",
+    "38": "link-bim-clear",
+    "39": "link-bim-clear",
+    "40": "route",
+    "42": "route",
+    "43": "link-bim-clear",
+    "44": "link-bim-clear"
+   },
+   "mobileSha256": "229720a9f066047a627905b56c3543a48f3d61730e59919c01bc05279d8c556e",
+   "manualBlurBoxes": 26
+  },
+  {
+   "id": "raw477_f000249",
+   "file": "f000249.jpg",
+   "sourceName": "raw477 frame 249",
+   "video": "B",
+   "sourceFrame": 249,
+   "frameOrder": 42,
+   "position": [
+    34.89861724799285,
+    15.908025794997167,
+    27.646208627804867
+   ],
+   "positionBIM": [
+    -0.2946566704860203,
+    16.535145702560026,
+    2.4895801655059024
+   ],
+   "e57Quaternion": [
+    -0.03016963712261464,
+    -0.00954769572301694,
+    0.8985018016438561,
+    0.43782775945000935
+   ],
+   "sha256": "e174bb861aeb70df0ff56ecf16d809b17f973a68e50ae439581adcfb20700d2d",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.393991470336914,
+   "cameraAboveBimFloor": 2.141154232223112,
+   "neighbors": [
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    43,
+    44
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "36": "link-bim-clear",
+    "37": "link-bim-clear",
+    "38": "link-bim-clear",
+    "39": "link-bim-clear",
+    "40": "link-bim-clear",
+    "41": "route",
+    "43": "route",
+    "44": "link-bim-clear"
+   },
+   "mobileSha256": "2014d0cd2d3f99f8c5d11a2b355dc27d7be9aaa4636b922b0fc053686d82cdfa",
+   "manualBlurBoxes": 28
+  },
+  {
+   "id": "raw477_f000251",
+   "file": "f000251.jpg",
+   "sourceName": "raw477 frame 251",
+   "video": "B",
+   "sourceFrame": 251,
+   "frameOrder": 43,
+   "position": [
+    35.525023795865664,
+    15.902142224029712,
+    27.78280804314202
+   ],
+   "positionBIM": [
+    0.33194399620782633,
+    16.52926213159257,
+    2.6252863480740096
+   ],
+   "e57Quaternion": [
+    -0.045443818854438066,
+    -0.024828806512585583,
+    0.907402933303788,
+    0.4170591161055794
+   ],
+   "sha256": "17890285b5e98a7844ca789a0c7a97a193013c23add10c9ad5f920f4e337224b",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 14.393991470336914,
+   "cameraAboveBimFloor": 2.1352706612556567,
+   "neighbors": [
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    44
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "36": "link-bim-clear",
+    "37": "link-bim-clear",
+    "38": "link-bim-clear",
+    "39": "link-bim-clear",
+    "40": "link-bim-clear",
+    "41": "link-bim-clear",
+    "42": "route",
+    "44": "route"
+   },
+   "mobileSha256": "a5e6f9f59107beb1f7f6971be9d11e5fecfb6bc4e82247bdda9fda700bea1fec",
+   "manualBlurBoxes": 18
+  },
+  {
+   "id": "raw477_f000255",
+   "file": "f000255.jpg",
+   "sourceName": "raw477 frame 255",
+   "video": "B",
+   "sourceFrame": 255,
+   "frameOrder": 44,
+   "position": [
+    36.40068364119183,
+    15.42449840468407,
+    27.870280137912008
+   ],
+   "positionBIM": [
+    1.2077276641521024,
+    16.05161831224693,
+    2.711509889187642
+   ],
+   "e57Quaternion": [
+    -0.09871086705197687,
+    -0.04558089227817982,
+    0.8578419925989652,
+    0.5022804622109136
+   ],
+   "sha256": "51498196433ba6bd504a14116aa7817863fe908759d1448c2f1cbef24d4fcecb",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "L3",
+   "packageFloor": "L3",
+   "bimFloorBelow": 13.869770050048828,
+   "cameraAboveBimFloor": 2.181848262198102,
+   "neighbors": [
+    39,
+    40,
+    41,
+    42,
+    43,
+    45
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "39": "link-bim-clear",
+    "40": "link-bim-clear",
+    "41": "link-bim-clear",
+    "42": "link-bim-clear",
+    "43": "route",
+    "45": "stairs"
+   },
+   "stairs": [
+    45
+   ],
+   "mobileSha256": "2cd5e32c9dce54bef6df3cfefa70376dbcf0a6a4c1f97bd30e494d09d6602ebb",
+   "manualBlurBoxes": 14
+  },
+  {
+   "id": "raw477_f000258",
+   "file": "f000258.jpg",
+   "sourceName": "raw477 frame 258",
+   "video": "B",
+   "sourceFrame": 258,
+   "frameOrder": 45,
+   "position": [
+    37.143973267084604,
+    15.020310494584855,
+    27.878841205761574
+   ],
+   "positionBIM": [
+    1.9510287404588311,
+    15.647430402147714,
+    2.719011209324723
+   ],
+   "e57Quaternion": [
+    -0.09393256939711397,
+    -0.03487324219441769,
+    0.8368942963427561,
+    0.5381156624130811
+   ],
+   "sha256": "84574e04aa51dd7bc252909b235aaa29c18f6097f4ce76841980ad7ba6c23c06",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 13.349213600158691,
+   "cameraAboveBimFloor": 2.298216801989023,
+   "neighbors": [
+    44,
+    46
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "44": "stairs",
+    "46": "stairs"
+   },
+   "stairs": [
+    44,
+    46
+   ],
+   "mobileSha256": "6f4c61916459570c0b21ae899a51afb93a2cb3729893f4e2ca39308d5feba2ae",
+   "manualBlurBoxes": 12
+  },
+  {
+   "id": "raw477_f000262",
+   "file": "f000262.jpg",
+   "sourceName": "raw477 frame 262",
+   "video": "B",
+   "sourceFrame": 262,
+   "frameOrder": 46,
+   "position": [
+    38.14037591215499,
+    14.393526806849431,
+    27.837491553515047
+   ],
+   "positionBIM": [
+    2.9473714188919615,
+    15.02064671441229,
+    2.676240986308432
+   ],
+   "e57Quaternion": [
+    -0.10459361167475006,
+    -0.036533127959883505,
+    0.8442655109061973,
+    0.5243484090302898
+   ],
+   "sha256": "14eb190308eb67400f8183b7d178941ff0e83e6451977c829325d70c108143aa",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 12.824991226196289,
+   "cameraAboveBimFloor": 2.1956554882160013,
+   "neighbors": [
+    45,
+    47
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "45": "stairs",
+    "47": "stairs"
+   },
+   "stairs": [
+    45,
+    47
+   ],
+   "mobileSha256": "a9dabfdb6892feeaefbac030766034385d649b99aac54c8d39e93a3fc9849dc6",
+   "manualBlurBoxes": 10
+  },
+  {
+   "id": "raw477_f000264",
+   "file": "f000264.jpg",
+   "sourceName": "raw477 frame 264",
+   "video": "B",
+   "sourceFrame": 264,
+   "frameOrder": 47,
+   "position": [
+    38.92521721369017,
+    14.221901599628541,
+    27.644777758580645
+   ],
+   "positionBIM": [
+    3.7319371626451385,
+    14.8490215071914,
+    2.482408406274846
+   ],
+   "e57Quaternion": [
+    -0.08033128802640069,
+    -0.08678248168135351,
+    0.9408757992537201,
+    0.3174404123861967
+   ],
+   "sha256": "3d926743bb5e2c9bf5f0c5db90d8d47253c4f371a810284c6990f05561aff4e4",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 12.652694702148438,
+   "cameraAboveBimFloor": 2.196326805042963,
+   "neighbors": [
+    46,
+    48
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "46": "stairs",
+    "48": "stairs"
+   },
+   "stairs": [
+    46,
+    48
+   ],
+   "mobileSha256": "f5cba3aa90bb6f263f2339f88ef8a82128fcf02375166b4226e3da4157cd8f9f",
+   "manualBlurBoxes": 8
+  },
+  {
+   "id": "raw477_f000268",
+   "file": "f000268.jpg",
+   "sourceName": "raw477 frame 268",
+   "video": "B",
+   "sourceFrame": 268,
+   "frameOrder": 48,
+   "position": [
+    39.23807147000481,
+    14.190643574972952,
+    26.06427747070498
+   ],
+   "positionBIM": [
+    4.042537715824281,
+    14.817763482535812,
+    0.9014636754148277
+   ],
+   "e57Quaternion": [
+    0.04763108382806234,
+    0.0285380345810912,
+    -0.8781203938658898,
+    0.4752067279747069
+   ],
+   "sha256": "50f0f46a1290d49371579e55986aea321630e7ceee95a5d85114e3b3a10e2473",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 12.652694702148438,
+   "cameraAboveBimFloor": 2.165068780387374,
+   "neighbors": [
+    47,
+    49
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "47": "stairs",
+    "49": "stairs"
+   },
+   "stairs": [
+    47,
+    49
+   ],
+   "mobileSha256": "f8da41f022cbb158a34a4106927cf5609888e31220a3e02b177a2e9823e78317",
+   "manualBlurBoxes": 17
+  },
+  {
+   "id": "raw477_f000271",
+   "file": "f000271.jpg",
+   "sourceName": "raw477 frame 271",
+   "video": "B",
+   "sourceFrame": 271,
+   "frameOrder": 49,
+   "position": [
+    38.15947760735782,
+    14.195747267639678,
+    25.629363918411457
+   ],
+   "positionBIM": [
+    2.9633248750426375,
+    14.822867175202537,
+    0.4680883613966813
+   ],
+   "e57Quaternion": [
+    -0.003150063629725801,
+    0.06740461318781633,
+    -0.5969208454944036,
+    0.7994574406648398
+   ],
+   "sha256": "e12df967198a69c037b99ae4f6a7d9a8a23b9d73dcb50f33e493efc2d91207d6",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 12.566621780395508,
+   "cameraAboveBimFloor": 2.2562453948070296,
+   "neighbors": [
+    48,
+    50
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "48": "stairs",
+    "50": "stairs"
+   },
+   "stairs": [
+    48,
+    50
+   ],
+   "mobileSha256": "de6cfc141088a5d36ba2bc3e9868c7c0c0a0fd90a115fd4fce46e8cd85ef7b32",
+   "manualBlurBoxes": 16
+  },
+  {
+   "id": "raw477_f000274",
+   "file": "f000274.jpg",
+   "sourceName": "raw477 frame 274",
+   "video": "B",
+   "sourceFrame": 274,
+   "frameOrder": 50,
+   "position": [
+    37.21430606092456,
+    13.626357817600029,
+    25.527728455881718
+   ],
+   "positionBIM": [
+    2.018009383336924,
+    14.253477725162888,
+    0.3678005726490987
+   ],
+   "e57Quaternion": [
+    -0.03628583297099909,
+    0.04310834496003121,
+    -0.47921456658533196,
+    0.8758872119701486
+   ],
+   "sha256": "e10913485d56b14fe263067916296e2e1222037bdfb5cf37a355b96d238d9e07",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 12.566621780395508,
+   "cameraAboveBimFloor": 1.6868559447673803,
+   "neighbors": [
+    49,
+    51
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "49": "stairs",
+    "51": "stairs"
+   },
+   "stairs": [
+    49,
+    51
+   ],
+   "mobileSha256": "77f01f48041778f0abffc3814baa63ac5cff720617b1d6073be934e60ea21ab6",
+   "manualBlurBoxes": 17
+  },
+  {
+   "id": "raw477_f000276",
+   "file": "f000276.jpg",
+   "sourceName": "raw477 frame 276",
+   "video": "B",
+   "sourceFrame": 276,
+   "frameOrder": 51,
+   "position": [
+    36.506075754363714,
+    13.202400363651993,
+    25.540935883549402
+   ],
+   "positionBIM": [
+    1.309798626980573,
+    13.829520271214852,
+    0.3820177403710403
+   ],
+   "e57Quaternion": [
+    0.057487142495560535,
+    0.010576717414653799,
+    -0.46537642334102297,
+    0.8831806984387411
+   ],
+   "sha256": "0ef3ac3782e783084c4cae0e498bf2736650d9d0635dc9dcf030fb9d0ccb0600",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 12.566621780395508,
+   "cameraAboveBimFloor": 1.2628984908193441,
+   "neighbors": [
+    50,
+    52
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "50": "stairs",
+    "52": "stairs"
+   },
+   "stairs": [
+    50,
+    52
+   ],
+   "mobileSha256": "1f4f6a1170b283f6b036941a8eeb463426341096e31c6fd0a3068f09b5215bb0",
+   "manualBlurBoxes": 17
+  },
+  {
+   "id": "raw477_f000279",
+   "file": "f000279.jpg",
+   "sourceName": "raw477 frame 279",
+   "video": "B",
+   "sourceFrame": 279,
+   "frameOrder": 52,
+   "position": [
+    35.44988702813194,
+    12.510086179111873,
+    25.453639083396975
+   ],
+   "positionBIM": [
+    0.2534865115397196,
+    13.137206086674732,
+    0.29622688124950614
+   ],
+   "e57Quaternion": [
+    0.007350822428809691,
+    -0.015268797773522616,
+    -0.45053359831132633,
+    0.8925986253724681
+   ],
+   "sha256": "fd999e15e79d701609bb85a169845428376f86203c5696ffedb1d0c5ca6644c2",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 12.566621780395508,
+   "cameraAboveBimFloor": 0.5705843062792244,
+   "neighbors": [
+    51,
+    53
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "51": "stairs",
+    "53": "stairs"
+   },
+   "stairs": [
+    51,
+    53
+   ],
+   "mobileSha256": "e60b886ab31199f6881b1d647a4d83e975b31151d4da486acb46fa6b7a712de5",
+   "manualBlurBoxes": 17
+  },
+  {
+   "id": "raw477_f000282",
+   "file": "f000282.jpg",
+   "sourceName": "raw477 frame 282",
+   "video": "B",
+   "sourceFrame": 282,
+   "frameOrder": 53,
+   "position": [
+    34.42575350232455,
+    11.840385580695484,
+    25.471506846636792
+   ],
+   "positionBIM": [
+    -0.7706204985538179,
+    12.467505488258343,
+    0.3155547761982902
+   ],
+   "e57Quaternion": [
+    -0.018075426317497437,
+    -0.01777604315865003,
+    -0.4900115793344673,
+    0.8713472002429362
+   ],
+   "sha256": "a006d68dabeb5241a6219e16734d075f4811b26024fdfb8d9e66092f8130a537",
+   "originalSha256": null,
+   "dimensions": [
+    4096,
+    2048
+   ],
+   "level": "stairs",
+   "packageFloor": "L3",
+   "bimFloorBelow": 10.214879035949707,
+   "cameraAboveBimFloor": 2.252626452308636,
+   "neighbors": [
+    52
+   ],
+   "sfmModel": 1,
+   "edgeKinds": {
+    "52": "stairs"
+   },
+   "stairs": [
+    52
+   ],
+   "mobileSha256": "62c54fdc98db6f5d96570de20bdb507d6e2ebf2a48eac7c291d8fdf021a14797",
+   "manualBlurBoxes": 11
+  }
+ ]
+}

@@ -121,14 +121,16 @@ function gaussianZoneSummary(index){
  return {zones,note:(zones.length===1?'only '+zones[0].name+' trained':zones.length+' zones trained: '+zones.map(z=>z.name).join(', '))+' · other areas have no Gaussian'};
 }
 /* END CAPTURE SELECTION */
-/* MULTI-FLOOR PREVIEW (local only, 2026-10-20): ?capture=2026-10-18&floors=all opens one Oct 18 station graph (Level 1 +
-   atrium stairs + Level 3 + partial Level 2) from the ignored capture-local package built by scripts/multifloor_review.py.
-   Upper-floor stations are already in the Level 1 scan frame, so the provisional Oct 18 registration applies unchanged.
-   The BIM pane's element floor follows the camera height. Never offered off localhost; nothing here is published. */
+/* MULTI-FLOOR PREVIEW (2026-10-20 local; Level 2 / Level 3 published 2026-10-28). ?capture=2026-10-18&floors=L2 / floors=L3
+   opens one upper floor alone on every host, from the published per-floor packages scan-assets/captures/2026-10-18/floors/<floor>/
+   (approved manual-blur photos of the upper-floor video, scripts/publish_upper_floors.py). ?floors=all opens one combined
+   station graph (Level 1 + atrium stairs + Level 3 + partial Level 2) from the ignored capture-local package built by
+   scripts/multifloor_review.py: localhost only, never published. Upper-floor stations are already in the Level 1 scan frame,
+   so the provisional Oct 18 registration applies unchanged. The BIM pane's element floor follows the camera height. */
 const FLOORS_MANIFEST='capture-local/grimes-oct18-floors/panoramas/manifest.json';
-/* 2026-10-27: ?floors=L2 / ?floors=L3 open one upper floor alone (capture-local per-floor packages, upper-floor video only). */
-const FLOOR_MANIFESTS={L2:'capture-local/grimes-L2-2026-10-18-v2/panoramas/manifest.json',L3:'capture-local/grimes-L3-2026-10-18-v2/panoramas/manifest.json'};
-function multiFloorSelection(search,host,c){const f=new URLSearchParams(search).get('floors');if(!(c&&c.date==='2026-10-18'&&['localhost','127.0.0.1'].includes(host)))return null;return f==='all'?{photo:FLOORS_MANIFEST,floors:'all'}:Object.hasOwn(FLOOR_MANIFESTS,f)?{photo:FLOOR_MANIFESTS[f],floors:f}:null;}
+const FLOOR_MANIFESTS={L2:'scan-assets/captures/2026-10-18/floors/L2/panoramas/manifest.json',L3:'scan-assets/captures/2026-10-18/floors/L3/panoramas/manifest.json'};
+const FLOOR_NAMES={L1:'Level 1',L2:'Level 2',L3:'Level 3'};
+function multiFloorSelection(search,host,c){const f=new URLSearchParams(search).get('floors');if(!(c&&c.date==='2026-10-18'))return null;if(f==='all')return ['localhost','127.0.0.1'].includes(host)?{photo:FLOORS_MANIFEST,floors:'all',local:true}:null;return Object.hasOwn(FLOOR_MANIFESTS,f)?{photo:FLOOR_MANIFESTS[f],floors:f,published:true}:null;}
 function floorForHeight(y){return !Number.isFinite(y)?null:y>=14.3+.5?'L3':y>=9.4+.5?'L2':'L1';}
 /* 2026-10-27: Cupix-free raw INSV captures (scripts/raw360_bim.py package). ?capture=<unpublished date>&floors=L1|L2|L3 on localhost
    opens capture-local/grimes-<floor>-<date>/: stations already in the BIM viewer frame, identity registration.json. */
@@ -140,18 +142,24 @@ if(localCapture){Object.assign(capture,{date:localCapture.date,provisional:true,
 const floorsPreview=multiFloorSelection(location.search,location.hostname,capture)||(localCapture&&{photo:localCapture.photo,floors:localCapture.floors,local:true});if(floorsPreview)capture.photo=floorsPreview.photo;
 let bimFloor=null;
 function followFloor(y){const f=floorForHeight(y);if(!f||f===bimFloor)return;bimFloor=f;send('bim',{type:'grimes-floor',level:f});const sp=document.querySelector('section[aria-label="BIM model"] h2 span');if(sp){sp.textContent=({L1:'Level 1',L2:'Level 2',L3:'Level 3'})[f]+' · elements + interior follow the photo floor';sp.title='BIM interior (walls, floors, furniture, ceilings) of this floor: source design geometry, not surveyed as-built; one floor loaded at a time';}}
-if(['localhost','127.0.0.1'].includes(location.hostname)&&capture.date==='2026-10-18'){
- const b=document.createElement('button');b.type='button';b.id='floorsToggle';b.style.cssText='font:12px Arial;background:#244562;color:white;border:1px solid #8aa5bb;border-radius:4px;padding:3px 6px;white-space:nowrap;flex:none';
- b.textContent=floorsPreview?'\u2190 Back to Level 1':'Levels 1\u20133 (local)';b.title=floorsPreview?'Back to the Level 1 capture':'Local preview: Level 1 + atrium stairs + Level 3 + partial Level 2 (upper floors placed by photo matching; provisional, not surveyed)';
- b.onclick=()=>{const u=new URL(location.href);if(floorsPreview)u.searchParams.delete('floors');else u.searchParams.set('floors','all');u.searchParams.delete('at');const p=currentBimPose();if(p)u.searchParams.set('at',encodeAt(p));location.assign(u);};
- const show=()=>capturePicker.after(b);if(floorsPreview)show();else fetch(FLOORS_MANIFEST,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)show();}).catch(()=>{});
- /* one-floor jump (Level 2 / Level 3 alone); offered only when the local per-floor package exists */
- const j=document.createElement('select');j.id='floorsJump';j.title='Local preview: one upper floor alone (upper-floor video only; provisional, not surveyed)';j.style.cssText='font:12px Arial;flex:none;max-width:9em';
- j.add(new Option(floorsPreview&&floorsPreview.floors!=='all'?({L2:'Level 2',L3:'Level 3'})[floorsPreview.floors]+' only':'Floor\u2026',''));
- for(const [k,path] of Object.entries(FLOOR_MANIFESTS))fetch(path,{method:'HEAD',cache:'no-store'}).then(r=>{if(!r.ok||floorsPreview?.floors===k)return;j.add(new Option(({L2:'Level 2',L3:'Level 3'})[k]+' only (local)',k));if(!j.isConnected)b.after(j);}).catch(()=>{});
- j.onchange=()=>{if(!j.value)return;const u=new URL(location.href);u.searchParams.set('floors',j.value);u.searchParams.delete('at');location.assign(u);};
- if(floorsPreview&&floorsPreview.floors!=='all'){const n=document.createElement('span');n.id='floorsNote';n.textContent=({L2:'Level 2',L3:'Level 3'})[floorsPreview.floors]+' only \u00b7 provisional';n.title='Local preview: this floor alone from the Oct 18 upper-floor video (blurred panoramas, placed by photo matching to Level 1 + ICP to BIM); provisional, not surveyed. Other floors: Floor menu.';n.style.cssText='white-space:nowrap;color:#ffe495';document.querySelector('section[aria-label="Actual scan"] h2').appendChild(n);}
- else if(floorsPreview){const n=document.createElement('span');n.id='floorsNote';n.textContent='L1\u2013L3 preview \u00b7 provisional';n.title='Local preview: Level 1 + atrium stairs + Level 3 + partial Level 2. Upper floors placed by photo matching to Level 1 + ICP to BIM; provisional, not surveyed. Stairs: walk on, or PgUp / PgDn.';n.style.cssText='white-space:nowrap;color:#ffe495';document.querySelector('section[aria-label="Actual scan"] h2').appendChild(n);}
+/* Floor picker for the Oct 18 capture (every host, 2026-10-28): Level 1 = the Level 1 export; Level 2 / Level 3 = the published
+   upper-floor packages, labelled provisional. Localhost also keeps the combined Levels 1-3 preview button (floors=all). */
+const UPPER_FLOOR_NOTE='Oct 18 upper-floor video (VID_20261018_153400_00_477): frames from the raw 360\u00b0 video, not a Cupix export. Positions: local structure-from-motion fitted to the Cupix-placed stations of the same video, then the provisional Oct 18 registration (a Cupix-free dry run differs by median 0.09 m). Provisional, not surveyed. Privacy: automatic blur (strict) + manual blur boxes after manual review of every image; not a claim of full anonymisation.';
+if(capture.date==='2026-10-18'&&!localCapture){
+ const cur=floorsPreview?floorsPreview.floors:'L1',j=document.createElement('select');j.id='floorPicker';j.setAttribute('aria-label','Floor of the Oct 18 capture');j.title='Floor of the Oct 18 capture. Level 2 / Level 3: '+UPPER_FLOOR_NOTE;j.style.cssText='font:12px Arial;flex:none;max-width:11em';
+ for(const k of ['L1','L2','L3'])j.add(new Option(FLOOR_NAMES[k]+(k==='L1'?'':' \u00b7 provisional'),k));
+ if(cur==='all')j.add(new Option('Levels 1\u20133 (local)','all'));
+ j.value=cur;j.onchange=()=>{const u=new URL(location.href);if(j.value==='L1')u.searchParams.delete('floors');else u.searchParams.set('floors',j.value);u.searchParams.delete('at');location.assign(u);};
+ capturePicker.after(j);
+ const h=document.querySelector('section[aria-label="Actual scan"] h2'),note=(text,title)=>{const n=document.createElement('span');n.id='floorsNote';n.textContent=text;n.title=title;n.style.cssText='white-space:nowrap;color:#ffe495';h.appendChild(n);};
+ if(floorsPreview&&floorsPreview.floors!=='all')note(FLOOR_NAMES[floorsPreview.floors]+' \u00b7 provisional, not surveyed',UPPER_FLOOR_NOTE+' Other floors: Floor menu.');
+ else if(floorsPreview)note('L1\u2013L3 preview \u00b7 provisional','Local preview: Level 1 + atrium stairs + Level 3 + partial Level 2. Upper floors placed by photo matching to Level 1 + ICP to BIM; provisional, not surveyed. Stairs: walk on, or PgUp / PgDn.');
+ if(['localhost','127.0.0.1'].includes(location.hostname)){
+  const b=document.createElement('button');b.type='button';b.id='floorsToggle';b.style.cssText='font:12px Arial;background:#244562;color:white;border:1px solid #8aa5bb;border-radius:4px;padding:3px 6px;white-space:nowrap;flex:none';
+  const all=floorsPreview?.floors==='all';b.textContent=all?'\u2190 Back to Level 1':'Levels 1\u20133 (local)';b.title=all?'Back to the Level 1 capture':'Local preview: Level 1 + atrium stairs + Level 3 + partial Level 2 (upper floors placed by photo matching; provisional, not surveyed)';
+  b.onclick=()=>{const u=new URL(location.href);if(all)u.searchParams.delete('floors');else u.searchParams.set('floors','all');u.searchParams.delete('at');const p=currentBimPose();if(p)u.searchParams.set('at',encodeAt(p));location.assign(u);};
+  if(all)j.after(b);else fetch(FLOORS_MANIFEST,{method:'HEAD',cache:'no-store'}).then(r=>{if(r.ok)j.after(b);}).catch(()=>{});
+ }
 }
 if(localCapture){const L={L1:'Level 1',L2:'Level 2',L3:'Level 3'},n=document.createElement('span');n.id='floorsNote';n.textContent=L[localCapture.floors]+' only \u00b7 '+localCapture.date+' (local, Cupix-free) \u00b7 provisional';n.title='Local preview: raw INSV, local SfM, placed by photo links + ICP to BIM design surfaces (scripts/raw360_bim.py); blurred panoramas, manual review pending; provisional, not surveyed.';n.style.cssText='white-space:nowrap;color:#ffe495';document.querySelector('section[aria-label="Actual scan"] h2').appendChild(n);
  const j=document.createElement('select');j.id='floorsJump';j.title='Other floors of this local capture';j.style.cssText='font:12px Arial;flex:none;max-width:9em';j.add(new Option(L[localCapture.floors]+' only',''));
@@ -171,7 +179,7 @@ for(const o of [...capturePicker.options])captureAvailable(o.value).then(ok=>{if
 function currentBimPose(){try{if(poses.bim&&valid(poses.bim))return poses.bim;if(registration&&poses.scan&&valid(poses.scan))return convert(poses.scan,'scan');}catch(e){}return null;}
 function encodeAt(p){const q=p.quaternion,n=Math.hypot(...q)||1;return [...p.position.map(v=>v.toFixed(3)),...q.map(v=>(v/n).toFixed(4)),Math.max(20,Math.min(110,p.fov)).toFixed(1)].join(',');}
 function decodeAt(s){const v=String(s||'').split(',').map(Number);if(v.length!==8||!v.every(Number.isFinite))return null;const q=v.slice(3,7),n=Math.hypot(...q);if(!(n>.5))return null;const p={position:v.slice(0,3),quaternion:q.map(x=>x/n),fov:v[7],zoom:1};return valid(p)?p:null;}
-function navigateCapture(date,display){const u=new URL(location.href);if(date!==capture.date)u.searchParams.delete('registration');if(date!==capture.date)u.searchParams.delete('manifest');u.searchParams.set('capture',date);u.searchParams.set('mode',display);u.searchParams.delete('at');const p=currentBimPose();if(p)u.searchParams.set('at',encodeAt(p));location.assign(u);}
+function navigateCapture(date,display){const u=new URL(location.href);if(date!==capture.date)u.searchParams.delete('registration');if(date!==capture.date)u.searchParams.delete('floors');if(date!==capture.date)u.searchParams.delete('manifest');u.searchParams.set('capture',date);u.searchParams.set('mode',display);u.searchParams.delete('at');const p=currentBimPose();if(p)u.searchParams.set('at',encodeAt(p));location.assign(u);}
 let carryPose=decodeAt(new URLSearchParams(location.search).get('at')),scanReady=false;
 if(new URLSearchParams(location.search).has('at')){try{const u=new URL(location.href);u.searchParams.delete('at');history.replaceState(history.state,'',u);}catch(e){}}
 function tryCarry(){if(!carryPose||!scanReady||!registration)return;let p;try{p=convert(carryPose,'bim');}catch(e){carryPose=null;return;}carryPose=null;
@@ -199,7 +207,7 @@ function setView(next,{push=true}={}){
  view=next;document.body.dataset.focus=next==='compare'?'both':next;
  document.querySelectorAll('#paneViews button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.focus===(next==='compare'?'both':next))));
  /* the pickers stay reachable in overlay mode: they move into the overlay bar */
- for(const el of [mode,capturePicker])(next==='overlay'?overlayBar:scanTitle).appendChild(el);
+ for(const el of [mode,capturePicker,...['floorPicker','floorsJump','floorsToggle','floorsNote'].map(id=>document.getElementById(id))])if(el)(next==='overlay'?overlayBar:scanTitle).appendChild(el);
  if(next==='overlay'){if(registration){link.checked=true;epoch++;}link.disabled=true;}else link.disabled=!registration;
  if(push){const u=new URL(location.href);if(next==='compare')u.searchParams.delete('view');else u.searchParams.set('view',next);history.replaceState(null,'',u);}
  applyStyle();

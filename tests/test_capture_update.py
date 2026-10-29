@@ -92,5 +92,52 @@ class Oct18Package(unittest.TestCase):
         self.assertFalse(list(self.base.rglob('*.glb')), 'mesh view is retired; no GLB in the package')
 
 
+def jpeg_size(path):
+    """(width, height) from the first SOF marker of a JPEG (no Pillow needed)."""
+    b = path.read_bytes(); i = 2
+    while i < len(b):
+        if b[i] != 0xFF: i += 1; continue
+        m = b[i + 1]
+        if m in (0xC0, 0xC1, 0xC2): return int.from_bytes(b[i + 7:i + 9], 'big'), int.from_bytes(b[i + 5:i + 7], 'big')
+        i += 2 + int.from_bytes(b[i + 2:i + 4], 'big')
+    raise ValueError(path)
+
+
+@unittest.skipUnless((ROOT / 'scan-assets/captures/2026-10-18/floors/L2/panoramas/manifest.json').is_file(), 'upper floors not published')
+class Oct18UpperFloors(unittest.TestCase):
+    """Published Level 2 / Level 3 packages (scripts/publish_upper_floors.py, 2026-10-28): approved manual-blur photos only."""
+    def test_packages(self):
+        reg = json.loads((ROOT / 'scan-assets/captures/2026-10-18/registration.json').read_text())
+        self.assertEqual(reg['status'], 'project-frame-provisional')
+        total_boxes = 0
+        for floor in ('L2', 'L3'):
+            base = ROOT / 'scan-assets/captures/2026-10-18/floors' / floor
+            m = json.loads((base / 'panoramas/manifest.json').read_text()); p = json.loads((base / 'provenance.json').read_text())
+            s = m['stations']
+            self.assertEqual((m['level'], m['captureDate'], m['status']), (floor, '2026-10-18', 'published-provisional'))
+            self.assertEqual(len(s), 54); self.assertEqual(m['exportedStations'], 54)
+            self.assertIn(m['defaultStation'], {x['id'] for x in s})
+            files = {f['file']: f for f in p['files']}
+            self.assertEqual(set(files), {x['file'] for x in s})
+            for i, x in enumerate(s):
+                self.assertEqual(x['file'], f"f{x['sourceFrame']:06d}.jpg"); self.assertIn(x['level'], (floor, 'stairs'))
+                full, mob = base / 'panoramas' / x['file'], base / 'panoramas/mobile' / x['file']
+                self.assertEqual(hashlib.sha256(full.read_bytes()).hexdigest(), x['sha256'])
+                self.assertEqual(hashlib.sha256(mob.read_bytes()).hexdigest(), x['mobileSha256'])
+                self.assertEqual(files[x['file']]['sha256'], x['sha256'])
+                self.assertEqual(jpeg_size(full), (4096, 2048)); self.assertEqual(jpeg_size(mob), (2048, 1024))
+                for n in x['neighbors']: self.assertIn(i, s[n]['neighbors'])
+            # nothing but the photos, their mobile copies, the manifest and the provenance record
+            published = sorted(str(f.relative_to(base)) for f in base.rglob('*') if f.is_file())
+            expected = sorted(['provenance.json', 'panoramas/manifest.json'] + [f'panoramas/{x["file"]}' for x in s] + [f'panoramas/mobile/{x["file"]}' for x in s])
+            self.assertEqual(published, expected)
+            pr = p['privacy']; total_boxes += pr['manualBoxes']['thisFloor']
+            self.assertEqual(pr['manualReview']['publishApproved'], '2026-10-28'); self.assertEqual(pr['automaticBlur']['params']['personScore'], 0.15)
+            self.assertEqual(pr['automaticBlur']['params']['crop'], 1536); self.assertFalse(p['placementCupixFree'])
+            self.assertEqual(p['registration']['file'], '../../registration.json')
+        self.assertEqual(total_boxes, 1241)
+        self.assertFalse([f for f in (ROOT / 'scan-assets/captures/2026-10-18/floors').rglob('*') if f.suffix in ('.glb', '.ply', '.ksplat', '.splat', '.e57')])
+
+
 if __name__ == '__main__':
     unittest.main()

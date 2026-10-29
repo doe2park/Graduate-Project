@@ -27,6 +27,10 @@ publishing (automatic blur + manual contact-sheet review; `provenance.json` `pri
 full-resolution files are byte-identical to the reviewed blurred set. Not a claim of full anonymisation. The Oct 18
 Gaussian zones stay local: off localhost `scan-compare.html` shows "no Gaussian for this capture" for Oct 18.
 
+**Upper floors published 2026-10-28.** Level 2 and Level 3 of the same day (upper-floor video, manual-blur set) are published as
+`scan-assets/captures/2026-10-18/floors/{L2,L3}/`; open them with the Floor picker or `?floors=L2` / `?floors=L3`. Details:
+`docs/MULTIFLOOR_OCT18.md` (Level 2 and Level 3 published).
+
 ## Route and coordinates
 
 Stations are sorted by video frame number. The Sep 17 rule (consecutive frames, distance <= 5.5 m, height difference

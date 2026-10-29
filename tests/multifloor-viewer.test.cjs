@@ -1,5 +1,5 @@
-/* Multi-floor Oct 18 preview (2026-10-20): stair edges in scan-photo, local-only selection and floor following in
-   scan-compare, floor message in scan-bim. Pure extraction tests; the local package itself is checked when present. */
+/* Multi-floor Oct 18 (2026-10-20; Level 2 / 3 published 2026-10-28): stair edges in scan-photo, floor selection (L2 / L3 public,
+   floors=all local-only) and floor following in scan-compare, floor message in scan-bim. Pure extraction tests; the local package itself is checked when present. */
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 const photo=read('scan-photo.html'),compare=read('scan-compare.html'),bim=read('scan-bim.html');
@@ -42,12 +42,23 @@ test('local multi-floor package (if built) is labelled provisional, keeps Level 
  // reachability: from the default Level 1 station, every level is reachable through the graph
  const seen=new Set([m.stations.findIndex(s=>s.id===m.defaultStation)]),q=[...seen];while(q.length){const i=q.shift();for(const n of m.stations[i].neighbors)if(!seen.has(n)){seen.add(n);q.push(n)}}
  for(const l of ['L2','L3'])assert.ok([...seen].some(i=>m.stations[i].level===l),'reachable '+l)});
-test('one-floor preview (?floors=L2 / L3) is Oct 18 + localhost only and points into ignored capture-local',()=>{const c=floorBlock();
- for(const f of ['L2','L3']){const s=c.sel('?capture=2026-10-18&floors='+f,'127.0.0.1',{date:'2026-10-18'});assert.equal(s.photo,c.per[f]);assert.equal(s.floors,f);assert.match(s.photo,/^capture-local\//);
-  assert.equal(c.sel('?capture=2026-10-18&floors='+f,'doe2park.github.io',{date:'2026-10-18'}),null);assert.equal(c.sel('?capture=2026-09-17&floors='+f,'localhost',{date:'2026-09-17'}),null)}
- assert.equal(c.sel('?capture=2026-10-18&floors=L1','localhost',{date:'2026-10-18'}),null);assert.equal(c.sel('?capture=2026-10-18&floors=toString','localhost',{date:'2026-10-18'}),null);
- assert.equal(c.sel('?capture=2026-10-18&floors=all','localhost',{date:'2026-10-18'}).floors,'all');
- assert.match(compare,/id='floorsJump'/)});
+/* 2026-10-28: Level 2 / Level 3 published (approved manual-blur photos), so ?floors=L2 / L3 works on every host */
+test('one-floor view (?floors=L2 / L3) is Oct 18 only, on every host, and points into the published per-floor packages',()=>{const c=floorBlock();
+ for(const host of ['127.0.0.1','localhost','doe2park.github.io','pages.emu'])for(const f of ['L2','L3']){const s=c.sel('?capture=2026-10-18&floors='+f,host,{date:'2026-10-18'});
+  assert.equal(s.photo,c.per[f]);assert.equal(s.photo,'scan-assets/captures/2026-10-18/floors/'+f+'/panoramas/manifest.json');assert.equal(s.floors,f);assert.equal(s.published,true);
+  assert.ok(fs.existsSync(path.join(__dirname,'..',s.photo)),s.photo);assert.equal(c.sel('?capture=2026-09-17&floors='+f,host,{date:'2026-09-17'}),null)}
+ assert.equal(c.sel('?capture=2026-10-18&floors=L1','localhost',{date:'2026-10-18'}),null);assert.equal(c.sel('?capture=2026-10-18&floors=toString','doe2park.github.io',{date:'2026-10-18'}),null);
+ assert.equal(c.sel('?capture=2026-10-18&floors=all','localhost',{date:'2026-10-18'}).floors,'all');assert.equal(c.sel('?capture=2026-10-18&floors=all','doe2park.github.io',{date:'2026-10-18'}),null);
+ for(const p of Object.values(c.per))assert.doesNotMatch(p,/capture-local/);
+ assert.match(compare,/id='floorsJump'/);assert.match(compare,/j\.id='floorPicker'/)});
+test('the Oct 18 floor picker is offered on every host (Level 1 / 2 / 3, upper floors labelled provisional); the Levels 1-3 button stays localhost-only',()=>{
+ const ui=compare.slice(compare.indexOf('/* Floor picker for the Oct 18 capture'),compare.indexOf('if(localCapture){const L='));
+ assert.match(ui,/^\/\* Floor picker/);assert.match(ui,/if\(capture\.date==='2026-10-18'&&!localCapture\)\{/);
+ assert.match(ui,/for\(const k of \['L1','L2','L3'\]\)j\.add\(new Option\(FLOOR_NAMES\[k\]\+\(k==='L1'\?'':' \\u00b7 provisional'\),k\)\)/);
+ assert.match(ui,/' \\u00b7 provisional, not surveyed'/);assert.match(ui,/not a Cupix export/);assert.match(ui,/not a claim of full anonymisation/);
+ assert.doesNotMatch(ui,/placed without Cupix|Cupix-free placement/,'v2 positions are fitted to Cupix-placed stations');
+ assert.match(ui,/if\(\['localhost','127\.0\.0\.1'\]\.includes\(location\.hostname\)\)\{\s*const b=document\.createElement\('button'\);b\.type='button';b\.id='floorsToggle'/);
+ assert.match(compare,/for\(const el of \[mode,capturePicker,\.\.\.\['floorPicker','floorsJump','floorsToggle','floorsNote'\]\.map\(id=>document\.getElementById\(id\)\)\]\)if\(el\)\(next==='overlay'\?overlayBar:scanTitle\)\.appendChild\(el\)/,'floor picker moves into the overlay bar with the capture picker')});
 test('local per-floor packages (if built) hold one floor, symmetric edges, provisional labels',()=>{
  for(const f of ['L2','L3']){const p=path.join(__dirname,'..','capture-local/grimes-'+f+'-2026-10-18-v2/panoramas/manifest.json');if(!fs.existsSync(p))continue;
   const m=JSON.parse(fs.readFileSync(p,'utf8'));assert.equal(m.level,f);assert.equal(m.status,'local-preview');assert.match(m.alignment,/provisional, not surveyed/);assert.equal(m.exportedStations,m.stations.length);
