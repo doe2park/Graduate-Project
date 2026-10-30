@@ -263,6 +263,37 @@ async function mrSmoke(browser,base,now){
  await page.evaluate(()=>{xrDebug.look(0,0);xrDebug.mr.panel(true);});await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-panel.png')});
  await page.evaluate(()=>xrDebug.mr.button(9));assert.equal((await page.evaluate(()=>xrInspection())).mr.rangeKey,'all');await page.evaluate(()=>xrDebug.mr.button(9));
  await page.evaluate(()=>xrDebug.mr.button(11));assert.equal((await page.evaluate(()=>xrInspection())).mr.page,'layers');await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-layers.png')});await page.evaluate(()=>xrDebug.mr.button(14));
+ // Demo here: Grimes services at real scale in any room. Not an alignment: labelled DEMO, no RMS, no checks, never saved; a landmark alignment replaces it.
+ {const savedBefore=await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/1')),checksBefore=await page.evaluate(()=>localStorage.getItem('grimes-mr-checks/1'));
+  await page.evaluate(()=>xrDebug.mr.panel(true));
+  const label=await page.evaluate(()=>MRAlign.demoLabel({id:xrInspection().mr.area}));
+  await page.evaluate(()=>xrDebug.mr.button(15));i=await page.evaluate(()=>xrInspection());   // desktop: places 2 m ahead of the camera
+  assert.equal(i.mr.phase,'demo');assert.equal(i.mr.fit,null,'no RMS / fit for a demo placement');assert.equal(i.mr.source,'demo');assert.equal(i.mr.persisted,false);assert.equal(i.mr.checksEnabled,false);
+  assert.equal(i.mr.demo.label,label);assert.match(i.mr.demo.label,/^DEMO placement · not aligned to this building · Grimes L1 foyer services shown at real scale$/);
+  assert.equal(i.mr.caption,label);assert.ok(!/RMS|manual alignment/.test(i.mr.caption));
+  const al=await page.locator('#align').textContent();assert.match(al,/DEMO placement · not aligned to this building/);assert.ok(!/RMS|manual alignment/.test(al));
+  assert.match(await page.locator('#mrLab').textContent(),/DEMO placement/);assert.match(await page.locator('#mrFit').textContent(),/DEMO placement · not an alignment · no RMS/);
+  const Fp=i.mr.demo.floorPoint,Rf=i.mr.demo.reference,Wp=await page.evaluate(r=>MRAlign.applyT(xrInspection().mr.T,r),Rf);
+  Wp.forEach((v,k)=>assert.ok(Math.abs(v-Fp[k])<1e-9,'reference point sits on the chosen floor point'));assert.ok(Math.abs(Fp[1])<1e-9,'floor point on the XR floor');
+  assert.equal(i.mr.bimVisible,true);assert.equal(await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/1')),savedBefore,'demo does not touch the saved alignment');
+  // explicit point + heading (head looking along +x: yaw -90 deg)
+  await page.evaluate(()=>xrDebug.mr.demo([1,0,-3],-Math.PI/2));i=await page.evaluate(()=>xrInspection());
+  const R2=i.mr.demo.reference,fwd=await page.evaluate(()=>{const T=xrInspection().mr.T,R=xrInspection().mr.demo.reference,a=MRAlign.applyT(T,R),b=MRAlign.applyT(T,[R[0],R[1],R[2]-1]);return [b[0]-a[0],b[2]-a[2]];});
+  assert.ok(Math.abs(fwd[0]-1)<1e-9&&Math.abs(fwd[1])<1e-9,'BIM forward follows the head heading: '+fwd);
+  assert.deepEqual(await page.evaluate(r=>MRAlign.applyT(xrInspection().mr.T,r).map(v=>+v.toFixed(9)),R2),[1,0,-3]);
+  // ceiling height: services stay relative to the floor point; nudge up/down still works and is NOT saved
+  const yD=i.mr.T.t[1];await page.evaluate(()=>xrDebug.mr.nudge('height',-1));i=await page.evaluate(()=>xrInspection());assert.ok(Math.abs(i.mr.T.t[1]-yD+.01)<1e-9);assert.equal(await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/1')),savedBefore,'nudging a demo is not saved');
+  // checks are disabled
+  await page.evaluate(()=>xrDebug.mr.nextCheck());i=await page.evaluate(()=>xrInspection());assert.equal(i.mr.check,null);assert.match(i.mr.note,/Check points are off in DEMO/);
+  await page.evaluate(()=>xrDebug.mr.check([0,0,0]));assert.equal(await page.evaluate(()=>localStorage.getItem('grimes-mr-checks/1')),checksBefore,'no check logged in demo');
+  await page.evaluate(()=>{xrDebug.look(0,0);xrDebug.mr.panel(true);});await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-demo-panel.png')});
+  // a landmark alignment replaces the demo (and a demo replaces the alignment view) cleanly
+  await page.evaluate(()=>xrDebug.mr.simulate());i=await page.evaluate(()=>xrInspection());
+  assert.equal(i.mr.phase,'aligned');assert.equal(i.mr.demo,null);assert.equal(i.mr.checksEnabled,true);assert.ok(i.mr.fit&&i.mr.fit.rmsCm<3);assert.match(i.mr.caption,/^manual alignment, not surveyed · RMS/);
+  assert.match(await page.locator('#align').textContent(),/manual alignment, not surveyed · RMS/);assert.ok(!/DEMO/.test(await page.locator('#align').textContent()));
+  await page.evaluate(()=>xrDebug.mr.beginDemo());i=await page.evaluate(()=>xrInspection());assert.equal(i.mr.phase,'demo');assert.equal(i.mr.fit,null);
+  await page.evaluate(()=>xrDebug.mr.simulate());i=await page.evaluate(()=>xrInspection());assert.equal(i.mr.phase,'aligned');assert.equal(i.mr.demo,null);
+  out.demo={label,floorPoint:Fp};}
  // reload: the saved alignment is announced (applied on Enter MR; no anchor on desktop)
  await page.reload();await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area,null,{timeout:60000});
  i=await page.evaluate(()=>xrInspection());assert.match(i.mr.note,/saved alignment exists .*no anchor/);

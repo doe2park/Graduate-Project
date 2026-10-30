@@ -19,6 +19,8 @@
   if (typeof module === 'object' && module && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
+/* API version of this file. scan-xr.html loads it as twin/mr-align.js?v=<API> and checks MRAlign.API (stale-cache guard). Bump with the exports. */
+const API = 3;
 const D2R = Math.PI / 180, R2D = 180 / Math.PI;
 const LABEL = 'manual alignment, not surveyed';
 const MIN_SPREAD_M = 0.5;          // horizontal RMS spread of the plan points below which the heading is undetermined
@@ -187,6 +189,31 @@ function checkOffset(T, bim, xr) {
   return {horizontalCm: cm(Math.hypot(d[0], d[2])), dxBimCm: cm(inBim[0]), dzBimCm: cm(inBim[2]), heightBelowCm: cm(q[1] - xr[1])};
 }
 
+
+/* ── "Demo here" placement (use the MR view in ANY building) ──
+   NOT an alignment: the Grimes BIM is dropped into whatever room you stand in, at real scale, as if you stood at a reference
+   point of the chosen area. Same representation as a fit (yaw + translation), so rendering, Lens/All, fade, cards and Nudge work
+   unchanged. It is never saved as an alignment, has no RMS and no checks, and every caption uses DEMO_TEXT.
+   Reference point R = centroid of the area's plan landmarks (x, z) at the area floor datum floorY (foyer: between the two round columns).
+   Floor point F = where the user pointed on the floor (XR frame). Heading: the BIM direction DEMO_FORWARD_BIM (-z) is turned to
+   the user's head heading h at placement (foyer: -z is toward the auditorium doors, so you face them). Result: applyT(T, R) = F exactly. */
+const DEMO_FORWARD_BIM = Object.freeze([0, 0, -1]);
+const DEMO_NAMES = {'l1-auditorium-foyer': 'L1 foyer', 'l1-east-entrance': 'L1 east entrance'};
+const DEMO_SOURCE = 'demo';
+function demoLabel(area) { return 'DEMO placement · not aligned to this building · Grimes ' + (DEMO_NAMES[area?.id] || area?.id || 'area') + ' services shown at real scale'; }
+function demoReference(area) {
+  const pts = (area.points || []).filter(p => usesPlan(p.kind) && Number.isFinite(p.bim[0]) && Number.isFinite(p.bim[2]));
+  if (!pts.length) throw new Error('demoReference: area has no plan points');
+  return [pts.reduce((m, p) => m + p.bim[0], 0) / pts.length, area.floorY, pts.reduce((m, p) => m + p.bim[2], 0) / pts.length];
+}
+/* headYawRad: head yaw in XR (0 = looking along -z), as yawFromQuaternion / headingStep use it. */
+function demoTransform(area, {floorPoint, headYawRad = 0, forwardBim = DEMO_FORWARD_BIM} = {}) {
+  if (!finite3(floorPoint) || !Number.isFinite(headYawRad)) throw new Error('demoTransform: needs a finite floor point and heading');
+  const phiF = Math.atan2(-forwardBim[0], -forwardBim[2]);   // BIM forward as an angle in the same convention as head yaw
+  const yawDeg = wrapDeg((headYawRad - phiF) * R2D), R = demoReference(area), r = rotY(yawDeg * D2R, R);
+  return {yawDeg, t: [floorPoint[0] - r[0], floorPoint[1] - r[1], floorPoint[2] - r[2]]};
+}
+
 /* ── Landmark file ── */
 function validateLandmarks(doc) {
   if (!doc || doc.schema !== 'grimes-mr-landmarks/1' || !Array.isArray(doc.areas) || !doc.areas.length) throw new Error('mr-landmarks.json: unexpected schema');
@@ -249,7 +276,7 @@ function mrAlpha({mode = 'lens', opacity = 0.85, cone = 1, outside = 0, distance
 }
 
 /* ── MR panel (world-locked canvas) ── buttons in a cols x rows grid in the lower part; (u, v) plane UVs, v up. */
-const PANEL = {cols: 5, rows: 3, left: .025, right: .975, top: .52, bottom: .97, gap: .012};
+const PANEL = {cols: 5, rows: 4, left: .025, right: .975, top: .52, bottom: .97, gap: .012};
 function gridRect(L, i) {
   const w = (L.right - L.left - L.gap * (L.cols - 1)) / L.cols, h = (L.bottom - L.top - L.gap * (L.rows - 1)) / L.rows;
   const c = i % L.cols, r = Math.floor(i / L.cols);
@@ -275,7 +302,7 @@ function simulateTouch(area, p, Ttrue, {noiseM = 0.01, random = Math.random, xrF
   return [q[0] + gauss(random) * noiseM, q[1] + (p.kind === 'xyz' ? gauss(random) * noiseM : 0), q[2] + gauss(random) * noiseM];
 }
 
-return {LABEL, MIN_SPREAD_M, SHORT_SPAN_M, IDENTITY, rotY, applyT, invertT, composeT, validT, wrapDeg,
+return {API, LABEL, DEMO_FORWARD_BIM, DEMO_SOURCE, demoLabel, demoReference, demoTransform, MIN_SPREAD_M, SHORT_SPAN_M, IDENTITY, rotY, applyT, invertT, composeT, validT, wrapDeg,
   fitAlignment, residuals, leaveOneOut, cm, summary, nudge, headingStep, yawFromQuaternion, NUDGE_STEPS,
   STORE_KEY, CHECK_KEY, SCHEMA, anchorT, toAnchorFrame, fromAnchorFrame, makeRecord, parseRecord, saveRecord, loadRecord, clearRecord, appendCheck, loadChecks,
   checkOffset, validateLandmarks, areaById, landmarkBim, createSession, currentPoint, capture, skip, redo, finishEarly, sessionPairs, solveSession, capturedPlanCount,

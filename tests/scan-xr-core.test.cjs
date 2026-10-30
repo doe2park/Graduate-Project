@@ -378,3 +378,29 @@ test('scan-xr.html Gaussian wiring: pinned GaussianSplats3D 0.4.7 DropInViewer, 
     assert.match(src, /export \{[^}]*\bDropInViewer\b/);
   }
 });
+
+test('headset quality: Quest 3 / 3S default to scale 1.0 + foveation 0.2, Quest 2 and unknown keep 0.85 + 0.7, URL overrides, scale clamp 0.5-1.5', () => {
+  const UA = {
+    q3: 'Mozilla/5.0 (Linux; Android 14; Quest 3) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/38.0.0.1.29 SamsungBrowser/4.0 Chrome/131.0.0.0 VR Safari/537.36',
+    q3s: 'Mozilla/5.0 (Linux; Android 14; Quest 3S) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/38.0.0.1.29 Chrome/131.0.0.0 VR Safari/537.36',
+    q2: 'Mozilla/5.0 (Linux; Android 12; Quest 2) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/38.0.0.1.29 Chrome/131.0.0.0 VR Safari/537.36',
+    qNoModel: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/38.0.0.1.29 SamsungBrowser/4.0 Chrome/131.0.0.0 VR Safari/537.36',
+    desktop: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  };
+  const P = s => new URLSearchParams(s);
+  assert.deepEqual(X.headsetProfile(UA.q3), {device: 'quest3', xrScale: 1, foveation: 0.2});
+  assert.deepEqual(X.headsetProfile(UA.q3s), {device: 'quest3s', xrScale: 1, foveation: 0.2});
+  assert.equal(X.headsetProfile(UA.q2).device, 'quest2');
+  for (const k of ['q2', 'qNoModel', 'desktop']) { const e = X.xrQuality(UA[k], P('')); assert.equal(e.xrScale, 0.85, k); assert.equal(e.foveation, 0.7, k); }
+  assert.equal(X.xrQuality('', P('')).device, 'unknown'); assert.equal(X.xrQuality(undefined, P('')).xrScale, 0.85);
+  let e = X.xrQuality(UA.q3, P(''));
+  assert.deepEqual([e.xrScale, e.foveation, e.scaleSource, e.foveationSource], [1, 0.2, 'device-default', 'device-default']);
+  e = X.xrQuality(UA.q3, P('xrscale=1.3&foveation=0'));
+  assert.deepEqual([e.xrScale, e.foveation, e.scaleSource, e.foveationSource], [1.3, 0, 'url', 'url']);
+  assert.equal(X.xrQuality(UA.q3, P('xrscale=9')).xrScale, 1.5, 'upper clamp 1.5');
+  assert.equal(X.xrQuality(UA.q2, P('xrscale=0.1')).xrScale, 0.5, 'lower clamp 0.5');
+  assert.equal(X.xrQuality(UA.q2, P('xrscale=1.25')).xrScale, 1.25);
+  assert.equal(X.xrQuality(UA.q3, P('xrscale=abc&foveation=zzz')).xrScale, 1); assert.equal(X.xrQuality(UA.q3, P('foveation=5')).foveation, 1);
+  const html = read('scan-xr.html');
+  assert.ok(html.includes('X.xrQuality(navigator.userAgent,q)') && html.includes('foveation:P.foveation,device:XQ.device'), 'page uses the profile and reports it in xrInspection');
+});

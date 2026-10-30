@@ -201,3 +201,47 @@ test('scan-xr.html MR wiring: immersive-ar with local-floor + optional features,
   assert.ok(/'MR passthrough · '\+mrShort\(\)\+' · '\+MR\.LABEL/.test(html) && MR.LABEL === 'manual alignment, not surveyed');
   assert.ok(html.includes("sphere.visible=false") && /function bootMR\(\)[\s\S]*?sphere\.visible=false/.test(html), 'no photo sphere in MR');
 });
+
+/* ── Demo here placement ── */
+const FOYER = LANDMARKS.areas[0];
+test('demo: the area reference point (plan centroid at floorY) lands exactly on the chosen floor point', () => {
+  const R = MR.demoReference(FOYER);
+  assert.equal(R[1], FOYER.floorY);
+  const plan = FOYER.points.filter(p => p.kind !== 'y');
+  close(R[0], plan.reduce((m, p) => m + p.bim[0], 0) / plan.length, 1e-12); close(R[2], plan.reduce((m, p) => m + p.bim[2], 0) / plan.length, 1e-12);
+  for (const [F, hy] of [[[0, 0, 0], 0], [[2.5, 0.03, -4], 1.1], [[-7, 0, 9], -2.9], [[1, 0, 1], Math.PI]]) {
+    const T = MR.demoTransform(FOYER, {floorPoint: F, headYawRad: hy});
+    close3(MR.applyT(T, R), F, 1e-9, 'reference -> floor point');
+  }
+});
+test('demo: heading convention, BIM -z (toward the auditorium doors) faces where the head looks; heights stay relative to the floor', () => {
+  const R = MR.demoReference(FOYER), F = [3, 0, -2];
+  for (const hy of [0, 0.7, -1.9, 3]) {
+    const T = MR.demoTransform(FOYER, {floorPoint: F, headYawRad: hy});
+    const a = MR.applyT(T, R), b = MR.applyT(T, [R[0], R[1], R[2] - 1]);          // one metre along BIM -z
+    close3([b[0] - a[0], b[2] - a[2]], [-Math.sin(hy), -Math.cos(hy)], 1e-9, 'BIM forward = head forward (headingStep convention)');
+    close3(MR.headingStep('forward', hy, 1).filter((_, k) => k !== 1), [b[0] - a[0], b[2] - a[2]], 1e-9);
+    close(b[1], a[1], 1e-9, 'level');
+    close(MR.applyT(T, [R[0], R[1] + 3.2, R[2]])[1] - F[1], 3.2, 1e-9, 'a 3.2 m ceiling stays 3.2 m above the floor point');
+  }
+  // heading 0 means no rotation; a quaternion yaw maps through yawFromQuaternion
+  assert.equal(MR.demoTransform(FOYER, {floorPoint: F, headYawRad: 0}).yawDeg, 0);
+  const hy = 0.9, q = [0, Math.sin(hy / 2), 0, Math.cos(hy / 2)];
+  close(MR.demoTransform(FOYER, {floorPoint: F, headYawRad: MR.yawFromQuaternion(q)}).yawDeg, hy * 180 / Math.PI, 1e-9);
+  // custom forward vector
+  const T2 = MR.demoTransform(FOYER, {floorPoint: F, headYawRad: 0, forwardBim: [1, 0, 0]}), a = MR.applyT(T2, R), b = MR.applyT(T2, [R[0] + 1, R[1], R[2]]);
+  close3([b[0] - a[0], b[2] - a[2]], [0, -1], 1e-9);
+  assert.throws(() => MR.demoTransform(FOYER, {floorPoint: [NaN, 0, 0]}));
+});
+test('demo: honest label, API version, and the page never saves or checks a demo placement', () => {
+  const l = MR.demoLabel(FOYER);
+  assert.equal(l, 'DEMO placement · not aligned to this building · Grimes L1 foyer services shown at real scale');
+  assert.ok(!/RMS|manual alignment/i.test(l));
+  assert.equal(MR.API, 3);
+  const html = read('scan-xr.html');
+  assert.ok(html.includes(`<script src="twin/mr-align.js?v=${MR.API}"></script>`) && html.includes(`MR_ALIGN_API=${MR.API},`), 'mr-align.js versioned with its API; the page checks it');
+  assert.match(html, /function mrSave\([^)]*\)\{if\(!mr\.T\|\|mr\.demo\)return;/, 'demo is never persisted');
+  assert.match(html, /function mrCheck\(point,method\)\{if\(mrDemoOn\(\)\)return;/);
+  assert.match(html, /function mrNextCheck\(\)\{if\(mrDemoOn\(\)\)/);
+  assert.ok(html.includes("q.get('place')==='demo'") && html.includes('id="mrDemo"'));
+});

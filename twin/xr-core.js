@@ -383,11 +383,36 @@ function teleportTarget(origin, dir, {viewY, eyeHeight = 1.5, maxDistance = 8, s
   return {ok: true, point: hit, landing: [hit[0], viewY, hit[2]], nearest: near.index};
 }
 
+/* ── Headset quality profile ──
+   Quest Browser (OculusBrowser) user agents name the device: "... Android 12; Quest 3) ..." / "Quest 3S" / "Quest 2" (older builds say "Quest"
+   only or "Quest Pro"). Not verified on a Quest 3 yet: if the UA carries no model, the Quest 2 budget defaults stay (safe).
+   Quest 2: framebuffer 0.85, fixed foveation 0.7 (budget). Quest 3 / 3S: 1.0 and 0.2 (sharper lines). ?xrscale= (0.5-1.5) and ?foveation= (0-1) always win. */
+const XR_SCALE_MIN = 0.5, XR_SCALE_MAX = 1.5;
+function headsetProfile(ua) {
+  const s = String(ua || '');
+  if (/\bQuest\s*3S\b/i.test(s)) return {device: 'quest3s', xrScale: 1.0, foveation: 0.2};
+  if (/\bQuest\s*3\b/i.test(s)) return {device: 'quest3', xrScale: 1.0, foveation: 0.2};
+  if (/\bQuest\s*2\b/i.test(s)) return {device: 'quest2', xrScale: 0.85, foveation: 0.7};
+  if (/\bQuest\b|OculusBrowser/i.test(s)) return {device: 'quest-other', xrScale: 0.85, foveation: 0.7};
+  return {device: 'unknown', xrScale: 0.85, foveation: 0.7};
+}
+/* params: URLSearchParams-like (get/has). Returns the effective values and where they came from. */
+function xrQuality(ua, params) {
+  const prof = headsetProfile(ua), clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rawScale = params && params.get ? Number(params.get('xrscale')) : NaN;
+  const hasScale = Number.isFinite(rawScale) && rawScale > 0;
+  const hasFov = !!(params && params.has && params.has('foveation')) && Number.isFinite(Number(params.get('foveation')));
+  return {device: prof.device,
+    xrScale: clampN(hasScale ? rawScale : prof.xrScale, XR_SCALE_MIN, XR_SCALE_MAX),
+    foveation: clampN(hasFov ? Number(params.get('foveation')) : prof.foveation, 0, 1),
+    scaleSource: hasScale ? 'url' : 'device-default', foveationSource: hasFov ? 'url' : 'device-default'};
+}
+
 /* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
    Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
-const API = 2;
+const API = 3;
 
-return {API, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
+return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
   chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines,
   MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,
