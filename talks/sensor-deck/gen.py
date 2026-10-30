@@ -536,21 +536,31 @@ def slide(s, n):
         elif sid in SC: body += twin_slide(SC[sid])
     return f'<section class="slide" id="{s["id"]}">{body}</section>'
 
-slides_html = '\n'.join(slide(s, i + 1) for i, s in enumerate(SLIDES))
-notes = json.dumps([s.get('notes', '') for s in SLIDES], ensure_ascii=False)
 css = (ROOT / 'deck.css').read_text() + TWIN_CSS + DIV_CSS
 js = (ROOT / 'deck.js').read_text() + '\n' + (ROOT / 'place.js').read_text()
-doc = f"""<!doctype html>
+
+def write_deck(slides, path, title, hint, with_notes=True):
+    slides_html = '\n'.join(slide(s, i + 1) for i, s in enumerate(slides))
+    notes = json.dumps([s.get('notes', '') if with_notes else '' for s in slides], ensure_ascii=False)
+    doc = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Building Data and Sensing for the Grimes Twin</title>
+<title>{e(title)}</title>
 <style>{css}</style></head><body>
 <div id="viewport"><div id="stage">
 {slides_html}
 </div></div>
 <div id="notes" hidden><div id="notes-text"></div></div>
-<div id="bar"><button id="prev" aria-label="Previous slide">‹</button><span id="count"></span><button id="next" aria-label="Next slide">›</button><span class="hint">←/→ slides · F fullscreen · N notes · concept slides: drag the live view · hover a numbered card to point at its sensor</span></div>
+<div id="bar"><button id="prev" aria-label="Previous slide">‹</button><span id="count"></span><button id="next" aria-label="Next slide">›</button><span class="hint">{e(hint)}</span></div>
 <script>const NOTES={notes};
 {js}
 {TWIN_JS}</script></body></html>"""
-(ROOT / 'index.html').write_text(doc)
-print('ok', len(doc), 'slides', len(SLIDES))
+    (ROOT / path).write_text(doc)
+    print('ok', path, len(doc), 'slides', len(slides))
+
+write_deck(SLIDES, 'index.html', 'Building Data and Sensing for the Grimes Twin',
+           '←/→ slides · F fullscreen · N notes · concept slides: drag the live view · hover a numbered card to point at its sensor')
+# Shareable page: only the interactive twin concept slides (8-12 of the deck), without speaker notes or the department header.
+HEADER = ''
+write_deck([CS[sc['id']] for sc in SCENARIOS], 'twin.html', 'Grimes Twin: Sensor Test Concepts',
+           '←/→ next concept · drag the live view to look around · click a numbered sensor for its reading · all values simulated',
+           with_notes=False)
