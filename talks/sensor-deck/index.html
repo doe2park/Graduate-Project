@@ -360,8 +360,8 @@ function watchPins(){if(pinObs){pinObs.disconnect();pinObs=null}const f=liveFram
   if(!L)return;pinObs=new MutationObserver(()=>{if(shown&&!raf)raf=requestAnimationFrame(()=>{raf=0;placeCall(true)})});
   pinObs.observe(L,{attributes:true,subtree:true,attributeFilter:['style','hidden']})}
 function setStatus(){if(!status||!live)return;const busy=!live.hidden&&!live.classList.contains('ready')&&!live.classList.contains('failed')&&sl.classList.contains('active');
-  status.textContent=busy?'Interactive view loading (about 10–20 s)…':'';status.hidden=!busy;
-  const wt=sl.querySelector('.tw-wait');if(wt)wt.hidden=!busy}
+  const wt=sl.querySelector('.tw-wait');if(wt)wt.hidden=!busy;
+  status.textContent=busy&&!wt?'Interactive view loading (about 10–20 s)…':'';status.hidden=!status.textContent}
 function setMode(stat){if(!live)return;live.hidden=stat;live.dataset.off=stat?'1':'';mode.setAttribute('aria-pressed',String(stat));mode.textContent=stat?'Interactive view':'Static view';
   if(stat)unloadLive(live);else if(sl.classList.contains('active'))loadLive(live);liveSel=null;setStatus();render();mode.blur()}
 if(mode)mode.addEventListener('click',ev=>{ev.stopPropagation();setMode(!live.hidden)});

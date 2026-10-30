@@ -203,6 +203,8 @@ def sd_icon(sid, px_):
     return (f'<svg viewBox="0 0 24 24" width="{px_:.0f}" height="{px_:.0f}" aria-hidden="true"><path d="{e(sd_style(sid)["icon"])}" fill="none" stroke="#fff" '
             'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>')
 
+SHARE_Q = {}   # twin.html only: one question per concept page, shown instead of the step flow
+
 def twin_slide(sc):
     for el in sc['elements']:
         if el.get('sid') in SD_TYPE: el['col'] = sd_style(el['sid'])['color']   # rows and cards use the viewer's type colour
@@ -221,6 +223,10 @@ def twin_slide(sc):
         out += f'<div class="tx" style="{pos(rx,yy+.0,rw,.22)};flex-direction:row;font-size:{9*PT:.1f}px;align-items:center">{lg}</div>'
         yy += .26
     sy = 3.54
+    if SHARE_Q.get(sc['id']):
+        out += box(rx, sy, rw, 4.7 - sy, 'card', extra=f'background:#FFF3D6;border:{3*PT:.1f}px solid {GOLD}')
+        out += text(rx + .16, sy + .1, rw - .32, 4.7 - sy - .2, [[('QUESTION FOR OUR MEETING', dict(bold=True, size=8.5, color=TEAL))], [(SHARE_Q[sc['id']], dict(bold=True, size=13, color=NAVY))]], anchor='middle', gap=4)
+        return out + callouts(sc, U, x, y, h, chart_for)
     out += '<div class="twsteps">' + numsteps(rx, sy, rw, 4.7 - sy, sc['steps'], head_size=10, size=9, arrow=.18, compact=True) + '</div>'
     # selected sensor: a callout card beside its marker / live pin, placed clear of the other markers and the text (place.js)
     out += callouts(sc, U, x, y, h, chart_for)
@@ -503,24 +509,27 @@ def thanks_extra():
     return out
 
 TWIN_INTRO = dict(id='twin-intro', kind='content', part='grimes',
-    title='Grimes digital twin: candidate sensor tests',
-    subtitle='A short guide to the five pages that follow. Nothing is installed; every sensor reading in them is simulated.',
-    footnote='Use → or the › button below to go to the next page. Base images and live views: May 6, 2026 360° capture of Grimes Level 1.')
+    title='Grimes digital twin: ideas for a first sensor test',
+    subtitle='Five ideas to talk through together. Nothing is installed; all readings are simulated.',
+    footnote='Use → or the › button below for the next page.')
+
+TWIN_QUESTIONS = ['Which nodes and gateways does the lab have?', 'What has deploying inside a building been like?',
+                  'What battery life and sampling would you expect?', 'How does the data come out, so it can feed the twin?']
 
 def twin_intro():
     cols = [
-        ('The project', ['We build a digital twin of the Grimes Building from 360° photo walks and the building’s BIM model.',
-                         'The two are aligned, so pipes, ducts and equipment from the model appear in place in the photos.',
-                         'Each sensor is attached to a BIM element ID, so a reading points to one pipe, duct or unit.',
-                         'Next step: choose one or two wireless sensors for a small first test in the building.']),
+        ('The project', ['A digital twin of Grimes built from 360° photos and the BIM model.',
+                         'Each sensor is tied to one BIM element, so a reading points to one pipe, duct or unit.']),
         ('The five pages', [sc['title'].replace('Test install ', '').replace(': ', '. ', 1) for sc in SCENARIOS]),
-        ('How to use each page', ['Left: a live 3D view of a Level 1 ceiling with the BIM drawn in. Drag to look around.',
-                                  'Right: the numbered sensors. Click one to see its simulated reading and chart beside it.',
-                                  'The live view takes about 10–20 seconds to load. Until then a still image of the same view is shown.',
-                                  'If it does not load, the Static view button keeps the still image with the sensors drawn on it.'])]
+        ('How to use', ['Drag the 3D view; click a numbered sensor for its reading.',
+                        'The 3D view takes about 10–20 seconds to load.'])]
     out = ''
     for i, (head, items) in enumerate(cols):
-        out += bullets_card(.55 + 3.05 * i, 1.3, 2.85, 3.55, head, items, head_size=14, size=11)
+        out += bullets_card(.55 + 3.05 * i, 1.25, 2.85, 2.2, head, items, head_size=14, size=11)
+    y0 = 3.62; out += box(.55, y0, 8.95, 1.3, 'card', extra=f'background:#FFF3D6;border:{3*PT:.1f}px solid {GOLD}')
+    out += text(.75, y0 + .1, 8.6, .25, P('QUESTIONS FOR OUR MEETING', bold=True, size=8.5, color=TEAL))
+    for i, q in enumerate(TWIN_QUESTIONS):
+        out += text(.75 + 4.35 * (i % 2), y0 + .42 + .38 * (i // 2), 4.2, .36, [[(f'{i+1}. {q}', dict(bold=True, size=12.5, color=NAVY))]])
     return out
 
 def slide(s, n):
@@ -581,8 +590,17 @@ def write_deck(slides, path, title, hint, with_notes=True):
 
 write_deck(SLIDES, 'index.html', 'Building Data and Sensing for the Grimes Twin',
            '←/→ slides · F fullscreen · N notes · concept slides: drag the live view · hover a numbered card to point at its sensor')
-# Shareable page: a short intro page + the interactive twin concept slides (8-12 of the deck), without speaker notes or the department header.
+# Shareable page (twin.html): a short intro page + the five interactive twin concept slides (8-12 of the deck), each
+# with one highlighted question for the meeting instead of the step flow; no speaker notes, no department header.
 HEADER = ''
-write_deck([TWIN_INTRO] + [CS[sc['id']] for sc in SCENARIOS], 'twin.html', 'Grimes Twin: Sensor Test Concepts',
-           '←/→ next concept · drag the live view to look around · click a numbered sensor for its reading · all values simulated',
+SHARE_Q.update({
+    'twin-concept': 'Could a fiber temperature line pick up a controlled temperature change on this pipe and point to the right segment?',
+    'twin-hvac': 'Would one duct airflow probe and one room sensor be enough to compare this branch with its design?',
+    'twin-water': 'Would a wetness puck below this coupling make a good first leak test? Which product would you suggest?',
+    'twin-power': 'What would be the simplest way to log power on one VAV circuit?',
+    'twin-fan': 'Would a battery vibration node on this duct show the fan’s on/off state reliably?'})
+SHORT_FOOT = 'Nothing is installed; values are simulated. Live view: May 6, 2026 capture of Level 1.'
+share = [dict(CS[sc['id']], subtitle='', footnote=SHORT_FOOT) for sc in SCENARIOS]
+write_deck([TWIN_INTRO] + share, 'twin.html', 'Grimes Twin: Sensor Test Concepts',
+           '←/→ next page · drag the live view to look around · click a numbered sensor for its reading · all values simulated',
            with_notes=False)
