@@ -58,6 +58,7 @@ def build_twin(sc, U, x, y, h):
     # at once and remains the fallback (Static view, or iframe failure).
     out += (f'<div class="live twlive" data-live="sensor" data-clean="1" data-scale="0.72" data-src="{e(sc["live"])}" style="{pos(x,y,w,h)}">'
             '<div class="vp"></div><span class="badge-live">Interactive twin, simulated data. Drag to look</span></div>')
+    out += (f'<div class="tw-wait" hidden style="{pos(x,y,w,h)}"><span>Loading the interactive 3D view: about 10–20 seconds.<br>This still image is shown until it is ready.</span></div>')
     out += (f'<div style="{pos(x,y+h+.1,w,.32)};display:flex;gap:10px;align-items:center"><button class="btn tw-btn tw-toggle" aria-pressed="true">Sensors: on</button>'
             '<button class="btn tw-btn tw-mode" aria-pressed="false">Static view</button>'
             f'<a class="btn tw-btn" href="{e(sc["live"])}" target="_blank" rel="noopener">Open in viewer ↗</a><span class="tw-status" aria-live="polite"></span></div>')
@@ -105,7 +106,8 @@ function watchPins(){if(pinObs){pinObs.disconnect();pinObs=null}const f=liveFram
   if(!L)return;pinObs=new MutationObserver(()=>{if(shown&&!raf)raf=requestAnimationFrame(()=>{raf=0;placeCall(true)})});
   pinObs.observe(L,{attributes:true,subtree:true,attributeFilter:['style','hidden']})}
 function setStatus(){if(!status||!live)return;const busy=!live.hidden&&!live.classList.contains('ready')&&!live.classList.contains('failed')&&sl.classList.contains('active');
-  status.textContent=busy?'Live 3D view loading… static view shown':'';status.hidden=!busy}
+  status.textContent=busy?'Interactive view loading (about 10–20 s)…':'';status.hidden=!busy;
+  const wt=sl.querySelector('.tw-wait');if(wt)wt.hidden=!busy}
 function setMode(stat){if(!live)return;live.hidden=stat;live.dataset.off=stat?'1':'';mode.setAttribute('aria-pressed',String(stat));mode.textContent=stat?'Interactive view':'Static view';
   if(stat)unloadLive(live);else if(sl.classList.contains('active'))loadLive(live);liveSel=null;setStatus();render();mode.blur()}
 if(mode)mode.addEventListener('click',ev=>{ev.stopPropagation();setMode(!live.hidden)});
@@ -201,6 +203,9 @@ TWIN_CSS = """
 .tw-btn[disabled]{opacity:.55;cursor:default}
 .tw-status{font:700 17px Calibri,Carlito,Arial,sans-serif;color:#003262;background:#FFF3D6;border-radius:999px;padding:4px 12px;white-space:nowrap}
 .tw-status[hidden]{display:none}
+.tw-wait{position:absolute;display:flex;align-items:flex-end;justify-content:center;padding-bottom:28px;pointer-events:none;z-index:5}
+.tw-wait[hidden]{display:none}
+.tw-wait span{font:700 19px Calibri,Carlito,Arial,sans-serif;color:#fff;background:rgba(0,50,98,.88);border-radius:10px;padding:10px 18px;text-align:center;line-height:1.35}
 .live.twlive{background:transparent;outline:3px solid #FDB515;transition:opacity .35s}
 .live.twlive:not(.ready){opacity:0;pointer-events:none}
 .live.twlive[hidden],.live.twlive.failed{display:none}

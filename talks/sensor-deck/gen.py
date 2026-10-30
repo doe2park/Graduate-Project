@@ -502,6 +502,27 @@ def thanks_extra():
         out += text(.82 + 2.95 * i, 3.35, 2.5, 1.0, [[('QUESTION ' + str(i + 1), dict(bold=True, size=8, color=TEAL))], [(q, dict(size=11.5, color=NAVY, bold=True))]], anchor='middle', gap=2)
     return out
 
+TWIN_INTRO = dict(id='twin-intro', kind='content', part='grimes',
+    title='Grimes digital twin: candidate sensor tests',
+    subtitle='A short guide to the five pages that follow. Nothing is installed; every sensor reading in them is simulated.',
+    footnote='Use → or the › button below to go to the next page. Base images and live views: May 6, 2026 360° capture of Grimes Level 1.')
+
+def twin_intro():
+    cols = [
+        ('The project', ['We build a digital twin of the Grimes Building from 360° photo walks and the building’s BIM model.',
+                         'The two are aligned, so pipes, ducts and equipment from the model appear in place in the photos.',
+                         'Each sensor is attached to a BIM element ID, so a reading points to one pipe, duct or unit.',
+                         'Next step: choose one or two wireless sensors for a small first test in the building.']),
+        ('The five pages', [sc['title'].replace('Test install ', '').replace(': ', '. ', 1) for sc in SCENARIOS]),
+        ('How to use each page', ['Left: a live 3D view of a Level 1 ceiling with the BIM drawn in. Drag to look around.',
+                                  'Right: the numbered sensors. Click one to see its simulated reading and chart beside it.',
+                                  'The live view takes about 10–20 seconds to load. Until then a still image of the same view is shown.',
+                                  'If it does not load, the Static view button keeps the still image with the sensors drawn on it.'])]
+    out = ''
+    for i, (head, items) in enumerate(cols):
+        out += bullets_card(.55 + 3.05 * i, 1.3, 2.85, 3.55, head, items, head_size=14, size=11)
+    return out
+
 def slide(s, n):
     body = ''; k = s['kind']
     if k == 'cover':
@@ -534,6 +555,7 @@ def slide(s, n):
         elif sid == 'week-quest': body += week_quest()
         elif sid == 'week-asks': body += week_asks()
         elif sid in SC: body += twin_slide(SC[sid])
+        elif sid == 'twin-intro': body += twin_intro()
     return f'<section class="slide" id="{s["id"]}">{body}</section>'
 
 css = (ROOT / 'deck.css').read_text() + TWIN_CSS + DIV_CSS
@@ -559,8 +581,8 @@ def write_deck(slides, path, title, hint, with_notes=True):
 
 write_deck(SLIDES, 'index.html', 'Building Data and Sensing for the Grimes Twin',
            '←/→ slides · F fullscreen · N notes · concept slides: drag the live view · hover a numbered card to point at its sensor')
-# Shareable page: only the interactive twin concept slides (8-12 of the deck), without speaker notes or the department header.
+# Shareable page: a short intro page + the interactive twin concept slides (8-12 of the deck), without speaker notes or the department header.
 HEADER = ''
-write_deck([CS[sc['id']] for sc in SCENARIOS], 'twin.html', 'Grimes Twin: Sensor Test Concepts',
+write_deck([TWIN_INTRO] + [CS[sc['id']] for sc in SCENARIOS], 'twin.html', 'Grimes Twin: Sensor Test Concepts',
            '←/→ next concept · drag the live view to look around · click a numbered sensor for its reading · all values simulated',
            with_notes=False)

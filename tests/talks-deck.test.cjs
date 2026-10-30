@@ -178,10 +178,11 @@ test('slide order (Oct 29 talk): 15 main slides in two tagged parts without sect
   assert.ok(!/3\u00a0cm|Check in cm/.test(sec['week-quest'].replace(/&nbsp;/g, '\u00a0')), 'accuracy targets are in the notes only');
 });
 
-test('twin.html is the shareable page: the five twin concept slides only, no speaker notes or department header', () => {
+test('twin.html is the shareable page: an intro page + the five twin concept slides, no speaker notes or department header', () => {
   const twin = read('twin.html');
-  assert.equal((twin.match(/<section class="slide"/g) || []).length, 5);
-  assert.match(twin, /const NOTES=\["", "", "", "", ""\];/);
+  assert.equal((twin.match(/<section class="slide"/g) || []).length, 6);
+  assert.match(twin, /<section class="slide" id="twin-intro">/);
+  assert.match(twin, /const NOTES=\["", "", "", "", "", ""\];/);
   assert.doesNotMatch(twin, /Civil &amp; Environmental|Nov 16/);
   assert.equal((twin.match(/class="live twlive"/g) || []).length, 5);
 });
