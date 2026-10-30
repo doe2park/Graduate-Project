@@ -115,3 +115,14 @@ test('a requested Gaussian loads only after validation, so the carried viewpoint
  assert.match(src,/if\(capture\.display!=='splat'\)frames\[0\]\.src=photoSource/);
  assert.match(src,/function startSplat\(\)\{mode\.value='splat';photoMode=false;scanReady=false;/);
  assert.match(src,/send\('scan',\{type:photoMode\?'grimes-photo-goto':'grimes-start-pose'/)});
+
+test('ui=min parses only the exact value and the default page is unchanged without it',()=>{const c=logic();
+ assert.equal(c.parseUiMin(''),false);assert.equal(c.parseUiMin('?view=overlay'),false);assert.equal(c.parseUiMin('?ui=full'),false);assert.equal(c.parseUiMin('?ui=MIN'),false);
+ assert.equal(c.parseUiMin('?ui=min'),true);assert.equal(c.parseUiMin('?view=overlay&capture=2026-05-06&style=lens&sensors=demo&ui=min&at=1,2,3'),true);
+ assert.equal(c.parseView('?view=overlay&ui=min'),'overlay');
+ /* wiring: class only added when the param is present; touch-only collapse path kept; demo-sensor notice never hidden by ui-min rules */
+ assert.match(src,/if\(uiMin\)document\.body\.classList\.add\('ui-min'\)/);
+ assert.match(src,/else if\(touchMq\.matches\)apply\(saved===null\?view==='overlay':saved==='1'\)/);
+ assert.match(src,/btn\.hidden=!\(touchMq\.matches\|\|uiMin\)/);
+ const rules=src.match(/body\.ui-min[^{]*\{[^}]*\}/g).join('\n');assert.doesNotMatch(rules,/sensor|badge/i);
+ assert.match(src,/body\.ctl-min header p,body\.ctl-min \.rights-link/)});
