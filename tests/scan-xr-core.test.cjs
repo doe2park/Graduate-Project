@@ -141,7 +141,7 @@ test('XR menu (2026-10-22): main page ≤ 5 large buttons, More holds settings +
   const more = X.menuButtons('more', {hands: 'both', opacity: .7, hiRes: false, scene: 'photo', layers});
   assert.equal(more.length, X.menuLayout(X.MENU_PAGES.more).length);
   assert.deepEqual(more.slice(0, 5).map(b => b.id), ['back', 'hands', 'opacity', 'hires', 'exit']);
-  assert.equal(more[1].value, 'both hands'); assert.equal(more[2].value, '70%'); assert.equal(more[12].id, 'layer:fire'); assert.equal(more[12].value, 'off');
+  assert.equal(more[13].id, 'sensors'); assert.equal(more[13].value, 'off'); assert.equal(more[1].value, 'both hands'); assert.equal(more[2].value, '70%'); assert.equal(more[12].id, 'layer:fire'); assert.equal(more[12].value, 'off');
   assert.equal(X.menuButtons('more', {scene: 'gaussian', layers}).find(b => b.id === 'hires').value, 'n/a');
   // fixed opacity defaults, More ▸ Opacity cycles 50/70/90 %
   assert.equal(X.DEFAULT_LENS_OPACITY, .7); assert.equal(X.DEFAULT_ALL_OPACITY, .35);

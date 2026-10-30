@@ -140,7 +140,7 @@ function cellKey(x, z, size) { return Math.floor(x / size) + ',' + Math.floor(z 
    Few, large buttons. Pages: 'main' = 5 buttons (Capture, Lens/All, Photo/Gaussian, Recenter, More), 'more' = settings + layer toggles.
    Layout = rows of button counts inside the lower part of the canvas (fractions, y down). Buttons carry stable ids, so the
    page dispatches by id, never by a grid index. */
-const MENU_PAGES = {main: [3, 2], more: [5, 4, 4]};
+const MENU_PAGES = {main: [3, 2], more: [5, 5, 4]};
 const MENU_AREA = {left: .03, right: .97, top: .4, bottom: .965, gap: .022};
 function menuLayout(rows, area = MENU_AREA) {
   const out = [], n = rows.length, h = (area.bottom - area.top - area.gap * (n - 1)) / n;
@@ -167,13 +167,25 @@ function menuButtons(page, s = {}) {
       {id: 'hands', label: 'Flashlight', value: s.hands === 'both' ? 'both hands' : 'right hand', tone: s.hands === 'both' ? 'on' : ''},
       {id: 'opacity', label: 'Opacity', value: Math.round((s.opacity ?? DEFAULT_LENS_OPACITY) * 100) + '%', tone: ''},
       {id: 'hires', label: 'Photo', value: s.scene === 'gaussian' ? 'n/a' : s.hiRes ? '4K' : '2K', tone: s.hiRes ? 'on' : ''},
-      {id: 'exit', label: 'Exit VR', value: '', tone: 'exit'}, ...layers];
+      {id: 'exit', label: 'Exit VR', value: '', tone: 'exit'}, ...layers,
+      {id: 'sensors', label: 'Demo sensors', value: s.sensorsLabel || 'off', tone: s.sensorsLabel && s.sensorsLabel !== 'off' ? 'on' : ''}];
   }
   return [{id: 'capture', label: 'Capture', value: s.captureLabel || 'May 6', tone: ''},
     {id: 'style', label: 'Lens / All', value: s.mode === 'all' ? 'All' : 'Lens', tone: s.mode === 'all' ? 'on' : ''},
     {id: 'scene', label: 'Photo / Gaussian', value: s.gaussianLoading ? 'loading…' : s.scene === 'gaussian' ? 'Gaussian' : s.gaussianAvailable === false ? 'Photo (no Gaussian)' : 'Photo', tone: s.scene === 'gaussian' ? 'on' : ''},
     {id: 'recenter', label: 'Recenter', value: 'nearest capture', tone: ''},
     {id: 'more', label: 'More ▸', value: 'layers · settings', tone: 'nav'}];
+}
+
+/* Download progress text that can never show loaded > total. GitHub Pages serves GLBs gzip-compressed: the progress event's total is the
+   compressed Content-Length while loaded counts decompressed bytes (it once read "21.8 / 2.0 MB"). So the total is NOT trusted;
+   only a known raw size (chunk manifest bytes, or the layer's documented size) is used as denominator, and once loaded exceeds it
+   (beyond a 2 % rounding allowance) only "x MB loaded" is shown. Without a known size: "x MB loaded". */
+function loadProgressText(label, loaded, expectedBytes) {
+  const mb = v => (v / 1e6).toFixed(1);
+  if (!Number.isFinite(loaded) || loaded < 0) return label + ' · loading…';
+  if (Number.isFinite(expectedBytes) && expectedBytes > 0 && loaded <= expectedBytes * 1.02) return label + ' · ' + mb(Math.min(loaded, expectedBytes)) + ' / ' + mb(expectedBytes) + ' MB';
+  return label + ' · ' + mb(loaded) + ' MB loaded';
 }
 
 /* ── Controller roles ── LEFT = move hand (point-and-go, snap turn), RIGHT = flashlight + info trigger.
@@ -410,12 +422,12 @@ function xrQuality(ua, params) {
 
 /* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
    Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
-const API = 3;
+const API = 4;
 
 return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
   chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines,
-  MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,
+  loadProgressText, MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,
   controllerRoles, stickIntent, aimUpdate, stepConeHalf, routeDistances, stationTarget, arcPoints, targetLabel,
   PUBLISHED_GAUSSIANS, SCENES, sceneRequest, isDevHost, gaussianOverride, SPLAT_BUDGET, gaussianAsset, gaussianFor, resolveScene, toggleScene,
   dateLabel, gaussianLabel, gaussianStations, floorHit, nearestStation, teleportTarget};

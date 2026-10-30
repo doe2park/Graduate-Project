@@ -19,6 +19,7 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   const now=new Date().toISOString().slice(0,19);
   await page.route('**/raw.githubusercontent.com/**/building_data.json',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({meters:{76:{latest:{kw:120.5,t:now}},77:{latest:{kw:40.2,t:now}},3:{latest:{kw:12,t:now}}}})}));
   const layers=process.env.XR_SMOKE_LAYERS?'&layers='+process.env.XR_SMOKE_LAYERS:'';
+  await page.addInitScript(()=>{window.__status=[];addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('status');new MutationObserver(()=>window.__status.push(el.textContent)).observe(el,{childList:true,characterData:true,subtree:true});});});
   const t0=Date.now();await page.goto(base+'/scan-xr.html?'+layers.slice(1));
   await page.waitForFunction(()=>window.xrInspection?.().ready,null,{timeout:60000});
   const first=await page.evaluate(()=>xrInspection());
@@ -27,6 +28,10 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   assert.equal(await page.locator('#enterVR').isHidden(),true,'no Enter VR without immersive-vr');assert.match(await page.locator('#xrNote').textContent(),/Desktop preview/);
   assert.match(await page.locator('#align').textContent(),/registered \(internal residual ≈0\.13 m, not surveyed\)/);
   const cam=first.camera.world;first.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-cam[k])<1e-6,'eye on the station'));
+  // progress text: never "loaded / total" with loaded > total (gzip Content-Length vs decompressed bytes), and the gzip case is handled by the pure helper
+  {const texts=await page.evaluate(()=>window.__status),bad=texts.filter(t=>{const m=t.match(/([\d.]+) \/ ([\d.]+) MB/);return m&&Number(m[1])>Number(m[2])+1e-9;});
+   assert.deepEqual(bad,[],'no improper-fraction progress text');report.progressTexts=texts.filter(t=>/ MB/.test(t)).length;
+   assert.equal(await page.evaluate(()=>ScanXRCore.loadProgressText('Fire piping 2/2',21.8e6,2.0e6)),'Fire piping 2/2 · 21.8 MB loaded');}
   const expected=process.env.XR_SMOKE_LAYERS?process.env.XR_SMOKE_LAYERS.split(',').length:7;
   await page.waitForFunction(n=>{const l=Object.values(xrInspection().layers);return l.length>=n&&l.every(x=>x.loaded||x.error);},expected,{timeout:240000,polling:500});
   const loaded=await page.evaluate(()=>{xrDebug.renderNow();return xrInspection();});
@@ -88,6 +93,7 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   if(process.env.XR_SMOKE_GAUSSIAN!=='0')report.gaussian=await gaussianSmoke(browser,base,now);
   if(process.env.XR_SMOKE_OCT==='1')report.gaussianOct=await gaussianSmoke(browser,base,now,'work/gaussian/2026-10-18/l1-a/20261019T074640Z/package/viewer.json');
   if(process.env.XR_SMOKE_MR!=='0')report.mr=await mrSmoke(browser,base,now);
+  if(process.env.XR_SMOKE_SENSORS!=='0'){report.sensorsVr=await sensorsVrSmoke(browser,base,now);report.mrSensors=await mrSensorsSmoke(browser,base,now);}
   fs.writeFileSync(path.join(OUT,'scan-xr-report.json'),JSON.stringify(report,null,2));
   console.log(JSON.stringify(report,null,2));console.log('PASS scan-xr desktop smoke (registration, photo, Level-1 services, radius culling, card tiers, navigation, provisional Sep/Oct, capture cycle, point-and-go, snap turn, menu hover/click/More, idle gating, 390 px'+(report.gaussian?', Gaussian mobile scene, teleport, scene toggle':'')+(report.gaussianOct?', local Oct 18 zone override':'')+(report.mr?', MR passthrough desktop simulation (alignment fit, persistence, fade/culling, checks, nudge)':'')+')');
  }finally{await browser.close();if(server)server.kill();}
@@ -301,4 +307,98 @@ async function mrSmoke(browser,base,now){
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'MR: no horizontal overflow at 390 px');await page.screenshot({path:path.join(OUT,'scan-xr-mr-390.png')});
  assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);
  out.heapMB=i.heapMB;await ctx.close();return out;
+}
+
+/* Simulated sensors in the photo VR view (&sensors=demo, May 6 default station): pins at the anchored elements, a pin pick opens a SIMULATED card.
+   The fire layer (leak scene) is loaded on demand. Desktop only; nothing here is a headset measurement. */
+async function sensorsVrSmoke(browser,base,now){
+ const ctx=await browser.newContext({viewport:{width:1280,height:800}}),page=await ctx.newPage(),errors=[],out={};
+ page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+ await page.route('**/raw.githubusercontent.com/**/building_data.json',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({meters:{76:{latest:{kw:120.5,t:now}}}})}));
+ const reg=JSON.parse(fs.readFileSync(path.join(ROOT,'twin/sensors/registry.json')));
+ await page.goto(base+'/scan-xr.html?layers=equipment&sensors=demo');
+ await page.waitForFunction(()=>{const i=window.xrInspection?.();return i?.ready&&i.sensors&&(i.sensors.ready||i.sensors.error);},null,{timeout:240000,polling:500});
+ let i=await page.evaluate(()=>xrInspection());assert.equal(i.sensors.error,null);assert.equal(i.sensors.scene,'leak','default scene');assert.equal(i.sensors.ready,true);
+ assert.equal(i.layers.fire?.loaded,true,'fire layer loaded on demand for the leak scene');
+ const want=reg.sensors.filter(s=>s.scenario==='leak');assert.deepEqual(i.sensors.sensors.map(s=>s.id).sort(),want.map(s=>s.id).sort());
+ for(const s of i.sensors.sensors){const w=want.find(x=>x.id===s.id);assert.equal(s.layer,w.anchor.layer);assert.equal(s.element,w.anchor.id);s.point.forEach(v=>assert.ok(Number.isFinite(v)));
+  assert.equal(s.simulated,true,s.id+' value is simulated');assert.match(s.chip,/ · SIM$/);}
+ assert.equal(i.sensors.dtsMeshes,1,'DTS colouring along the pipe');assert.equal(i.sensors.rings,1,'alert ring');
+ // all leak sensors sit on the one anchored pipe (same element): their points lie within its length of each other
+ const pts=i.sensors.sensors.map(s=>s.point),span=Math.max(...pts.map(a=>Math.max(...pts.map(b=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2])))));assert.ok(span>0.3&&span<60,'cluster span '+span);
+ out.span=span;
+ const card=await page.evaluate(async()=>{xrDebug.sensors.lookAt('leak-alert');return xrDebug.pickNdc(0,0);});
+ assert.equal(card?.sensor,'leak-alert','centre-ray pick on the pin');assert.equal(card.simulated,true);assert.equal(card.lines.badge,'SIMULATED');
+ assert.equal(card.lines.footer[0],'Demo sensor — illustrative, not installed · values simulated');assert.match(card.lines.footer[1],/registered/);assert.match(card.lines.rows[2],/Pipe219763 · fire:278123/);assert.match(card.lines.rows[0],/^Simulated value: /);
+ assert.equal((await page.evaluate(()=>xrInspection())).sensors.card,'leak-alert');
+ await page.waitForTimeout(200);await page.screenshot({path:path.join(OUT,'scan-xr-sensors-vr-card.png')});
+ // scene cycling from the menu: leak -> air (duct layer on demand); off after the last scene
+ await page.evaluate(()=>{xrDebug.setMenu(true);});
+ assert.ok((await page.evaluate(()=>xrInspection().menu.buttons)) ,'menu exists');
+ await page.evaluate(()=>xrDebug.setMenu(false));
+ await page.evaluate(()=>xrDebug.menuAction('sensors')).catch(()=>{});
+ await page.waitForFunction(()=>xrInspection().sensors.scene==='air'&&xrInspection().sensors.ready,null,{timeout:240000});
+ i=await page.evaluate(()=>xrInspection());assert.ok(i.sensors.sensors.length>=3);assert.equal(i.layers.duct?.loaded,true);assert.equal(i.sensors.card,null,'card closed when the scene changes');
+ for(const sc of ['water','elec','rotating']){await page.evaluate(()=>xrDebug.sensors.next());await page.waitForFunction(s=>xrInspection().sensors.scene===s&&xrInspection().sensors.ready,sc,{timeout:240000});}
+ await page.evaluate(()=>xrDebug.menuAction('sensors'));await page.waitForFunction(()=>xrInspection().sensors.enabled===false,null,{timeout:20000});
+ i=await page.evaluate(()=>xrInspection());assert.equal(i.sensors.drawables,0);assert.equal(i.sensors.ready,false);
+ // no sensors without the opt-in: no request for the sensor files at all
+ const p2=await ctx.newPage(),reqs=[];p2.on('request',r=>reqs.push(r.url()));await p2.goto(base+'/scan-xr.html?layers=equipment');await p2.waitForFunction(()=>xrInspection?.().ready,null,{timeout:120000});
+ assert.deepEqual(reqs.filter(u=>/sensors\/|sensor-demo|feed\.js/.test(u)),[],'no sensor files without sensors=demo');assert.equal((await p2.evaluate(()=>xrInspection())).sensors.enabled,false);
+ assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);await ctx.close();return out;
+}
+/* /mr default (demo placement + simulated sensors), the 2D choice buttons and the saved-alignment rule, on a desktop without immersive-ar. */
+async function mrSensorsSmoke(browser,base,now){
+ const ctx=await browser.newContext({viewport:{width:1280,height:800}}),page=await ctx.newPage(),errors=[],out={};
+ page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+ await page.route('**/raw.githubusercontent.com/**/building_data.json',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({meters:{76:{latest:{kw:120.5,t:now}}}})}));
+ // plain /mr: the short address opens the demo with sensors; an explicit param wins; extra params pass through
+ const q=async s=>{await page.goto(base+'/mr/'+s);await page.waitForURL(/scan-xr\.html/);return new URL(page.url()).searchParams;};
+ let u=await q('?layers=fire,duct,plumbing');assert.equal(u.get('mode'),'ar');assert.equal(u.get('place'),'demo');assert.equal(u.get('sensors'),'demo');assert.equal(u.get('layers'),'fire,duct,plumbing');
+ await page.waitForFunction(()=>{const i=window.xrInspection?.();return i?.mr?.phase&&i.sensors?.ready&&i.mr.phase==='demo';},null,{timeout:240000,polling:500});
+ let i=await page.evaluate(()=>xrInspection());
+ assert.equal(i.mr.phase,'demo');assert.equal(i.sensors.scene,'leak');assert.equal(i.mr.demo.sensorScene,'leak');assert.equal(i.mr.persisted,false);
+ // the demo reference is the scene centroid at the level floor, not the foyer landmark centroid
+ const c=i.sensors.center,area=await page.evaluate(()=>MRAlign.demoReference({floorY:xrInspection().mr.demo.reference[1],points:[]})).catch(()=>null);
+ assert.ok(Math.abs(i.mr.demo.reference[0]-c[0])<1e-9&&Math.abs(i.mr.demo.reference[2]-c[2])<1e-9,'reference x,z = sensor cluster centre');
+ const lm=JSON.parse(fs.readFileSync(path.join(ROOT,'buildings/grimes/mr-landmarks.json'))).areas[0];assert.equal(i.mr.demo.reference[1],lm.floorY);
+ const foyer=await page.evaluate(()=>0);const fc=lm.points.filter(p=>p.kind!=='y').reduce((a,p)=>[a[0]+p.bim[0]/4,a[1]+p.bim[2]/4],[0,0]);
+ assert.ok(Math.hypot(i.mr.demo.reference[0]-fc[0],i.mr.demo.reference[2]-fc[1])>1,'not the foyer centroid');
+ const W=await page.evaluate(()=>{const I=xrInspection();return {ref:MRAlign.applyT(I.mr.T,I.mr.demo.reference),floor:I.mr.demo.floorPoint,pins:I.sensors.sensors.map(s=>MRAlign.applyT(I.mr.T,s.point))};});
+ W.ref.forEach((v,k)=>assert.ok(Math.abs(v-W.floor[k])<1e-9,'floor point sits under the cluster centre'));
+ for(const p of W.pins){assert.ok(Math.hypot(p[0]-W.floor[0],p[2]-W.floor[2])<40,'pin within 40 m horizontally of the user');assert.ok(p[1]>W.floor[1]+0.5,'pin above the floor: '+p[1]);}
+ out.pinHeightsAboveFloor=W.pins.map(p=>+(p[1]-W.floor[1]).toFixed(2));
+ assert.match(i.mr.caption,/^DEMO placement · not aligned to this building · Grimes L1 foyer services shown at real scale · placed around the demo-sensor scene "Leak" \(simulated sensors\)$/);assert.ok(!/RMS|manual alignment/.test(i.mr.caption));
+ assert.match(await page.locator('#align').textContent(),/DEMO placement/);assert.match(await page.locator('#mrNow').textContent(),/DEMO placement.*sensors Leak \(simulated\)/);
+ const card=await page.evaluate(async()=>{xrDebug.sensors.lookAt('leak-alert');return xrDebug.pickNdc(0,0);});
+ assert.equal(card?.sensor,'leak-alert');assert.match(card.lines.footer[1],/DEMO placement · not aligned to this building/);assert.equal(card.lines.footer[0],'Demo sensor — illustrative, not installed · values simulated');
+ await page.evaluate(()=>{xrDebug.sensors.lookAt('leak-dts');xrDebug.setStyle('all');});await page.waitForTimeout(400);await page.screenshot({path:path.join(OUT,'scan-xr-mr-demo-sensors.png')});
+ // 2D buttons reflect the state; the scene picker re-places the demo around the new scene and updates the URL
+ assert.equal(await page.locator('#chDemo').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('#chScene-leak').getAttribute('aria-pressed'),'true');
+ const refLeak=i.mr.demo.reference.slice();
+ await page.locator('#chScene-water').click();await page.waitForFunction(()=>xrInspection().sensors.scene==='water'&&xrInspection().sensors.ready,null,{timeout:240000});
+ i=await page.evaluate(()=>xrInspection());assert.equal(i.mr.demo.sensorScene,'water');assert.notDeepEqual(i.mr.demo.reference,refLeak,'demo re-placed around the new scene');
+ assert.deepEqual(i.mr.demo.floorPoint,W.floor,'same floor point and heading');assert.equal(new URL(page.url()).searchParams.get('scene'),'water');assert.equal(new URL(page.url()).searchParams.get('sensors'),'demo');
+ // in-headset panel: scene button (index 18) cycles, mode button (16) switches
+ await page.evaluate(()=>{xrDebug.mr.panel(true);xrDebug.mr.button(18);});await page.waitForFunction(()=>xrInspection().sensors.scene==='elec'&&xrInspection().sensors.ready,null,{timeout:240000});
+ await page.evaluate(()=>{xrDebug.look(0,0);});await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-demo-sensors-panel.png')});
+ // a saved Grimes alignment survives the demo default and is used when Grimes mode is chosen
+ await page.evaluate(()=>xrDebug.mr.simulate());const saved=await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/1'));assert.ok(saved,'alignment saved');
+ await page.locator('#chDemo').click();await page.waitForFunction(()=>xrInspection().mr.phase==='demo'&&xrInspection().sensors.ready,null,{timeout:240000});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/1')),saved,'demo does not touch the saved alignment');assert.equal(new URL(page.url()).searchParams.get('place'),'demo');
+ await page.locator('#chFoyer').click();await page.waitForFunction(()=>xrInspection().mr.phase==='aligned',null,{timeout:20000});
+ i=await page.evaluate(()=>xrInspection());assert.match(i.mr.source,/saved/);assert.equal(i.mr.demo,null);assert.equal(new URL(page.url()).searchParams.get('place'),'grimes');assert.equal(new URL(page.url()).searchParams.get('area'),'l1-auditorium-foyer');
+ assert.match(await page.locator('#mrNow').textContent(),/Grimes alignment/);assert.equal(await page.locator('#chFoyer').getAttribute('aria-pressed'),'true');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/1')),saved);
+ // east entrance has no saved alignment: a fresh landmark flow; sensors stay on
+ await page.locator('#chEast').click();await page.waitForFunction(()=>xrInspection().mr.area==='l1-east-entrance',null,{timeout:20000});i=await page.evaluate(()=>xrInspection());assert.equal(i.mr.phase,'capture');assert.equal(i.sensors.enabled,true);assert.equal(new URL(page.url()).searchParams.get('area'),'l1-east-entrance');
+ // sensors toggle off/on
+ await page.locator('#chSens').click();await page.waitForFunction(()=>xrInspection().sensors.enabled===false,null,{timeout:20000});assert.equal(new URL(page.url()).searchParams.get('sensors'),'off');assert.match(await page.locator('#chSens').textContent(),/OFF/);
+ // reload keeps the choice
+ await page.reload();await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area==='l1-east-entrance',null,{timeout:120000});assert.equal((await page.evaluate(()=>xrInspection())).sensors.enabled,false);
+ // explicit params beat the /mr defaults
+ u=await q('?place=');assert.equal(u.get('place'),'');assert.equal(u.get('sensors'),'demo');await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area,null,{timeout:120000});assert.notEqual((await page.evaluate(()=>xrInspection())).mr.phase,'demo');
+ assert.deepEqual(errors.filter(e=>!/favicon|Failed to fetch/.test(e)),[]);   // reload/navigation aborts layer fetches in flight; any other error fails (it aborts the layer fetches in flight)
+ u=await q('?sensors=off');assert.equal(u.get('place'),'demo');assert.equal(u.get('sensors'),'off');
+ await ctx.close();return out;
 }

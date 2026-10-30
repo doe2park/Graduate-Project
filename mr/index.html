@@ -1,8 +1,10 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Grimes MR</title>
-<!-- Short address for typing on a headset: /mr -> scan-xr.html?mode=ar (extra query params are passed through). -->
-<meta http-equiv="refresh" content="0; url=../scan-xr.html?mode=ar">
-<script>location.replace('../scan-xr.html?mode=ar' + (location.search ? '&' + location.search.slice(1) : '') + location.hash)</script>
+<!-- The one address typed on a headset: /mr -> scan-xr.html?mode=ar&place=demo&sensors=demo (Demo here placement + simulated demo sensors).
+     Extra query params pass through; a param named in the incoming query wins over the default, e.g. /mr?place= (Grimes landmark alignment),
+     /mr?sensors=off, /mr?scene=air. The page itself has big buttons for every choice (twin/sensor-xr.js mrDefaults is the tested twin of this logic). -->
+<noscript><meta http-equiv="refresh" content="0; url=../scan-xr.html?mode=ar&place=demo&sensors=demo"></noscript>
+<script>(function(){var p=new URLSearchParams(location.search),o=new URLSearchParams();o.set('mode','ar');if(!p.has('place'))o.set('place','demo');if(!p.has('sensors'))o.set('sensors','demo');p.forEach(function(v,k){if(k!=='mode')o.set(k,v);});location.replace('../scan-xr.html?'+o.toString()+location.hash);})()</script>
 <style>body{font:18px system-ui,sans-serif;margin:2rem;background:#fff;color:#003262}</style>
-</head><body><p>Opening the Grimes MR view… <a href="../scan-xr.html?mode=ar">Tap here if it does not open.</a></p></body></html>
+</head><body><p>Opening the Grimes MR view… <a href="../scan-xr.html?mode=ar&amp;place=demo&amp;sensors=demo">Tap here if it does not open.</a></p></body></html>
