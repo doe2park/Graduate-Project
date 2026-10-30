@@ -60,6 +60,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
   <button id="chDemo" class="b big" aria-pressed="false">Demo anywhere + sensors</button>
   <button id="chFoyer" class="b big" aria-pressed="false">Align at Grimes (L1 foyer)</button>
   <button id="chEast" class="b big" aria-pressed="false">Align at Grimes (L1 east entrance)</button>
+  <a id="chVR" class="b big" href="scan-xr.html?sensors=demo" style="display:flex;align-items:center;text-decoration:none;color:inherit">Walk inside Grimes (VR photos, room hidden)</a>
   <button id="chSens" class="b big" aria-pressed="false">Sensors: OFF · tap to switch</button>
   <div class="scenes"><button id="chScene-leak" data-scene="leak" class="b big" aria-pressed="false">Leak</button><button id="chScene-air" data-scene="air" class="b big" aria-pressed="false">Air</button><button id="chScene-water" data-scene="water" class="b big" aria-pressed="false">Water</button><button id="chScene-elec" data-scene="elec" class="b big" aria-pressed="false">Power</button><button id="chScene-rotating" data-scene="rotating" class="b big" aria-pressed="false">Rotating</button></div>
   <p class="help">Demo sensors are simulated and illustrative: no sensor is installed in Grimes. Your choices are kept in the address, so nothing needs typing.</p>
@@ -1157,4 +1158,5 @@ setInterval(updateStats,1000);
  await loadLayers(P.layers);
  if(SENS.on)await sensorsSetScene(SENS.scene);
 })();
-</script></body></html>
+</script><script>/* /mr: open photo VR inside Grimes with the same demo-sensor scene (no typing on the headset) */(function(){const a=document.getElementById('chVR');if(!a)return;a.addEventListener('click',()=>{const q=new URLSearchParams(location.search),o=new URLSearchParams();if(q.get('sensors')!=='off')o.set('sensors','demo');const sc=q.get('scene');if(sc&&/^[a-z0-9-]{1,30}$/.test(sc))o.set('scene',sc);a.href='scan-xr.html'+(o.toString()?'?'+o:'');});})();</script>
+</body></html>
