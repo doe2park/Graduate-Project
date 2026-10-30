@@ -86,8 +86,9 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);
   if(process.env.XR_SMOKE_GAUSSIAN!=='0')report.gaussian=await gaussianSmoke(browser,base,now);
   if(process.env.XR_SMOKE_OCT==='1')report.gaussianOct=await gaussianSmoke(browser,base,now,'work/gaussian/2026-10-18/l1-a/20261019T074640Z/package/viewer.json');
+  if(process.env.XR_SMOKE_MR!=='0')report.mr=await mrSmoke(browser,base,now);
   fs.writeFileSync(path.join(OUT,'scan-xr-report.json'),JSON.stringify(report,null,2));
-  console.log(JSON.stringify(report,null,2));console.log('PASS scan-xr desktop smoke (registration, photo, Level-1 services, radius culling, card tiers, navigation, provisional Sep/Oct, capture cycle, menu, idle gating, 390 px'+(report.gaussian?', Gaussian mobile scene, teleport, scene toggle':'')+(report.gaussianOct?', local Oct 18 zone override':'')+')');
+  console.log(JSON.stringify(report,null,2));console.log('PASS scan-xr desktop smoke (registration, photo, Level-1 services, radius culling, card tiers, navigation, provisional Sep/Oct, capture cycle, menu, idle gating, 390 px'+(report.gaussian?', Gaussian mobile scene, teleport, scene toggle':'')+(report.gaussianOct?', local Oct 18 zone override':'')+(report.mr?', MR passthrough desktop simulation (alignment fit, persistence, fade/culling, checks, nudge)':'')+')');
  }finally{await browser.close();if(server)server.kill();}
 })().catch(e=>{console.error(e);process.exit(1);});
 /* Gaussian scene mode: short run, two light layers, the reduced mobile file (350k SH0) that XR uses by default.
@@ -145,4 +146,65 @@ async function gaussianSmoke(browser,base,now,override){
  assert.equal(sep.scene.splats,0,'previous capture splats disposed');
  assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);
  await page.close();return out;
+}
+/* MR passthrough mode (?mode=ar) on a desktop without immersive-ar: the page must explain, load only services (no photo),
+   and run the full alignment flow with synthetic touches (Simulate alignment). XR_SMOKE_MR=0 skips; XR_SMOKE_MR_LAYERS
+   overrides the light default (duct,plumbing; the page default adds fire piping, ~42 MB). Not a headset test. */
+async function mrSmoke(browser,base,now){
+ const ctx=await browser.newContext({viewport:{width:1280,height:800}}),page=await ctx.newPage(),errors=[],out={};
+ page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+ await page.route('**/raw.githubusercontent.com/**/building_data.json',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({meters:{76:{latest:{kw:120.5,t:now}},3:{latest:{kw:12,t:now}}}})}));
+ const layers=(process.env.XR_SMOKE_MR_LAYERS||'duct,plumbing').split(','),t0=Date.now();
+ await page.goto(base+'/scan-xr.html?mode=ar&layers='+layers.join(','));
+ await page.waitForFunction(n=>{const i=window.xrInspection?.();if(!i?.mr?.area)return false;const l=Object.values(i.layers);return l.length>=n&&l.every(x=>x.loaded||x.error);},layers.length,{timeout:240000,polling:500});
+ let i=await page.evaluate(()=>xrInspection());out.layersReadyWallMs=Date.now()-t0;
+ assert.equal(i.mode,'ar');assert.equal(i.capture,null,'no capture / registration in MR');assert.equal(i.texture,null,'no photo downloaded');assert.equal(i.photoSphereVisible,false);
+ assert.equal(i.mr.area,'l1-auditorium-foyer','default area');assert.deepEqual(i.mr.areas,['l1-auditorium-foyer','l1-east-entrance']);
+ assert.equal(i.mr.phase,'capture');assert.equal(i.mr.current,'A');assert.equal(i.mr.bimVisible,false,'services hidden until aligned');
+ for(const [k,l] of Object.entries(i.layers)){assert.equal(l.error,null,k);assert.ok(l.elements>0,k);assert.equal(l.unidentifiedObjects||0,0,k);}
+ assert.deepEqual(Object.keys(i.layers).sort(),[...layers].sort());
+ assert.equal(await page.locator('#enterMR').isHidden(),true,'no Enter MR without immersive-ar');assert.equal(await page.locator('#enterVR').isHidden(),true);
+ assert.match(await page.locator('#xrNote').textContent(),/Desktop MR simulation/);assert.equal(await page.locator('#mr').isVisible(),true);
+ assert.match(await page.locator('#align').textContent(),/MR passthrough · .* · manual alignment, not surveyed · not aligned yet/);
+ assert.equal(i.mr.rangeKey,'room');assert.deepEqual(i.mr.fade,{on:1,range:[8,14]});assert.equal(i.mr.outside,.12,'Lens: faint outside the cone');
+ // simulated alignment: 5 synthetic touches (1 cm noise) through the same state machine and solver
+ const sim=await page.evaluate(()=>xrDebug.mr.simulate());i=await page.evaluate(()=>xrInspection());
+ assert.ok(i.mr.fit&&i.mr.fit.n===5&&i.mr.fit.rmsCm<3,'fit RMS '+i.mr.fit?.rmsCm);assert.ok(sim.maxTruthErrorCm<3&&sim.yawErrorDeg<.5,'recovers the hidden transform: '+JSON.stringify(sim));
+ assert.equal(i.mr.phase,'aligned');assert.equal(i.mr.bimVisible,true);assert.ok(Math.abs(i.mr.bimRoot.rotationY-i.mr.fit.yawDeg*Math.PI/180)<1e-12);i.mr.bimRoot.position.forEach((v,k)=>assert.ok(Math.abs(v-i.mr.fit.t[k])<1e-12));
+ assert.equal(i.mr.record.frame,'session');assert.equal(i.mr.record.label,'manual alignment, not surveyed');
+ const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('grimes-mr-alignment/1')));assert.equal(stored.area,'l1-auditorium-foyer');assert.equal(stored.rmsCm,i.mr.record.rmsCm);
+ assert.match(await page.locator('#align').textContent(),/manual alignment, not surveyed · RMS \d+\.\d cm \(5 points\)/);
+ out.fit=i.mr.fit;out.sim=sim;
+ // services render over the (cleared) background; distance culling keeps far batches out
+ const fr=await page.evaluate(()=>{xrDebug.setStyle('all');return xrDebug.frameStats();});assert.ok(fr.litFraction>0,'services on screen: '+fr.litFraction);
+ i=await page.evaluate(()=>xrInspection());assert.ok(i.totals.visibleDrawCalls>0&&i.totals.visibleDrawCalls<i.totals.drawCalls,'Room range culls distant batches');out.room={visible:i.totals.visibleDrawCalls,total:i.totals.drawCalls,frame:fr};
+ await page.screenshot({path:path.join(OUT,'scan-xr-mr-all.png')});
+ await page.evaluate(()=>xrDebug.mr.range('near'));i=await page.evaluate(()=>xrInspection());assert.deepEqual(i.mr.fade,{on:1,range:[3,6]});assert.ok(i.totals.visibleDrawCalls<=out.room.visible);out.near={visible:i.totals.visibleDrawCalls};
+ await page.evaluate(()=>xrDebug.mr.range('all'));i=await page.evaluate(()=>xrInspection());assert.equal(i.mr.fade.on,0);assert.equal(i.totals.visibleDrawCalls,i.totals.drawCalls,'All = no culling');
+ await page.evaluate(()=>{xrDebug.mr.range('room');xrDebug.setStyle('lens');});
+ // info card on an aligned element: honest MR caption
+ const card=await page.evaluate(async()=>{const I=xrInspection(),near=xrDebug.elementsNearStation(30);for(const e of near){const w=MRAlign.applyT(I.mr.T,e.point),c=I.camera.world,d=[w[0]-c[0],w[1]-c[1],w[2]-c[2]],n=Math.hypot(...d);
+  xrDebug.look(Math.atan2(-d[0],-d[2]),Math.asin(d[1]/n));const r=await xrDebug.pickNdc(0,0);if(r?.id)return r;}return null;});
+ assert.ok(card?.id,'centre-ray pick on an aligned service');assert.match(card.lines.footer[0],/^MR · .* · manual alignment, not surveyed · RMS/);assert.match(card.lines.footer[1],/Design \(BIM\) position/);out.pick={id:card.id,layer:card.layer,tier:card.tier};
+ // check point: a device 5 cm (BIM x) from its design position is reported as 5 cm and logged
+ const chk=await page.evaluate(()=>{xrDebug.mr.nextCheck();const I=xrInspection(),doc=I.mr,a=doc.check;return {id:a};});assert.equal(chk.id,'S1');
+ const row=await page.evaluate(async()=>{const d=await (await fetch('buildings/grimes/mr-landmarks.json')).json(),c=d.areas[0].checks[0],T=xrInspection().mr.T;xrDebug.mr.check(MRAlign.applyT(T,[c.bim[0]+.05,6.3,c.bim[2]]));return xrInspection().mr.lastCheck;});
+ assert.equal(row.check,'S1');assert.equal(row.horizontalCm,5);assert.equal(row.dxBimCm,5);assert.equal(row.dzBimCm,0);assert.match(row.note,/not surveyed/);
+ assert.equal((await page.evaluate(()=>JSON.parse(localStorage.getItem('grimes-mr-checks/1')))).length,1);
+ // nudge (1 cm up) is applied and saved
+ const y0=i.mr.T.t[1];await page.evaluate(()=>xrDebug.mr.nudge('height',1));i=await page.evaluate(()=>xrInspection());assert.ok(Math.abs(i.mr.T.t[1]-y0-.01)<1e-9);assert.equal(i.mr.record.nudged,true);
+ // the check loaded its element's layer (fire piping for S1) on demand
+ await page.waitForFunction(()=>Object.values(xrInspection().layers).every(x=>x.loaded||x.error),null,{timeout:240000,polling:500});
+ assert.equal((await page.evaluate(()=>xrInspection())).layers.fire?.loaded,true,'check S1 brings in its fire piping layer');
+ // world panel (what the headset shows) and its buttons
+ await page.evaluate(()=>{xrDebug.look(0,0);xrDebug.mr.panel(true);});await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-panel.png')});
+ await page.evaluate(()=>xrDebug.mr.button(9));assert.equal((await page.evaluate(()=>xrInspection())).mr.rangeKey,'all');await page.evaluate(()=>xrDebug.mr.button(9));
+ await page.evaluate(()=>xrDebug.mr.button(11));assert.equal((await page.evaluate(()=>xrInspection())).mr.page,'layers');await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-layers.png')});await page.evaluate(()=>xrDebug.mr.button(14));
+ // reload: the saved alignment is announced (applied on Enter MR; no anchor on desktop)
+ await page.reload();await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area,null,{timeout:60000});
+ i=await page.evaluate(()=>xrInspection());assert.match(i.mr.note,/saved alignment exists .*no anchor/);
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'MR: no horizontal overflow at 390 px');await page.screenshot({path:path.join(OUT,'scan-xr-mr-390.png')});
+ assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);
+ out.heapMB=i.heapMB;await ctx.close();return out;
 }

@@ -1,0 +1,571 @@
+{
+ "schema": "grimes-mr-landmarks/1",
+ "building": "grimes",
+ "frame": "BIM viewer world (scan-bim / scan-xr): GLB scene placed with rotY(pi) + EQUIP_OFFSET (-35.28, -97.16, 28.60), metres, Y up",
+ "status": "BIM-derived candidates, not verified on site; positions are design (BIM) positions, not surveyed",
+ "derivedWith": "node scripts/derive_mr_landmarks.mjs --write (reads GLB node names and decodes Draco in memory; nothing re-encoded)",
+ "kinds": {
+  "xz": "vertical edge or face point: plan position only, touch at any height (bim[1] = suggested touch height)",
+  "y": "floor touch: height only",
+  "check": "not fitted; compared after alignment"
+ },
+ "inputs": {
+  "interior/enclosure-l1.glb": "79fb52191fe0a6bfe673cb0f3cd9f5b740aba77965de425d7742befcc3bc95ff",
+  "interior/enclosure-l1.elements.json": "2d2f95f3a4b4fe0bf4ca5955521a2155a8bf7afe84af7bdc151cd58a249a39c9",
+  "buildings/grimes/grimes-structural.glb": "705cdd74bfcba8c5cc523df81241908cf2a1d8283ab483de4926b5806fce6990",
+  "buildings/grimes/structural.elements.json": "62397a03b1dc2bb3db767f53afd006170284883ddfd0e81b382b5da6630e560b",
+  "buildings/grimes/grimes-equipment.glb": "3e475b367143ac8c0d0953f51b70f244f26c1082a221aa40b3a496a14b5ff05c",
+  "buildings/grimes/elements.json": "c67b8936bcd349201d094dc2168561cdb42a110a02090bd192e8a8ebff429ad0",
+  "buildings/grimes/grimes-fire-l1-1.glb": "de4aa66d0ae7bc2d5d1fb1e173ba1782f0fd254b575b4c862012c7878f670d4c",
+  "buildings/grimes/grimes-fire-l1-2.glb": "e2f098b3d09e0a145023f8372831311e50cf83d8244133dd9018e66e5c5cf682",
+  "buildings/grimes/fire.elements.json": "7a74c31f1dc479826dfd50e8de7f08c70a0eabd08528d964248c5d07b8f660df"
+ },
+ "areas": [
+  {
+   "id": "l1-auditorium-foyer",
+   "level": "L1",
+   "name": "Level 1 · foyer outside the auditorium doors (open ceiling)",
+   "why": "Likely the Oct 18 open-ceiling check area: a row of exposed upright sprinkler heads (VK300) over the foyer between two round concrete columns, directly north of the raked auditorium floor (Floor 128625, z -22.1 to -7.15). Inferred from BIM, confirm on site.",
+   "floorY": 5.25,
+   "floorNote": "Level 1 datum y = 5.25 m (base of the L1 column and wall segments here). The foyer floor finish was not verified.",
+   "points": [
+    {
+     "id": "A",
+     "kind": "xz",
+     "label": "East round column · face toward the other column",
+     "text": "Round concrete column (20\" dia., BIM 130415) on the east side of the foyer. Touch its surface at the point that faces the west column across the foyer, at any height.",
+     "bim": [
+      -18.77,
+      6.25,
+      -7.15
+     ],
+     "source": {
+      "layer": "structural",
+      "element": "130415",
+      "name": "Concrete-Round-Column (I)",
+      "category": "Structural Columns",
+      "pick": [
+       "min",
+       "mid"
+      ],
+      "box": {
+       "min": [
+        -18.77,
+        5.249,
+        -7.403
+       ],
+       "max": [
+        -18.262,
+        8.463,
+        -6.898
+       ]
+      }
+     }
+    },
+    {
+     "id": "B",
+     "kind": "xz",
+     "label": "West round column · face toward the other column",
+     "text": "Round concrete column (20\" dia., BIM 130413) on the west side, ~8.3 m from A. Touch the point that faces column A, at any height.",
+     "bim": [
+      -27.101,
+      6.25,
+      -7.15
+     ],
+     "source": {
+      "layer": "structural",
+      "element": "130413",
+      "name": "Concrete-Round-Column (I)",
+      "category": "Structural Columns",
+      "pick": [
+       "max",
+       "mid"
+      ],
+      "box": {
+       "min": [
+        -27.609,
+        5.249,
+        -7.403
+       ],
+       "max": [
+        -27.101,
+        8.463,
+        -6.898
+       ]
+      }
+     }
+    },
+    {
+     "id": "C",
+     "kind": "xz",
+     "label": "West wall · outside corner nearest the auditorium",
+     "text": "Outside (convex) corner of the thick wall north-east of column B (BIM wall 14933), the corner nearer the auditorium. Vertical edge, any height.",
+     "bim": [
+      -25.978,
+      6.25,
+      -6.707
+     ],
+     "source": {
+      "layer": "enclosure",
+      "element": "14933",
+      "name": "Basic Wall",
+      "category": "Walls",
+      "pick": [
+       "max",
+       "min"
+      ],
+      "box": {
+       "min": [
+        -27.408,
+        5.249,
+        -6.707
+       ],
+       "max": [
+        -25.978,
+        9.212,
+        -4.296
+       ]
+      }
+     }
+    },
+    {
+     "id": "D",
+     "kind": "xz",
+     "label": "East wall · outside corner nearest the auditorium",
+     "text": "Outside corner of the wall north-east of column A (BIM wall 14925), the corner nearer the auditorium. Vertical edge, any height.",
+     "bim": [
+      -17.257,
+      6.25,
+      -6.154
+     ],
+     "source": {
+      "layer": "enclosure",
+      "element": "14925",
+      "name": "Basic Wall",
+      "category": "Walls",
+      "pick": [
+       "min",
+       "min"
+      ],
+      "box": {
+       "min": [
+        -17.257,
+        5.249,
+        -6.154
+       ],
+       "max": [
+        -16.071,
+        9.212,
+        -4.28
+       ]
+      }
+     }
+    },
+    {
+     "id": "F",
+     "kind": "y",
+     "label": "Floor",
+     "text": "Touch the floor anywhere in the foyer (not on a mat or ramp).",
+     "bim": [
+      null,
+      5.25,
+      null
+     ]
+    }
+   ],
+   "checks": [
+    {
+     "id": "S1",
+     "label": "Upright sprinkler head (centre of the exposed row)",
+     "text": "Exposed upright head VK300 (BIM 278545). Stand under the real head, hold the tip directly below its deflector, trigger.",
+     "bim": [
+      -21.564,
+      8.22,
+      -5.957
+     ],
+     "source": {
+      "layer": "fire",
+      "element": "278545",
+      "name": "Fitting8_6400961_2551",
+      "description": "VK300, Microfast, 5.6, (QR), Brass, 155°F, Upright",
+      "mark": null,
+      "box": {
+       "min": [
+        -21.666,
+        8.22,
+        -6.058
+       ],
+       "max": [
+        -21.462,
+        8.267,
+        -5.855
+       ]
+      }
+     }
+    },
+    {
+     "id": "S2",
+     "label": "Upright sprinkler head (west)",
+     "text": "Exposed upright head VK300 (BIM 278541), west end of the row.",
+     "bim": [
+      -24.483,
+      8.22,
+      -5.957
+     ],
+     "source": {
+      "layer": "fire",
+      "element": "278541",
+      "name": "Fitting8_6400961_2551",
+      "description": "VK300, Microfast, 5.6, (QR), Brass, 155°F, Upright",
+      "mark": null,
+      "box": {
+       "min": [
+        -24.585,
+        8.22,
+        -6.058
+       ],
+       "max": [
+        -24.381,
+        8.267,
+        -5.855
+       ]
+      }
+     }
+    },
+    {
+     "id": "S3",
+     "label": "Upright sprinkler head (east)",
+     "text": "Exposed upright head VK300 (BIM 278537), east end of the row.",
+     "bim": [
+      -18.313,
+      8.22,
+      -5.957
+     ],
+     "source": {
+      "layer": "fire",
+      "element": "278537",
+      "name": "Fitting8_6400961_2551",
+      "description": "VK300, Microfast, 5.6, (QR), Brass, 155°F, Upright",
+      "mark": null,
+      "box": {
+       "min": [
+        -18.414,
+        8.22,
+        -6.058
+       ],
+       "max": [
+        -18.211,
+        8.267,
+        -5.855
+       ]
+      }
+     }
+    },
+    {
+     "id": "G1",
+     "label": "24×24 supply diffuser, mark 672",
+     "text": "24×24 supply diffuser (BIM 15365, mark 672), ~2.2 m north of the foyer's north wall in BIM. Hold the tip directly below its centre. If it is not in the same room, skip it and use the east-entrance check.",
+     "bim": [
+      -19.595,
+      7.993,
+      -2.121
+     ],
+     "source": {
+      "layer": "equipment",
+      "element": "15365",
+      "name": "Diffuser - Supply (I)",
+      "description": "24 x 24 Face 12 x 12 Connection",
+      "mark": "672",
+      "box": {
+       "min": [
+        -19.9,
+        7.993,
+        -2.426
+       ],
+       "max": [
+        -19.291,
+        8.095,
+        -1.817
+       ]
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "l1-east-entrance",
+   "level": "L1",
+   "name": "Level 1 · east entrance (double glass door 140)",
+   "why": "Exterior double door (BIM door mark 140, \"EXTERIOR, CR, PANIC\") in the east curtain wall: clean frame edges and a concealed pendent head 0.75 m inside the door.",
+   "floorY": 5.25,
+   "floorNote": "Level 1 datum y = 5.25 m (door threshold / vestibule floor 7920 top at 5.248).",
+   "points": [
+    {
+     "id": "A",
+     "kind": "xz",
+     "label": "Door 140 · frame edge A (inside face)",
+     "text": "Inside face of the door-frame mullion (BIM 18089) at the edge of the opening, on the side away from the small closet. Vertical edge, any height.",
+     "bim": [
+      29.096,
+      6.25,
+      -17.926
+     ],
+     "source": {
+      "layer": "enclosure",
+      "element": "18089",
+      "name": "Rectangular Mullion",
+      "category": "Curtain Wall Mullions",
+      "pick": [
+       "min",
+       "max"
+      ],
+      "box": {
+       "min": [
+        29.096,
+        5.25,
+        -17.996
+       ],
+       "max": [
+        29.274,
+        7.542,
+        -17.926
+       ]
+      }
+     }
+    },
+    {
+     "id": "B",
+     "kind": "xz",
+     "label": "Door 140 · frame edge B (inside face)",
+     "text": "Inside face of the other frame mullion (BIM 18097), 1.83 m from A, on the closet side.",
+     "bim": [
+      29.096,
+      6.25,
+      -16.098
+     ],
+     "source": {
+      "layer": "enclosure",
+      "element": "18097",
+      "name": "Rectangular Mullion",
+      "category": "Curtain Wall Mullions",
+      "pick": [
+       "min",
+       "min"
+      ],
+      "box": {
+       "min": [
+        29.096,
+        5.326,
+        -16.098
+       ],
+       "max": [
+        29.274,
+        7.542,
+        -16.028
+       ]
+      }
+     }
+    },
+    {
+     "id": "C",
+     "kind": "xz",
+     "label": "Closet · outside corner",
+     "text": "Outside corner of the small closet next to the door (walls 26157/26161), the corner farthest from the door and nearest the corridor. Vertical edge, any height.",
+     "bim": [
+      27.842,
+      6.25,
+      -16.041
+     ],
+     "source": {
+      "layer": "enclosure",
+      "element": "26157",
+      "name": "Basic Wall",
+      "category": "Walls",
+      "pick": [
+       "min",
+       "min"
+      ],
+      "box": {
+       "min": [
+        27.842,
+        5.25,
+        -16.041
+       ],
+       "max": [
+        27.966,
+        8.298,
+        -15.132
+       ]
+      }
+     }
+    },
+    {
+     "id": "D",
+     "kind": "xz",
+     "label": "Corridor doorway · jamb corner west of the closet",
+     "text": "Corridor-side corner of the short wall (BIM 25593) that forms the far jamb of the opening just west of the closet, ~3 m from the door. Vertical edge, any height.",
+     "bim": [
+      26.213,
+      6.25,
+      -16.142
+     ],
+     "source": {
+      "layer": "enclosure",
+      "element": "25593",
+      "name": "Basic Wall",
+      "category": "Walls",
+      "pick": [
+       "max",
+       "min"
+      ],
+      "box": {
+       "min": [
+        26.08,
+        5.25,
+        -16.142
+       ],
+       "max": [
+        26.213,
+        8.298,
+        -15.266
+       ]
+      }
+     }
+    },
+    {
+     "id": "E",
+     "kind": "xz",
+     "label": "Corridor north wall · west end (~9.7 m in)",
+     "text": "Where the corridor's north wall ends ~9.7 m in from the door (BIM wall 25723 corner). Far point: improves the heading. Skip it if the corner is not exposed.",
+     "bim": [
+      19.508,
+      6.25,
+      -16.142
+     ],
+     "source": {
+      "layer": "enclosure",
+      "element": "25723",
+      "name": "Basic Wall",
+      "category": "Walls",
+      "pick": [
+       "min",
+       "min"
+      ],
+      "box": {
+       "min": [
+        19.508,
+        5.25,
+        -16.142
+       ],
+       "max": [
+        19.673,
+        8.298,
+        -8.732
+       ]
+      }
+     }
+    },
+    {
+     "id": "F",
+     "kind": "y",
+     "label": "Floor",
+     "text": "Touch the floor just inside the door (not on the threshold or a mat).",
+     "bim": [
+      null,
+      5.25,
+      null
+     ]
+    }
+   ],
+   "checks": [
+    {
+     "id": "S1",
+     "label": "Concealed pendent head 0.75 m inside the door",
+     "text": "Concealed pendent head VK462 (BIM 279994). Hold the tip directly below the cover plate centre, trigger.",
+     "bim": [
+      28.442,
+      7.99,
+      -17.057
+     ],
+     "source": {
+      "layer": "fire",
+      "element": "279994",
+      "name": "Fitting8_6404410_2559",
+      "description": "VK462, Mirage, 5.6, (QR), Brass, 155°F, Pendent, Concealed",
+      "mark": null,
+      "box": {
+       "min": [
+        28.341,
+        7.99,
+        -17.158
+       ],
+       "max": [
+        28.544,
+        8.037,
+        -16.955
+       ]
+      }
+     }
+    },
+    {
+     "id": "G1",
+     "label": "24×24 supply diffuser, mark 55",
+     "text": "24×24 supply diffuser (BIM 15169, mark 55). Directly below its centre.",
+     "bim": [
+      28.982,
+      7.993,
+      -13.399
+     ],
+     "source": {
+      "layer": "equipment",
+      "element": "15169",
+      "name": "Diffuser - Supply (I)",
+      "description": "24 x 24 Face 12 x 12 Connection",
+      "mark": "55",
+      "box": {
+       "min": [
+        28.677,
+        7.993,
+        -13.704
+       ],
+       "max": [
+        29.287,
+        8.095,
+        -13.094
+       ]
+      }
+     }
+    },
+    {
+     "id": "G2",
+     "label": "24×24 supply diffuser, mark 33",
+     "text": "24×24 supply diffuser (BIM 15165, mark 33). Directly below its centre.",
+     "bim": [
+      26.804,
+      7.993,
+      -19.523
+     ],
+     "source": {
+      "layer": "equipment",
+      "element": "15165",
+      "name": "Diffuser - Supply (I)",
+      "description": "24 x 24 Face 12 x 12 Connection",
+      "mark": "33",
+      "box": {
+       "min": [
+        26.499,
+        7.993,
+        -19.828
+       ],
+       "max": [
+        27.109,
+        8.095,
+        -19.219
+       ]
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
