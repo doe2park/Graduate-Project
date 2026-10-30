@@ -119,7 +119,7 @@ test('persistence: record schema, anchor vs session frame, guarded storage, chec
   const st = mem(), fit = {ok: true, rmsM: 0.0234, n: 5, heightSource: 'floor-touch'};
   const rec = MR.makeRecord({area: 'l1-auditorium-foyer', level: 'L1', T: {yawDeg: 10, t: [1, 2, 3]}, fit, created: '2026-10-21T10:00:00Z'});
   assert.equal(rec.frame, 'session'); assert.equal(rec.anchor, null); assert.equal(rec.rmsCm, 2.3); assert.equal(rec.label, 'manual alignment, not surveyed');
-  assert.ok(MR.saveRecord(st, rec)); assert.deepEqual(MR.loadRecord(st), rec); assert.ok([...st.m.keys()].every(k => k === MR.STORE_KEY));
+  assert.ok(MR.saveRecord(st, rec)); assert.deepEqual(MR.loadRecord(st), rec); assert.deepEqual(MR.loadRecord(st, rec.area), rec); assert.ok([...st.m.keys()].every(k => k === MR.STORE_KEY));
   const ra = MR.makeRecord({area: 'x', level: 'L1', T: {yawDeg: 1, t: [0, 0, 0]}, anchorHandle: 'uuid-1', anchorLocal: {yawDeg: 2, t: [1, 1, 1]}});
   assert.equal(ra.frame, 'anchor'); assert.equal(MR.parseRecord(JSON.stringify(ra)).anchor.handle, 'uuid-1');
   assert.equal(MR.makeRecord({area: 'x', T: {yawDeg: 1, t: [0, 0, 0]}, anchorHandle: null, anchorLocal: {yawDeg: 2, t: [1, 1, 1]}}).frame, 'session', 'no persistent handle = session frame');
@@ -127,6 +127,7 @@ test('persistence: record schema, anchor vs session frame, guarded storage, chec
   const broken = {getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); }, removeItem() { throw new Error('denied'); }};
   assert.equal(MR.saveRecord(broken, rec), false); assert.equal(MR.loadRecord(broken), null); assert.equal(MR.clearRecord(broken), false);
   assert.ok(MR.clearRecord(st)); assert.equal(MR.loadRecord(st), null);
+  assert.equal(st.m.size, 0, 'nothing left behind');
   assert.equal(MR.appendCheck(st, {check: 'S1', horizontalCm: 4.2}), 1); assert.equal(MR.appendCheck(st, {check: 'G1'}), 2);
   assert.deepEqual(MR.loadChecks(st).map(r => r.check), ['S1', 'G1']); assert.deepEqual(MR.loadChecks(broken), []);
   assert.throws(() => MR.makeRecord({area: 'x', T: {yawDeg: NaN, t: [0, 0, 0]}}));
@@ -190,7 +191,7 @@ test('shader mirror: lens floor outside the cone and the overlay-visibility dist
 test('scan-xr.html MR wiring: immersive-ar with local-floor + optional features, transparent services-only scene, honest labels, storage via MRAlign only', () => {
   const html = read('scan-xr.html');
   for (const s of ['twin/overlay-visibility.js', 'twin/mr-align.js']) assert.match(html, new RegExp(`<script src="${s.replace(/\./g, '\\.')}(\\?v=\\d+)?"></script>`));
-  assert.ok(html.includes("navigator.xr.requestSession('immersive-ar',{requiredFeatures:['local-floor'],optionalFeatures:['hit-test','anchors','plane-detection','mesh-detection','dom-overlay']"));
+  assert.ok(html.includes("MR_SESSION_INIT={requiredFeatures:['local-floor'],optionalFeatures:['hit-test','anchors','plane-detection','mesh-detection','dom-overlay']}") && html.includes("navigator.xr.requestSession('immersive-ar',{...MR_SESSION_INIT,"), 'anchors requested as an optional feature; only local-floor required');
   assert.ok(html.includes("isSessionSupported('immersive-ar')") && html.includes("const MODE_AR=q.get('mode')==='ar'"));
   assert.ok(html.includes("const MR_DEFAULT_LAYERS=['fire','duct','plumbing']"));
   assert.ok(html.includes("renderer.xr.setReferenceSpaceType('local-floor')") && html.includes('setFoveation(P.foveation)') && html.includes('updateTargetFrameRate(72)'));
@@ -237,11 +238,65 @@ test('demo: honest label, API version, and the page never saves or checks a demo
   const l = MR.demoLabel(FOYER);
   assert.equal(l, 'DEMO placement · not aligned to this building · Grimes L1 foyer services shown at real scale');
   assert.ok(!/RMS|manual alignment/i.test(l));
-  assert.equal(MR.API, 3);
+  assert.equal(MR.API, 4);
   const html = read('scan-xr.html');
   assert.ok(html.includes(`<script src="twin/mr-align.js?v=${MR.API}"></script>`) && html.includes(`MR_ALIGN_API=${MR.API},`), 'mr-align.js versioned with its API; the page checks it');
   assert.match(html, /function mrSave\([^)]*\)\{if\(!mr\.T\|\|mr\.demo\)return;/, 'demo is never persisted');
   assert.match(html, /function mrCheck\(point,method\)\{if\(mrDemoOn\(\)\)return;/);
   assert.match(html, /function mrNextCheck\(\)\{if\(mrDemoOn\(\)\)/);
   assert.ok(html.includes("q.get('place')==='demo'") && html.includes('id="mrDemo"'));
+});
+
+const mem2 = () => { const m = new Map(); return {getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), m}; };
+const mk = (area, extra = {}) => MR.makeRecord({area, level: 'L1', T: {yawDeg: 5, t: [1, 0, 2]}, fit: {ok: true, rmsM: 0.021, n: 4, heightSource: 'floor-touch'}, created: '2026-10-30T10:00:00Z', ...extra});
+
+test('per-area records: foyer and east entrance coexist; forgetting one keeps the other', () => {
+  const st = mem2(), foyer = mk('l1-auditorium-foyer', {anchorHandle: 'uuid-F', anchorLocal: {yawDeg: 1, t: [0, 0, 0]}}), east = mk('l1-east-entrance');
+  assert.ok(MR.saveRecord(st, foyer)); assert.ok(MR.saveRecord(st, east));
+  assert.equal(MR.loadRecord(st, 'l1-auditorium-foyer').anchor.handle, 'uuid-F'); assert.equal(MR.loadRecord(st, 'l1-east-entrance').frame, 'session');
+  assert.equal(MR.loadRecord(st, 'nowhere'), null); assert.equal(MR.loadAllRecords(st).length, 2);
+  assert.ok(MR.saveRecord(st, mk('l1-east-entrance', {created: '2026-10-31T10:00:00Z'}))); assert.equal(MR.loadAllRecords(st).length, 2, 'same area overwrites itself only');
+  assert.equal(MR.loadRecord(st, 'l1-auditorium-foyer').created, '2026-10-30T10:00:00Z');
+  assert.ok(MR.clearRecord(st, 'l1-east-entrance')); assert.equal(MR.loadRecord(st, 'l1-east-entrance'), null); assert.ok(MR.loadRecord(st, 'l1-auditorium-foyer'));
+  assert.ok(MR.clearRecord(st, 'l1-auditorium-foyer')); assert.equal(st.m.size, 0);
+});
+
+test('migration: the old single record moves under its area, the legacy key goes away', () => {
+  const st = mem2(), old = mk('l1-east-entrance');
+  st.setItem(MR.LEGACY_KEY, JSON.stringify(old));
+  assert.deepEqual(MR.loadRecord(st, 'l1-east-entrance'), old); assert.equal(MR.loadRecord(st, 'l1-auditorium-foyer'), null);
+  assert.equal(st.getItem(MR.LEGACY_KEY), null, 'legacy key removed'); assert.ok(st.getItem(MR.STORE_KEY));
+  assert.notEqual(MR.STORE_KEY, MR.LEGACY_KEY);
+  // a corrupt store never throws and never hides a valid legacy record
+  const st2 = mem2(); st2.setItem(MR.STORE_KEY, '{nope'); st2.setItem(MR.LEGACY_KEY, JSON.stringify(old)); assert.deepEqual(MR.loadRecord(st2, 'l1-east-entrance'), old);
+});
+
+test('export: area, date, RMS, points, anchor yes/no; no handle, no pose', () => {
+  const st = mem2(); MR.saveRecord(st, mk('l1-auditorium-foyer', {anchorHandle: 'secret-uuid', anchorLocal: {yawDeg: 1, t: [0, 0, 0]}})); MR.saveRecord(st, mk('l1-east-entrance'));
+  const ex = MR.exportAlignments(st, '2026-10-30T12:00:00Z'), text = JSON.stringify(ex);
+  assert.equal(ex.rows.length, 2); assert.ok(!text.includes('secret-uuid') && !/yawDeg|"t":/.test(text));
+  const f = ex.rows.find(r => r.area === 'l1-auditorium-foyer'); assert.deepEqual([f.rmsCm, f.points, f.anchorPresent, f.created], [2.1, 4, true, '2026-10-30T10:00:00Z']);
+  assert.equal(ex.rows.find(r => r.area === 'l1-east-entrance').anchorPresent, false); assert.match(ex.label, /not surveyed/);
+});
+
+test('restore decision: anchor record restores, no anchor warns, no record -> landmarks, demo untouched', () => {
+  const anch = mk('a', {anchorHandle: 'u', anchorLocal: {yawDeg: 1, t: [0, 0, 0]}}), plain = mk('a');
+  assert.equal(MR.restoreDecision({mode: 'grimes', record: anch, anchorsApi: true}).action, 'restore');
+  const noApi = MR.restoreDecision({mode: 'grimes', record: anch, anchorsApi: false}); assert.equal(noApi.action, 'landmarks'); assert.ok(noApi.warning);
+  const un = MR.restoreDecision({mode: 'grimes', record: plain, anchorsApi: true}); assert.equal(un.action, 'unanchored'); assert.match(un.warning, /WITHOUT an anchor/);
+  assert.equal(MR.restoreDecision({mode: 'grimes', record: null, anchorsApi: true}).action, 'landmarks');
+  assert.equal(MR.restoreDecision({mode: 'demo', record: anch, anchorsApi: true}).action, 'none');
+  assert.equal(MR.RESTORE_TIMEOUT_MS, 8000);
+  const t = MR.restoreText(mk('a', {created: '2026-10-30T10:00:00Z'})); assert.match(t, /^Restored from Quest anchor · 2026-10-30 · RMS 2\.1 cm at save/); assert.match(t, /not surveyed/); assert.match(t, /check one point or Re-align/);
+});
+
+test('page wiring: restore uses the decision + 8 s timeout, falls back to landmarks; backdrop is desktop-only and cleared in XR', () => {
+  const html = read('scan-xr.html');
+  assert.ok(html.includes('MR.restoreDecision({mode:\'grimes\'') && html.includes('MR.RESTORE_TIMEOUT_MS') && html.includes('Looking for the saved Grimes anchor…') && html.includes('MR.restoreText(rec)'));
+  assert.ok(/function mrRestoreFail[\s\S]*?mrStartAlign\(area\)/.test(html), 'a missing anchor starts the landmark flow');
+  assert.ok(html.includes('MR.loadRecord(localStorage,mr.area.id)') && !html.includes('MR.loadRecord(localStorage)'), 'records are read per area');
+  assert.ok(html.includes('mrDownloadAlignments') && html.includes('MR.exportAlignments(localStorage)'));
+  assert.ok(/const mrBackdropAllowed=\(\)=>MODE_AR&&CORE_OK&&!xrARSupported&&!xrSession/.test(html), 'backdrop only without immersive-ar and outside a session');
+  assert.ok(/function mrOnSessionStart\(session\)\{mrBackdropOff\(\)/.test(html) && html.includes("if(BD.state!=='off'&&BD.state!=='idle')mrBackdropOff();mrFrame()"), 'cleared on session start and per XR frame');
+  assert.ok(!/setClearColor|setClearAlpha/.test(html.replace(/\/\*[\s\S]*?\*\//g, '')), 'no renderer clear colour is ever set');
 });

@@ -33,7 +33,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=4"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=3"></script><script src="twin/sensor-xr.js?v=1"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=4"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=1"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -54,6 +54,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 <section id="mr" hidden aria-label="Mixed-reality alignment">
  <h2>MR passthrough · BIM services through ceilings and walls</h2>
  <p class="lab" id="mrLab">Alignment: manual, not surveyed · Design (BIM) positions · landmarks BIM-derived, not verified on site</p>
+ <p id="mrBackdropNote" class="help" role="note" hidden style="color:#9fd0ff;margin:4px 0"></p>
  <div id="mrChoices" role="group" aria-label="Mode and demo sensors">
   <p id="mrNow" class="now" role="status"></p>
   <button id="chDemo" class="b big" aria-pressed="false">Demo anywhere + sensors</button>
@@ -66,7 +67,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
  <label>Area <select id="mrArea" aria-label="Area"></select></label>
  <ol id="mrSteps"></ol>
  <p id="mrFit" role="status"></p>
- <div class="row"><button id="mrSim" class="b">Simulate alignment</button><button id="mrPanelBtn" class="b">World panel (M)</button><button id="mrForget" class="b">Forget saved</button><button id="mrLog" class="b">Check log</button><button id="mrDemo" class="b" aria-pressed="false" title="Show the Grimes L1 services at real scale in the room you are in (not an alignment)">Demo here</button></div>
+ <div class="row"><button id="mrSim" class="b">Simulate alignment</button><button id="mrPanelBtn" class="b">World panel (M)</button><button id="mrForget" class="b">Forget saved</button><button id="mrLog" class="b">Check log</button><button id="mrExport" class="b" title="Download the saved alignments (area, date, RMS, points, anchor yes/no) as JSON; nothing is uploaded">Export alignment</button><button id="mrDemo" class="b" aria-pressed="false" title="Show the Grimes L1 services at real scale in the room you are in (not an alignment)">Demo here</button></div>
  <p class="help">On Quest: Enter MR, put the gold tip ball on each real landmark, trigger. B/Y opens the panel. <b>Demo here</b> (any building): point at the floor, trigger; the Grimes services appear at real scale, labelled DEMO, not aligned; Nudge raises/lowers them to your ceiling. Steps and test protocol: docs/QUEST_XR_OVERLAY.md.</p>
 </section>
 <script type="module">
@@ -77,7 +78,7 @@ import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight
 const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
 /* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
    inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
-const XR_CORE_API=4,MR_ALIGN_API=3,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
+const XR_CORE_API=4,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
 const T0=performance.now(),q=new URLSearchParams(location.search);
 const MODE_AR=q.get('mode')==='ar';   // mixed-reality passthrough mode (immersive-ar, manual alignment); default = the 360° photo VR overlay
 const MR_DEFAULT_LAYERS=['fire','duct','plumbing'];   // Quest 2 budget: fire piping, ducts, plumbing on; the rest toggle from the MR panel
@@ -751,7 +752,7 @@ function xrInput(){
    = see-through window (full strength inside, faint outside). Landmarks: buildings/grimes/mr-landmarks.json (BIM-derived). */
 const mr={doc:null,area:null,session:null,fit:null,T:null,source:'none',record:null,rangeKey:OV.parseRange(location.search),panel:false,page:'main',nudge:false,step:'fine',
  checkIdx:-1,lastCheck:null,note:'',hitSources:new Map(),hitPending:new Set(),hitPoint:null,anchor:null,anchorA:null,anchorLocal:null,pendingAnchor:null,cull:OV.createCullTracker(),headBim:[0,0,0],sim:null,stale:false,features:[],nudged:false,events:[],
- demo:null,demoPending:false,demoWanted:q.get('place')==='demo',ready:false};   // Demo here: Grimes services at real scale in any room; NOT an alignment, never saved
+ demo:null,demoPending:false,demoWanted:q.get('place')==='demo',ready:false,restore:null,restoreSeq:0};   // Demo here: Grimes services at real scale in any room; NOT an alignment, never saved
 const mrLog=e=>{mr.events.push({t:Math.round(performance.now()-T0),e});if(mr.events.length>60)mr.events.shift();};
 const mrPanel=makeSurface(1280,720,1.0,.5625,72);scene.add(mrPanel.mesh);
 const tipGeo=new THREE.SphereGeometry(.009,16,10),tipMat=new THREE.MeshBasicMaterial({color:0xffd479,depthTest:false,depthWrite:false,transparent:true,toneMapped:false});
@@ -765,7 +766,7 @@ const mrShort=()=>mr.area?mr.area.name.replace(/^Level 1 · /,'L1 · '):'MR';
 const mrDemoOn=()=>!!(mr.demo||mr.demoPending);
 /* One caption for panel, info cards and the 2D page. Demo placement: no RMS, no 'manual alignment' claim. */
 function mrDemoText(){return MR.demoLabel(mr.area)+(mr.demo?.sensorScene?' · placed around the demo-sensor scene "'+SXN[mr.demo.sensorScene]+'" (simulated sensors)':'');}
-function mrAlignText(){if(mrDemoOn()&&mr.area)return mrDemoText()+(mr.nudged?' · nudged':'');return MR.LABEL+(mr.fit?.ok?' · RMS '+MR.cm(mr.fit.rmsM).toFixed(1)+' cm':'')+(mr.nudged?' · nudged':'');}
+function mrAlignText(){if(mrDemoOn()&&mr.area)return mrDemoText()+(mr.nudged?' · nudged':'');return MR.LABEL+(mr.fit?.ok?' · RMS '+MR.cm(mr.fit.rmsM).toFixed(1)+' cm':mr.source.startsWith('anchor (restored')&&mr.record?.rmsCm!=null?' · restored via Quest anchor · RMS '+mr.record.rmsCm.toFixed(1)+' cm at save':'')+(mr.nudged?' · nudged':'');}
 function mrCardCapture(){return {label:'MR · '+mrShort(),alignmentText:mrAlignText()};}
 function mrCullRadius(){const l=OV.cullLimit(mr.rangeKey);return Number.isFinite(l)?l:1e6;}
 function mrApplyRange(key){mr.rangeKey=OV.RANGE_KEYS.includes(key)?key:OV.DEFAULT_RANGE;const u=OV.uniformValues(mr.rangeKey);U.fadeOn.value=mr.rangeKey==='all'?0:1;U.fadeRange.value.set(u.fade[0],u.fade[1]);mr.cull.reset();mrUpdateCull(true);mrRefresh();}
@@ -776,6 +777,7 @@ function mrUpdateCull(force=false){if(!mr.T)return;camera.getWorldPosition(_head
 function mrStatusLine(){if(!mr.area)return 'MR · loading landmarks…';
  if(mr.demoPending)return 'DEMO · aim at the floor, then pull the trigger';
  if(mr.demo)return 'DEMO placement · not an alignment · no RMS · '+mr.demo.method+' · facing '+Math.round(mr.demo.headingDeg)+'°';
+ if(mr.restore)return 'Looking for the saved Grimes anchor…';
  const s=mr.session,p=s?MR.currentPoint(mr.area,s):null;
  if(p)return `Point ${p.id} (${mr.area.points.indexOf(p)+1}/${mr.area.points.length}) · ${p.label}`;
  if(s&&s.phase==='review')return 'Review · '+MR.summary(s.fit);
@@ -784,8 +786,8 @@ function mrStatusLine(){if(!mr.area)return 'MR · loading landmarks…';
 function mrRefresh(){updateAlignMR();if(mr.panel)mrDrawPanel();mrRender2D();invalidate();}
 function updateAlignMR(){const a=$('align');a.textContent=mrDemoOn()&&mr.area?'MR passthrough · '+mrDemoText()+' · Design (BIM) positions':'MR passthrough · '+mrShort()+' · '+MR.LABEL+(mr.fit?.ok?' · RMS '+MR.cm(mr.fit.rmsM).toFixed(1)+' cm ('+mr.fit.n+' points)':mr.T?' · '+mr.source:' · not aligned yet')+' · Design (BIM) positions';a.classList.toggle('prov',true);}
 /* Alignment session (state machine in MRAlign). A live fit is shown as soon as two plan points are in. */
-function mrStartAlign(areaId){const wasDemo=mrDemoOn();if(mr.ready)mr.demoWanted=false;mr.demo=null;mr.demoPending=false;if(wasDemo){mr.T=null;mr.source='none';mr.nudged=false;}   // a real alignment replaces a demo placement
- mr.area=MR.areaById(mr.doc,areaId||mr.area?.id);mr.session=MR.createSession(mr.area);mr.fit=null;mr.checkIdx=-1;checkRing.visible=false;if(!mr.T)bimRoot.visible=false;mr.note='Touch each landmark with the gold tip, then trigger. Skip what you cannot reach.';mrLog('align:start '+mr.area.id);mrSyncUrl();mrRefresh();}
+function mrStartAlign(areaId){const wasDemo=mrDemoOn();mr.restore=null;if(areaId&&mr.area&&areaId!==mr.area.id)mr.record=null; /* another area's saved record/anchor must not be reused */ if(mr.ready)mr.demoWanted=false;mr.demo=null;mr.demoPending=false;if(wasDemo){mr.T=null;mr.source='none';mr.nudged=false;}   // a real alignment replaces a demo placement
+ mr.area=MR.areaById(mr.doc,areaId||mr.area?.id);mr.session=MR.createSession(mr.area);mr.fit=null;mr.checkIdx=-1;checkRing.visible=false;if(!mr.T)bimRoot.visible=false;mr.note='Touch each landmark with the gold tip, then trigger. Skip what you cannot reach.';mrLog('align:start '+mr.area.id);if(!xrSession)mrBackdropApply();mrSyncUrl();mrRefresh();}
 function mrLiveFit(){const s=mr.session;if(!s)return;const f=s.phase==='review'?s.fit:MR.capturedPlanCount(mr.area,s)>=2?MR.solveSession(mr.area,s):null;if(f?.ok){mr.fit=f;mrSetT(f.T,'fit-preview');}else if(f)mr.note=f.error;}
 function mrCapture(point,method){const s=mr.session;if(!s||s.phase!=='capture')return;const p=MR.currentPoint(mr.area,s);MR.capture(mr.area,s,point);mrLog('capture '+p.id+' '+method);mr.note=`Point ${p.id} captured (${method==='hit'?'surface hit':'tip'})`;mrLiveFit();
  if(s.phase==='review'){mr.note=s.fit.ok?'All points in · '+MR.summary(s.fit)+(s.fit.warnings.length?' · '+s.fit.warnings[0]:''):s.fit.error;}mrRefresh();}
@@ -799,7 +801,7 @@ function mrPlanCentroid(s){const pts=s?Object.values(s.captures):[];if(!pts.leng
 function mrSave(handle=mr.record?.anchor?.handle||null){if(!mr.T||mr.demo)return;   // a demo placement is never stored (it is not an alignment)
  const local=mr.anchorA?MR.toAnchorFrame(mr.T,mr.anchorA):null;
  mr.record=MR.makeRecord({area:mr.area.id,level:mr.area.level,T:mr.T,fit:mr.fit,anchorHandle:local?handle:null,anchorLocal:local,nudged:mr.nudged});MR.saveRecord(localStorage,mr.record);if(local)mr.anchorLocal=local;}
-function mrForget(){const handle=mr.record?.anchor?.handle||MR.loadRecord(localStorage)?.anchor?.handle;MR.clearRecord(localStorage);mr.record=null;mr.note='Saved alignment forgotten (the current view keeps it until you re-align)';
+function mrForget(){const id=mr.area.id,handle=mr.record?.anchor?.handle||MR.loadRecord(localStorage,id)?.anchor?.handle;MR.clearRecord(localStorage,id);mr.record=null;mr.restore=null;mr.note='Saved alignment of '+mrShort()+' forgotten (the other area keeps its own; the current view keeps this one until you re-align)';
  if(mr.anchor?.delete)try{mr.anchor.delete();}catch(e){}if(handle&&xrSession?.deletePersistentAnchor)xrSession.deletePersistentAnchor(handle).catch(()=>{});mr.anchor=null;mr.anchorA=null;mr.anchorLocal=null;mrRefresh();}
 function mrNudge(kind,dir){if(!mr.T)return;const st=MR.NUDGE_STEPS[mr.step];camera.getWorldPosition(_head);const q=camera.getWorldQuaternion(new THREE.Quaternion());const hy=MR.yawFromQuaternion(q.toArray());
  let T=mr.T;if(kind==='move')T=MR.nudge(T,{move:MR.headingStep(dir,hy,st.moveM)});else if(kind==='height')T=MR.nudge(T,{move:[0,dir*st.moveM,0]});else if(kind==='yaw')T=MR.nudge(T,{yawDeg:dir*st.yawDeg,pivot:_head.toArray()});
@@ -832,12 +834,48 @@ function mrPlaceDemo(pt,method,headYawRad=null){
  camera.updateMatrixWorld(true);const hy=headYawRad!=null?headYawRad:MR.yawFromQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()).toArray());
  // Sensors on and placed: the reference is the centre of the scene's anchored elements (at the level floor), so the pipe / duct and its sensors are overhead.
  const ref=sensorsActive()&&SENS.center?SX.demoArea(mr.area,SENS.center):mr.area,T=MR.demoTransform(ref,{floorPoint:pt,headYawRad:hy});
- mr.demoPending=false;mr.session=null;mr.fit=null;mr.nudged=false;mr.stale=false;mr.checkIdx=-1;checkRing.visible=false;
+ mr.demoPending=false;mr.restore=null;mr.session=null;mr.fit=null;mr.nudged=false;mr.stale=false;mr.checkIdx=-1;checkRing.visible=false;
  if(mr.anchor?.delete)try{mr.anchor.delete();}catch(e){}mr.anchor=null;mr.anchorA=null;mr.anchorLocal=null;mr.pendingAnchor=null;
  mr.demo={area:mr.area.id,floorPoint:pt.slice(),headingDeg:hy*180/Math.PI,headYawRad:hy,method,reference:MR.demoReference(ref),sensorScene:ref!==mr.area?SENS.scene:null,placedAt:new Date().toISOString()};
  mrSetT(T,MR.DEMO_SOURCE);
  mr.note='DEMO placed. Services too high or low for this ceiling? Nudge: on, then grip + stick up/down. Not saved; Re-align to use real landmarks.';mrLog('demo:placed '+method);
- if(xrSession)mrSetPanel(true);mrSyncUrl();mrRefresh();}
+ if(xrSession)mrSetPanel(true);else mrBackdropApply();mrSyncUrl();mrRefresh();}
+/* ── Desktop preview backdrop ── ONLY where this browser has no immersive-ar (a Mac/PC simulation): without it the MR view is black because the
+   passthrough is missing. The May 6 360° photo (2K mobile derivative) of the capture station nearest to the area / demo-sensor cluster is drawn with the
+   same registration as photo VR mode, carried through the current BIM placement (scan -> BIM by the May 6 registration, BIM -> world by mr.T), so the BIM
+   and the sensors line up with the photo; the camera sits at that station and looks at the cluster. Photo missing: dark gradient + floor grid.
+   Never in an immersive-ar session: mrBackdropOff() clears sphere / background / grid on session start and every XR frame, so the clear stays transparent. */
+const BD={state:'idle',busy:false,epoch:0,date:'2026-05-06',cfg:null,reg:null,tf:null,stations:null,url:null,station:-1,stationId:null,error:null,tex:new Map()};
+const BD_LABEL='Desktop preview: May 6 photo as background · in Quest the real room shows instead';
+const mrBackdropAllowed=()=>MODE_AR&&CORE_OK&&!xrARSupported&&!xrSession;
+const bdGrid=new THREE.GridHelper(60,60,0x3a5f82,0x1e3248);bdGrid.material.transparent=true;bdGrid.material.opacity=.65;bdGrid.visible=false;scene.add(bdGrid);
+let bdGradient=null;function bdGradientTex(){if(!bdGradient){const c=document.createElement('canvas');c.width=2;c.height=256;const g=c.getContext('2d'),gr=g.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#24425f');gr.addColorStop(.55,'#0f1d2e');gr.addColorStop(1,'#070b12');g.fillStyle=gr;g.fillRect(0,0,2,256);bdGradient=new THREE.CanvasTexture(c);bdGradient.colorSpace=THREE.SRGBColorSpace;}return bdGradient;}
+function mrBackdropNote(){const n=$('mrBackdropNote');if(!n)return;const on=BD.state==='photo'||BD.state==='fallback';n.hidden=!on;n.textContent=BD.state==='fallback'?'Desktop preview: May 6 photo not available, plain background · in Quest the real room shows instead':BD_LABEL;}
+function mrBackdropOff(){BD.epoch++;BD.busy=false;BD.state='off';sphere.visible=false;scene.background=null;bdGrid.visible=false;mrBackdropNote();invalidate();}
+function mrBackdropFallback(why){BD.state='fallback';BD.busy=false;BD.error=why;sphere.visible=false;scene.background=bdGradientTex();bdGrid.position.set(rig.position.x,rig.position.y-1.6,rig.position.z);bdGrid.visible=true;mrBackdropNote();invalidate();}
+async function mrBackdropManifest(){const cfg=X.captureConfig(BD.date),[m,r]=await Promise.all([fetchJson(cfg.photo),fetchJson(cfg.registration)]);
+ if(!X.validRegistration(r))throw new Error('registration unavailable');if(!m.stations?.length)throw new Error('no stations');
+ BD.cfg=cfg;BD.reg=r;BD.tf=X.bimRootTransform(r);BD.stations=m.stations;BD.url=new URL(cfg.photo,location.href);}
+/* BIM-frame point the backdrop is about: the demo-sensor cluster when placed around one, else the area's reference point. */
+function mrBackdropTarget(){if(mr.demo?.sensorScene&&SENS.center)return Array.from(SENS.center);return MR.demoReference(mr.area);}
+/* Runs synchronously to the end when the manifest and the station photo are cached; otherwise awaits. A newer call supersedes an older one. */
+async function mrBackdropApply({aim=true,look=null,pitchOverride=null}={}){
+ if(!mrBackdropAllowed()){if(BD.state!=='off'&&BD.state!=='idle')mrBackdropOff();return;}
+ if(!mr.area)return;const epoch=++BD.epoch;BD.busy=true;if(BD.state==='idle'||BD.state==='off')BD.state='loading';
+ if(!BD.stations&&!BD.error){try{await mrBackdropManifest();}catch(e){BD.error='manifest: '+String(e?.message||e);}}
+ if(epoch!==BD.epoch||!mrBackdropAllowed())return;
+ if(BD.error)return mrBackdropFallback(BD.error);
+ const tb=mrBackdropTarget(),n=X.nearestStation(BD.stations,X.applyRootTransform(BD.tf,tb)),st=BD.stations[n.index];let tex=BD.tex.get(n.index);
+ if(!tex){try{tex=await texLoader.loadAsync(new URL('mobile/'+st.file,BD.url).href);tex.colorSpace=THREE.SRGBColorSpace;}catch(e){if(epoch===BD.epoch)mrBackdropFallback('photo '+(n.index+1)+' failed to load');return;}
+  if(epoch!==BD.epoch||!mrBackdropAllowed()){tex.dispose();return;}BD.tex.set(n.index,tex);}
+ const T=mr.T||MR.IDENTITY,G=MR.composeT(T,{yawDeg:BD.reg.rotationYDegrees,t:BD.reg.translation}),sp=MR.applyT(G,st.position);
+ sphereMat.map=tex;sphereMat.needsUpdate=true;sphereMat.color.setScalar(1);U.fade.value=1;fader.visible=false;
+ sphere.position.fromArray(sp);sphere.quaternion.setFromAxisAngle(new THREE.Vector3(0,1,0),G.yawDeg*Math.PI/180).multiply(new THREE.Quaternion().fromArray(X.stationQuaternion(st.e57Quaternion,0)));sphere.visible=true;
+ for(const [k,t] of BD.tex)if(k!==n.index){t.dispose();BD.tex.delete(k);}
+ rig.rotation.set(0,0,0);rig.position.fromArray(sp);rig.updateMatrixWorld(true);
+ if(aim){const tw=MR.applyT(T,look||tb),dx=tw[0]-sp[0],dz=tw[2]-sp[2],dy=tw[1]-sp[1];yaw=Math.atan2(-dx,-dz);pitch=pitchOverride!=null?pitchOverride:clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.3,.6);}
+ scene.background=null;bdGrid.visible=false;BD.state='photo';BD.busy=false;BD.station=n.index;BD.stationId=st.id;BD.error=null;
+ setDesktopLook();camera.updateMatrixWorld(true);coneFromView();mrUpdateCull(true);mrBackdropNote();invalidate();}
 /* ── MR panel (world-locked canvas; B/Y toggles; trigger presses) ── */
 function mrButtons(){if(mr.page==='layers')return [...OVERLAY_LAYER_KEYS.map(k=>`${LAYERS[k].label}: ${layerState[k]?.loading?'…':mrLayerOn(k)?'on':'off'}`),'','','','','','','◂ Back'];
  const s=mr.session;return ['Capture: trigger','Skip point','Redo last','Solve now',s?'Restart align':'Re-align','Accept + save',`Nudge: ${mr.nudge?'on':'off'}`,`Step: ${mr.step==='fine'?'1 cm · 0.25°':'5 cm · 1°'}`,
@@ -882,6 +920,10 @@ function mrSelect(c,o,d){
  if(mr.session&&mr.session.phase==='capture')return mrCapture(pt,method);
  if(mr.checkIdx>=0&&mr.T)return mrCheck(pt,method);
  if(mr.T)pickAlong(o,d);}
+/* The alignment follows the anchor: T = anchor pose . stored anchor-relative alignment (also the first time after a restore). */
+function mrApplyAnchorPose(p,o){const A=MR.anchorT(p,o),T=MR.fromAnchorFrame(mr.anchorLocal,A);mr.anchorA=A;
+ if(!mr.T||Math.abs(T.yawDeg-mr.T.yawDeg)>.01||Math.hypot(T.t[0]-mr.T.t[0],T.t[1]-mr.T.t[1],T.t[2]-mr.T.t[2])>.001)mrSetT(T,mr.source.startsWith('anchor')?mr.source:'anchor'+(mr.nudged?' · nudged':''));
+ if(mr.restore?.phase==='tracking')mrRestoreDone();}
 /* Per XR frame: hit-test, anchor pose, input, culling. */
 function mrFrame(){const frame=renderer.xr.getFrame(),ref=renderer.xr.getReferenceSpace();
  for(const c of controllers){const src=c.userData.source;if(!src||!xrSession)continue;
@@ -893,8 +935,8 @@ function mrFrame(){const frame=renderer.xr.getFrame(),ref=renderer.xr.getReferen
   frame.createAnchor(new XRRigidTransform({x:c[0],y:c[1],z:c[2]},{x:0,y:0,z:0,w:1}),ref).then(async a=>{mr.anchor=a;mr.anchorA={yawDeg:0,t:c.slice()};let h=null;
    if(a.requestPersistentHandle)try{h=await a.requestPersistentHandle();}catch(e){mrLog('anchor:persist failed');}mrSave(h);mr.note=h?'Saved with a persistent XR anchor':'Anchor created (not persistent) · valid this session';mrLog('anchor '+(h?'persistent':'session'));mrRefresh();})
    .catch(e=>{mr.note='Anchor not available · saved for this session only';mrLog('anchor:error');mrRefresh();});}
- if(frame&&ref&&mr.anchor&&mr.anchorLocal){const pose=frame.getPose(mr.anchor.anchorSpace,ref);if(pose){const p=pose.transform.position,o=pose.transform.orientation,A=MR.anchorT([p.x,p.y,p.z],[o.x,o.y,o.z,o.w]),T=MR.fromAnchorFrame(mr.anchorLocal,A);mr.anchorA=A;
-  if(!mr.T||Math.abs(T.yawDeg-mr.T.yawDeg)>.01||Math.hypot(T.t[0]-mr.T.t[0],T.t[1]-mr.T.t[1],T.t[2]-mr.T.t[2])>.001)mrSetT(T,mr.source.startsWith('anchor')?mr.source:'anchor'+(mr.nudged?' · nudged':''));}}
+ if(frame&&ref&&mr.anchor&&mr.anchorLocal){const pose=frame.getPose(mr.anchor.anchorSpace,ref);if(pose){const p=pose.transform.position,o=pose.transform.orientation;mrApplyAnchorPose([p.x,p.y,p.z],[o.x,o.y,o.z,o.w]);}}
+ if(mr.restore?.phase==='tracking'&&performance.now()-mr.restore.start>MR.RESTORE_TIMEOUT_MS)mrRestoreFail('the anchor was found but is not tracked here');
  for(const c of controllers){const gp=c.userData.source?.gamepad;if(!gp||gp.mapping!=='xr-standard')continue;
   const was=prevButtons.get(c)||[],now=gp.buttons.map(b=>b.pressed),edge=k=>now[k]&&!was[k];prevButtons.set(c,now);
   if(edge(4))setStyle(state.mode==='lens'?'all':'lens');if(edge(5))mrSetPanel(!mr.panel);
@@ -907,18 +949,31 @@ function mrFrame(){const frame=renderer.xr.getFrame(),ref=renderer.xr.getReferen
  for(const k of controllers){if(!k.userData.source)continue;rayOf(k,k.userData.o,k.userData.d);updatePointer(k,k.userData.o,k.userData.d,k===c);}   // laser + reticle + panel hover
  mrUpdateCull();}
 /* Grimes landmark mode: the saved alignment of this area (XR anchor, else the session-frame record with its caveat) or a fresh alignment. */
-function mrRestoreOrAlign(session){const rec=MR.loadRecord(localStorage);
- if(rec&&rec.area===mr.area.id&&rec.frame==='anchor'&&session?.restorePersistentAnchor){mr.note='Restoring saved anchor…';session.restorePersistentAnchor(rec.anchor.handle).then(a=>{mr.anchor=a;mr.anchorLocal=rec.anchor.local;mr.record=rec;mr.fit=null;mr.source='anchor (restored '+rec.created.slice(0,10)+')';mr.note='Saved alignment restored from the XR anchor · check one landmark';mrLog('anchor restored');mrRefresh();})
-  .catch(()=>{mrLog('anchor restore failed');mrStartAlign(rec.area);mr.note='Saved anchor not found in this space · Re-align';mrRefresh();});}
- else if(rec&&rec.area===mr.area.id){mr.record=rec;mrSetT(rec,'saved, earlier session');mr.stale=true;mr.note='Saved alignment from an earlier session WITHOUT an anchor: valid only if MR started at the same spot and heading. Check a landmark or Re-align.';}
- else mrStartAlign();}
+function mrRestoreOrAlign(session){const rec=MR.loadRecord(localStorage,mr.area.id),dec=MR.restoreDecision({mode:'grimes',record:rec,anchorsApi:!!session?.restorePersistentAnchor});mr.restore=null;
+ if(dec.action==='restore')return mrRestoreAnchor(session,rec);
+ if(dec.action==='unanchored'){mr.record=rec;mrSetT(rec,'saved, earlier session');mr.stale=true;mr.note=dec.warning;}
+ else{mrStartAlign(mr.area.id);if(dec.warning){mr.note=dec.warning;mrRefresh();}}}
+/* Automatic restore: no landmark touching. Ask the Quest for the saved persistent anchor (8 s), then the frame loop places the BIM from the anchor's pose
+   and the stored anchor-relative alignment. Not found / timed out / refused: say so and start the landmark flow. */
+function mrRestoreAnchor(session,rec){const id=++mr.restoreSeq;mr.restore={phase:'looking',rec,start:performance.now()};mr.session=null;mr.fit=null;mr.record=rec;mr.T=null;mr.source='none';bimRoot.visible=false;
+ mr.note='Looking for the saved Grimes anchor…';status(mr.note,true);mrLog('anchor:restoring');mrRefresh();
+ const timer=new Promise((_,rej)=>setTimeout(()=>rej(new Error('no answer in '+MR.RESTORE_TIMEOUT_MS/1000+' s')),MR.RESTORE_TIMEOUT_MS));
+ let call;try{call=Promise.resolve(session.restorePersistentAnchor(rec.anchor.handle));}catch(e){call=Promise.reject(e);}
+ Promise.race([call,timer]).then(a=>{if(mr.restoreSeq!==id||!mr.restore){try{a?.delete?.();}catch(e){}return;}
+  if(!a||!a.anchorSpace)throw new Error('the Quest returned no anchor');
+  mr.anchor=a;mr.anchorLocal=rec.anchor.local;mr.anchorA=null;mr.source='anchor (restored '+rec.created.slice(0,10)+')';mr.restore.phase='tracking';mr.restore.start=performance.now();mrLog('anchor:found');})
+ .catch(e=>{if(mr.restoreSeq===id)mrRestoreFail(String(e?.message||e));});}
+function mrRestoreFail(why){if(!mr.restore)return;const area=mr.area.id;mr.restore=null;mr.anchor=null;mr.anchorLocal=null;mrLog('anchor restore failed: '+why);mrStartAlign(area);
+ mr.note='The saved Grimes anchor was not found ('+why+'). Starting the landmark alignment instead: touch the landmarks again.';status(mr.note);mrRefresh();}
+/* First anchor pose arrived: the BIM is placed (mrFrame). Tell the user plainly what this is. */
+function mrRestoreDone(){const rec=mr.restore.rec;mr.restore=null;mr.stale=false;mr.note=MR.restoreText(rec);status(mr.note);mrLog('anchor:restored');mrRefresh();}
 /* Mode switch (2D buttons, in-headset panel): Demo here <-> Grimes landmark alignment. Demo is never saved; switching to Grimes uses the saved alignment if there is one. */
 function mrUseGrimes(areaId){const wasDemo=mrDemoOn();mr.demoWanted=false;mr.demoPending=false;mr.demo=null;
  if(wasDemo){mr.T=null;mr.source='none';mr.nudged=false;bimRoot.visible=false;}
  if(areaId&&mr.area?.id!==areaId){mr.area=MR.areaById(mr.doc,areaId);if(mr.T&&!wasDemo){mr.T=null;mr.source='none';bimRoot.visible=false;}}
  $('mrArea').value=mr.area.id;mr.session=null;mr.fit=null;mr.checkIdx=-1;checkRing.visible=false;
  if(xrSession||!xrARSupported)mrRestoreOrAlign(xrSession);
- else{mrStartAlign(mr.area.id);if(MR.loadRecord(localStorage)?.area===mr.area.id)mr.note='A saved alignment exists · it is applied when you enter MR';}
+ else{mrStartAlign(mr.area.id);if(MR.loadRecord(localStorage,mr.area.id))mr.note='A saved alignment of this area exists · it is restored from the Quest anchor when you enter MR (no landmark touching)';}
  if(xrSession&&!mr.panel&&!mr.demoPending)mrSetPanel(true);}
 function mrSetMode(mode,areaId){if(!mr.ready)return;
  if(mode==='demo'){mr.demoWanted=true;if(xrSession||!xrARSupported)mrBeginDemo();else mr.note='Demo here armed: Enter MR, point at the floor, pull the trigger. Nothing is saved; a saved alignment is left alone.';}
@@ -935,7 +990,8 @@ async function mrChoose(what,arg){
  else if(what==='sensors'){await sensorsEnable(!SENS.on);}
  else if(what==='scene'){if(!SENS.on){SENS.scene=arg;await sensorsEnable(true);}else await sensorsSetScene(arg);}
  mrSyncUrl();mrRefresh();}
-function mrOnSessionStart(session){
+function mrOnSessionStart(session){mrBackdropOff();   // immersive-ar: the real room is the background; nothing of the desktop preview may stay
+
  // enabledFeatures where the browser reports it; otherwise feature-detect (a refused request is caught where it is used)
  mr.features=session.enabledFeatures?[...session.enabledFeatures]:[session.requestHitTestSource&&'hit-test',typeof XRFrame!=='undefined'&&XRFrame.prototype.createAnchor&&'anchors'].filter(Boolean);
  mrLog('session features '+(session.enabledFeatures?'':'(guessed) ')+mr.features.join(','));mr.hitSources.clear();mr.anchor=null;mr.anchorA=null;mr.anchorLocal=null;
@@ -945,13 +1001,15 @@ function mrOnSessionStart(session){
  if(mr.demoWanted){mr.session=null;mrBeginDemo();}   // Demo here armed (2D button, /mr default or &place=demo): no saved alignment is restored or touched
  else mrRestoreOrAlign(session);
  mrSetPanel(!mr.demoPending);mrRefresh();}
-function mrOnSessionEnd(){xrSession=null;if(mrDemoOn()){mr.demo=null;mr.demoPending=false;mr.T=null;mr.source='none';mr.nudged=false;bimRoot.visible=false;}   // a demo placement belongs to its session
+function mrOnSessionEnd(){xrSession=null;mr.restore=null;if(mrDemoOn()){mr.demo=null;mr.demoPending=false;mr.T=null;mr.source='none';mr.nudged=false;bimRoot.visible=false;}   // a demo placement belongs to its session
  mr.hitSources.clear();mr.hitPending.clear();mr.anchor=null;mr.pendingAnchor=null;hitRing.visible=false;for(const c of controllers){c.userData.ray.visible=false;c.userData.tip.visible=false;c.userData.reticle.visible=false;setHover(c,null);}toast.mesh.visible=false;
  mrSetPanel(false);renderer.xr.setReferenceSpaceType('local');rig.position.set(0,1.6,0);rig.rotation.set(0,0,0);camera.position.set(0,0,0);setDesktopLook();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
  $('enterMR').textContent='Enter MR';mr.note='MR session ended · the alignment belonged to that session';mrRefresh();}
+/* Only local-floor is required; 'anchors' (persistent anchors, per origin) is optional so a refusal never blocks MR. */
+const MR_SESSION_INIT={requiredFeatures:['local-floor'],optionalFeatures:['hit-test','anchors','plane-detection','mesh-detection','dom-overlay']};
 $('enterMR').onclick=async()=>{if(xrSession)return xrSession.end();if(!mr.area){status('Landmarks not loaded yet');return;}try{
  renderer.xr.setReferenceSpaceType('local-floor');renderer.xr.setFramebufferScaleFactor(P.xrScale);
- const session=await navigator.xr.requestSession('immersive-ar',{requiredFeatures:['local-floor'],optionalFeatures:['hit-test','anchors','plane-detection','mesh-detection','dom-overlay'],domOverlay:{root:$('mr')}});
+ const session=await navigator.xr.requestSession('immersive-ar',{...MR_SESSION_INIT,domOverlay:{root:$('mr')}});
  await renderer.xr.setSession(session);renderer.xr.setFoveation(P.foveation);xrSession=session;
  try{if(session.updateTargetFrameRate&&session.supportedFrameRates&&[...session.supportedFrameRates].includes(72))await session.updateTargetFrameRate(72);}catch(e){}
  rig.position.set(0,0,0);rig.rotation.set(0,0,0);camera.position.set(0,0,0);camera.quaternion.identity();hideCard();coneFromView();
@@ -969,6 +1027,7 @@ function mrRender2D(){const box=$('mr');if(!box||box.hidden||!mr.area)return;
  $('chSens').textContent='Sensors: '+(SENS.loading?'loading…':SENS.on?'ON (simulated)':'OFF')+' · tap to switch';
  for(const b of document.querySelectorAll('#mrChoices [data-scene]'))pr(b.id,SENS.on&&SENS.scene===b.dataset.scene);
  $('mrNow').textContent='Now: '+(demoM?'DEMO placement (not aligned to this building)':'Grimes alignment ('+mr.area.name+')')+' · sensors '+(SENS.on?SXN[SENS.scene]+' (simulated)':'off');}
+function mrDownloadAlignments(){const blob=new Blob([JSON.stringify(MR.exportAlignments(localStorage),null,1)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='grimes-mr-alignments-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
 function mrDownloadChecks(){const rows=MR.loadChecks(localStorage);const blob=new Blob([JSON.stringify({schema:'grimes-mr-checks/1',label:'design (BIM) vs installed; manual alignment, not surveyed',rows},null,1)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='grimes-mr-checks-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
 /* Desktop simulation: synthetic touches from a hidden 'session' transform + 1 cm noise run through the same state machine. */
@@ -979,12 +1038,13 @@ function mrSimulate({noiseM=.01,seed=7}={}){const area=mr.area,Tt=mrSimTruth(are
  const err=area.points.filter(p=>p.kind!=='y').map(p=>{const a=MR.applyT(f.T,p.bim),b=MR.applyT(Tt,p.bim);return Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);});
  mr.sim={truth:Tt,noiseM,seed,maxTruthErrorCm:MR.cm(Math.max(...err)),yawErrorDeg:Math.abs(MR.wrapDeg(f.T.yawDeg-Tt.yawDeg))};
  // desktop eye 1.6 m above the simulated Quest floor, looking at landmark A
- rig.position.set(0,1.6,0);const A=MR.applyT(Tt,area.points[0].bim),d=new THREE.Vector3(A[0],1.6,A[2]).sub(new THREE.Vector3(0,1.6,0)).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=.25;setDesktopLook();camera.updateMatrixWorld(true);coneFromView();mrUpdateCull(true);
+ if(mrBackdropAllowed())mrBackdropApply({look:area.points[0].bim,pitchOverride:.25});   // camera at the nearest photo station, looking at landmark A
+ else{rig.position.set(0,1.6,0);const A=MR.applyT(Tt,area.points[0].bim),d=new THREE.Vector3(A[0],1.6,A[2]).sub(new THREE.Vector3(0,1.6,0)).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=.25;setDesktopLook();camera.updateMatrixWorld(true);coneFromView();mrUpdateCull(true);}
  mr.note='Simulated alignment (desktop, synthetic touches, '+Math.round(noiseM*100)+' cm noise; truth error '+mr.sim.maxTruthErrorCm.toFixed(1)+' cm)';mrRefresh();return mr.sim;}
 function mrInspection(){return {area:mr.area?.id??null,areas:mr.doc?.areas.map(a=>a.id)??[],phase:mr.session?.phase??(mr.demoPending?'demo-pending':mr.demo?'demo':mr.T?'aligned':'none'),demo:mr.demo?{...mr.demo,label:MR.demoLabel(mr.area)}:null,demoPending:mr.demoPending,demoWanted:mr.demoWanted,caption:mrAlignText(),checksEnabled:!mrDemoOn(),persisted:!mr.demo,current:mr.session?MR.currentPoint(mr.area,mr.session)?.id??null:null,
  captured:mr.session?Object.keys(mr.session.captures):[],fit:mr.fit?.ok?{rmsCm:MR.cm(mr.fit.rmsM),n:mr.fit.n,worst:mr.fit.worst,heightSource:mr.fit.heightSource,warnings:mr.fit.warnings,yawDeg:mr.fit.T.yawDeg,t:mr.fit.T.t}:null,
  T:mr.T,source:mr.source,record:mr.record,rangeKey:mr.rangeKey,fade:{on:U.fadeOn.value,range:U.fadeRange.value.toArray()},outside:U.outside.value,cullRadius:mrCullRadius(),headBim:mr.headBim,panel:mr.panel,page:mr.page,
- nudge:mr.nudge,step:mr.step,check:mr.checkIdx>=0?mr.area.checks[mr.checkIdx].id:null,lastCheck:mr.lastCheck,sim:mr.sim,stale:mr.stale,features:mr.features,note:mr.note,label:MR.LABEL,events:mr.events.slice(-12),
+ backdrop:{state:BD.state,busy:BD.busy,date:BD.date,station:BD.station,stationId:BD.stationId,error:BD.error,label:BD_LABEL,sphereVisible:sphere.visible,fallbackGrid:bdGrid.visible,background:!!scene.background,sphereWorld:sphere.position.toArray()},restore:mr.restore?{phase:mr.restore.phase}:null,sessionInit:MR_SESSION_INIT,nudge:mr.nudge,step:mr.step,check:mr.checkIdx>=0?mr.area.checks[mr.checkIdx].id:null,lastCheck:mr.lastCheck,sim:mr.sim,stale:mr.stale,features:mr.features,note:mr.note,label:MR.LABEL,events:mr.events.slice(-12),
  arSupported:xrARSupported,bimVisible:bimRoot.visible,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()}};}
 async function bootMR(){
  document.body.classList.add('mr');$('mr').hidden=false;sphere.visible=false;
@@ -994,13 +1054,13 @@ async function bootMR(){
  P.levels=new Set([mr.area.level]);mrApplyRange(mr.rangeKey);applyShaderState();
  rig.position.set(0,1.6,0);setDesktopLook();bimRoot.visible=false;
  mrStartAlign(mr.area.id);mr.ready=true;
- const rec=MR.loadRecord(localStorage);
- if(rec&&rec.area===mr.area.id){mr.record=rec;mr.note='A saved alignment exists ('+rec.created.slice(0,16).replace('T',' ')+', '+(rec.frame==='anchor'?'XR anchor':'no anchor')+(rec.rmsCm!=null?', RMS '+rec.rmsCm+' cm':'')+') · it is applied when you enter MR';}
+ const rec=MR.loadRecord(localStorage,mr.area.id);
+ if(rec){mr.record=rec;mr.note='A saved alignment of this area exists ('+rec.created.slice(0,16).replace('T',' ')+', '+(rec.frame==='anchor'?'XR anchor':'no anchor')+(rec.rmsCm!=null?', RMS '+rec.rmsCm+' cm':'')+') · it is applied when you enter MR';}
  else mr.note=xrARSupported?'Enter MR, then touch the landmarks in order.':'Desktop MR simulation · press "Simulate alignment" to run the alignment flow with synthetic touches.';
  $('mrDemo').onclick=()=>{if(xrARSupported&&!xrSession){mr.demoWanted=!mr.demoWanted;mr.note=mr.demoWanted?'Demo here armed: Enter MR, point at the floor, pull the trigger. Nothing is saved; a saved alignment is left alone.':'Demo here off';}else mrBeginDemo();mrSyncUrl();mrRefresh();};
  $('chDemo').onclick=()=>mrChoose('demoSensors');$('chFoyer').onclick=()=>mrChoose('grimes','l1-auditorium-foyer');$('chEast').onclick=()=>mrChoose('grimes','l1-east-entrance');$('chSens').onclick=()=>mrChoose('sensors');
  for(const b of document.querySelectorAll('#mrChoices [data-scene]'))b.onclick=()=>mrChoose('scene',b.dataset.scene);
- $('mrSim').onclick=()=>mrSimulate();$('mrForget').onclick=()=>mrForget();$('mrLog').onclick=()=>mrDownloadChecks();$('mrPanelBtn').onclick=()=>mrSetPanel(!mr.panel);
+ $('mrSim').onclick=()=>mrSimulate();$('mrForget').onclick=()=>mrForget();$('mrLog').onclick=()=>mrDownloadChecks();$('mrExport').onclick=()=>mrDownloadAlignments();$('mrPanelBtn').onclick=()=>mrSetPanel(!mr.panel);
  $('fire').setAttribute('aria-pressed',String(P.layers.includes('fire')));
  if(mr.demoWanted&&xrARSupported)mr.note='Demo here armed (&place=demo): Enter MR, point at the floor, pull the trigger. Nothing is saved.';
  status('MR · '+mrShort()+' · loading services…',true);
@@ -1017,7 +1077,7 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
    so one uncaught exception would stop rendering for the rest of the session (Quest shows black). Errors are counted, logged once
    per message and shown in the headset; the photo and services keep rendering. */
 let xrFrameErrors=0,lastXrFrameError=null;
-function xrFrameSafe(){try{if(MODE_AR)mrFrame();else{if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}sensorsTick();}
+function xrFrameSafe(){try{if(MODE_AR){if(BD.state!=='off'&&BD.state!=='idle')mrBackdropOff();mrFrame();}else{if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}sensorsTick();}
  catch(e){xrFrameErrors++;const m=String(e?.message||e);if(m!==lastXrFrameError){lastXrFrameError=m;console.error('XR frame error (rendering continues):',e);try{status('XR controls error · '+m);}catch(_){}}}}
 renderer.setAnimationLoop((t)=>{
  const xr=renderer.xr.isPresenting;
@@ -1050,7 +1110,7 @@ function inspection(){const heap=performance.memory?Math.round(performance.memor
    sortRunning:!!gauss.dropIn?.viewer.sortRunning,splatVisible:!!gauss.dropIn?.visible,teleports:gauss.teleports,eyeHeight:EYE_H,sharedMemory:false,renderer:'GaussianSplats3D 0.4.7 DropInViewer'}};}
 window.xrInspection=inspection;
 window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};return lastInfo;},
- openStation:i=>openStation(i),mr:{demo:(pt,hy)=>mrPlaceDemo(pt,'debug',hy),beginDemo:()=>mrBeginDemo(),simulate:o=>mrSimulate(o),button:i=>mrButton(i),panel:on=>mrSetPanel(on),range:k=>mrApplyRange(k),startAlign:id=>mrStartAlign(id),capture:p=>mrCapture(p,'debug'),skip:()=>mrSkip(),solve:()=>mrSolveNow(),accept:()=>mrAccept(),nudge:(k,d)=>mrNudge(k,d),nextCheck:()=>mrNextCheck(),check:p=>mrCheck(p,'debug'),toggleLayer:k=>mrToggleLayer(k),forget:()=>mrForget()},walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,setScene,recenter,
+ openStation:i=>openStation(i),mr:{demo:(pt,hy)=>mrPlaceDemo(pt,'debug',hy),beginDemo:()=>mrBeginDemo(),simulate:o=>mrSimulate(o),button:i=>mrButton(i),panel:on=>mrSetPanel(on),range:k=>mrApplyRange(k),startAlign:id=>mrStartAlign(id),capture:p=>mrCapture(p,'debug'),skip:()=>mrSkip(),solve:()=>mrSolveNow(),accept:()=>mrAccept(),nudge:(k,d)=>mrNudge(k,d),nextCheck:()=>mrNextCheck(),check:p=>mrCheck(p,'debug'),toggleLayer:k=>mrToggleLayer(k),forget:()=>mrForget(),restoreWith:ss=>mrRestoreOrAlign(ss),anchorPose:(p,o)=>mrApplyAnchorPose(p,o),useGrimes:id=>mrUseGrimes(id)},walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,setScene,recenter,
  frameStats:()=>{renderer.render(scene,camera);const gl=renderer.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,px=new Uint8Array(4);let lit=0,n=0;
   for(let i=1;i<24;i++)for(let j=1;j<16;j++){gl.readPixels(Math.floor(w*i/24),Math.floor(h*j/16),1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);n++;if(px[0]+px[1]+px[2]>45)lit++;}const r=renderer.info.render;return {litFraction:lit/n,calls:r.calls,triangles:r.triangles};},
  look:(y,p)=>{yaw=y;pitch=p;setDesktopLook();camera.updateMatrixWorld(true);coneFromView();},

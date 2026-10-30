@@ -20,7 +20,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 /* API version of this file. scan-xr.html loads it as twin/mr-align.js?v=<API> and checks MRAlign.API (stale-cache guard). Bump with the exports. */
-const API = 3;
+const API = 4;
 const D2R = Math.PI / 180, R2D = 180 / Math.PI;
 const LABEL = 'manual alignment, not surveyed';
 const MIN_SPREAD_M = 0.5;          // horizontal RMS spread of the plan points below which the heading is undetermined
@@ -152,7 +152,7 @@ const NUDGE_STEPS = Object.freeze({fine: {moveM: 0.01, yawDeg: 0.25}, coarse: {m
    alignment is in the old session's local-floor frame and is valid only if the new session starts at the same spot
    and heading; the page says so and asks for a landmark check. Anchor poses are reduced to yaw + position
    (gravity-aligned), so a slightly tilted anchor never tilts the BIM. */
-const STORE_KEY = 'grimes-mr-alignment/1', SCHEMA = 'grimes-mr-alignment/1';
+const STORE_KEY = 'grimes-mr-alignment/2', SCHEMA = 'grimes-mr-alignment/1';
 function anchorT(position, quaternion) { return {yawDeg: wrapDeg(yawFromQuaternion(quaternion) * R2D), t: position.slice()}; }
 function toAnchorFrame(T, A) { return composeT(invertT(A), T); }
 function fromAnchorFrame(local, A) { return composeT(A, local); }
@@ -170,10 +170,58 @@ function parseRecord(text) {
   if (r.frame !== 'anchor' && r.frame !== 'session') return null;
   return r;
 }
-/* storage: a Web Storage object (localStorage). Every access is guarded: private mode / blocked storage must not break MR. */
-function saveRecord(storage, record) { try { storage.setItem(STORE_KEY, JSON.stringify(record)); return true; } catch (e) { return false; } }
-function loadRecord(storage) { try { return parseRecord(storage.getItem(STORE_KEY)); } catch (e) { return null; } }
-function clearRecord(storage) { try { storage.removeItem(STORE_KEY); return true; } catch (e) { return false; } }
+/* Records are stored PER AREA (foyer and east entrance do not overwrite each other) under STORE_KEY = {schema: STORE_SCHEMA, areas: {<areaId>: record}}.
+   The record itself is unchanged (schema grimes-mr-alignment/1). The first release stored ONE record under LEGACY_KEY; it is moved into the map on first read
+   (migration), then the legacy key is removed. storage: a Web Storage object (localStorage). Every access is guarded: private mode / blocked storage must not break MR. */
+const LEGACY_KEY = 'grimes-mr-alignment/1', STORE_SCHEMA = 'grimes-mr-alignments/2';
+function readStore(storage) {
+  let doc = null;
+  try { const raw = storage.getItem(STORE_KEY); doc = raw ? JSON.parse(raw) : null; } catch (e) { doc = null; }
+  const areas = {};
+  if (doc && doc.schema === STORE_SCHEMA && doc.areas && typeof doc.areas === 'object') for (const [id, r] of Object.entries(doc.areas)) { const p = parseRecord(r); if (p && p.area === id) areas[id] = p; }
+  let migrated = false;
+  try {
+    const legacy = parseRecord(storage.getItem(LEGACY_KEY));
+    if (legacy && !areas[legacy.area]) { areas[legacy.area] = legacy; migrated = true; }
+    if (legacy) migrated = true;
+  } catch (e) {}
+  if (migrated) { try { storage.setItem(STORE_KEY, JSON.stringify({schema: STORE_SCHEMA, areas})); storage.removeItem(LEGACY_KEY); } catch (e) {} }
+  return areas;
+}
+function writeStore(storage, areas) { try { if (Object.keys(areas).length) storage.setItem(STORE_KEY, JSON.stringify({schema: STORE_SCHEMA, areas})); else storage.removeItem(STORE_KEY); return true; } catch (e) { return false; } }
+function saveRecord(storage, record) { const areas = readStore(storage); areas[record.area] = record; return writeStore(storage, areas); }
+/* areaId given: that area's record or null. Without areaId (old callers): the newest record. */
+function loadRecord(storage, areaId = null) {
+  try { const areas = readStore(storage); if (areaId != null) return areas[areaId] || null; return Object.values(areas).sort((a, b) => String(b.created).localeCompare(String(a.created)))[0] || null; } catch (e) { return null; }
+}
+function loadAllRecords(storage) { try { return Object.values(readStore(storage)); } catch (e) { return []; } }
+/* areaId given: forget that area only; without: forget all. */
+function clearRecord(storage, areaId = null) {
+  try { if (areaId == null) { storage.removeItem(STORE_KEY); storage.removeItem(LEGACY_KEY); return true; } const areas = readStore(storage); delete areas[areaId]; return writeStore(storage, areas); } catch (e) { return false; }
+}
+/* Non-sensitive export of the saved alignments (no poses, no anchor handle): what was aligned, when, how well, whether an anchor exists. Never uploaded. */
+function exportAlignments(storage, now = new Date().toISOString()) {
+  return {schema: 'grimes-mr-alignments-export/1', exported: now, label: LABEL + '; anchor restore = manual alignment restored via Quest anchor, not surveyed',
+    rows: loadAllRecords(storage).map(r => ({area: r.area, level: r.level, created: r.created, rmsCm: r.rmsCm, points: r.points, heightSource: r.heightSource, nudged: !!r.nudged,
+      frame: r.frame, anchorPresent: r.frame === 'anchor' && !!r.anchor?.handle}))};
+}
+/* What to do when the user chooses a Grimes area. Pure; the page performs it.
+   inputs: mode 'demo' | 'grimes'; record = saved record of THIS area (or null); anchorsApi = the session offers restorePersistentAnchor.
+   'none'       demo placement: saved records are never read or written
+   'restore'    record with a persistent anchor handle and an anchors-capable session: skip the landmark touches, restore from the Quest anchor (the page times it out)
+   'unanchored' record without anchor (or no anchor API): apply it with the stale warning, landmark check or Re-align
+   'landmarks'  nothing saved for this area: landmark flow */
+function restoreDecision({mode = 'grimes', record = null, anchorsApi = false} = {}) {
+  if (mode === 'demo') return {action: 'none', reason: 'demo placement never reads or writes saved alignments', warning: null};
+  if (!record) return {action: 'landmarks', reason: 'no saved alignment for this area', warning: null};
+  if (record.frame === 'anchor' && record.anchor?.handle) {
+    if (anchorsApi) return {action: 'restore', reason: 'persistent anchor saved', warning: null};
+    return {action: 'landmarks', reason: 'saved anchor, but this session offers no anchors', warning: 'Saved anchor cannot be used here (no anchors in this session): touch the landmarks again.'};
+  }
+  return {action: 'unanchored', reason: 'saved without an anchor', warning: 'Saved alignment from an earlier session WITHOUT an anchor: valid only if MR started at the same spot and heading. Check a landmark or Re-align.'};
+}
+const RESTORE_TIMEOUT_MS = 8000;
+function restoreText(rec) { return 'Restored from Quest anchor \u00b7 ' + String(rec.created).slice(0, 10) + (rec.rmsCm != null ? ' \u00b7 RMS ' + rec.rmsCm.toFixed(1) + ' cm at save' : '') + ' \u00b7 manual alignment restored via Quest anchor, not surveyed \u00b7 check one point or Re-align'; }
 /* check log (sprinkler / diffuser offsets), newest last, capped */
 const CHECK_KEY = 'grimes-mr-checks/1';
 function appendCheck(storage, row, cap = 200) {
@@ -304,7 +352,7 @@ function simulateTouch(area, p, Ttrue, {noiseM = 0.01, random = Math.random, xrF
 
 return {API, LABEL, DEMO_FORWARD_BIM, DEMO_SOURCE, demoLabel, demoReference, demoTransform, MIN_SPREAD_M, SHORT_SPAN_M, IDENTITY, rotY, applyT, invertT, composeT, validT, wrapDeg,
   fitAlignment, residuals, leaveOneOut, cm, summary, nudge, headingStep, yawFromQuaternion, NUDGE_STEPS,
-  STORE_KEY, CHECK_KEY, SCHEMA, anchorT, toAnchorFrame, fromAnchorFrame, makeRecord, parseRecord, saveRecord, loadRecord, clearRecord, appendCheck, loadChecks,
+  STORE_KEY, LEGACY_KEY, STORE_SCHEMA, CHECK_KEY, SCHEMA, loadAllRecords, exportAlignments, restoreDecision, restoreText, RESTORE_TIMEOUT_MS, anchorT, toAnchorFrame, fromAnchorFrame, makeRecord, parseRecord, saveRecord, loadRecord, clearRecord, appendCheck, loadChecks,
   checkOffset, validateLandmarks, areaById, landmarkBim, createSession, currentPoint, capture, skip, redo, finishEarly, sessionPairs, solveSession, capturedPlanCount,
   smoothstep, mrAlpha, PANEL, gridRect, gridHit, rng, gauss, simulateTouch};
 });
