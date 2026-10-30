@@ -121,11 +121,120 @@ test('flashlight cone: inside, soft edge, outside, behind; Lens vs All alpha', (
   assert.equal(X.cellKey(-.1, 6.1, 6), '-1,1');
 });
 
-test('XR menu: every button centre hits its own index, gaps and header miss', () => {
-  for (let i = 0; i < X.MENU.cols * X.MENU.rows; i++) { const r = X.menuRect(i); assert.equal(X.menuHit(r.x + r.w / 2, 1 - (r.y + r.h / 2)), i); }
-  assert.equal(X.MENU.cols * X.MENU.rows, 12, '12 buttons: … Fire, Scene, Nearest station, Close');
-  assert.equal(X.menuHit(.5, .9), -1, 'header'); assert.equal(X.menuHit(.01, .2), -1, 'margin');
-  const a = X.menuRect(0), b = X.menuRect(1); assert.equal(X.menuHit((a.x + a.w + b.x) / 2, 1 - (a.y + a.h / 2)), -1, 'gap');
+test('XR menu (2026-10-22): main page ≤ 5 large buttons, More holds settings + 8 layers; every centre hits its own index, gaps miss', () => {
+  for (const [page, rows] of Object.entries(X.MENU_PAGES)) {
+    const rects = X.menuLayout(rows), n = rows.reduce((a, b) => a + b, 0);
+    assert.equal(rects.length, n);
+    rects.forEach((r, i) => assert.equal(X.layoutHit(rects, r.x + r.w / 2, 1 - (r.y + r.h / 2)), i, page + ' ' + i));
+    assert.equal(X.layoutHit(rects, .5, .9), -1, 'header'); assert.equal(X.layoutHit(rects, .01, .2), -1, 'margin');
+    const a = rects[0], b = rects[1]; assert.equal(X.layoutHit(rects, (a.x + a.w + b.x) / 2, 1 - (a.y + a.h / 2)), -1, 'gap');
+    for (const r of rects) assert.ok(r.x >= 0 && r.y >= X.MENU_AREA.top - 1e-12 && r.x + r.w <= 1 && r.y + r.h <= 1);
+  }
+  const main = X.menuButtons('main', {captureLabel: 'Sep 17', mode: 'lens', scene: 'photo', gaussianAvailable: false});
+  assert.ok(main.length <= 5 && main.length === X.menuLayout(X.MENU_PAGES.main).length);
+  assert.deepEqual(main.map(b => b.id), ['capture', 'style', 'scene', 'recenter', 'more']);
+  assert.equal(main[0].value, 'Sep 17'); assert.equal(main[1].value, 'Lens'); assert.match(main[2].value, /no Gaussian/);
+  assert.ok(!main.some(b => /opacity/i.test(b.label + b.value)), 'opacity is not on the main page');
+  // main buttons are big: at the 0.64 m panel width each is wider than 0.18 m and taller than 0.09 m (0.40 m panel height)
+  for (const r of X.menuLayout(X.MENU_PAGES.main)) { assert.ok(r.w * .64 > .18, 'width ' + r.w * .64); assert.ok(r.h * .4 > .09, 'height ' + r.h * .4); }
+  const layers = ['equipment', 'lighting', 'conduit', 'duct', 'hydronic', 'plumbing', 'lifesafety', 'fire'].map((key, i) => ({key, label: key, on: i < 7, loading: false}));
+  const more = X.menuButtons('more', {hands: 'both', opacity: .7, hiRes: false, scene: 'photo', layers});
+  assert.equal(more.length, X.menuLayout(X.MENU_PAGES.more).length);
+  assert.deepEqual(more.slice(0, 5).map(b => b.id), ['back', 'hands', 'opacity', 'hires', 'exit']);
+  assert.equal(more[1].value, 'both hands'); assert.equal(more[2].value, '70%'); assert.equal(more[12].id, 'layer:fire'); assert.equal(more[12].value, 'off');
+  assert.equal(X.menuButtons('more', {scene: 'gaussian', layers}).find(b => b.id === 'hires').value, 'n/a');
+  // fixed opacity defaults, More ▸ Opacity cycles 50/70/90 %
+  assert.equal(X.DEFAULT_LENS_OPACITY, .7); assert.equal(X.DEFAULT_ALL_OPACITY, .35);
+  assert.equal(X.nextLensOpacity(.7), .9); assert.equal(X.nextLensOpacity(.9), .5); assert.equal(X.nextLensOpacity(.5), .7); assert.equal(X.nextLensOpacity(.33), .5);
+});
+
+test('controller roles: LEFT moves, RIGHT is the flashlight; both-hands adds the left cone; a lone controller does both', () => {
+  const L = {handedness: 'left', pointer: true}, R = {handedness: 'right', pointer: true};
+  assert.deepEqual(X.controllerRoles([L, R]), {move: 0, lens: [1]});
+  assert.deepEqual(X.controllerRoles([R, L]), {move: 1, lens: [0]}, 'slot order does not matter');
+  assert.deepEqual(X.controllerRoles([R, L], 'both'), {move: 1, lens: [0, 1]}, 'right cone first, then the left');
+  assert.deepEqual(X.controllerRoles([null, R]), {move: 1, lens: [1]}, 'right alone: moves and lights');
+  assert.deepEqual(X.controllerRoles([L, null]), {move: 0, lens: [0]});
+  assert.deepEqual(X.controllerRoles([{handedness: 'none', pointer: true}, {handedness: 'none', pointer: true}]), {move: 0, lens: [1]});
+  assert.deepEqual(X.controllerRoles([{handedness: 'left', pointer: false}, R]), {move: 1, lens: [1]}, 'gaze/screen sources are ignored');
+  assert.deepEqual(X.controllerRoles([null, null]), {move: -1, lens: []});
+  // stick intents: move hand aims / steps back; flashlight hand widens / narrows; both sticks snap-turn
+  assert.equal(X.stickIntent('move', 'forward'), 'aim'); assert.equal(X.stickIntent('move', 'back'), 'step-back');
+  assert.equal(X.stickIntent('both', 'forward'), 'aim'); assert.equal(X.stickIntent('lens', 'forward'), 'cone-wider'); assert.equal(X.stickIntent('lens', 'back'), 'cone-narrower');
+  for (const r of ['move', 'lens', 'both']) { assert.equal(X.stickIntent(r, 'turn-left'), 'turn-left'); assert.equal(X.stickIntent(r, 'turn-right'), 'turn-right'); }
+  assert.equal(X.stickIntent(null, 'forward'), null); assert.equal(X.stickIntent('move', null), null);
+  // hold-to-aim: held keeps the preview, release goes, pulling back cancels
+  assert.equal(X.aimUpdate(0, -.9), 'hold'); assert.equal(X.aimUpdate(.4, -.1), 'hold', 'sideways while held still aims');
+  assert.equal(X.aimUpdate(0, -.1), 'go'); assert.equal(X.aimUpdate(0, 0), 'go'); assert.equal(X.aimUpdate(0, .8), 'cancel');
+  assert.equal(X.stepConeHalf(12, 1), 15); assert.equal(X.stepConeHalf(29, 1), 30); assert.equal(X.stepConeHalf(5, -1), 4);
+  // snap turn: 30° about the head, repeated 12 times returns to the start
+  let rig = {position: [2, 0, -1], yaw: .3}; const head = [2.4, 1.6, -1.3];
+  for (let k = 0; k < 12; k++) rig = X.snapTurn(rig.position, rig.yaw, head, Math.PI / 6);
+  near(rig.position, [2, 0, -1], 1e-9); assert.ok(Math.abs(rig.yaw - .3 - 2 * Math.PI) < 1e-9);
+});
+
+test('point-and-go: floor spot -> nearest station, cone ≤ 30° / ≤ 15 m, detour penalty, other floors ignored, arc + labels', () => {
+  // a corridor along -z with a side room behind a wall (only reachable by a long route)
+  const st = [[0, 6, 0], [0, 6, -3], [0, 6, -6], [0, 6, -9], [0, 6, -12], [0, 6, -20], [4, 6, -6], [0, 9.5, -6], [3, 6, 0.5]].map((position, i) => ({id: 's' + i, position, neighbors: []}));
+  const link = (a, b) => { st[a].neighbors.push(b); st[b].neighbors.push(a); };
+  link(0, 1); link(1, 2); link(2, 3); link(3, 4); link(4, 5); link(2, 6); link(0, 8);
+  const route = X.routeDistances(st, 0);
+  assert.equal(route[0], 0); assert.equal(route[3], 9); assert.ok(Math.abs(route[6] - 10) < 1e-12); assert.equal(route[7], Infinity, 'unconnected');
+  const o = [0, 5.6, 0], fwd = [0, 0, -1], opts = {current: 0, floorY: 4.5, refY: 6, route};
+  const dirTo = p => { const d = p.map((v, k) => v - o[k]), n = Math.hypot(...d); return d.map(v => v / n); };
+  // a level ray down the corridor ("I want to go over there") picks a far station, not the next one
+  const a = X.stationTarget(st, o, fwd, opts);
+  assert.equal(a.ok, true); assert.equal(a.method, 'cone'); assert.ok(a.index === 3 || a.index === 4, 'far station, got ' + a.index);
+  assert.equal(a.point[1], 4.5, 'marker on the assumed floor'); assert.ok(a.distance >= 9);
+  // aiming at a station's camera centre selects exactly it, near or far
+  for (const k of [1, 2, 3, 4]) assert.equal(X.stationTarget(st, o, dirTo(st[k].position.map((v, j) => v + (j === 0 ? .25 : 0))), opts).index, k, 'aimed at ' + k);
+  // pointing at the floor 9 m ahead picks the station above that spot
+  const f = X.stationTarget(st, o, dirTo([0.3, 4.5, -9.2]), opts);
+  assert.deepEqual([f.ok, f.index, f.method], [true, 3, 'floor']); assert.ok(f.floorPoint);
+  // beyond 15 m: never; 20 m station is not a candidate even straight on
+  assert.notEqual(X.stationTarget(st, o, dirTo([0, 5.6, -20]), opts).index, 5);
+  // the side room (4,6,-6): 46° off the corridor axis is outside the 30° cone; pointed at directly it is chosen
+  const side = X.stationTarget(st, o, dirTo([4, 5.6, -6]), opts); assert.equal(side.index, 6);
+  assert.notEqual(X.stationTarget(st, o, fwd, {...opts, coneDeg: 10}).index, 6);
+  // station on another floor (3.5 m higher) and unconnected stations are ignored
+  assert.notEqual(X.stationTarget(st, o, dirTo([0, 9.5, -6]), opts).index, 7);
+  // detour: two stations at the same angle; the one 20 m away by the recorded route (behind a wall) loses to the on-route one
+  const st2 = [{position: [0, 6, 0], neighbors: [2]}, {position: [-.5, 6, -6], neighbors: []}, {position: [.5, 6, -6], neighbors: [0]}];
+  assert.equal(X.stationTarget(st2, [0, 6, 0], [0, 0, -1], {current: 0}).index, 1, 'without a route: tie, first wins');
+  assert.equal(X.stationTarget(st2, [0, 6, 0], [0, 0, -1], {current: 0, route: [0, 20, Math.hypot(.5, 6)]}).index, 2, 'route detour penalised');
+  assert.equal(X.stationTarget(st2, [0, 6, 0], [0, 0, -1], {current: 0, route: X.routeDistances(st2, 0)}).index, 2, 'unconnected station skipped');
+  // pointing at your own feet, straight up, or into empty space: explained refusals
+  assert.match(X.stationTarget(st, o, dirTo([0.2, 4.5, -.4]), opts).reason, /You are here/);
+  assert.match(X.stationTarget(st, o, [0, 1, 0], opts).reason, /Point toward/);
+  assert.match(X.stationTarget(st, o, [-1, 0, 0], {...opts, coneDeg: 20}).reason, /No captured position within 20° and 15 m/);
+  // Gaussian fallback: zone indices only, distance reported from the teleport landing
+  const z = X.stationTarget(st, o, fwd, {...opts, current: -1, indices: [2, 3], from: [0, 6, -1]});
+  assert.equal(z.index, 3); assert.ok(Math.abs(z.distance - 8) < 1e-12);
+  // arc: starts at the controller, ends at the target, apex above both
+  const arc = X.arcPoints([0, 1, 0], [0, 0, -6], 24);
+  assert.equal(arc.length, 24); near(arc[0], [0, 1, 0]); near(arc[23], [0, 0, -6]); assert.ok(Math.max(...arc.map(p => p[1])) > 1);
+  assert.equal(X.targetLabel({...a, kind: 'station', distance: 3}, 'Capture 2'), 'Capture 2 · 3.0 m');
+  assert.equal(X.targetLabel({...f, kind: 'station'}, 'Capture 4'), 'Capture 4 · 9.0 m · floor');
+  assert.equal(X.targetLabel({ok: true, kind: 'point', distance: 2.149}), 'Teleport · 2.1 m');
+  assert.match(X.targetLabel({ok: false, reason: 'Point toward a captured position'}), /Point toward/);
+});
+
+test('point-and-go on the real May 6 manifest: from the default station every far station in view is reachable by pointing', () => {
+  const m = MANIFESTS.may, s = m.stations, i0 = s.findIndex(x => x.id === m.defaultStation), here = s[i0].position, route = X.routeDistances(s, i0);
+  assert.ok(route.filter(Number.isFinite).length > 50, 'station graph connected');
+  const o = [here[0], here[1] - .4, here[2]];
+  let tried = 0, hit = 0, far = 0;
+  for (let j = 0; j < s.length; j++) {
+    const p = s[j].position, dh = Math.hypot(p[0] - here[0], p[2] - here[2]);
+    if (j === i0 || dh < 1 || dh > 15 || Math.abs(p[1] - here[1]) > 1.5 || !Number.isFinite(route[j]) || route[j] > 1.5 * dh + 3) continue;
+    tried++;
+    const d = [p[0] - o[0], 0, p[2] - o[2]].map((v, _, a) => v / Math.hypot(a[0], a[2]));
+    const t = X.stationTarget(s, o, d, {current: i0, floorY: here[1] - 1.5, refY: here[1], route});
+    if (t.ok && t.index === j) { hit++; if (dh > 6) far++; }
+  }
+  assert.ok(tried > 5, 'candidates ' + tried);
+  assert.ok(hit / tried > .6, `pointing straight at a station selects it: ${hit}/${tried}`);
+  assert.ok(far >= 1, 'at least one station > 6 m away is reachable in one jump (the old stick only stepped ≤ 5.5 m to a neighbour)');
 });
 
 test('info card keeps the ElementCards honesty ladder (CONTEXT is a building meter, NO FEED stays no feed)', () => {
@@ -154,6 +263,13 @@ test('scan-xr.html wiring: shared scripts, pinned three, overlay layer set, no e
   assert.ok(html.includes("const EQUIP_OFFSET={x:-35.28,y:-97.16,z:28.60}") && /EQUIP_OFFSET = \{ x: -35\.28, y: -97\.16, z: 28\.60 \}/.test(bim), 'same layer placement as scan-bim');
   assert.ok(html.includes("renderer.shadowMap.enabled=false") && html.includes('setFramebufferScaleFactor') && html.includes('setFoveation'));
   assert.ok(!/accepted-registration\.json['"]?\s*,\s*\{\s*method:\s*['"]PUT/.test(html) && !/localStorage\.setItem/.test(html));
+  // 2026-10-22 controls: two flashlight cones in the shader, laser + reticle, haptics, point-and-go, hover-only clicks
+  assert.ok(html.includes('if(cone2On>.5)w=max(w,smoothstep(coneCos-coneSoft,coneCos,dot(normalize(vWorld-cone2Origin),cone2Dir)));'));
+  assert.ok(html.includes('gp.hapticActuators?.[0]') && html.includes('X.stationTarget(stations,') && html.includes('X.controllerRoles(') && html.includes('X.aimUpdate(x,y)'));
+  assert.ok(html.includes("if(h&&h.panel){if(h.button>=0){"), 'trigger acts on the highlighted button only');
+  assert.ok(!/state\.snap\b|menuLabels|X\.menuHit|X\.MENU\b/.test(html), 'old 6x2 menu removed');
+  assert.ok(html.includes('opacity:{lens:X.DEFAULT_LENS_OPACITY,all:X.DEFAULT_ALL_OPACITY}'));
+  assert.ok(/\(needs blending\)\n for\(const m of materials\.values\(\)\)m\.transparent=!opaque;/.test(html), 'material transparency loop is code, not part of a comment');
 });
 
 /* ── Gaussian scene mode (2026-10-19) ── */
