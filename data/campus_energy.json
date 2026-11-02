@@ -1,14 +1,21 @@
 {
-  "generated_at": "2026-11-02 01:30:59",
+  "generated_at": "2026-11-02 01:38:20",
   "update_interval_min": 15,
   "buildings_total": 37,
   "buildings_online": 32,
-  "total_kw": 3765.0,
-  "total_daily_kwh": 90360,
-  "total_daily_cost": 13554.0,
-  "total_daily_co2_kg": 18975.6,
-  "anomaly_count": 0,
-  "anomalies": {},
+  "total_kw": 3766.5,
+  "total_daily_kwh": 90396,
+  "total_daily_cost": 13559.4,
+  "total_daily_co2_kg": 18983.2,
+  "anomaly_count": 1,
+  "anomalies": {
+    "anthony": {
+      "type": "high",
+      "current": 2.1,
+      "avg": 0.9,
+      "ratio": 2.27
+    }
+  },
   "buildings": {
     "grimes": {
       "name": "Grimes Engineering Center",
@@ -65,7 +72,7 @@
       "name": "Cory Hall",
       "kw": 0.0,
       "status": "online",
-      "timestamp": "2026-11-01 17:16:09",
+      "timestamp": "2026-11-01 17:30:49",
       "mac": "001EC6001885",
       "meter": "29",
       "meters_configured": [
@@ -105,11 +112,11 @@
       "est_daily_cost": 0.0,
       "est_daily_co2_kg": 0.0,
       "flow": {
-        "water_gpm": 4.74,
+        "water_gpm": 4.67,
         "steam_lb_hr": 0.0,
-        "condensate_gpm": 0.27,
+        "condensate_gpm": 0.0,
         "irrigation_gpm": 0.0,
-        "ts": "2026-11-01 17:15:55"
+        "ts": "2026-11-01 17:30:53"
       }
     },
     "soda": {
@@ -466,7 +473,7 @@
       "name": "Stanley Hall",
       "kw": 55.7,
       "status": "online",
-      "timestamp": "2026-11-01 17:15:03",
+      "timestamp": "2026-11-01 17:30:02",
       "mac": "001EC600009A",
       "meter": "48",
       "meters_configured": [
@@ -474,10 +481,9 @@
         "63",
         "76"
       ],
-      "predicted_kw": 55.5,
+      "predicted_kw": 55.6,
       "anomaly": null,
       "sparkline": [
-        54.4,
         56.5,
         54.6,
         55.5,
@@ -500,6 +506,7 @@
         56.3,
         54.6,
         55.6,
+        55.7,
         55.7
       ],
       "est_daily_kwh": 1337,
@@ -644,11 +651,11 @@
       "est_daily_cost": 0.0,
       "est_daily_co2_kg": 0.0,
       "flow": {
-        "water_gpm": 1.52,
+        "water_gpm": 1.56,
         "steam_lb_hr": null,
-        "condensate_gpm": 701.88,
+        "condensate_gpm": 788.11,
         "irrigation_gpm": null,
-        "ts": "2026-11-01 17:15:31"
+        "ts": "2026-11-01 17:30:19"
       }
     },
     "hilde": {
@@ -1352,19 +1359,23 @@
     },
     "anthony": {
       "name": "Anthony Hall",
-      "kw": 0.6,
+      "kw": 2.1,
       "status": "online",
-      "timestamp": "2026-11-01 17:00:50",
+      "timestamp": "2026-11-01 17:31:28",
       "mac": "001EC6001BBF",
       "meter": "1+30",
       "meters_configured": [
         "1",
         "30"
       ],
-      "predicted_kw": 0.7,
-      "anomaly": null,
+      "predicted_kw": 1.2,
+      "anomaly": {
+        "type": "high",
+        "current": 2.1,
+        "avg": 0.9,
+        "ratio": 2.27
+      },
       "sparkline": [
-        0.5,
         0.6,
         0.6,
         0.6,
@@ -1387,11 +1398,12 @@
         2.1,
         0.6,
         0.5,
-        0.6
+        0.6,
+        2.1
       ],
-      "est_daily_kwh": 14,
-      "est_daily_cost": 2.16,
-      "est_daily_co2_kg": 3.0
+      "est_daily_kwh": 50,
+      "est_daily_cost": 7.56,
+      "est_daily_co2_kg": 10.6
     },
     "sproul": {
       "name": "Sproul Hall",
