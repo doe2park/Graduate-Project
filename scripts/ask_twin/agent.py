@@ -18,6 +18,7 @@ import time
 from . import index as ix
 from .tools import TOOL_SCHEMAS, Twin, ids_in, run_tool
 
+NOT_RUN_RX = re.compile(r'hanger|support|clearance zone|anno', re.I)
 CITE_RX = re.compile(r'\[\[([A-Za-z0-9_.:-]{1,40})\]\]')
 DEFAULT_MODEL = 'claude-sonnet-5-5'
 MAX_ROUNDS = 8
@@ -77,6 +78,16 @@ def verify_citations(twin: Twin, text: str, grounded: set) -> list:
                         'bbox_m': twin.box[cid], 'in_viewer': s['layer'] in ix.VIEWER_LAYERS})
         out.append(row)
     return out
+
+
+def tool_event(name, args, result) -> dict:
+    """The 'tool' event the browser sees. connected_run also carries its paths (element ids from the start element to each
+    notable element on the run, all from this tool result) so the headset can light the run up; nothing else is added."""
+    ev = {'type': 'tool', 'name': name, 'input': args, 'summary': tool_summary(name, args, result)}
+    if name == 'connected_run' and 'error' not in result:
+        ev['paths'] = [{'to': n['id'], 'ids': list(n.get('path_ids') or [])} for n in result.get('notable_on_run', [])[:6]]
+        ev['start'] = (result.get('start') or {}).get('id')
+    return ev
 
 
 def tool_summary(name, args, result) -> str:
@@ -185,7 +196,7 @@ class LiveAgent:
                 res = run_tool(self.twin, b.name, b.input)
                 grounded |= ids_in(res)
                 used.append({'name': b.name, 'input': b.input})
-                yield {'type': 'tool', 'name': b.name, 'input': b.input, 'summary': tool_summary(b.name, b.input, res)}
+                yield tool_event(b.name, b.input, res)
                 results.append({'type': 'tool_result', 'tool_use_id': b.id, 'content': json.dumps(res, separators=(',', ':')),
                                 **({'is_error': True} if 'error' in res else {})})
             messages.append({'role': 'user', 'content': results})   # all results in one user turn
@@ -215,7 +226,7 @@ class MockAgent:
         res = run_tool(self.twin, name, args)
         grounded |= ids_in(res)
         used.append({'name': name, 'input': args})
-        return res, {'type': 'tool', 'name': name, 'input': args, 'summary': tool_summary(name, args, res)}
+        return res, tool_event(name, args, res)
 
     def _stream(self, text):
         for chunk in re.findall(r'\S+\s*|\s+', text):
@@ -241,8 +252,14 @@ class MockAgent:
             text = yield from self._leak(ref, used, grounded)
         elif re.search(r'valve|shut ?off|isolat', q):
             text = yield from self._valve(ref, used, grounded)
+        elif re.search(r'\bwarm|\bhot\b|\bcold\b|stuffy|comfort|too (warm|hot|cold)', q):
+            text = yield from self._comfort(ref, used, grounded)
         elif re.search(r'feed|serv|supplied|upstream|where does .* come from|ahu|air handler', q):
             text = yield from self._feed(ref, used, grounded)
+        elif re.search(r'\babove\b|\bover (this|the) (ceiling|tile)|plenum', q):
+            text = yield from self._above(ref, used, grounded)
+        elif re.search(r'what room|which room|where am i', q):
+            text = yield from self._lookup(ref, used, grounded)
         else:
             text = yield from self._describe(ref, used, grounded)
         yield from self._stream(text)
@@ -366,6 +383,88 @@ class MockAgent:
             lines.append('**Other candidates:**')
             lines += [f'- [[{n["id"]}]] {self._label(n)}, {n["hops"]} segments' for n in notable[1:4]]
         lines.append('**Limits:** touching boxes are not verified connections; no airflow direction in the model. *(mock mode: scripted, tool-grounded)*')
+        return '\n'.join(lines)
+
+    # The four question levels of the headset demo (look up · nearby in 3D · trace a system · reason across sources).
+    # _feed is level 3; these three are levels 1, 2 and 4. Every id and number below comes from a tool result.
+    def _lookup(self, ref, used, grounded):
+        lines = []
+        if ref.get('element_id'):
+            el, ev = self._tool('get_element', {'element_id': ref['element_id']}, used, grounded)
+            yield ev
+            e = el['element']
+            lines.append(f'**Answer:** [[{e["id"]}]] is a {self._label(e)} on {e.get("level")} ({e["layer"]} layer).')
+        room, ev = self._tool('room_of', dict(ref), used, grounded)
+        yield ev
+        n = len(room.get('nearby_labelled_equipment') or [])
+        lines += ['**Why:**', '- Identity, type and level come from its own design BIM record.',
+                  f'- Room: {room.get("room") or "unknown"} on {room.get("level")} (inferred, {room.get("confidence") or "no label"}): '
+                  f'the most common label among the {n} nearest room-labelled elements.' if room.get('room') else
+                  f'- Room: no room-labelled element nearby on {room.get("level")}.',
+                  '**Limits:** the model has no room outlines; the room is a vote, not a boundary. *(mock mode: scripted, tool-grounded)*']
+        return '\n'.join(lines)
+
+    def _above(self, ref, used, grounded):
+        near, ev = self._tool('elements_near', dict(ref, radius_m=2.0, above_only=True, limit=40), used, grounded)
+        yield ev
+        els = [e for e in near.get('elements', []) if not NOT_RUN_RX.search(f'{e.get("type", "")} {e.get("name", "")}')]
+        if not els:
+            return ('**Answer:** Nothing within 2 m above this spot in the design model. '
+                    '**Limits:** design BIM positions, not as-built. *(mock mode: scripted, tool-grounded)*')
+        counts = ', '.join(f'{k} {v}' for k, v in list(near.get('counts_by_layer', {}).items())[:4])
+        top = els[0]
+        lines = [f'**Answer:** Above this spot within 2 m: {near.get("total_found")} elements ({counts}). '
+                 f'Closest: [[{top["id"]}]] {self._label(top)}, {self._d(top)}.',
+                 '**Closest:**', *[f'- [[{e["id"]}]] {self._label(e)}, {self._d(e)}' for e in els[:3]],
+                 '**Check first:**', f'- Lift the ceiling tile next to [[{top["id"]}]] before cutting or drilling.',
+                 '**Limits:** box-to-box distances from the design model, not an as-built survey. *(mock mode: scripted, tool-grounded)*']
+        return '\n'.join(lines)
+
+    def _comfort(self, ref, used, grounded):
+        room, ev = self._tool('room_of', dict(ref), used, grounded)
+        yield ev
+        start = ref.get('element_id')
+        if not start or self.twin.layer.get(start) != 'duct':
+            near, ev = self._tool('elements_near', dict(ref, radius_m=3, layers=['duct'], limit=5), used, grounded)
+            yield ev
+            start = (near.get('elements') or [{}])[0].get('id')
+        box = None
+        if start:
+            run, ev = self._tool('connected_run', {'element_id': start, 'max_elements': 250}, used, grounded)
+            yield ev
+            box = next((n for n in run.get('notable_on_run', []) if n.get('type') == 'Terminal unit'), None)
+        sens, ev = self._tool('list_sensors', dict(ref, radius_m=6), used, grounded)
+        yield ev
+        reads = {}
+        for s in sens.get('sensors', []):
+            if s['type'] in ('zone', 'iaq', 'damper', 'airflow') and s['type'] not in reads:
+                r, ev = self._tool('sensor_readings', {'sensor_id': s['sensor_id'], 'hours': 24}, used, grounded)
+                yield ev
+                reads[s['type']] = r
+        room_txt = f'{room.get("room")} on {room.get("level")} (inferred, {room.get("confidence")})' if room.get('room') else f'{room.get("level")} (room unknown)'
+        if not reads:
+            return (f'**Answer:** {room_txt}. No demo sensor is near this spot, so the twin has no trend to reason from. '
+                    '**Limits:** the model alone cannot explain a comfort complaint. *(mock mode: scripted, tool-grounded)*')
+        st = lambda r: r.get('stats') or {}
+        why = []
+        zone, damper, iaq, air = reads.get('zone'), reads.get('damper'), reads.get('iaq'), reads.get('airflow')
+        if zone:
+            why.append(f'- Demo zone sensor (simulated): {zone["latest"]["value"]:+.1f} °C vs reference now, 24 h range {st(zone).get("min")} to {st(zone).get("max")}'
+                       + (' - above the 2 °C rule.' if zone.get('alert_active') else '.'))
+        if iaq:
+            why.append(f'- Demo CO2 (simulated): {st(iaq).get("min"):.0f} to {st(iaq).get("max"):.0f} ppm over 24 h: consistent with heat from people.')
+        if damper:
+            why.append(f'- Demo damper at [[{damper["anchor_element_id"]}]] (simulated): {st(damper).get("min"):.0f} to {st(damper).get("max"):.0f} % open; it never opens fully.')
+        capped = bool(damper and st(damper).get('max', 100) < 90 and zone and zone.get('alert_active'))
+        conf = 'medium' if capped and box else 'low'
+        lead = (f'**Most likely source:** [[{box["id"]}]] terminal unit (VAV box), {box["hops"]} duct pieces from here (inferred) · confidence: {conf}' if box
+                else f'**Answer:** {room_txt}: warm with the demo sensors, but no terminal unit was found on the touching duct run · confidence: low')
+        lines = [lead, f'**Where:** {room_txt}.', '**Why:**', *why, '**Check first:**']
+        if box:
+            lines.append(f'- The maximum airflow setting of [[{box["id"]}]] and its damper command against the position.')
+        if air:
+            lines.append(f'- Then the supply air at [[{air["anchor_element_id"]}]] (demo airflow sensor, simulated).')
+        lines.append('**Limits:** no sun or window data, no verified duct connections or design airflow; all sensor values are simulated. *(mock mode: scripted, tool-grounded)*')
         return '\n'.join(lines)
 
     def _describe(self, ref, used, grounded):

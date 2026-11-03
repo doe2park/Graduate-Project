@@ -163,6 +163,33 @@ class MockAgentTests(unittest.TestCase):
         _, f = self.ask('What is this?', LIGHT)
         self.assertTrue(all(c['verified'] for c in f['citations']))
 
+    def test_four_headset_levels_are_tool_grounded(self):
+        diffuser = '388279'   # Level 1 supply diffuser, anchor of the demo IAQ / comfort sensors
+        evs, f = self.ask('What is this, and what room am I in?', diffuser)
+        self.assertEqual([e['name'] for e in evs if e['type'] == 'tool'], ['get_element', 'room_of'])
+        self.assertIn('inferred', f['answer'])
+        evs, f = self.ask('What is above this ceiling tile within 2 m?', diffuser)
+        self.assertEqual([e['name'] for e in evs if e['type'] == 'tool'], ['elements_near'])
+        self.assertTrue(f['citations'] and all(c['verified'] for c in f['citations']))
+        evs, f = self.ask('Which VAV box feeds this diffuser?', diffuser)
+        run = [e for e in evs if e['type'] == 'tool' and e['name'] == 'connected_run'][0]
+        self.assertEqual(run['start'], diffuser)
+        lead = A.CITE_RX.search(f['answer']).group(1)
+        path = next(p['ids'] for p in run['paths'] if p['to'] == lead)
+        self.assertEqual((path[0], path[-1]), (diffuser, lead))   # the run the headset lights up, start -> cited box
+        evs, f = self.ask('This room is warm from 9 to 5 every weekday. What is the likely cause, and where do I check first?', diffuser)
+        names = [e['name'] for e in evs if e['type'] == 'tool']
+        self.assertEqual(names[:2], ['room_of', 'connected_run'])
+        self.assertIn('sensor_readings', names)
+        self.assertIn('simulated', f['answer'])
+        self.assertTrue(all(c['verified'] for c in f['citations']))
+
+    def test_tool_event_paths_only_for_connected_run(self):
+        self.assertNotIn('paths', A.tool_event('get_element', {}, {'element': {}}))
+        ev = A.tool_event('connected_run', {}, {'start': {'id': 'a'}, 'notable_on_run': [{'id': 'c', 'path_ids': ['a', 'b', 'c']}]})
+        self.assertEqual((ev['start'], ev['paths']), ('a', [{'to': 'c', 'ids': ['a', 'b', 'c']}]))
+        self.assertNotIn('paths', A.tool_event('connected_run', {}, {'error': 'unknown element id x'}))
+
     def test_no_selection(self):
         _, f = self.ask('What is leaking?', None, None)
         self.assertIn('Select an element', f['answer'])
@@ -313,10 +340,43 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.post('/api/ask', {'question': 'x'}, {'Origin': 'http://evil.example'})[0], 403)
         self.assertEqual(self.post('/api/transcribe', {})[0], 501)
 
+    def test_speak_is_optional_and_validated(self):
+        code, _ = self.post('/api/speak', {'text': ''})
+        self.assertIn(code, (400, 501))
+        self.assertEqual(self.post('/api/speak', {'text': 'x'}, {'Origin': 'http://evil.example'})[0], 403)
+        h = json.loads(self.get('/api/health')[1])
+        self.assertIn('tts', h)
+
+    def test_xr_page_and_helper_are_served(self):
+        self.assertEqual(self.get('/scan-xr.html')[0], 200)
+        self.assertEqual(self.get('/twin/xr-ask.js')[0], 200)
+
     def test_static_is_read_only_and_restricted(self):
         self.assertEqual(self.get('/twin/ask-twin.js')[0], 200)
         for p in ('/.git/config', '/work/ask-twin/element-index.json', '/scripts/../.git/HEAD', '/.gitignore'):
             self.assertEqual(self.get(p)[0], 403, p)
+
+
+class AudioDecodeTests(unittest.TestCase):
+    def test_decode_16k_resamples_a_wav_to_mono_float(self):
+        try:
+            import av  # noqa: F401
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest('PyAV/numpy not installed (the ~/.venvs/ask-twin venv has them)')
+        import math
+        import struct
+        import wave
+        import ask_twin_server as S
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / 'tone.wav'
+            with wave.open(str(f), 'wb') as w:
+                w.setnchannels(2); w.setsampwidth(2); w.setframerate(48000)
+                w.writeframes(b''.join(struct.pack('<hh', int(8000 * math.sin(i / 20)), 0) for i in range(48000)))
+            a = S.decode_16k(str(f))
+        self.assertEqual(str(a.dtype), 'float32')
+        self.assertAlmostEqual(len(a) / 16000, 1.0, delta=0.05)
+        self.assertLess(float(abs(a).max()), 1.0)
 
 
 class KeyHandlingTests(unittest.TestCase):

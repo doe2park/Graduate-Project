@@ -9,6 +9,7 @@ Serves this checkout read-only (GET/HEAD; dot-files, work/, capture-local/ and n
     GET  /api/health      mode, model, index and speech-to-text status
     POST /api/ask         {question, element_id?, point?, history?} -> text/event-stream of agent events
     POST /api/transcribe  raw audio body (webm/ogg/wav/mp4) -> {text} via local faster-whisper (optional)
+    POST /api/speak       {text} -> audio/wav via macOS `say` (optional; for browsers with no speechSynthesis voice)
 The API key is read only from ANTHROPIC_API_KEY (optionally loaded from an env file OUTSIDE the repo). It is never
 printed, logged, written or sent anywhere except to the Anthropic API.
 """
@@ -17,6 +18,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -33,6 +36,7 @@ DEFAULT_ENV_FILE = Path.home() / '.config' / 'ask-twin' / 'env'
 DENY_TOP = {'work', 'capture-local', 'node_modules', 'target', 'logs', 'raw_csv'}
 MAX_BODY = 25 * 1024 * 1024
 ENTRY = '/grimes-bim-viewer.html?ask=1'
+XR_ENTRY = '/mr/?ask=1'   # the headset page: /mr -> scan-xr.html?mode=ar&place=demo&sensors=demo&ask=1
 
 
 def maybe_reexec_in_venv():
@@ -79,6 +83,24 @@ ANTHROPIC_API_KEY is not set, so live answers cannot run.
 """
 
 
+def decode_16k(path: str):
+    """Audio file -> 16 kHz mono float32 for faster-whisper. Decoded here with PyAV because faster-whisper 1.2.1's own
+    decode_audio passes metadata_errors=, which PyAV >= 15 no longer accepts (TypeError seen with av 19.0.2). Falls back to
+    the path (faster-whisper decodes) if PyAV/numpy are unavailable."""
+    try:
+        import av
+        import numpy as np
+    except ImportError:
+        return path
+    out = []
+    with av.open(path, mode='r') as container:
+        rs = av.audio.resampler.AudioResampler(format='s16', layout='mono', rate=16000)
+        for frame in container.decode(audio=0):
+            out += [f.to_ndarray().reshape(-1) for f in rs.resample(frame)]
+        out += [f.to_ndarray().reshape(-1) for f in rs.resample(None)]
+    return (np.concatenate(out) if out else np.zeros(0, np.int16)).astype(np.float32) / 32768.0
+
+
 class STT:
     """Lazy local speech-to-text (faster-whisper). Optional: the browser falls back to Web Speech."""
 
@@ -113,10 +135,42 @@ class STT:
             f.write(data)
             f.flush()
             t0 = time.time()
-            segments, info = model.transcribe(f.name, language='en', beam_size=1, vad_filter=True,
-                                              initial_prompt='Grimes building digital twin: ceiling, duct, valve, pipe, sprinkler, leak, plenum.')
+            segments, info = model.transcribe(decode_16k(f.name), language='en', beam_size=1, vad_filter=True,
+                                              initial_prompt='Grimes building digital twin: ceiling tile, duct, diffuser, VAV box, AHU, valve, pipe, sprinkler, leak, plenum.')
             text = ' '.join(s.text.strip() for s in segments).strip()
         return {'text': text, 'seconds': round(time.time() - t0, 2), 'engine': f'faster-whisper {self.model_name} (local)'}
+
+
+class TTS:
+    """Optional spoken replies made on the laptop (macOS `say` -> WAV) for browsers without a speechSynthesis voice
+    (the Quest Browser may have none; not verified). Local only: the text never leaves the machine."""
+    MAX_CHARS = 1200
+
+    def __init__(self, enabled=True):
+        self.cmd = shutil.which('say') if enabled and sys.platform == 'darwin' else None
+        self.available = bool(self.cmd)
+        self.error = None if self.available else ('disabled' if not enabled else 'macOS `say` not available')
+        self.voice = self._english_voice() if self.available else None
+
+    def _english_voice(self):
+        """An English system voice: the default voice follows the Mac's language (e.g. Korean Yuna would read English oddly)."""
+        try:
+            listing = subprocess.run([self.cmd, '-v', '?'], capture_output=True, text=True, timeout=10).stdout
+        except Exception:
+            return None
+        names = {line.split('  ')[0].strip() for line in listing.splitlines() if ' en_' in line}
+        return next((v for v in ('Samantha', 'Daniel', 'Karen', 'Moira', 'Fred') if v in names), None)
+
+    def speak(self, text: str) -> bytes:
+        text = ' '.join(str(text or '').split())[:self.MAX_CHARS]
+        if not text:
+            raise ValueError('nothing to say')
+        with tempfile.TemporaryDirectory() as d:
+            src, out = Path(d) / 'in.txt', Path(d) / 'out.wav'
+            src.write_text(text)
+            subprocess.run([self.cmd, *(['-v', self.voice] if self.voice else []), '-o', str(out), '--data-format=LEI16@22050', '-f', str(src)],
+                           check=True, timeout=30, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return out.read_bytes()
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -190,6 +244,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._ask(json.loads(self._body() or b'{}'))
             if path == '/api/transcribe':
                 return self._transcribe(self._body())
+            if path == '/api/speak':
+                return self._speak(json.loads(self._body() or b'{}'))
         except (ValueError, json.JSONDecodeError) as e:
             return self._json(400, {'error': str(e)[:200]})
         return self._json(404, {'error': 'unknown endpoint'})
@@ -225,6 +281,22 @@ class Handler(SimpleHTTPRequestHandler):
             except OSError:
                 pass
 
+    def _speak(self, req):
+        tts = self.app.tts
+        if not tts or not tts.available:
+            return self._json(501, {'error': (tts.error if tts else None) or 'text-to-speech disabled'})
+        try:
+            data = tts.speak(req.get('text'))
+        except ValueError as e:
+            return self._json(400, {'error': str(e)})
+        except Exception as e:
+            return self._json(500, {'error': f'speech failed: {type(e).__name__}'})
+        self.send_response(200)
+        self.send_header('Content-Type', 'audio/wav')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def _transcribe(self, data: bytes):
         stt = self.app.stt
         if not stt or not stt.available:
@@ -240,8 +312,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 class App:
-    def __init__(self, agent, mode, model, twin, stt, port, verbose=False, lan=False):
+    def __init__(self, agent, mode, model, twin, stt, port, verbose=False, lan=False, tts=None):
         self.agent, self.mode, self.model, self.twin, self.stt, self.port, self.verbose, self.lan = agent, mode, model, twin, stt, port, verbose, lan
+        self.tts = tts
 
     def origin_ok(self, origin, host):
         if not origin:
@@ -254,7 +327,8 @@ class App:
                 'index': {'elements': len(self.twin.box), 'layers': len(self.twin.index['layers'])},
                 'sensors': {'count': len(self.twin.sensors), 'note': 'demo, simulated'},
                 'stt': {'available': bool(self.stt and self.stt.available), 'loaded': bool(self.stt and self.stt.model),
-                        'engine': f'faster-whisper {self.stt.model_name}' if self.stt else None, 'error': self.stt.error if self.stt else None}}
+                        'engine': f'faster-whisper {self.stt.model_name}' if self.stt else None, 'error': self.stt.error if self.stt else None},
+                'tts': {'available': bool(self.tts and self.tts.available), 'engine': f'macOS say {self.tts.voice or "default voice"} (local)' if self.tts and self.tts.available else None}}
 
 
 def build_app(args, log=print):
@@ -282,7 +356,7 @@ def build_app(args, log=print):
     else:
         agent = MockAgent(twin)
     stt = None if args.no_stt else STT(args.stt_model)
-    return App(agent, mode, model, twin, stt, args.port, args.verbose, args.lan)
+    return App(agent, mode, model, twin, stt, args.port, args.verbose, args.lan, tts=TTS(not args.no_tts))
 
 
 def parse_args(argv=None):
@@ -293,6 +367,7 @@ def parse_args(argv=None):
     ap.add_argument('--port', type=int, default=8765)
     ap.add_argument('--env-file', default=str(DEFAULT_ENV_FILE), help='file outside the repo with ANTHROPIC_API_KEY=...')
     ap.add_argument('--no-stt', action='store_true', help='disable local speech-to-text (browser Web Speech only)')
+    ap.add_argument('--no-tts', action='store_true', help='disable laptop text-to-speech (/api/speak, macOS say)')
     ap.add_argument('--stt-model', default='base.en', help='faster-whisper model (tiny.en, base.en, small.en)')
     ap.add_argument('--no-fallbacks', action='store_true', help='do not send the server-side refusal fallback beta')
     ap.add_argument('--lan', action='store_true', help='HTTPS on the private LAN address (Quest on the same Wi-Fi), self-signed dev certificate from scripts/serve_quest_https.py')
@@ -324,7 +399,8 @@ def main(argv=None):
         app.stt.warm()
     print(f'[ask-twin] {app.mode.upper()} mode · model {app.model} · {len(app.twin.box)} indexed elements · '
           f'speech-to-text: {"faster-whisper " + app.stt.model_name + " (loading)" if app.stt and app.stt.available else "browser only"}', flush=True)
-    print(f'[ask-twin] open {scheme}://{host}:{args.port}/   (Ctrl+C to stop)'
+    print(f'[ask-twin] open {scheme}://{host}:{args.port}/   (Ctrl+C to stop)', flush=True)
+    print(f'[ask-twin] headset (WebXR MR + ask): {scheme}://{host}:{args.port}{XR_ENTRY}'
           + ('\n[ask-twin] self-signed dev certificate: accept the warning only for this address; same Wi-Fi required' if args.lan else ''), flush=True)
     try:
         httpd.serve_forever()

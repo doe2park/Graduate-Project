@@ -317,7 +317,7 @@ class Twin:
                     p = parent[p]
                 s['path_ids'] = list(reversed(path))
                 notable.append(s)
-        notable.sort(key=lambda s: s['hops'])
+        notable.sort(key=lambda s: (s['hops'], s['id']))   # id breaks ties: the same answer on every run
         types = Counter(self.meta[e].get('type') for e in hops)
         return {'start': self.summary(eid0), 'layer': layer, 'elements_reached': len(hops), 'stopped_at_limit': len(hops) >= max_elements,
                 'max_hops': max(hops.values()), 'types_in_run': dict(types.most_common(10)),
