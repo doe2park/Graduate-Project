@@ -247,7 +247,7 @@ class App:
         if not origin:
             return True   # same-origin fetch from older browsers / curl
         o = urlparse(origin)
-        return o.netloc == host or (not self.lan and o.hostname in ('127.0.0.1', 'localhost') and str(o.port) == str(self.port))
+        return o.netloc == host or (o.hostname in ('127.0.0.1', 'localhost') and str(o.port) == str(self.port))
 
     def health(self):
         return {'ok': True, 'mode': self.mode, 'model': self.model,
@@ -295,7 +295,7 @@ def parse_args(argv=None):
     ap.add_argument('--no-stt', action='store_true', help='disable local speech-to-text (browser Web Speech only)')
     ap.add_argument('--stt-model', default='base.en', help='faster-whisper model (tiny.en, base.en, small.en)')
     ap.add_argument('--no-fallbacks', action='store_true', help='do not send the server-side refusal fallback beta')
-    ap.add_argument('--lan', action='store_true', help='listen on all interfaces (Quest on the same Wi-Fi). Plain HTTP: no mic on Quest.')
+    ap.add_argument('--lan', action='store_true', help='HTTPS on the private LAN address (Quest on the same Wi-Fi), self-signed dev certificate from scripts/serve_quest_https.py')
     ap.add_argument('--verbose', action='store_true')
     return ap.parse_args(argv)
 
@@ -305,14 +305,27 @@ def main(argv=None):
     args = parse_args(argv)
     app = build_app(args)
     Handler.app = app
-    host = '0.0.0.0' if args.lan else '127.0.0.1'
+    host, scheme = '127.0.0.1', 'http'
+    if args.lan:   # private-LAN HTTPS (the Quest needs a secure context for the microphone); never a public address
+        import ssl
+        import serve_quest_https as qh
+        host, scheme = qh.private_ip(), 'https'
+        if not qh.is_private(host):
+            sys.exit('Refusing to bind a non-private address: ' + host)
+        cert, key = qh.ensure_certificate(host)
     httpd = ThreadingHTTPServer((host, args.port), Handler)
     httpd.daemon_threads = True
+    if args.lan:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.load_cert_chain(cert, key)
+        httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
     if app.stt:
         app.stt.warm()
     print(f'[ask-twin] {app.mode.upper()} mode · model {app.model} · {len(app.twin.box)} indexed elements · '
           f'speech-to-text: {"faster-whisper " + app.stt.model_name + " (loading)" if app.stt and app.stt.available else "browser only"}', flush=True)
-    print(f'[ask-twin] open http://127.0.0.1:{args.port}/   (Ctrl+C to stop)', flush=True)
+    print(f'[ask-twin] open {scheme}://{host}:{args.port}/   (Ctrl+C to stop)'
+          + ('\n[ask-twin] self-signed dev certificate: accept the warning only for this address; same Wi-Fi required' if args.lan else ''), flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

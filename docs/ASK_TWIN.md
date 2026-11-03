@@ -44,7 +44,9 @@ The server refuses an env file inside the repository, never prints the key, and 
 `--mock` hint) when no key is set. `.gitignore` also lists `ask-twin.env` / `.env.ask-twin` in case a copy is made.
 
 Options: `--model claude-opus-5-5` (default `claude-sonnet-5-5`), `--effort low|medium|high` (default `medium`),
-`--port`, `--no-stt`, `--stt-model small.en`, `--no-fallbacks`, `--lan` (see Quest below), `--verbose`.
+`--port`, `--no-stt`, `--stt-model small.en`, `--no-fallbacks`, `--lan` (private-LAN HTTPS, see Quest below), `--verbose`.
+If the API rejects an optional request feature (the refusal-fallback beta or eager tool streaming) with a 400, the
+server retries that question once without them.
 
 ## How an answer is made
 
@@ -125,11 +127,14 @@ the spiral duct `#401233` (demo airflow sensor anchor).
 
 ## Quest 3 (stretch, not verified on a headset)
 
-`--lan` listens on all interfaces so a Quest on the same Wi-Fi can open `http://<laptop-ip>:8765/`. Quest Browser has
-no Web Speech recognition, so speech must go through `/api/transcribe`, and the microphone needs a secure context
-(HTTPS). Plain-HTTP `--lan` therefore gives typing only on the Quest. A next step is to serve the same handler behind
-the existing private-LAN certificate (`scripts/serve_quest_https.py`, `work/quest-https/`) and add the panel to the MR
-page; neither is done here.
+`python3 scripts/ask_twin_server.py --lan` serves HTTPS on the Mac's **private** LAN address only (never `0.0.0.0`),
+reusing the self-signed development certificate logic of `scripts/serve_quest_https.py` (key under ignored
+`work/quest-https/`). On the Quest Browser open the printed `https://<lan-ip>:8765/` and accept the certificate warning
+for that address only. HTTPS gives the page a secure context, so push-to-talk records with `MediaRecorder` and is
+transcribed on the laptop (Quest Browser has no Web Speech recognition); answers can be spoken with `speechSynthesis`.
+Verified on the Mac only (HTTPS health check on the LAN address, localhost refused in that mode). This is the 2D
+desktop viewer page with the panel inside the Quest browser, **not** the immersive MR page: wiring the panel into
+`scan-xr.html` (controller ray pick → ask → world-space card) is not done.
 
 ## Tests
 
