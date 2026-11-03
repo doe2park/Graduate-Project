@@ -1565,6 +1565,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   // Equipment (element tier) wins first — small targets beat system blobs
   if (anyLayerVisible()) {
     const eqHit = raycaster.intersectObjects(visibleEquip(), false)[0];
+    askPickPoint = eqHit ? eqHit.point.toArray() : null;   // Ask-the-twin (?ask=1) context only
     if (eqHit && pickResolvedEquipmentHit(eqHit)) return;
   }
   // Resolve systems after element picking; empty space clears the selection.
@@ -1850,6 +1851,27 @@ window.selectElementById = (id) => {
   console.warn('[twin] element not in any loaded layer:', id);
 };
 
+/* Ask-the-twin hook (local demo, loaded only with ?ask=1 from twin/ask-twin.js). Read-only view helpers:
+   highlight/clear cited elements (render-time colour only, same path as picks), load a layer, fly the camera. */
+let askPickPoint = null;
+const askHighlights = new Map();   // id -> color
+window.twinViewerApi = {
+  THREE, scene, camera, controls, LAYERS,
+  meta: id => equipMeta[id] || null,
+  selected: () => equipPicked ? equipPicked.id : null,
+  isLoaded: key => !!layerState[key]?.group,
+  loadLayer: key => LAYERS[key] ? (layerState[key]?.group ? (layerState[key].group.visible || toggleLayer(key), Promise.resolve(true)) : toggleLayer(key, {bulk: true})) : Promise.resolve(false),
+  select: id => selectElementById(id),
+  highlight(ids, color = 0x38bdf8) {
+    for (const id of ids) { askHighlights.set(id, color); for (const mesh of equipMeshes) highlightElementRender(mesh, id, true, color); }
+    return ids.filter(id => equipMeshes.some(m => m.userData.ids?.includes(id) || m.userData.ranges?.some(r => r.id === id)));
+  },
+  clearHighlights() {
+    for (const id of askHighlights.keys()) { if (equipPicked && equipPicked.id === id) continue; for (const mesh of equipMeshes) highlightElementRender(mesh, id, false); }
+    askHighlights.clear();
+  },
+};
+
 function neighbourRows(id, info) {
   const same = [];
   const byRoom = !!info.location;
@@ -1890,6 +1912,8 @@ async function pickEquipment(mesh, instanceId, explicitId = null) {
   highlight(null);
   unhighlightEquip();
   equipPicked = { im: mesh, id }; picked = mesh;
+  if (window.__askTwin) { try { window.__askTwin.onPick(id, info, askPickPoint); } catch (e) { console.warn('[ask-twin]', e); } }
+  askPickPoint = null;
   for (const mesh of equipMeshes) highlightElementRender(mesh, id, true, _amber);
   document.body.classList.add('twin-open');
   document.getElementById('twinPanel').classList.add('show');
@@ -2668,6 +2692,9 @@ let mobileSearchTimer;document.getElementById('mobileElementSearch').oninput=()=
 document.getElementById('mobileElementClose').onclick=()=>{document.getElementById('mobileElementBrowser').hidden=true;};
 document.getElementById('mobileFit').onclick=()=>{if(walkMode)exitWalk();clearPick();const bb=bimBbox();if(bb.isEmpty())return;const c=bb.getCenter(new THREE.Vector3()),r=bb.getSize(new THREE.Vector3()).length()/2;const angle=Math.min(camera.fov*Math.PI/180,2*Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect));controls.target.copy(c);camera.position.copy(c).addScaledVector(new THREE.Vector3(1,.7,1).normalize(),r/Math.sin(angle/2)*1.05);controls.update();};
 let _lastT = 0, _lastWalkRender = -Infinity;
+if (new URLSearchParams(location.search).has('ask')) {   // local Ask-the-twin demo (scripts/ask_twin_server.py)
+  const sc = document.createElement('script'); sc.src = 'twin/ask-twin.js'; document.head.appendChild(sc);
+}
 renderer.setAnimationLoop((t) => {
   const dt = Math.min(0.1, (t - _lastT) / 1000) || 0.016;
   _lastT = t;

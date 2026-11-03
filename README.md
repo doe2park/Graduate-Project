@@ -96,6 +96,17 @@ Open `http://localhost:8000/grimes-campus-map-arcgis.html`. Internet access is n
 
 To train a Gaussian scene for a capture yourself (Mac or Windows with a GPU), follow the [Gaussian training guide](docs/GAUSSIAN_TRAINING_GUIDE.md).
 
+### Ask the twin (local AI demo)
+
+Click a BIM element in the viewer and ask a question; a small server on your laptop answers with Claude and read-only tools over the twin data, and highlights the elements the answer cites. Local only: nothing is deployed.
+
+```bash
+python3 scripts/ask_twin_server.py          # live: needs ANTHROPIC_API_KEY (env or ~/.config/ask-twin/env)
+python3 scripts/ask_twin_server.py --mock   # no key: scripted answers built from the same tools
+```
+
+Open `http://127.0.0.1:8765/`. Setup, data limits and example questions: [docs/ASK_TWIN.md](docs/ASK_TWIN.md).
+
 For implementation changes, read [AGENTS.md](AGENTS.md). Preserve GLB identity nodes and existing Draco bytes; sidecars bind to source-scoped element identifiers. See [MEP recovery](docs/MEP_RECOVERY.md) and [new capture onboarding](docs/CAPTURE_ONBOARDING.md).
 
 ## Copyright and reuse
