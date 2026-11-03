@@ -1181,7 +1181,7 @@ function askPlace(){const a=ASK.anchor;if(!a)return;const up=new THREE.Vector3(0
 function askButtons(){return XA.barButtons({busy:ASK.busy,voice:ASK.voice,voiceNote:ASK.voiceNote});}
 function askDrawBar(){if(!ASK.on)return;XA.drawBar(askBar.ctx,askBar.canvas.width,askBar.canvas.height,askButtons(),ASK.hover);askBar.texture.needsUpdate=true;invalidate();}
 function askDraw(){ASK.dirty=false;ASK.lastDraw=performance.now();
- const run=ASK.run?'Lit run: '+ASK.run.ids.length+' touching pieces, cited source to here · inferred from geometry, no flow direction in the model':'';
+ const run=ASK.run?'Lit run: '+(ASK.run.ids.length-1)+' steps along touching pieces, cited source to here · inferred from geometry, no flow direction in the model':'';
  XA.drawAnswer(askCard.ctx,askCard.canvas.width,askCard.canvas.height,{phase:ASK.phase,model:ASK.model||{question:ASK.question,level:ASK.level},steps:ASK.steps,error:ASK.error,speech:ASK.speech,runNote:run,
   modeLabel:ASK.health?.mode==='live'?'LIVE':ASK.health?.mode==='mock'?'MOCK':'',footer:['Answers from read-only tools over the twin · '+(ASK.health?.mode==='mock'?'MOCK: scripted from real tool results':ASK.health?.model||''),'Design BIM · inferred geometry and rooms · demo sensors SIMULATED · not headset-verified']});
  askCard.texture.needsUpdate=true;invalidate();}

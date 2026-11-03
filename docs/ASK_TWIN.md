@@ -86,6 +86,11 @@ Verified from the repository data:
   cached in ignored `work/ask-twin/element-index.json` and rebuilt automatically (~5 s) when a GLB/sidecar changes.
 - **Types, CAD layer codes, levels, design parameters** (marks, room `location` on 334 equipment elements, flow, size,
   fire fabrication attributes) from the sidecars.
+- **VAV boxes vs their coil kits:** the duct layer has 66 Price SDV5 terminal units and 90 `Coil Kit Supply/Return_2019`
+  entities (the hot-water pipe connection kits on a box). Both carry type *Terminal unit*; the kits are now labelled as
+  accessories and left out of `connected_run`'s notable list, so the box is named. From diffuser `#388279` the run reaches
+  box `#400766` (Price SDV5, 1-2 row coil) in 11 steps (10 duct pieces between); its two kits `#383845`/`#383987` touch it
+  and the last duct piece, one step earlier.
 - **Valves** exist as fabrication entities (e.g. 42 valves on Level 1, all on the hydronic layer; plumbing-layer valves
   are on the Lower level and Level 2).
 - **17 demo sensors** (`twin/sensors/registry.json`), all `install_status: demo`, simulated by `tools/sensor_sim.py`.

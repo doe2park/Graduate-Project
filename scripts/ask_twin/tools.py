@@ -43,6 +43,9 @@ SERVICE_RULES = [
     (r'balanc(e|ing) valve|circuit setter', 'balancing valve (not a shut-off)', 'pressurized water', 'family name'),
     (r'check valve', 'check (backflow) valve, not a shut-off', 'pressurized water', 'family name'),
     (r'valve', 'valve (type unclear)', 'pressurized water', 'family name'),
+    # 'Coil Kit Supply/Return_2019' (45 + 45 in the duct layer) are the hot-water pipe connection kits bolted to a Price SDV
+    # box, not the box: their boxes touch the box and the duct, so without this rule they pose as the nearest terminal unit.
+    (r'coil kit', 'reheat-coil pipe connection kit (accessory of a VAV box, not the box)', 'hot water', 'Coil Kit family name'),
     (r'coil|sdv5|vav', 'air terminal with hot-water reheat coil', 'hot water (coil) + air', 'Price SDV/coil family name'),
     (r'\bahu\b|air handl', 'air handling unit', 'air + chilled/hot water coils', 'family name'),
     (r'type l copper|propress|viega|copper', 'pressurized copper water piping (domestic or hydronic)', 'pressurized water', 'copper/press-fit family name'),
@@ -308,6 +311,8 @@ class Twin:
         for e, h in hops.items():
             hint = self.service_hint(e)
             t = f"{self.meta[e].get('type', '')} {self.meta[e].get('name', '')}".lower()
+            if 'coil kit' in t:   # accessory of the terminal unit it touches; the unit itself is listed
+                continue
             if hint and any(k in hint['service'] for k in ('valve', 'terminal', 'air handling', 'heater', 'drain pan')) or 'ahu' in t or self.meta[e].get('type') in ('Terminal unit', 'Valve'):
                 s = self.summary(e, self.box[eid0])
                 s['hops'] = h

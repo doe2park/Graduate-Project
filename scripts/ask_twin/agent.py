@@ -375,9 +375,12 @@ class MockAgent:
             return (f'**Answer:** Following touching duct segments from [[{start}]] ({run.get("elements_reached")} elements) found no AHU or terminal unit. '
                     '**Limits:** adjacency is geometric only. *(mock mode)*')
         top = notable[0]
-        lines = [f'**Answer:** Nearest air source on this run: [[{top["id"]}]] {self._svc(top)}, {top["hops"]} segments from [[{start}]] · confidence: low',
-                 '**Why:**', f'- Touching-box run of {run["elements_reached"]} duct elements ({", ".join(f"{k} {v}" for k, v in list(run["types_in_run"].items())[:3])}).',
-                 f'- {top["service_hint"]["basis"] if top.get("service_hint") else "type " + str(top.get("type"))}.',
+        fam = str(top.get('name') or '').split(' - ')[0].split(' w-')[0]
+        what = 'VAV box with hot-water reheat coil' if 'terminal with hot-water reheat' in self._svc(top) else self._svc(top)
+        lines = [f'**Answer:** [[{top["id"]}]] {what}' + (f' ({fam})' if fam else '')
+                 + f', {top["hops"]} steps along touching ducts from [[{start}]] · confidence: low',
+                 '**Why:**', f'- Nearest terminal unit on the touching-duct run: {top["hops"] - 1} duct pieces between them; the run reaches {run["elements_reached"]} elements.',
+                 f'- Design record: {top.get("type")}, family {str(top.get("name") or "").split(" - ")[0] or "unknown"}; service {top["service_hint"]["basis"] if top.get("service_hint") else "unknown"}.',
                  '**Check first:**', f'- Trace the duct from [[{start}]] to [[{top["id"]}]] on the mechanical drawings.']
         if len(notable) > 1:
             lines.append('**Other candidates:**')
@@ -457,7 +460,7 @@ class MockAgent:
             why.append(f'- Demo damper at [[{damper["anchor_element_id"]}]] (simulated): {st(damper).get("min"):.0f} to {st(damper).get("max"):.0f} % open; it never opens fully.')
         capped = bool(damper and st(damper).get('max', 100) < 90 and zone and zone.get('alert_active'))
         conf = 'medium' if capped and box else 'low'
-        lead = (f'**Most likely source:** [[{box["id"]}]] terminal unit (VAV box), {box["hops"]} duct pieces from here (inferred) · confidence: {conf}' if box
+        lead = (f'**Most likely source:** [[{box["id"]}]] terminal unit (VAV box), {box["hops"]} steps along touching ducts from here (inferred) · confidence: {conf}' if box
                 else f'**Answer:** {room_txt}: warm with the demo sensors, but no terminal unit was found on the touching duct run · confidence: low')
         lines = [lead, f'**Where:** {room_txt}.', '**Why:**', *why, '**Check first:**']
         if box:

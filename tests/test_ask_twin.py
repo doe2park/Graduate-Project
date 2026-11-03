@@ -177,6 +177,11 @@ class MockAgentTests(unittest.TestCase):
         lead = A.CITE_RX.search(f['answer']).group(1)
         path = next(p['ids'] for p in run['paths'] if p['to'] == lead)
         self.assertEqual((path[0], path[-1]), (diffuser, lead))   # the run the headset lights up, start -> cited box
+        # the box itself (Price SDV5), not its two 'Coil Kit Supply/Return' pipe connection kits that touch it one step earlier
+        self.assertEqual(lead, '400766')
+        self.assertEqual(len(path), 12)   # 11 steps: diffuser, 10 duct pieces, box
+        self.assertNotIn('383845', f['answer']); self.assertNotIn('383987', f['answer'])
+        self.assertIn('reheat-coil pipe connection kit', T.Twin.service_hint(twin(), '383845')['service'])
         evs, f = self.ask('This room is warm from 9 to 5 every weekday. What is the likely cause, and where do I check first?', diffuser)
         names = [e['name'] for e in evs if e['type'] == 'tool']
         self.assertEqual(names[:2], ['room_of', 'connected_run'])
