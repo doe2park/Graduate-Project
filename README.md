@@ -107,6 +107,8 @@ python3 scripts/ask_twin_server.py --mock   # no key: scripted answers built fro
 
 Open `http://127.0.0.1:8765/`. Setup, data limits and example questions: [docs/ASK_TWIN.md](docs/ASK_TWIN.md).
 
+Headset prototype (not verified on a Quest yet): `python3 scripts/ask_twin_server.py --mock --lan` serves the MR page with the same questions inside the immersive view at the printed `https://<lan-ip>:8765/mr/?ask=1` (steps in [docs/ASK_TWIN.md](docs/ASK_TWIN.md#headset-webxr-on-quest-3)).
+
 For implementation changes, read [AGENTS.md](AGENTS.md). Preserve GLB identity nodes and existing Draco bytes; sidecars bind to source-scoped element identifiers. See [MEP recovery](docs/MEP_RECOVERY.md) and [new capture onboarding](docs/CAPTURE_ONBOARDING.md).
 
 ## Copyright and reuse

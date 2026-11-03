@@ -44,7 +44,7 @@ The server refuses an env file inside the repository, never prints the key, and 
 `--mock` hint) when no key is set. `.gitignore` also lists `ask-twin.env` / `.env.ask-twin` in case a copy is made.
 
 Options: `--model claude-opus-5-5` (default `claude-sonnet-5-5`), `--effort low|medium|high` (default `medium`),
-`--port`, `--no-stt`, `--stt-model small.en`, `--no-fallbacks`, `--lan` (private-LAN HTTPS, see Quest below), `--verbose`.
+`--port`, `--no-stt`, `--stt-model small.en`, `--no-tts` (no laptop voice for `/api/speak`), `--no-fallbacks`, `--lan` (private-LAN HTTPS, see Headset below), `--verbose`.
 If the API rejects an optional request feature (the refusal-fallback beta or eager tool streaming) with a 400, the
 server retries that question once without them.
 
@@ -124,22 +124,94 @@ the spiral duct `#401233` (demo airflow sensor anchor).
   If the server has no speech-to-text, the browser falls back to Web Speech recognition (Chrome/Safari desktop).
 - **Spoken reply:** *Speak answers* reads the card with `speechSynthesis` (ids replaced by element types, the
   *Limits* line skipped).
+- Audio is decoded on the server with PyAV into 16 kHz mono before faster-whisper (`decode_16k`): faster-whisper 1.2.1's own
+  decoder passes an argument PyAV 19 no longer accepts (`TypeError … metadata_errors`, found 2026-11-03), which made every
+  `/api/transcribe` fail with 500.
+- **Laptop voice:** `POST /api/speak {text}` returns a WAV from macOS `say` with an English voice (Samantha if installed;
+  the default voice follows the system language). Used by the headset page when the browser has no voice.
 
-## Quest 3 (stretch, not verified on a headset)
+## Headset (WebXR) on Quest 3
 
-`python3 scripts/ask_twin_server.py --lan` serves HTTPS on the Mac's **private** LAN address only (never `0.0.0.0`),
-reusing the self-signed development certificate logic of `scripts/serve_quest_https.py` (key under ignored
-`work/quest-https/`). On the Quest Browser open the printed `https://<lan-ip>:8765/` and accept the certificate warning
-for that address only. HTTPS gives the page a secure context, so push-to-talk records with `MediaRecorder` and is
-transcribed on the laptop (Quest Browser has no Web Speech recognition); answers can be spoken with `speechSynthesis`.
-Verified on the Mac only (HTTPS health check on the LAN address, localhost refused in that mode). This is the 2D
-desktop viewer page with the panel inside the Quest browser, **not** the immersive MR page: wiring the panel into
-`scan-xr.html` (controller ray pick → ask → world-space card) is not done.
+**Status: built and checked on the Mac only. Not tested on a headset.** The four question levels work inside the immersive
+MR/VR page (`scan-xr.html`, the page behind `/mr`) in mock mode; nothing below is verified on Quest hardware.
+
+`/mr` is a redirect to `scan-xr.html?mode=ar&place=demo&sensors=demo` and passes extra parameters through, so
+`/mr/?ask=1` opens the MR page with the ask feature. `scan-xr.html` is a different page from the element viewer
+(`grimes-bim-viewer.html`); both talk to the same local server. Without `?ask=1` the MR/VR page is unchanged.
+
+### What you do in the headset
+
+1. Trigger on a service element (duct, pipe, light…) or on a demo-sensor pin: the usual info card appears, plus an
+   **ask bar** under it: `1 · What is this?` (look up), `2 · What's above?` (nearby in 3D), `3 · What feeds it?`
+   (trace a system), `4 · Why is it warm?` (reason across sources), **Hold to speak**, **Close**.
+2. Trigger on a level button, or hold the trigger on *Hold to speak*, say the question, release.
+3. The answer comes back as a world-locked card just under the element: Claude badge, LIVE/MOCK, the short lead,
+   two evidence lines, the first *check first* line, the cited ids (verified ones bordered; unverified struck through) and
+   the provenance footer (*design BIM · inferred geometry and rooms · demo sensors SIMULATED · not headset-verified*).
+4. Verified cited elements glow (most likely source magenta, others cyan): render-only copies of the element's own
+   batch vertices, drawn on top; a box outline when the element is not drawn (layer not loaded, other level). When the
+   answer used `connected_run` (levels 3 and 4), the run lights up piece by piece from the cited terminal unit to the
+   picked element, then a pulse travels along it. The card says the run is inferred from touching geometry and that the
+   model has no flow direction.
+5. The answer is read aloud: the browser voice if `speechSynthesis` has a voice (2.5 s start watchdog), else the laptop's
+   macOS voice (`POST /api/speak` → WAV played with Web Audio), else the card says *text only*.
+
+The mock answers for the four levels are scripted from real tool runs (`MockAgent._lookup`, `_above`, `_feed`,
+`_comfort` in `scripts/ask_twin/agent.py`). With a key the same page gets live Claude answers.
+
+### Try it on the Quest (owner steps)
+
+1. Mac and Quest on the **same Wi-Fi** (a home or lab network; guest/campus Wi-Fi with client isolation blocks it).
+2. On the Mac:
+   ```bash
+   cd ~/Graduate-Project-asktwin            # the feat/ask-twin-ai worktree
+   python3 scripts/ask_twin_server.py --mock --lan
+   ```
+   It prints `headset (WebXR MR + ask): https://<lan-ip>:8765/mr/?ask=1`. (Live answers: drop `--mock` once
+   `~/.config/ask-twin/env` holds the key.)
+3. In Quest Browser type that address. A certificate warning appears (self-signed development certificate, made by
+   `scripts/serve_quest_https.py`, kept in the ignored `work/quest-https/`): **Advanced → Proceed**, for this address only.
+   No certificate is installed anywhere and no system setting changes.
+4. Wait for *Services ready*. In the **Ask the twin** box (top right): press **Allow mic** (allow the microphone
+   prompt), then **Test voice** (you should hear "Ask the twin is ready"; this also unlocks sound).
+5. Press **Enter MR**. *Demo anywhere* is the default: point at the floor, trigger, the Grimes services appear at
+   real scale (DEMO, not aligned). Trigger on a duct or diffuser overhead → the ask bar → press `3` (or hold *Hold to speak*).
+6. Ctrl+C on the Mac stops the server.
+
+Why HTTPS: WebXR and the microphone need a secure context; a LAN IP over plain http is not one. Alternative without a
+certificate warning (not tried here): USB + Quest developer mode + `adb reverse tcp:8765 tcp:8765`, then
+`http://localhost:8765/mr/?ask=1` in Quest Browser (localhost counts as secure). The owner would install `adb` and enable
+developer mode; this was not done for the prototype.
+
+### Risky parts on the Quest (unverified)
+
+| Part | Expectation | Fallback built in |
+|---|---|---|
+| Microphone inside an immersive session | The permission prompt is a 2D dialog that cannot show in VR/MR, so the mic is opened on the 2D page **before** Enter MR and kept open; recording itself (`MediaRecorder`) during the session is expected to work but is not verified. | If no stream: one in-session `getUserMedia` try, then *voice off: use 1-4*; the preset buttons never need the mic. |
+| Text-to-speech | Quest Browser may have no `speechSynthesis` voice. | Laptop voice over the LAN (`/api/speak`, macOS `say`, local), then *text only* on the card. |
+| Audio autoplay in XR | Web Audio is unlocked by the 2D click (Test voice / Enter MR). | The card still shows the answer. |
+| HTTPS | Works with the self-signed certificate after *Proceed* (the same path `scripts/serve_quest_https.py` documents for the MR page). | `adb reverse` + localhost (owner). |
+| Latency | Mac, mock: 1.4–2.2 s from press to the full card (smoke run). Live Claude: several seconds to tens of seconds (tool rounds); whisper `base.en` ≈ 0.6 s on this Mac; `say` ≈ 0.5–3 s. The card shows the tool steps while waiting. | — |
+| Frame rate | Card redraws are throttled (≤ 8/s); the glow is ≤ ~80 small meshes. Not measured on the headset. | — |
+
+### Desktop check (Mac only)
+
+```bash
+python3 scripts/ask_twin_server.py --mock --port 8766 &
+PLAYWRIGHT_MODULE=/path/to/playwright-core node tests/xr-ask-smoke.cjs http://127.0.0.1:8766   # shots -> work/ask-twin/xr-shots/
+```
+
+The smoke opens the MR page in its **desktop simulation** (no immersive session; Chrome with the GPU, ductwork only,
+photo backdrop refused so the shots carry no capture photos), picks diffuser `#388279` through the page's real ray path,
+presses button 3 through the same panel hit test a controller ray uses, asks levels 4 and 2, and checks the glow, the lit
+run, verified citations, speech plan and *Close*. The immersive emulator smoke (`tests/scan-xr-immersive-smoke.cjs`,
+IWER) was not run for this feature.
 
 ## Tests
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_ask_twin      # index, tools, citations, mock, live loop (fake client), server
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_ask_twin      # index, tools, citations, mock (4 levels), live loop (fake client), server
+node --test tests/xr-ask.test.cjs                                       # headset helpers: stream, card model, speech text, run path, bar hit, drawing
 python3 scripts/ask_twin_server.py --mock &                             # then the headless browser check:
 PLAYWRIGHT_MODULE=/path/to/playwright-core CHROME_EXECUTABLE=/path/to/chrome-headless-shell \
   [FAKE_AUDIO=/abs/question.wav] node tests/ask-twin-smoke.cjs          # screenshots -> work/ask-twin/shots/
@@ -149,8 +221,10 @@ The headless check loads three element layers under software WebGL and takes abo
 
 ## Files
 
-- `scripts/ask_twin_server.py` — server (static read-only + `/api/health`, `/api/ask` SSE, `/api/transcribe`)
+- `scripts/ask_twin_server.py` — server (static read-only + `/api/health`, `/api/ask` SSE, `/api/transcribe`, `/api/speak`)
 - `scripts/ask_twin/index.py` — element box index; `tools.py` — read-only tools + schemas; `agent.py` — live and mock loops
 - `twin/ask-twin.js` — panel, citation chips, highlights, fly-to, push-to-talk, spoken reply
+- `twin/xr-ask.js` — headset helpers and canvas drawing (ask bar, answer card, Claude badge); `scan-xr.html` `?ask=1` block wires it into the XR page
+- `tests/xr-ask.test.cjs`, `tests/xr-ask-smoke.cjs` — headset helper tests and the desktop-simulation smoke
 - `grimes-bim-viewer.html` — small `?ask=1` hook (`window.twinViewerApi`, pick context); inert without `?ask=1`
 - `tests/test_ask_twin.py`, `tests/ask-twin-smoke.cjs`

@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=1"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -330,7 +330,7 @@ function drawCard(lines){const {ctx,canvas}=card,W=canvas.width,H=canvas.height;
   lines.spark.forEach((v,i)=>{const x=sx+sw*i/(lines.spark.length-1),y2=sy+sh-(v-mn)/sp*sh;i?ctx.lineTo(x,y2):ctx.moveTo(x,y2);});ctx.stroke();}
  ctx.fillStyle='#8aa2b8';fitText(ctx,lines.footer[0],44,H-70,W-90,28,'Arial');fitText(ctx,lines.footer[1],44,H-34,W-90,26,'Arial');
  card.texture.needsUpdate=true;}
-function hideCard(){pickEpoch++;SENS.picked=null;if(picked){for(const st of Object.values(layerState))for(const m of st.meshes)highlight(THREE,m,picked.id,false);picked=null;}card.mesh.visible=false;marker.visible=false;invalidate();}
+function hideCard(){if(ASK?.on)askClear();pickEpoch++;SENS.picked=null;if(picked){for(const st of Object.values(layerState))for(const m of st.meshes)highlight(THREE,m,picked.id,false);picked=null;}card.mesh.visible=false;marker.visible=false;invalidate();}
 const _head=new THREE.Vector3(),_v=new THREE.Vector3();
 async function pickAlong(origin,dir){
  raycaster.set(origin,dir);raycaster.far=(MODE_AR?Math.min(40,mrCullRadius()):P.radius)+6;
@@ -345,6 +345,7 @@ async function pickAlong(origin,dir){
  camera.getWorldPosition(_head);const toHit=_v.copy(hit.point).sub(_head),dist=clamp(toHit.length()*.7,.8,1.8);
  card.mesh.position.copy(_head).addScaledVector(toHit.normalize(),dist);card.mesh.position.y-=.1*dist;card.mesh.scale.setScalar(dist/1.4);card.mesh.lookAt(_head);card.mesh.visible=true;
  marker.position.copy(hit.point);marker.visible=true;picked.tier=tier.tier;picked.lines=lines;invalidate();
+ if(ASK?.on)askOnPick({id,layer,point:hit.point});   // ?ask=1 only: ask bar under the card
  return {id,layer,tier:tier.tier,lines,distance:hit.distance};
 }
 /* ── Simulated sensors ── (opt-in &sensors=demo[&scene=leak|air|water|elec|rotating]). ILLUSTRATIVE ONLY: no sensor is installed in Grimes.
@@ -451,7 +452,7 @@ function sensorsShowCard(sp){hideCard();const r=SENS.recs.get(sp.id);if(!r)retur
  const s=r.s,lines=sensorsCardLines(r);
  drawCard(lines);camera.getWorldPosition(_head);const w=new THREE.Vector3().fromArray(sp.point),toHit=_v.copy(w).sub(_head),dist=clamp(toHit.length()*.7,.8,1.8);
  card.mesh.position.copy(_head).addScaledVector(toHit.normalize(),dist);card.mesh.position.y-=.1*dist;card.mesh.scale.setScalar(dist/1.4);card.mesh.lookAt(_head);card.mesh.visible=true;
- marker.position.copy(w);marker.visible=true;SENS.picked=s.id;invalidate();return {sensor:s.id,simulated:!SENS.live,lines,distance:sp.distance};}
+ marker.position.copy(w);marker.visible=true;SENS.picked=s.id;if(ASK?.on)askOnPick({id:s.anchor.id,layer:s.anchor.layer,point:w,sensor:s.id});invalidate();return {sensor:s.id,simulated:!SENS.live,lines,distance:sp.distance};}
 function sensorsInspection(){return {enabled:SENS.on,live:SENS.live,feed:SENS.gw,scene:SENS.scene,ready:SENS.ready,loading:SENS.loading,error:SENS.error,center:SENS.center,card:SENS.picked,scenes:SXOK?SX.SCENES:[],
  states:SENS.states,dtsMeshes:[...SENS.recs.values()].filter(r=>r.mesh).length,rings:[...SENS.recs.values()].filter(r=>r.ring).length,drawables:SENS.group.children.length,
  sensors:[...SENS.recs.values()].map(r=>({id:r.s.id,type:r.s.type,layer:r.s.anchor.layer,element:r.s.anchor.id,point:r.point,pinVisible:r.pin.visible,chip:r.chipText,simulated:SENS.obs[r.s.id]?.simulated===true,source:SENS.obs[r.s.id]?.source??null,obs:SENS.obs[r.s.id]??null}))};}
@@ -516,9 +517,11 @@ async function menuAction(k){const {buttons}=menuModel(),id=(typeof k==='number'
 /* Pointing: the visible interactive panel (VR menu or MR panel) and which button a ray is on (-1 = panel background). */
 function activePanel(){if(MODE_AR)return mrPanel.mesh.visible?{name:'mr',mesh:mrPanel.mesh,hit:(u,v)=>{const i=MR.gridHit(MR.PANEL,u,v);return i>=0&&mrButtons()[i]?i:-1;}}:null;
  return menu.mesh.visible?{name:'menu',mesh:menu.mesh,hit:(u,v)=>X.layoutHit(menuModel().rects,u,v)}:null;}
-function panelHit(o,d){const p=activePanel();if(!p)return null;raycaster.set(o,d);raycaster.far=10;const h=raycaster.intersectObject(p.mesh,false)[0];if(!h)return null;return {panel:p.name,button:p.hit(h.uv.x,h.uv.y),point:h.point.clone(),distance:h.distance};}
+function panelHit(o,d){const a=askPanelHit(o,d),b=panelHitBase(o,d);return a&&b?(a.distance<=b.distance?a:b):a||b;}
+function panelHitBase(o,d){const p=activePanel();if(!p)return null;raycaster.set(o,d);raycaster.far=10;const h=raycaster.intersectObject(p.mesh,false)[0];if(!h)return null;return {panel:p.name,button:p.hit(h.uv.x,h.uv.y),point:h.point.clone(),distance:h.distance};}
 /* Trigger / click (desktop and legacy path): a panel button first, then service elements. */
 async function selectRay(origin,dir){
+ const ah=askPanelHit(origin,dir);if(ah){const b=panelHitBase(origin,dir);if(!b||ah.distance<=b.distance)return {ask:ah.button>=0?askButton(ah.button,null):null};}
  if(MODE_AR)return mrSelectDesktop(origin,dir);
  const h=panelHit(origin,dir);if(h)return {menu:h.button>=0?await menuAction(h.button):null};
  return pickAlong(origin,dir);
@@ -749,7 +752,7 @@ function buzz(c,intensity=.3,ms=15){const gp=c?.userData?.source?.gamepad;if(!gp
  try{const h=gp.hapticActuators?.[0];if(h?.pulse){h.pulse(intensity,ms);return true;}const v=gp.vibrationActuator;if(v?.playEffect){v.playEffect('dual-rumble',{duration:ms,strongMagnitude:intensity,weakMagnitude:intensity}).catch(()=>{});return true;}}catch(e){}return false;}
 const mrHover=new Set();
 function setHover(c,hit){const u=c.userData,b=hit&&hit.button>=0?hit.button:-1,p=hit?.panel||null;u.hover=hit;if(u.hoverBtn===b&&u.hoverPanel===p)return;u.hoverBtn=b;u.hoverPanel=p;if(b>=0)buzz(c,.25,12);refreshHover();}
-function refreshHover(){const tgt=MODE_AR?mrHover:menuHover,want=new Set([...controllers,mouse].filter(c=>c.userData.hoverBtn>=0).map(c=>c.userData.hoverBtn));
+function refreshHover(){askRefreshHover();const tgt=MODE_AR?mrHover:menuHover,want=new Set([...controllers,mouse].filter(c=>c.userData.hoverBtn>=0&&c.userData.hoverPanel!=='ask').map(c=>c.userData.hoverBtn));
  if(want.size===tgt.size&&[...want].every(i=>tgt.has(i)))return;tgt.clear();want.forEach(i=>tgt.add(i));if(MODE_AR){if(mr.panel)mrDrawPanel();}else if(state.menu)drawMenu();}
 /* Element hover for the flashlight ray: a full raycast of the visible batches, throttled and self-timed (cost x 20, 120-800 ms).
    Between casts the reticle stays on the ray at the last hit distance. ?hover=0 disables it. */
@@ -771,7 +774,7 @@ function updatePointer(c,o,d,isLens){const u=c.userData,ray=u.ray,ret=u.reticle;
  ret.userData.mat.color.set(col);ret.visible=true;}
 /* Trigger: acts only on what the ray highlights. Menu/panel button > (right or 'both' flashlight hand) info card. */
 function onSelect(c){const u=c.userData;rayOf(c,u.o,u.d);const o=u.o.clone(),d=u.d.clone(),h=u.hover;
- if(h&&h.panel){if(h.button>=0){buzz(c,.6,30);if(h.panel==='mr')mrButton(h.button);else menuAction(h.button);}return;}
+ if(h&&h.panel){if(h.button>=0){buzz(c,.6,30);if(h.panel==='mr')mrButton(h.button);else if(h.panel==='ask')askButton(h.button,c);else menuAction(h.button);}return;}
  if(MODE_AR)return mrSelect(c,o,d);
  if(u.aiming)return;
  const k=controllers.indexOf(c),R=curRoles.move>=0||curRoles.lens.length?curRoles:roles();
@@ -1146,6 +1149,162 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
 
  if(mr.demoPending){const f=mrDemoFloorPoint(null,o,d,false);mrPlaceDemo(f.p,f.method);return {demo:f.method};}
  return mr.T?pickAlong(o,d):null;}
+/* ══ Ask the twin in the headset (opt-in ?ask=1; docs/ASK_TWIN.md "Headset") ══ Needs the local server (scripts/ask_twin_server.py [--mock] --lan),
+   which serves this page and answers /api/ask with read-only tools over the twin (Claude, or scripted mock answers). Nothing here exists without ?ask=1.
+   Trigger on a service element (or a demo-sensor pin) -> the info card plus an ask bar: the four question levels, hold-to-speak, close.
+   The answer comes back as a world-locked card under the element (Claude badge, short text, cited ids), verified citations glow in the model
+   (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
+   and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
+var ASK=null;
+const XA=globalThis.XRAsk,XAOK=XA?.API===1;
+ASK={on:XAOK&&XA.parseParams(location.search).enabled,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
+ paths:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
+ hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0};
+ASK.glow.name='ask: cited elements (render-only glow)';bimRoot.add(ASK.glow);
+if(q.get('ask')==='1'&&!XAOK)console.warn('scan-xr: twin/xr-ask.js missing or out of date · Ask the twin is off');
+const askCard=makeSurface(1024,800,.6,.469,61),askBar=makeSurface(1024,300,.6,.176,62);scene.add(askCard.mesh,askBar.mesh);
+const askLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:0xD97757,transparent:true,opacity:.9,depthTest:false,depthWrite:false,toneMapped:false}));
+askLine.renderOrder=61;askLine.visible=false;askLine.frustumCulled=false;scene.add(askLine);
+const askReduced=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
+function askNote(t){ASK.voiceNote=t||'';const n=$('askNote');if(n)n.textContent=t||'';}
+/* Pick -> ask bar under the info card (the info card itself is unchanged). point = world hit point. */
+function askOnPick({id,layer,point,sensor=null}){if(!ASK.on)return;
+ askClear();ASK.el={id:String(id),layer,world:point.clone(),bim:bimRoot.worldToLocal(point.clone()).toArray().map(v=>+v.toFixed(3)),sensor};
+ ASK.anchor={p:card.mesh.position.clone(),q:card.mesh.quaternion.clone(),s:card.mesh.scale.x};askPlace();askDrawBar();askBar.mesh.visible=true;invalidate();}
+function askPlace(){const a=ASK.anchor;if(!a)return;const up=new THREE.Vector3(0,1,0).applyQuaternion(a.q),s=a.s;
+ // info card: as pickAlong placed it (on the ray, 0.1 x distance lower). Answer card: its top edge 5 cm (scaled) under the ray point, so the
+ // element and what the answer lights up stay visible above it. The bar hangs under whichever card is shown.
+ const cardOn=!!ASK.phase,h=cardOn?.469:.306,ray=a.p.clone().add(new THREE.Vector3(0,.14*s,0));
+ const c=cardOn?ray.addScaledVector(up,-(h/2+.05)*s):a.p.clone();askCard.mesh.position.copy(c);askCard.mesh.quaternion.copy(a.q);askCard.mesh.scale.setScalar(s);
+ askBar.mesh.position.copy(c).addScaledVector(up,-(h/2+.012+.176/2)*s);askBar.mesh.quaternion.copy(a.q);askBar.mesh.scale.setScalar(s);
+ if(ASK.el){const top=c.clone().addScaledVector(up,(h/2)*s);askLine.geometry.setFromPoints([top,ASK.el.world]);askLine.visible=cardOn;}}
+function askButtons(){return XA.barButtons({busy:ASK.busy,voice:ASK.voice,voiceNote:ASK.voiceNote});}
+function askDrawBar(){if(!ASK.on)return;XA.drawBar(askBar.ctx,askBar.canvas.width,askBar.canvas.height,askButtons(),ASK.hover);askBar.texture.needsUpdate=true;invalidate();}
+function askDraw(){ASK.dirty=false;ASK.lastDraw=performance.now();
+ const run=ASK.run?'Lit run: '+ASK.run.ids.length+' touching pieces, cited source to here · inferred from geometry, no flow direction in the model':'';
+ XA.drawAnswer(askCard.ctx,askCard.canvas.width,askCard.canvas.height,{phase:ASK.phase,model:ASK.model||{question:ASK.question,level:ASK.level},steps:ASK.steps,error:ASK.error,speech:ASK.speech,runNote:run,
+  modeLabel:ASK.health?.mode==='live'?'LIVE':ASK.health?.mode==='mock'?'MOCK':'',footer:['Answers from read-only tools over the twin · '+(ASK.health?.mode==='mock'?'MOCK: scripted from real tool results':ASK.health?.model||''),'Design BIM · inferred geometry and rooms · demo sensors SIMULATED · not headset-verified']});
+ askCard.texture.needsUpdate=true;invalidate();}
+/* Remove the answer (glow, run, speech) but keep the pick. */
+function askResetAnswer(){ASK.epoch++;try{ASK.abort?.abort();}catch(e){}ASK.abort=null;ASK.busy=false;askStopSpeech();
+ for(const o of [...ASK.glow.children]){ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();}ASK.run=null;
+ ASK.phase=null;ASK.model=null;ASK.final=null;ASK.text='';ASK.steps=[];ASK.paths=[];ASK.error=null;askCard.mesh.visible=false;askLine.visible=false;}
+function askClear(){if(!ASK?.on)return;askResetAnswer();if(ASK.voice==='recording')askRecStop(true);ASK.el=null;ASK.anchor=null;askBar.mesh.visible=false;ASK.hover.clear();invalidate();}
+/* Glow: a render-only copy of the element's own batch vertices (never modifies the batches), additive, always on top. Element not drawn
+   (layer not loaded, other level, not a drawn layer): a box outline from the server's bbox (viewer frame = bimRoot-local). */
+function askGlowFor(id,layer,bbox,color,opacity){const st=layerState[layer];const geo=st&&st.loaded?sensorElementGeom(st,id,true):null;let o;
+ if(geo&&geo.idx.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(geo.pos,3));g.setIndex(geo.idx);
+  o=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));o.userData.kind='glow';}
+ else if(bbox){const b=bbox,g=new THREE.EdgesGeometry(new THREE.BoxGeometry(Math.max(.05,b[3]-b[0]),Math.max(.05,b[4]-b[1]),Math.max(.05,b[5]-b[2])));g.translate((b[0]+b[3])/2,(b[1]+b[4])/2,(b[2]+b[5])/2);
+  o=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color,transparent:true,opacity:Math.min(1,opacity+.3),depthTest:false,depthWrite:false,toneMapped:false}));o.userData.kind='box';}
+ if(!o)return null;o.renderOrder=53;o.frustumCulled=false;o.userData.id=id;o.userData.base=opacity;ASK.glow.add(o);return o;}
+function askHighlight(final){const cites=(final.citations||[]).filter(c=>c.verified),primary=ASK.model?.primary;
+ for(const c of cites)askGlowFor(c.id,c.layer,c.bbox_m,c.id===primary?XA.COLORS.primary:XA.COLORS.other,c.id===primary?.62:.4);
+ const ids=XA.runPath(ASK.paths,primary,final.citations);if(!ids)return;
+ const lit=new Set(cites.map(c=>c.id)),meshes=[];for(const id of ids){if(lit.has(id))continue;const layer=ASK.el?.layer&&layerState[ASK.el.layer]?.meta?.[id]?ASK.el.layer:Object.keys(layerState).find(k=>layerState[k].meta?.[id]);
+  const o=layer?askGlowFor(id,layer,null,XA.COLORS.run,0):null;if(o){o.userData.kind='run';o.material.opacity=0;meshes.push({o,i:meshes.length});}}
+ if(meshes.length)ASK.run={meshes,t0:performance.now(),ids};}
+/* Per frame (XR and desktop): glow pulse, run lighting, throttled card redraw. Returns true while something animates (desktop keeps drawing). */
+function askTick(){if(!ASK?.on)return false;const now=performance.now();let anim=false;
+ if(ASK.dirty&&now-ASK.lastDraw>120)askDraw();
+ if(ASK.glow.children.length){const red=askReduced(),ph=red?0:Math.sin(now/260)*.5+.5;
+  for(const o of ASK.glow.children){if(o.userData.kind==='glow'||o.userData.kind==='box')o.material.opacity=o.userData.base*(.7+.6*ph);}
+  if(ASK.run){const n=ASK.run.meshes.length,t=now-ASK.run.t0;for(const {o,i} of ASK.run.meshes){const a=XA.runGlow(i,n,t,{reduced:red});o.material.opacity=a;o.visible=a>.01;}}
+  anim=!red;}
+ return anim||ASK.busy||ASK.speech==='speaking';}
+/* Ask: POST /api/ask (SSE). The selected element and the clicked point go along (bimRoot-local = the server's viewer frame). */
+async function askQuestion(level,text){if(!ASK.on)return null;if(!ASK.el){status('Ask: point at an element and pull the trigger first');return null;}if(ASK.busy)return null;
+ const L=level?XA.LEVELS.find(l=>l.level===level):null,question=(text||L?.question||'').trim();if(!question)return null;
+ askResetAnswer();const epoch=ASK.epoch,ac=typeof AbortController!=='undefined'?new AbortController():null;ASK.abort=ac;
+ ASK.busy=true;ASK.asked++;ASK.question=question;ASK.level=L?.level||null;ASK.phase='thinking';ASK.model={question,level:ASK.level};card.mesh.visible=false;askCard.mesh.visible=true;askPlace();askDraw();askDrawBar();
+ const t0=performance.now();
+ try{const res=await fetch('api/ask',{method:'POST',headers:{'Content-Type':'application/json'},signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
+  if(!res.ok||!res.body)throw new Error('ask server '+res.status+(res.status===404||res.status===501?' · open this page from scripts/ask_twin_server.py':''));
+  let fail=null;const sp=XA.createStream(ev=>{if(epoch!==ASK.epoch)return;
+   if(ev.type==='tool'){ASK.steps.push(ev.name+' · '+(ev.summary||''));if(Array.isArray(ev.paths))ASK.paths.push(...ev.paths);ASK.dirty=true;}
+   else if(ev.type==='status'){ASK.steps.push(ev.text);ASK.dirty=true;}
+   else if(ev.type==='text')ASK.text+=ev.text;else if(ev.type==='final')ASK.final=ev;else if(ev.type==='error')fail=ev.message||'server error';});
+  const reader=res.body.getReader(),dec=new TextDecoder();
+  for(;;){const {value,done}=await reader.read();if(done)break;sp.push(dec.decode(value,{stream:true}));if(fail||epoch!==ASK.epoch)break;}
+  sp.end();if(epoch!==ASK.epoch)return null;if(fail)throw new Error(fail);if(!ASK.final)throw new Error('the answer stream ended early');
+  const f=ASK.final,answer=f.answer||ASK.text;ASK.text=answer;ASK.model=XA.cardModel({question,answer,final:f,level:ASK.level});ASK.phase='answer';ASK.tAnswer=Math.round(performance.now()-t0);
+  askHighlight(f);askDraw();ASK.busy=false;askDrawBar();askSpeak(XA.speakable(answer,f.citations));
+  return {ms:ASK.tAnswer,final:f};
+ }catch(e){if(epoch!==ASK.epoch||e?.name==='AbortError')return null;ASK.phase='error';ASK.error=String(e?.message||e);console.warn('[ask]',e);askDraw();return {error:ASK.error};}
+ finally{if(epoch===ASK.epoch){ASK.busy=false;askDrawBar();}}}
+/* ── voice out ── speechSynthesis if a voice exists (2.5 s start watchdog), else the laptop voice (/api/speak WAV via Web Audio), else text only. */
+function askUnlockAudio(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!ASK.audio)ASK.audio={ctx:new C(),src:null};if(ASK.audio.ctx.state==='suspended')ASK.audio.ctx.resume().catch(()=>{});}catch(e){}}
+function askStopSpeech(){try{window.speechSynthesis?.cancel();}catch(e){}try{ASK.audio?.src?.stop();}catch(e){}if(ASK.audio)ASK.audio.src=null;if(ASK.speech==='speaking')ASK.speech=null;}
+function askSetSpeech(s,epoch){if(epoch!==ASK.epoch)return;ASK.speech=s;ASK.dirty=true;}
+async function askSpeakServer(text,epoch){try{askUnlockAudio();if(!ASK.audio)throw new Error('no Web Audio');
+  const r=await fetch('api/speak',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!r.ok)throw new Error('speak '+r.status);
+  const buf=await ASK.audio.ctx.decodeAudioData(await r.arrayBuffer());if(epoch!==ASK.epoch)return;
+  const src=ASK.audio.ctx.createBufferSource();src.buffer=buf;src.connect(ASK.audio.ctx.destination);src.onended=()=>{if(ASK.audio?.src===src){ASK.audio.src=null;askSetSpeech('read',epoch);}};
+  ASK.audio.src=src;src.start();askSetSpeech('speaking',epoch);ASK.speechEngine='laptop voice';}
+ catch(e){console.warn('[ask] laptop voice',e);askSetSpeech('text only',epoch);}}
+function askSpeak(text){if(!text)return;const epoch=ASK.epoch,S=window.speechSynthesis,voices=S?.getVoices?.().length||0,server=!!ASK.health?.tts?.available;
+ const plan=XA.ttsPlan({synth:!!S&&typeof SpeechSynthesisUtterance!=='undefined',voices,server});ASK.speechPlan=plan;
+ if(plan==='server')return askSpeakServer(text,epoch);
+ if(plan==='none'){askSetSpeech('text only',epoch);return;}
+ let started=false;const u=new SpeechSynthesisUtterance(text);u.rate=1.05;u.lang='en-US';
+ u.onstart=()=>{started=true;ASK.speechEngine='browser voice';askSetSpeech('speaking',epoch);};u.onend=()=>askSetSpeech('read',epoch);
+ u.onerror=()=>{if(started)return askSetSpeech('read',epoch);started=true;if(server)askSpeakServer(text,epoch);else askSetSpeech('text only',epoch);};
+ try{S.cancel();S.speak(u);}catch(e){u.onerror();}
+ setTimeout(()=>{if(!started&&epoch===ASK.epoch){started=true;try{S.cancel();}catch(e){}if(server)askSpeakServer(text,epoch);else askSetSpeech('text only',epoch);}},2500);}
+/* ── voice in ── the microphone is opened on the 2D page (button) before entering, because the permission prompt cannot show inside
+   an immersive session; the stream stays open and is recorded only while the trigger is held on "Hold to speak". */
+function askVoicePlan(){const p=XA.micPlan({secure:isSecureContext,getUserMedia:!!navigator.mediaDevices?.getUserMedia,mediaRecorder:typeof MediaRecorder!=='undefined',stt:!!ASK.health?.stt?.available,haveStream:!!ASK.stream,presenting:renderer.xr.isPresenting});
+ ASK.voice=p.mode==='ready'?(ASK.voice==='recording'||ASK.voice==='transcribing'?ASK.voice:'ready'):p.mode==='off'?'off':'ready';askNote(p.note);ASK.voicePlan=p.mode;return p;}
+async function askOpenMic(){try{const gum=navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});   // in a session the prompt may be invisible: give up after 6 s
+  ASK.stream=renderer.xr.isPresenting?await Promise.race([gum,new Promise((_,no)=>setTimeout(()=>no(new Error('no answer to the mic prompt inside the session')),6000))]):await gum;askVoicePlan();askNote('Microphone ready · in the headset hold the trigger on "Hold to speak"');}
+ catch(e){ASK.stream=null;askNote('Microphone refused or unavailable ('+(e?.name||e)+') · use the four preset buttons');ASK.voice='off';}askDrawBar();return !!ASK.stream;}
+async function askRecStart(){if(ASK.voice==='recording'||ASK.voice==='transcribing'||ASK.busy)return;if(!ASK.stream){const p=askVoicePlan();if(p.mode==='off')return;if(!(await askOpenMic()))return;}
+ try{const type=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(t=>MediaRecorder.isTypeSupported?.(t))||'';
+  ASK.rec=new MediaRecorder(ASK.stream,type?{mimeType:type}:undefined);ASK.chunks=[];ASK.rec.ondataavailable=e=>{if(e.data.size)ASK.chunks.push(e.data);};ASK.rec.start(250);ASK.recT0=performance.now();ASK.voice='recording';
+  clearTimeout(ASK.recTimer);ASK.recTimer=setTimeout(()=>{if(ASK.voice==='recording')askRecStop();},15000);status('Listening… release the trigger to ask');}
+ catch(e){ASK.rec=null;ASK.voice='off';askNote('Recording failed ('+(e?.name||e)+') · use the preset buttons');}askDrawBar();}
+async function askRecStop(discard=false){const r=ASK.rec;ASK.rec=null;clearTimeout(ASK.recTimer);if(!r){if(ASK.voice==='recording')ASK.voice='ready';askDrawBar();return;}
+ await new Promise(res=>{r.onstop=res;try{r.stop();}catch(e){res();}});if(discard){ASK.voice='ready';askDrawBar();return;}
+ const blob=new Blob(ASK.chunks,{type:r.mimeType||'audio/webm'});
+ if(blob.size<1500||performance.now()-ASK.recT0<500){ASK.voice='ready';status('Too short: hold the trigger on "Hold to speak" while you talk');askDrawBar();return;}
+ ASK.voice='transcribing';askDrawBar();
+ try{const res=await fetch('api/transcribe',{method:'POST',headers:{'Content-Type':blob.type},body:blob}),j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
+  ASK.voice='ready';askDrawBar();if(j.text){status('Heard: “'+j.text+'”');await askQuestion(null,j.text);}else status('Nothing heard · try again or use 1-4');}
+ catch(e){ASK.voice='ready';askDrawBar();status('Speech-to-text failed ('+(e?.message||e)+') · use the preset buttons');}}
+/* Trigger on the bar: selectstart on "Hold to speak" starts recording, selectend after > 0.45 s stops and asks (a short tap toggles). */
+function askSelectStart(c){const h=c.userData.hover;if(!ASK.on||h?.panel!=='ask')return;const b=askButtons()[h.button];if(b?.id!=='mic')return;
+ c.userData.askMic=true;if(ASK.voice==='recording')askRecStop();else if(!b.disabled)askRecStart();}
+function askSelectEnd(c){if(!c.userData.askMic)return;setTimeout(()=>{c.userData.askMic=false;},0);if(ASK.voice==='recording'&&performance.now()-ASK.recT0>450)askRecStop();}
+/* A bar press (controller select / desktop click). The mic button acts on selectstart/selectend in XR; a click toggles it on the desktop. */
+function askButton(i,c){const b=askButtons()[i];if(!b)return null;
+ if(b.id==='close'){askClear();if(picked||SENS.picked)hideCard();return 'close';}
+ if(b.id==='mic'){if(c?.userData.askMic)return 'mic';if(ASK.voice==='recording')askRecStop();else if(!b.disabled)askRecStart();return 'mic';}
+ if(b.disabled)return null;const L=XA.LEVELS.find(l=>l.id===b.id);if(L)askQuestion(L.level);return b.id;}
+function askPanelHit(o,d){if(!ASK?.on||!askBar.mesh.visible)return null;raycaster.set(o,d);raycaster.far=10;const h=raycaster.intersectObject(askBar.mesh,false)[0];if(!h)return null;
+ return {panel:'ask',button:XA.barHit(h.uv.x,h.uv.y),point:h.point.clone(),distance:h.distance};}
+function askRefreshHover(){if(!ASK?.on)return;const want=new Set([...controllers,mouse].filter(c=>c.userData.hoverPanel==='ask'&&c.userData.hoverBtn>=0).map(c=>c.userData.hoverBtn));
+ if(want.size===ASK.hover.size&&[...want].every(i=>ASK.hover.has(i)))return;ASK.hover=want;if(askBar.mesh.visible)askDrawBar();}
+for(const c of controllers){c.addEventListener('selectstart',()=>askSelectStart(c));c.addEventListener('selectend',()=>askSelectEnd(c));}
+/* 2D page box: server status, and the two things that need a 2D click before entering the headset session (mic permission, audio unlock). */
+async function askBoot(){if(!ASK.on)return;
+ const box=document.createElement('section');box.id='askBox';box.setAttribute('aria-label','Ask the twin');
+ box.style.cssText='position:fixed;right:8px;top:50px;z-index:7;width:min(330px,calc(100% - 16px));padding:10px 12px;border-radius:10px;background:rgba(5,10,18,.92);border:1px solid #D97757;font:500 12px/1.4 Arial,Helvetica,sans-serif;color:#cfe3f5';
+ box.innerHTML='<b style="color:#fff">Ask the twin</b> <span id="askMode" style="color:#fcd34d"></span><div class="row" style="display:flex;gap:4px;margin-top:6px"><button id="askMicBtn" class="b">Allow mic</button><button id="askVoiceBtn" class="b">Test voice</button></div><p id="askNote" style="margin:6px 0 0;color:#8aa2b8"></p><p style="margin:4px 0 0;color:#8aa2b8">Trigger on a service element → ask bar under the card. Before Enter MR/VR: press Allow mic (voice) and Test voice (unlocks sound). Not headset-verified.</p>';
+ document.body.appendChild(box);
+ addEventListener('pointerdown',askUnlockAudio,{capture:true});$('enterMR')?.addEventListener('click',askUnlockAudio,{capture:true});$('enterVR')?.addEventListener('click',askUnlockAudio,{capture:true});
+ $('askMicBtn').onclick=()=>{askUnlockAudio();askOpenMic();};
+ $('askVoiceBtn').onclick=()=>{askUnlockAudio();askSpeak('Ask the twin is ready.');};
+ try{const r=await fetch('api/health',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);ASK.health=await r.json();
+  $('askMode').textContent=(ASK.health.mode||'').toUpperCase()+' · '+(ASK.health.model||'')+' · voice in: '+(ASK.health.stt?.available?'laptop whisper':'off')+' · voice out: browser'+(ASK.health.tts?.available?' / laptop':'');}
+ catch(e){ASK.healthError=String(e?.message||e);$('askMode').textContent='server not reachable';askNote('Open this page from scripts/ask_twin_server.py (--mock --lan for the Quest); GitHub Pages has no ask server');}
+ askVoicePlan();askDrawBar();}
+function askInspection(){if(!ASK?.on)return {on:false,available:XAOK};const w=new THREE.Vector3();
+ return {on:true,health:ASK.health?{mode:ASK.health.mode,model:ASK.health.model,stt:!!ASK.health.stt?.available,tts:!!ASK.health.tts?.available}:null,healthError:ASK.healthError,
+  el:ASK.el&&{id:ASK.el.id,layer:ASK.el.layer,bim:ASK.el.bim,sensor:ASK.el.sensor},phase:ASK.phase,busy:ASK.busy,question:ASK.question,level:ASK.level,steps:ASK.steps.slice(),error:ASK.error,answerMs:ASK.tAnswer,
+  lead:ASK.model?.lead||null,primary:ASK.model?.primary||null,chips:ASK.model?.chips||[],citations:(ASK.final?.citations||[]).map(c=>({id:c.id,verified:c.verified,layer:c.layer})),
+  glow:ASK.glow.children.map(o=>({id:o.userData.id,kind:o.userData.kind})),run:ASK.run?{pieces:ASK.run.meshes.length,ids:ASK.run.ids.length}:null,speech:ASK.speech,speechPlan:ASK.speechPlan||null,speechEngine:ASK.speechEngine||null,
+  voice:ASK.voice,voicePlan:ASK.voicePlan||null,voiceNote:ASK.voiceNote,bar:askBar.mesh.visible?askButtons().map(b=>b.id):null,cardVisible:askCard.mesh.visible,infoCardVisible:card.mesh.visible,
+  cardWorld:askCard.mesh.visible?askCard.mesh.getWorldPosition(w).toArray():null};}
 /* ── Loop ── */
 /* XR per-frame work (input, placement, MR tracking) is guarded: three.js requests the next XR frame only after this callback returns,
    so one uncaught exception would stop rendering for the rest of the session (Quest shows black). Errors are counted, logged once
@@ -1157,8 +1316,9 @@ renderer.setAnimationLoop((t)=>{
  const xr=renderer.xr.isPresenting;
  if(xr)xrFrameSafe();
  else{if(!pointerInside&&!drag)coneFromViewIfIdle();try{sensorsTick();}catch(e){console.error('sensors',e);}}
+ let askAnim=false;if(ASK?.on)try{askAnim=askTick();}catch(e){console.error('ask',e);}
  const anim=stepFade(performance.now()),splat=gaussBusy();
- if(!xr&&!needsRender&&!anim&&!splat)return;needsRender=false;
+ if(!xr&&!needsRender&&!anim&&!splat&&!askAnim)return;needsRender=false;
  renderer.render(scene,camera);renderCount++;const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};
  // The splat sort triggers on the camera's LOCAL pose; rig moves (jump, teleport, snap turn) do not change it, so force one sort.
  const v=gauss.dropIn?.viewer;if(gauss.pendingSort&&v&&gauss.dropIn.visible&&v.initialized&&!v.sortRunning){gauss.pendingSort=false;v.runSplatSort(true);gauss.busyFrames=3;}
@@ -1175,7 +1335,7 @@ function inspection(){const heap=performance.memory?Math.round(performance.memor
   layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{loaded:s.loaded,loading:s.loading,error:s.error||null,visible:s.group.visible,loadMs:s.loadMs??null,...s.stats,visibleBatches:s.meshes.filter(m=>m.visible).length}])),
   totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation,device:XQ.device,scaleSource:XQ.scaleSource,foveationSource:XQ.foveationSource,antialias:!!renderer.getContext().getContextAttributes()?.antialias,layerSize:xrLayerSize(),coreInSync:CORE_OK,coreApi:X?.API??null,frameErrors:xrFrameErrors,lastFrameError:lastXrFrameError},
   card:picked?{id:picked.id,layer:picked.layer,tier:picked.tier,lines:picked.lines}:null,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()},rig:{position:rig.position.toArray(),yaw:rig.rotation.y},camera:{world:camera.getWorldPosition(new THREE.Vector3()).toArray()},
-  viewPos:viewPos.slice(),photoSphereVisible:sphere.visible,mode:MODE_AR?'ar':'vr',mr:MODE_AR?mrInspection():null,sensors:sensorsInspection(),
+  viewPos:viewPos.slice(),photoSphereVisible:sphere.visible,mode:MODE_AR?'ar':'vr',mr:MODE_AR?mrInspection():null,sensors:sensorsInspection(),ask:askInspection(),
   menu:{open:state.menu,page:state.page,buttons:CORE_OK?menuModel().buttons.map(b=>b.id):null,hover:[...menuHover],distance:state.menu?menu.mesh.getWorldPosition(new THREE.Vector3()).distanceTo(camera.getWorldPosition(new THREE.Vector3())):null},
   controls:{hands:state.hands,lensOpacity:state.opacity.lens,allOpacity:state.opacity.all,cone2:U.cone2On.value,roles:curRoles,hoverElements:HOVER_ELEMENTS,hoverCastMs:+hoverCost.ms.toFixed(2),hoverIntervalMs:Math.round(hoverCost.interval)},
   aim:deskAim?{ok:deskAim.ok,kind:deskAim.kind,index:deskAim.index??null,method:deskAim.method??null,reason:deskAim.reason??null}:null,
@@ -1207,6 +1367,13 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
  sensors:{setScene:sc=>(SENS.on?sensorsSetScene(sc):(SENS.scene=sc,sensorsEnable(true))),enable:on=>sensorsEnable(on),next:()=>sensorsNextScene(),menuCycle:()=>sensorsMenuCycle(),tick:()=>sensorsTick(),pinWorld:id=>{const r=SENS.recs.get(id);return r?_sw.fromArray(r.point).applyMatrix4(bimRoot.matrixWorld).toArray():null;},
   lookAt:id=>{const r=SENS.recs.get(id);if(!r)return null;bimRoot.updateMatrixWorld(true);const w=new THREE.Vector3().fromArray(r.point).applyMatrix4(bimRoot.matrixWorld),c=camera.getWorldPosition(new THREE.Vector3()),d=w.sub(c).normalize();yaw=Math.atan2(-d.x,-d.z)-rig.rotation.y;pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();sensorsTick();return d.toArray();}},
  mrChoose,mrSyncUrl,
+ // ?ask=1: aim the desktop camera at an element (its batch-vertex centroid) and pick it through the real ray path; then ask a level / press a bar button
+ ask:{pickId:id=>{id=String(id);const k=Object.keys(layerState).find(k=>layerState[k].loaded&&layerState[k].meta?.[id]);if(!k)return null;const g=sensorElementGeom(layerState[k],id,false);if(!g)return null;
+   const c=[0,0,0],n=g.pos.length/3;for(let i=0;i<n;i++)for(let j=0;j<3;j++)c[j]+=g.pos[i*3+j]/n;bimRoot.updateMatrixWorld(true);const w=new THREE.Vector3().fromArray(c).applyMatrix4(bimRoot.matrixWorld),o=camera.getWorldPosition(new THREE.Vector3()),d=w.clone().sub(o).normalize();
+   yaw=Math.atan2(-d.x,-d.z)-rig.rotation.y;pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();const look={yaw,pitch};return pickAlong(o,d).then(r=>r&&{...r,look});},
+  question:(level,text)=>askQuestion(level,text),button:i=>askButton(i,null),barButtonNdc:i=>{const r=XA.barRects()[i];if(!r||!askBar.mesh.visible)return null;askBar.mesh.updateMatrixWorld(true);camera.updateMatrixWorld(true);
+   const p=new THREE.Vector3((r.x+r.w/2-.5)*.6,(.5-(r.y+r.h/2))*.176,0).applyMatrix4(askBar.mesh.matrixWorld).project(camera);return [p.x,p.y];},
+  state:()=>askInspection(),clear:()=>askClear()},
  // cost of one element-hover raycast along the centre ray (what the flashlight hand pays per throttled cast), median of n
  rayCostMs:(n=15)=>{const [o,d]=xrDebug.ndcRay(0,0),t=[];for(let k=0;k<n;k++){const t0=performance.now();raycaster.set(o,d);raycaster.far=P.radius+6;raycaster.intersectObjects(pickables(),false);t.push(performance.now()-t0);}t.sort((a,b)=>a-b);return +t[n>>1].toFixed(2);},
  lookAtBim:p=>{const s=new THREE.Vector3().fromArray(X.invertReg(reg,p)),c=camera.getWorldPosition(new THREE.Vector3()),d=s.sub(c).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();return d.toArray();},
@@ -1220,6 +1387,7 @@ setInterval(updateStats,1000);
 /* ── Boot ── XR support first (decides the default photo resolution), then the capture, then services. */
 (async()=>{
  const supported=await detectXR();
+ askBoot();
  if(MODE_AR){await bootMR();return;}
  $('enterMR').onclick=()=>{location.search='?mode=ar';};   // the photo VR page offers MR only where immersive-ar exists
  state.hiRes=q.get('hires')==='1'?true:q.get('hires')==='0'?false:!supported;$('hires').setAttribute('aria-pressed',String(state.hiRes));
