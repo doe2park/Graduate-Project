@@ -106,7 +106,7 @@ function captureSelection(search){
  const CAPTURE_DATES=['2026-10-18','2026-09-17','2026-05-06'],CAPTURE_GAUSSIAN={'2026-05-06':{kind:'manifest',path:'scan-assets/gaussian/2026-05-06/viewer.json'},'2026-10-18':{kind:'zones',path:'scan-assets/gaussian/2026-10-18/zones/index.json'}};
  const q=new URLSearchParams(search),asked=q.get('capture'),wantsSplat=q.get('mode')==='splat';
  /* later captures share the Sep 17 layout and its provisional (borrowed May) project-frame alignment */
- const date=CAPTURE_DATES.includes(asked)?asked:wantsSplat?'2026-05-06':'2026-09-17',old=date==='2026-05-06',g=CAPTURE_GAUSSIAN[date]||null;
+ const date=CAPTURE_DATES.includes(asked)?asked:wantsSplat?'2026-05-06':'2026-10-18',old=date==='2026-05-06',g=CAPTURE_GAUSSIAN[date]||null;
  return {date,provisional:!old,gaussian:g?{kind:g.kind,path:g.path}:null,display:wantsSplat&&g?'splat':'photo',splatRefused:wantsSplat&&!g,photo:old?'scan-assets/panoramas/manifest.json':'scan-assets/captures/'+date+'/panoramas/manifest.json',registration:old?'alignment-analysis/accepted-registration.json':'scan-assets/captures/'+date+'/registration.json',mesh:'scan-bim.html?pane=scan&capture='+date+'&revision=walk-cameras2'};
 }
 /* Gaussian scenes kept on the owner's machine only (2026-10-28: Oct 18 zones are not published; zone B shows seated people).

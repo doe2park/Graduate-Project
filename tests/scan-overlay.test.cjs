@@ -48,7 +48,7 @@ test('Gaussian is enabled only from each capture\'s own public manifest/zone ind
  assert.doesNotMatch(splat,/train the local pilot/);
  const m=src.match(/\/\* CAPTURE SELECTION \*\/([\s\S]*?)\/\* END CAPTURE SELECTION \*\//)[1],c={URLSearchParams};vm.createContext(c);vm.runInContext(m,c);
  const sep=c.captureSelection('?mode=splat&capture=2026-09-17');assert.equal(sep.date,'2026-09-17');assert.equal(sep.gaussian,null);assert.equal(sep.display,'photo');
- assert.equal(c.captureSelection('').date,'2026-09-17');
+ assert.equal(c.captureSelection('').date,'2026-10-18');
  assert.match(src,/value="splat" disabled/);
  assert.match(logic().splatSource('scan-assets/gaussian/2026-05-06/viewer.json'),/^scan-splat\.html\?manifest=scan-assets%2Fgaussian%2F2026-05-06%2Fviewer\.json/)});
 

@@ -48,7 +48,7 @@ consistency between exports, not surveyed accuracy. Every UI label says provisio
 ## UI
 
 - `scan-compare.html?capture=2026-10-18`: picker lists Oct 18 / Sep 17 (both "Provisional") / May 6. The no-parameter
-  default is unchanged (Sep 17).
+  default was Sep 17 at publication; since 2026-11-05 it is Oct 18 (Level 1).
 - `scan-xr.html?capture=2026-10-18`: the menu Capture button cycles May 6 -> Sep 17 -> Oct 18 -> May 6 (default May 6);
   Oct 18 shows `PROVISIONAL alignment (not surveyed)`.
 - `registration-workbench.html` is not wired for Oct 18 (it needs a published mesh).
