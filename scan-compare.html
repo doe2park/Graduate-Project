@@ -242,12 +242,13 @@ function applyStyle(){
  layoutLens(true);syncXray();
 }
 /* Phones: the card docks at the bottom, so lift the lens into the space above it and keep the two apart. */
-const LENS_CARD_RESERVE=72+104+12,LENS_TOOLBAR_RESERVE=56;
+const LENS_CARD_RESERVE=72+104+12,LENS_TOOLBAR_RESERVE=56,LENS_DRAG_BOTTOM=8;
 function lensGeom(w,h){
  if(!touchMq.matches)return {c:lensCenter(lensTarget,w,h),r:lensRadius(w,h)};
  let cover=0;try{const m=mainEl.getBoundingClientRect().top;for(const el of [document.querySelector('header'),overlayBar])if(el){const b=el.getBoundingClientRect().bottom-m;if(Number.isFinite(b)&&b>cover)cover=b;}}catch(e){}
  const top=Math.min(h-120,Math.max(0,cover)+LENS_TOOLBAR_RESERVE),bottom=Math.max(top+80,h-LENS_CARD_RESERVE),r=Math.max(36,Math.min(lensRadius(w,h),(bottom-top)/2-6));
- const dragged=lensDragCenter(lensDrag,w,h,top,bottom);
+ /* the drag may reach the bottom of the photo; the card moves to the top when the lens is low (placeLensCard) */
+ const dragged=lensDragCenter(lensDrag,w,h,top,Math.max(bottom,h-LENS_DRAG_BOTTOM));
  return {c:dragged||{x:w/2,y:top+(bottom-top)/2},r};
 }
 function layoutLens(snap){
@@ -376,6 +377,7 @@ function probeLens(){
 function placeLensCard(){
  const w=mainEl.clientWidth,h=mainEl.clientHeight,c=lensNow||{x:w/2,y:h/2};
  const p=ElementCards.lensCardPosition({cx:c.x,cy:c.y,r:lensGeom(w,h).r,w:lensCard.offsetWidth,h:lensCard.offsetHeight,vw:w,vh:h,mobile:touchMq.matches,bottomInset:72});
+ if(touchMq.matches&&c.y+lensGeom(w,h).r>p.y-4)p.y=LENS_TOOLBAR_RESERVE+8;
  lensCard.style.transform='translate('+p.x+'px,'+p.y+'px)';
 }
 function hideLensCard(now){
