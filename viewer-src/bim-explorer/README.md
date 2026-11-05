@@ -20,7 +20,7 @@ Edit the source modules, `style.css` or `index.template.html`, then rebuild. Do 
 
 ## Hosting and data boundaries
 
-Open `grimes-bim-explorer.html?model=full` for the complete Grimes model, or use `?model=regional` / `?model=conduit` for the bundled teaching examples. Desktop defaults to full; narrow screens default to regional unless a mode is explicit. Full loading requires the existing 24 source files and can be demanding on a phone. All modes keep original property/identity validation.
+Open `grimes-bim-explorer.html?model=full` for the complete Grimes model, or use `?model=regional` / `?model=conduit` for the bundled teaching examples. Desktop defaults to full; narrow screens default to regional unless a mode is explicit. Full loading uses the existing source files (all SHA-256 and per-file object/triangle/segment checks are kept) and shows geometry progressively: the structure appears after its first file and the other disciplines are added as they arrive; selection and the inspector become available when the load completes. On phones (`(max-width: 768px), (pointer: coarse)`) `?model=full` loads 8 of 10 disciplines first, leaving out fire protection (about 86 MB) and receptacles & data (about 28 M triangles); the scope line says so and a "Load all 10 disciplines" button loads everything. Use `?layers=all` to force all 10 disciplines on a phone. All modes keep original property/identity validation.
 
 The regional package is a partial Level 1 area: 492 objects and eight disciplines. Its transform is specific to Grimes. The public explorer supports prepared embedded GLB + matching JSON input, not direct NWD/IFC conversion or automatic spatial registration.
 

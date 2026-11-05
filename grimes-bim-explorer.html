@@ -21,9 +21,11 @@
 .canvas-tools>div{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:600px){.canvas-tools{align-items:flex-start;gap:8px}.canvas-tools>div{gap:4px}.canvas-tools button{padding:8px 9px;min-height:44px}.object-actions button{min-height:44px}}
 
+#load-all{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:700}#load-all[hidden]{display:none}
+
 </style><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script></head><body>
 <header class="app-header"><a class="brand" href="grimes-campus-map-arcgis.html">Interior<span>Digital Twin</span></a><nav aria-label="Workspace"><a href="grimes-bim-explorer.html" aria-current="page">BIM explorer</a><a href="scan-compare.html">Scan ↔ BIM</a><a href="campus-energy-dashboard.html">Energy dashboard</a></nav><span class="local-badge">Web workspace</span></header>
-<main class="workspace"><div class="project-bar"><div><h1>Grimes Engineering Center</h1><p id="scope">Complete BIM · Existing source geometry</p></div><div class="project-actions"><label class="sr-only" for="dataset">Example package</label><select id="dataset"><option value="full">Grimes · Complete BIM</option><option value="regional">Small region · 492 objects</option><option value="conduit">Conduit · identity exercise</option></select><button id="demo">Reload example</button></div></div>
+<main class="workspace"><div class="project-bar"><div><h1>Grimes Engineering Center</h1><p id="scope">Complete BIM · Existing source geometry</p></div><div class="project-actions"><label class="sr-only" for="dataset">Example package</label><select id="dataset"><option value="full">Grimes · Complete BIM</option><option value="regional">Small region · 492 objects</option><option value="conduit">Conduit · identity exercise</option></select><button id="demo">Reload example</button><button id="load-all" hidden title="Also load fire protection and receptacles &amp; data (large; may be slow on a phone)">Load all 10 disciplines</button></div></div>
 <div class="layout"><aside class="systems-panel"><details open id="systems-panel"><summary>Building systems <span id="layer-count">—</span></summary><label for="floor">Floor</label><select id="floor"><option value="">All floors</option></select><label for="colours">Appearance</label><select id="colours"><option value="source">Original materials</option><option value="systems">System colours</option></select><div class="pair"><button id="all">Show all</button><button id="none">Hide all</button></div><div id="layers" aria-label="System visibility"></div><details class="section-tools"><summary>Section view</summary><label class="section-toggle"><input type="checkbox" id="section-enabled"> Horizontal cut</label><label for="section-height">Cut height <output id="section-value">—</output></label><input id="section-height" type="range" min="0" max="30" step="0.05" disabled><p>Height in model coordinates.</p></details><div class="legend-note"><i></i>Gold highlights your selection.</div></details><details class="import-panel"><summary>Open your own package</summary><p>Choose prepared files from your computer. Files stay in this browser.</p><label>Geometry (.glb)<input id="glb" type="file" accept=".glb"></label><label>Object properties (.json)<input id="json" type="file" accept=".json"></label><button id="load">Validate and open</button><p class="downloads">Teaching example: <a href="bim-explorer-assets/sample.glb" download>GLB</a> + <a href="bim-explorer-assets/sample.json" download>JSON</a></p></details><a class="text-link" href="scan-compare.html" target="_blank" rel="noopener">Open Scan ↔ BIM ↗</a></aside>
 <section class="model-panel"><div class="canvas-tools"><span id="view-label">Model overview</span><div><button id="fit">Fit model</button><button id="top">Top view</button><button id="restore-view" title="Show all floors and objects; reset the section">Reset view</button></div></div><div id="viewport" aria-label="Interactive BIM model"><div id="loading" role="status">Preparing Grimes…</div></div><div class="model-caption"><span>Drag to orbit · Scroll or pinch to zoom · Select a component</span><span id="render-stats">—</span></div><div class="metrics"><div><strong id="metric-objects">—</strong><span>Objects loaded</span></div><div><strong id="metric-visible">—</strong><span>Enabled objects</span></div><div><strong id="metric-bytes">—</strong><span>Geometry size</span></div></div><div id="summary" class="sr-only"></div></section>
 <aside class="inspector"><div class="inspector-title">Object inspector <span class="dot"></span></div><label for="search">Search by ID, tag or type</label><input id="search" type="search" placeholder="e.g. junction box"><label class="sr-only" for="objects">Find a loaded object</label><p id="search-count" class="search-count"></p><select id="objects" disabled><option>Loading…</option></select><div id="card"><span id="system-name" class="system-chip">Source properties</span><h2 id="type">Select a component</h2><div id="key"></div><dl id="props"></dl><div class="object-actions"><button id="focus">Focus</button><button id="isolate">Isolate</button><button id="hide-object">Hide</button></div><p id="object-filter-state" role="status"></p><p id="feed">No verified element-level live feed.</p><details><summary>All source properties</summary><pre id="raw"></pre></details></div><details class="activity"><summary>Package activity</summary><ol id="activity"></ol></details><button id="report" disabled>Export validation record</button></aside></div>
@@ -847,10 +849,16 @@ var cacheReads = [];
 var gate = createLoadGate();
 var floor = "";
 var buildingSource = false;
+var previewShown = false;
+var previewGroup = null;
+var subsetShown = false;
+var phoneMedia = matchMedia("(max-width: 768px), (pointer: coarse)");
+var wantAllLayers = () => new URLSearchParams(location.search).get("layers") === "all";
+var forceAll = wantAllLayers();
 var query = new URLSearchParams(location.search);
 if (!query.has("model") && matchMedia("(max-width: 600px)").matches) $("dataset").value = "regional";
 if (["regional", "conduit", "full"].includes(query.get("model"))) $("dataset").value = query.get("model");
-var draw = createDemandRenderer({ renderer, scene, camera, controls, blocked: () => buildingSource, onFrame: (stats) => {
+var draw = createDemandRenderer({ renderer, scene, camera, controls, blocked: () => buildingSource && !previewShown, onFrame: (stats) => {
   $("render-stats").textContent = `${stats.calls.toLocaleString()} draw calls${stats.moving ? " · navigating" : ""}`;
 } });
 var invalidate = () => draw.invalidate();
@@ -871,9 +879,17 @@ function visibleBox() {
   return box;
 }
 function fit(top = false) {
+  if (previewShown && previewGroup) {
+    const pb = new THREE.Box3().setFromObject(previewGroup);
+    if (!pb.isEmpty()) fitBox(pb, top, " · loading preview");
+    return;
+  }
   if (!root) return;
   const box = visibleBox();
   if (box.isEmpty()) return;
+  fitBox(box, top, floor ? " · " + levelName(floor) : "");
+}
+function fitBox(box, top, suffix) {
   const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()), radius = s.length() / 2;
   controls.target.copy(c);
   const direction = (top ? new THREE.Vector3(0, 1, 1e-4) : new THREE.Vector3(0.9, 0.65, 1)).normalize(), right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), direction).normalize(), up = new THREE.Vector3().crossVectors(direction, right), tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -887,7 +903,7 @@ function fit(top = false) {
   camera.far = Math.max(radius * 50, 100);
   camera.updateProjectionMatrix();
   controls.update();
-  $("view-label").textContent = (top ? "Top view" : "Model overview") + (floor ? " · " + levelName(floor) : "");
+  $("view-label").textContent = (top ? "Top view" : "Model overview") + suffix;
   invalidate();
 }
 $("fit").onclick = () => fit();
@@ -1222,34 +1238,81 @@ async function fetchSourceFile(path) {
 async function sourceFile(path, hash) {
   return verifiedAsset(path, hash, { fetchBuffer: fetchSourceFile, verify: verifyBytes, onRead: (r) => cacheReads.push(r) });
 }
-async function loadFull(next) {
-  const catalog = await checked(deployment.asset("source-catalog.json")), parts = [];
-  let completed = 0;
-  const total = catalog.layers.reduce((s, l) => s + l.parts.length, 0);
-  for (const layer of catalog.layers) {
-    $("loading").textContent = `Restoring ${systems[layer.key]?.label || layer.key} · ${completed}/${total} files`;
-    const raw = await sourceFile(layer.metadata, layer.metadataSHA256);
-    const metadata = sourceMetadata(JSON.parse(new TextDecoder().decode(raw)), layer.key), chunks = [];
-    for (const file of layer.parts) {
-      $("loading").textContent = `Loading ${systems[layer.key]?.label || layer.key} · ${completed + 1}/${total} files`;
-      await new Promise((r) => setTimeout(r, 0));
-      const buffer = await sourceFile(file.path, file.sha256);
-      const part = await decode(buffer, metadata, catalog.transform);
-      if (part.validation.matched !== file.objects || part.stats.renderTriangles !== file.triangles || part.stats.renderSegments !== file.segments) {
-        const g = new THREE.Group();
-        g.add(...part.meshes);
-        dispose(g);
-        throw Error(`Source fidelity mismatch: ${file.path}`);
-      }
-      next.add(...part.meshes);
-      chunks.push(part);
-      completed++;
-    }
-    parts.push(combineParts(chunks, layer.key));
-    event(`${systems[layer.key]?.label || layer.key}: ${layer.objects.toLocaleString()} original identities restored`);
+function showPreview(next, label) {
+  if (!previewShown) {
+    if (root) root.visible = false;
+    renderer.clippingPlanes = [];
+    scene.add(next);
+    previewGroup = next;
+    previewShown = true;
+    const box = new THREE.Box3().setFromObject(next);
+    if (!box.isEmpty()) fitBox(box, false, " · loading preview");
+    status("Preview: " + label + " shown while the rest loads. Selection becomes available when loading finishes.");
   }
-  if (parts.reduce((n, p) => n + p.validation.matched, 0) !== catalog.objects) throw Error("Incomplete building identities");
-  return { parts, choice: "full", scope: "Complete BIM · 10 disciplines · Existing source geometry" };
+  invalidate();
+}
+function endPreview(failed, next) {
+  if (!previewShown) return;
+  previewShown = false;
+  previewGroup = null;
+  if (failed) {
+    scene.remove(next);
+    if (root) root.visible = true;
+    updateSection();
+  }
+}
+var skippedOnPhone = ["fire", "fixtures"];
+async function loadFull(next) {
+  const catalog = await checked(deployment.asset("source-catalog.json")), phone = phoneMedia.matches && !forceAll && !wantAllLayers();
+  const bytesOf = (l) => l.parts.reduce((n, p) => n + p.bytes, 0), omitted = phone ? skippedOnPhone.filter((k) => catalog.layers.some((l) => l.key === k)) : [];
+  const requested = catalog.layers.filter((l) => !omitted.includes(l.key)), order = [...requested].sort((a, b) => a.key === "structural" ? -1 : b.key === "structural" ? 1 : bytesOf(a) - bytesOf(b));
+  const tasks = order.flatMap((layer) => layer.parts.map((file) => ({ layer, file }))), total = tasks.length, fetched = /* @__PURE__ */ new Map();
+  const prefetch = (i) => {
+    if (i >= total || fetched.has(i)) return;
+    const pr = sourceFile(tasks[i].file.path, tasks[i].file.sha256);
+    pr.catch(() => {
+    });
+    fetched.set(i, pr);
+  };
+  const chunksBy = new Map(order.map((l) => [l.key, []])), metaBy = /* @__PURE__ */ new Map();
+  let completed = 0;
+  for (let i = 0; i < total; i++) {
+    const { layer, file } = tasks[i], label = systems[layer.key]?.label || layer.key;
+    if (!metaBy.has(layer.key)) {
+      $("loading").textContent = `Restoring ${label} · ${completed}/${total} files`;
+      const raw = await sourceFile(layer.metadata, layer.metadataSHA256);
+      metaBy.set(layer.key, sourceMetadata(JSON.parse(new TextDecoder().decode(raw)), layer.key));
+    }
+    $("loading").textContent = `Loading ${label} · ${completed + 1}/${total} files`;
+    await new Promise((r) => setTimeout(r, 0));
+    prefetch(i);
+    const buffer = await fetched.get(i);
+    fetched.delete(i);
+    prefetch(i + 1);
+    const part = await decode(buffer, metaBy.get(layer.key), catalog.transform);
+    if (part.validation.matched !== file.objects || part.stats.renderTriangles !== file.triangles || part.stats.renderSegments !== file.segments) {
+      const g = new THREE.Group();
+      g.add(...part.meshes);
+      dispose(g);
+      throw Error(`Source fidelity mismatch: ${file.path}`);
+    }
+    next.add(...part.meshes);
+    chunksBy.get(layer.key).push(part);
+    completed++;
+    showPreview(next, label);
+    await new Promise((r) => {
+      const t = setTimeout(r, 100);
+      requestAnimationFrame(() => setTimeout(() => {
+        clearTimeout(t);
+        r();
+      }, 0));
+    });
+    if (chunksBy.get(layer.key).length === layer.parts.length) event(`${label}: ${layer.objects.toLocaleString()} original identities restored`);
+  }
+  const parts = requested.map((l) => combineParts(chunksBy.get(l.key), l.key)), expected = requested.reduce((n, l) => n + l.objects, 0);
+  if (parts.reduce((n, p) => n + p.validation.matched, 0) !== expected || !omitted.length && expected !== catalog.objects) throw Error("Incomplete building identities");
+  const scope = omitted.length ? `Grimes BIM · ${requested.length} of ${catalog.layers.length} disciplines on this phone · ${omitted.map((k) => (systems[k]?.label || k).toLowerCase()).join(" and ")} not loaded` : "Complete BIM · 10 disciplines · Existing source geometry";
+  return { parts, choice: "full", scope, omitted, subset: omitted.length > 0, previewed: true };
 }
 async function requestLoad(build) {
   return gate.run(async () => {
@@ -1279,7 +1342,7 @@ async function requestLoad(build) {
         scene.remove(old);
         dispose(old);
       }
-      report = { matched: Object.keys(records).length, ids: Object.keys(records), layers: result.parts.map((p) => ({ layer: p.layer, ...p.stats, matched: p.validation.matched, bytes: p.bytes })), fileBytes: result.parts.reduce((s, p) => s + p.bytes, 0), triangles: result.parts.reduce((s, p) => s + p.stats.renderTriangles, 0), segments: result.parts.reduce((s, p) => s + p.stats.renderSegments, 0), sourceGeometryPreserved: true, batching: query.get("batching") === "legacy" ? "by-type" : "compatible-material-floor-system", cache: { hits: cacheReads.filter((r) => r.source === "verified-cache").length, reads: cacheReads.length, assets: cacheReads }, mode: result.choice, scope: result.scope, units: "m", upAxis: "Y", spatiallyRegistered: false, hardwareValidated: false, validatedAt: (/* @__PURE__ */ new Date()).toISOString(), loadMs: Math.round(performance.now() - started) };
+      report = { matched: Object.keys(records).length, ids: Object.keys(records), layers: result.parts.map((p) => ({ layer: p.layer, ...p.stats, matched: p.validation.matched, bytes: p.bytes })), fileBytes: result.parts.reduce((s, p) => s + p.bytes, 0), triangles: result.parts.reduce((s, p) => s + p.stats.renderTriangles, 0), segments: result.parts.reduce((s, p) => s + p.stats.renderSegments, 0), sourceGeometryPreserved: true, batching: query.get("batching") === "legacy" ? "by-type" : "compatible-material-floor-system", cache: { hits: cacheReads.filter((r) => r.source === "verified-cache").length, reads: cacheReads.length, assets: cacheReads }, mode: result.choice, scope: result.scope, omittedLayers: result.omitted || [], units: "m", upAxis: "Y", spatiallyRegistered: false, hardwareValidated: false, validatedAt: (/* @__PURE__ */ new Date()).toISOString(), loadMs: Math.round(performance.now() - started) };
       applyColours();
       $("scope").textContent = result.scope;
       $("search").value = "";
@@ -1287,8 +1350,8 @@ async function requestLoad(build) {
       renderLayers();
       resetSection();
       select(Object.keys(records).find((k) => records[k].sourceId === "160988" && records[k].layer === "equipment") || report.ids[0]);
-      fit();
-      if (result.choice === "full") {
+      if (!result.previewed) fit();
+      if (result.choice === "full" && !result.previewed) {
         camera.position.sub(controls.target).multiplyScalar(0.84).add(controls.target);
         controls.update();
       }
@@ -1300,6 +1363,9 @@ async function requestLoad(build) {
         $("view-label").textContent = "Regional overview";
         invalidate();
       }
+      if (result.previewed) $("view-label").textContent = "Model overview";
+      subsetShown = !!result.subset;
+      $("load-all").hidden = !subsetShown;
       $("metric-objects").textContent = report.matched.toLocaleString();
       $("metric-bytes").textContent = report.fileBytes > 1e6 ? `${(report.fileBytes / 1e6).toFixed(2)} MB` : `${(report.fileBytes / 1e3).toFixed(1)} kB`;
       $("summary").textContent = `${report.matched} objects · ${report.triangles} triangles · identity preserved`;
@@ -1307,17 +1373,24 @@ async function requestLoad(build) {
       status("Ready. Select a component to inspect its source properties.");
       event(`Ready: ${report.matched} objects in ${layers.length} systems`);
     } catch (e) {
+      endPreview(true, next);
       dispose(next);
+      if (subsetShown) forceAll = wantAllLayers();
       status(e.message, true);
       event("Load failed; previous model retained");
       if (mode && mode !== "upload") $("dataset").value = mode;
     } finally {
+      endPreview(false, next);
       $("loading").hidden = true;
       for (const id of ["demo", "load", "dataset"]) $(id).disabled = false;
       invalidate();
     }
   });
 }
+$("load-all").onclick = () => {
+  forceAll = true;
+  loadExample();
+};
 $("demo").onclick = loadExample;
 $("dataset").onchange = loadExample;
 $("load").onclick = () => requestLoad(async (next) => {
@@ -1336,7 +1409,7 @@ function hitKey(h) {
 var down;
 renderer.domElement.onpointerdown = (e) => down = [e.clientX, e.clientY];
 renderer.domElement.onpointerup = (e) => {
-  if (!root || !down) return;
+  if (!root || previewShown || !down) return;
   const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]);
   down = null;
   if (moved > 5) return;
