@@ -450,8 +450,10 @@ function mountParent(ctx) {
   const worlds = {}, chipSize = new Map(); let lastRect = null, cardSize = null, lastProj = {}, lastSeen = [], restDiff = null;
   /* Lens rest sensor (?focus= or the scene's primary). auto = the Lens sits on it when no sensor is pinned (a pin click or a
      deck card switches the lock; releasing returns to the primary). In a deck embed it always stays on; standalone, the badge
-     button toggles between "on sensor" and mouse-follow. */
+     button toggles between "on sensor" and mouse-follow. In mouse-follow mode a pin click only opens the card: the Lens stays
+     with the mouse so a viewer can keep looking around while the card is open. */
   let primaryId = null, auto = false, feed = null, obs = {}, feedAt = 0;
+  const lockTarget = () => on && (auto || embedded) ? (pinned || (auto ? primaryId : null)) : null;
   /* observations from twin/sensors/feed.js (ctx.feedModule): demo-sim now, real adapters later; refreshed every 15 s */
   function refreshFeed() {
     if (!feed) return;
@@ -556,7 +558,7 @@ function mountParent(ctx) {
     const id = on ? (pinned || hover) : null, s = id && byId.get(id), b = s && pins.get(id);
     pins.forEach((p, k) => p.classList.toggle('on', k === id)); chips.forEach((c, k) => c.classList.toggle('on', k === id));
     /* the Lens follows a clicked / deck-focused sensor: centred on its pin, recomputed from each new projection */
-    const lockId = on ? (pinned || (auto ? primaryId : null)) : null;
+    const lockId = lockTarget();
     const RR = lastRect || rect();   // the rect read at the start of this render: no forced layout after the pin writes
     const pt = lockId ? lensAnchor(lockId, lastProj, lastSeen) : null;
     if (lens && lockId) { if (pt) lens.set(pt[0], pt[1], RR.mw, RR.mh); lensLocked = true; }
@@ -608,7 +610,7 @@ function mountParent(ctx) {
     /* a locked Lens ignores mouse moves over the photo (dragging the view included), so it stays on its sensor; standalone,
        the badge button "Lens: on sensor / mouse" hands it back to the mouse. true = let the mouse move the Lens */
     pointerMoved: () => !lensLocked,
-    inspection: () => ({feed: {sources: [...new Set(Object.values(obs).map(o => o.source))], count: Object.keys(obs).length, at: feedAt}, primary: primaryId, auto, lockId: on ? (pinned || (auto ? primaryId : null)) : null, restDiff, projectedFromPose: !!(ctx.getPose && ctx.getPose() && Object.keys(worlds).length), lensLocked, chips: [...chips].filter(([, c]) => !c.hidden).map(([id, c]) => { const r = c.getBoundingClientRect(); return [id, c.textContent, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }),
+    inspection: () => ({feed: {sources: [...new Set(Object.values(obs).map(o => o.source))], count: Object.keys(obs).length, at: feedAt}, primary: primaryId, auto, lockId: lockTarget(), restDiff, projectedFromPose: !!(ctx.getPose && ctx.getPose() && Object.keys(worlds).length), lensLocked, chips: [...chips].filter(([, c]) => !c.hidden).map(([id, c]) => { const r = c.getBoundingClientRect(); return [id, c.textContent, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; }),
     pinXY: Object.fromEntries([...pins].filter(([, b]) => !b.hidden).map(([id, b]) => [id, [+b.dataset.x, +b.dataset.y]])), scene: ctx.sceneFilter || null, sensors: byId.size, attached: Object.keys(elements), pins: [...pins].filter(([, b]) => !b.hidden).map(([id]) => id), fibreSegments: gFibre.childNodes.length / 2, pulses: gPulse.childNodes.length / 3, links: gLinks.childNodes.length, zones: gZones.childNodes.length, card: card.classList.contains('show') ? card.dataset.sensor : null, failed}),
     focus: id => { pinned = byId.has(id) ? id : null; renderCard(); }};
   return api;
