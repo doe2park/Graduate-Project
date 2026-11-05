@@ -40,18 +40,17 @@ test('date switches carry a Gaussian request and the viewpoint; mode switches ke
  assert.doesNotMatch(src,/mode\.value==='splat'\?'2026-05-06'/);
  assert.match(src,/u\.searchParams\.set\('at',encodeAt\(p\)\)/)});
 
-/* Oct 18 published as photos only (2026-10-28): its Gaussian zones stay local, so off localhost the capture has none */
+/* Oct 18 Gaussian zones A, C, D published 2026-11-05 (zone B stays local): every host gets the same zones */
 function hostBlock(){const m=src.match(/\/\* CAPTURE SELECTION \*\/([\s\S]*?)\/\* END CAPTURE SELECTION \*\//);const c={URLSearchParams};vm.createContext(c);vm.runInContext(m[1]+';this.captureForHost=captureForHost;this.gaussianOptionLabel=gaussianOptionLabel;',c);return c}
-test('off localhost the Oct 18 Gaussian is "no Gaussian for this capture"; localhost keeps the local zones; photos unchanged',()=>{const c=hostBlock();
- for(const host of ['doe2park.github.io','pages.emu','localhost.test','']){
-  const p=c.captureForHost(c.captureSelection('?capture=2026-10-18'),host);assert.equal(p.gaussian,null);assert.equal(p.gaussianLocalOnly,true);assert.equal(p.display,'photo');assert.equal(p.splatRefused,false);
-  assert.equal(p.photo,'scan-assets/captures/2026-10-18/panoramas/manifest.json');assert.equal(p.registration,'scan-assets/captures/2026-10-18/registration.json');
-  assert.equal(c.gaussianOptionLabel(p),'Gaussian · no Gaussian for this capture');
-  const s=c.captureForHost(c.captureSelection('?capture=2026-10-18&mode=splat'),host);assert.equal(s.gaussian,null);assert.equal(s.display,'photo');assert.equal(s.splatRefused,true);
+test('Oct 18 Gaussian zones are offered on every host; May and Sep unchanged',()=>{const c=hostBlock();
+ for(const host of ['doe2park.github.io','pages.emu','localhost','127.0.0.1','']){
+  const s=c.captureForHost(c.captureSelection('?capture=2026-10-18&mode=splat'),host);assert.equal(s.display,'splat');assert.equal(s.gaussian.path,'scan-assets/gaussian/2026-10-18/zones/index.json');assert.equal(s.gaussianLocalOnly,undefined);
+  const p=c.captureForHost(c.captureSelection('?capture=2026-10-18'),host);assert.equal(p.display,'photo');assert.equal(p.photo,'scan-assets/captures/2026-10-18/panoramas/manifest.json');
   const may=c.captureForHost(c.captureSelection('?mode=splat&capture=2026-05-06'),host);assert.equal(may.display,'splat');assert.equal(may.gaussian.path,'scan-assets/gaussian/2026-05-06/viewer.json');
   assert.equal(c.captureForHost(c.captureSelection('?capture=2026-09-17'),host).gaussian,null)}
- for(const host of ['localhost','127.0.0.1']){const l=c.captureForHost(c.captureSelection('?capture=2026-10-18&mode=splat'),host);assert.equal(l.display,'splat');assert.equal(l.gaussian.path,'scan-assets/gaussian/2026-10-18/zones/index.json');assert.equal(l.gaussianLocalOnly,undefined)}
  assert.match(src,/const capture=captureForHost\(captureSelection\(location\.search\),location\.hostname\)/)});
+test('published Oct 18 zone index leaves out zone B (seated people)',()=>{const p=require('node:path'),f=p.join(__dirname,'../scan-assets/gaussian/2026-10-18/zones/index.json');if(!fs.existsSync(f))return;
+ const idx=JSON.parse(fs.readFileSync(f,'utf8'));assert.deepEqual(idx.zones.map(z=>z.id),['l1-a','l1-c','l1-d']);assert.match(idx.privacy,/Zone B is not published/);assert.doesNotMatch(idx.privacy,/fully anonymi[sz]ed/)});
 test('the published Oct 18 package records the manual review and approval, never "fully anonymised"',()=>{const p=require('node:path'),d=p.join(__dirname,'../scan-assets/captures/2026-10-18');
  const m=JSON.parse(fs.readFileSync(p.join(d,'panoramas/manifest.json'),'utf8')),pr=JSON.parse(fs.readFileSync(p.join(d,'provenance.json'),'utf8')).privacy;
  assert.match(m.privacy,/manual contact-sheet review/);assert.match(m.privacy,/2026-10-28/);assert.match(m.privacy,/not a claim of full anonymisation/);assert.doesNotMatch(m.privacy,/review required before publishing/);

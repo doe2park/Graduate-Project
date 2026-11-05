@@ -1,0 +1,335 @@
+{
+  "status": "experimental-trained",
+  "frame": "scan-y-up-metres",
+  "file": "trained.ksplat",
+  "mobileFile": "mobile.ply",
+  "splatCount": 1000000,
+  "mobileSplatCount": 350000,
+  "camera": {
+    "position": [
+      18.50982387000047,
+      6.199491065029482,
+      10.87450956711279
+    ],
+    "quaternion": [
+      0.0,
+      -1.1102230246251565e-16,
+      0.0,
+      1.0
+    ],
+    "fov": 65,
+    "zoom": 1
+  },
+  "maxDistance": 120,
+  "provenance": {
+    "trainingIterations": 50000,
+    "sourceCheckpointSha256": "34efef747abdb6bf56127fd41afda8b84b0388d0296d352c163cd48d26d10aa1",
+    "sourceCheckpointBytes": 152001027,
+    "sourceGaussianCount": 1000000,
+    "desktopEncoding": "Lossy browser derivative: quantized centers, scales, rotations, color and retained spherical harmonics; alpha threshold 1. Source PLY is unchanged. No scene-coordinate transform.",
+    "desktopSha256": "5bde93523f3078dac4e1a18cb9f1a7e64c8dde23fa15ba3fc8805ef4a668e5c6",
+    "mobileSha256": "5e5d7441ae17beb8df0df8314040d72d972691053ce0d87c702e30fdbf6517b3",
+    "desktopBytes": 48053612,
+    "mobileBytes": 19600427,
+    "initialStation": "pano_107294568",
+    "mobileMethod": "SH0; opacity >=0.02; 15cm cell coverage and opacity budget. Lossy visual derivative; no change to source checkpoint.",
+    "geometryScope": "Trained appearance, not surveyed geometry or device identity. Same Cupix scan frame must be verified.",
+    "validation": {
+      "stations": 5,
+      "views": 30,
+      "psnr": 20.639013,
+      "ssim": 0.83360785,
+      "scope": "Station-held-out validation parsed from the Brush log; no independent final test set; not controlled across captures; camera poses and seed come from the same reconstruction."
+    },
+    "pipeline": {
+      "script": "scripts/run_gaussian_pipeline.py",
+      "argv": [
+        "--capture",
+        "2026-10-18",
+        "--zone",
+        "l1-c",
+        "--mask-nadir",
+        "--steps",
+        "50000"
+      ],
+      "smokeTest": false,
+      "nadirMasked": true,
+      "settings": {
+        "prepare": {
+          "size": 768,
+          "pointCount": 150000,
+          "maxStations": null,
+          "radius": 12.03,
+          "centerId": "pano_107294568",
+          "seedUpAxis": "z",
+          "stations": [
+            "pano_107294599",
+            "pano_107294610",
+            "pano_107294612",
+            "pano_107294736",
+            "pano_107294738",
+            "pano_107294531",
+            "pano_107294533",
+            "pano_107294535",
+            "pano_107294537",
+            "pano_107294544",
+            "pano_107294546",
+            "pano_107294548",
+            "pano_107294550",
+            "pano_107294563",
+            "pano_107294565",
+            "pano_107294568",
+            "pano_107294570",
+            "pano_107294572",
+            "pano_107294574",
+            "pano_107294576",
+            "pano_107294589",
+            "pano_107294592",
+            "pano_107294594",
+            "pano_107294596",
+            "pano_107294598",
+            "pano_107294601",
+            "pano_107294604",
+            "pano_107294606",
+            "pano_107294608",
+            "pano_107294611",
+            "pano_107294614",
+            "pano_107294617",
+            "pano_107294619",
+            "pano_107294734"
+          ]
+        },
+        "train": {
+          "steps": 50000,
+          "maxSplats": 1000000,
+          "resolution": 768,
+          "checkpointEvery": 5000,
+          "refineEvery": 400,
+          "growthStop": 30000,
+          "shDegree": 2
+        },
+        "mobileBudget": 350000,
+        "maskNadir": true,
+        "zone": {
+          "id": "l1-c",
+          "name": "Zone C",
+          "stations": [
+            "pano_107294599",
+            "pano_107294610",
+            "pano_107294612",
+            "pano_107294736",
+            "pano_107294738",
+            "pano_107294531",
+            "pano_107294533",
+            "pano_107294535",
+            "pano_107294537",
+            "pano_107294544",
+            "pano_107294546",
+            "pano_107294548",
+            "pano_107294550",
+            "pano_107294563",
+            "pano_107294565",
+            "pano_107294568",
+            "pano_107294570",
+            "pano_107294572",
+            "pano_107294574",
+            "pano_107294576",
+            "pano_107294589",
+            "pano_107294592",
+            "pano_107294594",
+            "pano_107294596",
+            "pano_107294598",
+            "pano_107294601",
+            "pano_107294604",
+            "pano_107294606",
+            "pano_107294608",
+            "pano_107294611",
+            "pano_107294614",
+            "pano_107294617",
+            "pano_107294619",
+            "pano_107294734"
+          ],
+          "core": [
+            "pano_107294599",
+            "pano_107294610",
+            "pano_107294612",
+            "pano_107294736",
+            "pano_107294738",
+            "pano_107294533",
+            "pano_107294535",
+            "pano_107294546",
+            "pano_107294548",
+            "pano_107294565",
+            "pano_107294568",
+            "pano_107294570",
+            "pano_107294572",
+            "pano_107294574",
+            "pano_107294592",
+            "pano_107294594",
+            "pano_107294596",
+            "pano_107294598",
+            "pano_107294601",
+            "pano_107294604",
+            "pano_107294606",
+            "pano_107294608",
+            "pano_107294611",
+            "pano_107294614",
+            "pano_107294617",
+            "pano_107294734"
+          ],
+          "overlapMetres": 3.0,
+          "bounds": {
+            "min": [
+              11.073,
+              5.401,
+              4.019
+            ],
+            "max": [
+              28.769,
+              7.062,
+              19.676
+            ]
+          },
+          "coreBounds": {
+            "min": [
+              13.749,
+              5.763,
+              4.697
+            ],
+            "max": [
+              26.444,
+              7.062,
+              19.676
+            ]
+          },
+          "stationSelection": "explicit-station-list"
+        }
+      },
+      "inputs": {
+        "manifestSha256": "494760fa646c1af6ecded72752b4ab41bb7ffdb7b5a0f3c0c5dbf2cc8182b3e7",
+        "seedGlbSha256": {
+          "scan.glb": "0eb0c482631e7efffded121ba77aebe757b830126fe3f63f839faa2cb39d32b0"
+        },
+        "datasetProvenanceSha256": "ee26a28a50c2e1515044676d80400fa1b0f183c40e9b68d89221babb0de9bc1d"
+      },
+      "tools": {
+        "brush": "brush-cli 0.3.0",
+        "brushExecutableSha256": "ec87ea0c950e74b88767fb978d83e5a4814dd41641a87f1b3c0a4b91bed95b2f",
+        "node": "v26.3.1",
+        "python": "3.12.10",
+        "gaussianSplats3d": "0.4.7",
+        "os": "Darwin 25.5.0 arm64",
+        "repoCommit": "f3f1423ad50e760a904a3e8da3d36c42b6515e42"
+      },
+      "timingsSeconds": {
+        "prepare": 22.9,
+        "train": 2051.2,
+        "encode": 2.3,
+        "package": 1.3
+      },
+      "startedAt": "2026-10-20T09:06:04.197255+00:00",
+      "endedAt": "2026-10-20T09:40:58.986723+00:00",
+      "trainViews": 174,
+      "evaluationViews": 30
+    },
+    "selectionStatus": "Local run from the one-command pipeline; not yet reviewed or selected."
+  },
+  "capture": "2026-10-18",
+  "building": "grimes",
+  "zone": {
+    "id": "l1-c",
+    "name": "Zone C",
+    "stations": [
+      "pano_107294599",
+      "pano_107294610",
+      "pano_107294612",
+      "pano_107294736",
+      "pano_107294738",
+      "pano_107294531",
+      "pano_107294533",
+      "pano_107294535",
+      "pano_107294537",
+      "pano_107294544",
+      "pano_107294546",
+      "pano_107294548",
+      "pano_107294550",
+      "pano_107294563",
+      "pano_107294565",
+      "pano_107294568",
+      "pano_107294570",
+      "pano_107294572",
+      "pano_107294574",
+      "pano_107294576",
+      "pano_107294589",
+      "pano_107294592",
+      "pano_107294594",
+      "pano_107294596",
+      "pano_107294598",
+      "pano_107294601",
+      "pano_107294604",
+      "pano_107294606",
+      "pano_107294608",
+      "pano_107294611",
+      "pano_107294614",
+      "pano_107294617",
+      "pano_107294619",
+      "pano_107294734"
+    ],
+    "core": [
+      "pano_107294599",
+      "pano_107294610",
+      "pano_107294612",
+      "pano_107294736",
+      "pano_107294738",
+      "pano_107294533",
+      "pano_107294535",
+      "pano_107294546",
+      "pano_107294548",
+      "pano_107294565",
+      "pano_107294568",
+      "pano_107294570",
+      "pano_107294572",
+      "pano_107294574",
+      "pano_107294592",
+      "pano_107294594",
+      "pano_107294596",
+      "pano_107294598",
+      "pano_107294601",
+      "pano_107294604",
+      "pano_107294606",
+      "pano_107294608",
+      "pano_107294611",
+      "pano_107294614",
+      "pano_107294617",
+      "pano_107294734"
+    ],
+    "overlapMetres": 3.0,
+    "bounds": {
+      "min": [
+        11.073,
+        5.401,
+        4.019
+      ],
+      "max": [
+        28.769,
+        7.062,
+        19.676
+      ]
+    },
+    "coreBounds": {
+      "min": [
+        13.749,
+        5.763,
+        4.697
+      ],
+      "max": [
+        26.444,
+        7.062,
+        19.676
+      ]
+    },
+    "stationSelection": "explicit-station-list"
+  },
+  "alignment": "project-frame-provisional",
+  "publication": "Published 2026-10-20 from scripts/run_gaussian_pipeline.py with nadir faces masked for zone l1-c (Zone C). Experimental appearance layer; not surveyed geometry; see provenance.pipeline for settings and held-out metrics."
+}

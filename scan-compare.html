@@ -119,7 +119,7 @@ function captureSelection(search){
 /* Gaussian scenes kept on the owner's machine only (2026-10-28: Oct 18 zones are not published; zone B shows seated people).
  Off localhost the capture is reported as having no Gaussian (option disabled, ?mode=splat falls back to photos with a note)
  instead of requesting an index that 404s. Localhost keeps the local zones. */
-const LOCAL_ONLY_GAUSSIAN=['2026-10-18'];
+const LOCAL_ONLY_GAUSSIAN=[];   /* 2026-11-05: Oct 18 zones A, C, D published (zone B stays local); nothing is localhost-only now */
 function captureForHost(c,host){if(!c.gaussian||!LOCAL_ONLY_GAUSSIAN.includes(c.date)||['localhost','127.0.0.1'].includes(host))return c;return {...c,gaussian:null,display:'photo',splatRefused:c.display==='splat'||c.splatRefused,gaussianLocalOnly:true};}
 function gaussianOptionLabel(c){if(!c.gaussian)return 'Gaussian · no Gaussian for this capture';return 'Gaussian · '+CAPTURE_SHORT[c.date]+(c.gaussian.kind==='zones'?' zones':'')+' (experimental)';}
 /* zones/index.json -> trained zones and an honest note; throws on anything the splat viewer would refuse */
