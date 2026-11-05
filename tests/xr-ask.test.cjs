@@ -28,9 +28,14 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=1"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=2"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
-  assert.match(page, /ASK=\{on:XAOK&&XA\.parseParams\(location\.search\)\.enabled/);
+  assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
+  assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
+  // the hold-to-ask hook in the trigger handler is guarded too
+  assert.ok(page.includes('function onSelect(c){const u=c.userData;if(ASK?.on&&askHoldSwallow(c))return;'));
+  // every API call goes through askApi (same origin, or the validated laptop origin)
+  assert.doesNotMatch(page, /fetch\('api\//);
   // every hook into the existing page is guarded, so the page is unchanged without ?ask=1
   for (const hook of ['if(ASK?.on)askOnPick', 'function hideCard(){if(ASK?.on)askClear();', 'if(ASK?.on)try{askAnim=askTick();}']) assert.ok(page.includes(hook), hook);
   assert.match(page, /function askPanelHit\(o,d\)\{if\(!ASK\?\.on\|\|!askBar\.mesh\.visible\)return null;/);
@@ -64,10 +69,11 @@ test('card model: short lead, 2 evidence bullets + first check, verified chips f
   assert.equal(XA.cardModel({answer: ANSWER, final: f2}).primary, null);
 });
 
-test('spoken text: element types instead of ids, no markdown, no Limits', () => {
+test('spoken text (fallback): lead + one check only, element types instead of ids, no markdown, no confidence, no Limits', () => {
   const t = XA.speakable(ANSWER, CITES);
-  assert.doesNotMatch(t, /\[\[|\*|400766|388279|Limits|mock/);
-  assert.match(t, /Terminal unit/); assert.match(t, /Confidence low/); assert.match(t, /Check first: Trace the duct/);
+  assert.doesNotMatch(t, /\[\[|\*|400766|388279|Limits|mock|onfidence|Touching-box|Other/);
+  assert.match(t, /Terminal unit/); assert.match(t, /First, trace the duct/);
+  assert.ok(t.split(/[.!?](\s|$)/).filter(x => x && x.trim()).length <= 2, t);
   assert.match(XA.speakable('**Answer:** Closest: [[1]] pipe, ~1.1 m above.', [{id: '1', type: 'Pipe'}]), /about 1\.1 metres above/);
 });
 
@@ -109,7 +115,9 @@ test('voice plans: mic opened before the session, laptop voice when the browser 
   assert.equal(XA.micPlan({...ok, presenting: true}).mode, 'try');
   assert.equal(XA.micPlan({...ok, secure: false}).mode, 'off');
   assert.equal(XA.micPlan({...ok, stt: false}).mode, 'off');
-  assert.equal(XA.ttsPlan({synth: true, voices: 3, server: true}), 'browser');
+  assert.equal(XA.ttsPlan({synth: true, voices: 3, server: true}), 'server');            // laptop voice preferred
+  assert.equal(XA.ttsPlan({synth: true, voices: 3, server: true, prefer: 'browser'}), 'browser');
+  assert.equal(XA.ttsPlan({synth: true, voices: 3, server: false}), 'browser');
   assert.equal(XA.ttsPlan({synth: true, voices: 0, server: true}), 'server');
   assert.equal(XA.ttsPlan({synth: true, voices: 0, server: false}), 'browser-unknown');
   assert.equal(XA.ttsPlan({synth: false, server: false}), 'none');
@@ -132,4 +140,49 @@ test('canvas drawing: answer card (thinking / answer / error) and bar draw witho
   }
   const ctx = fakeCtx(); XA.drawBar(ctx, 1024, 300, XA.barButtons({voice: 'ready'}), new Set([1]));
   assert.ok(ctx.calls.includes('1 · What is this?') && ctx.calls.includes('Hold to speak'));
+});
+
+test('server= (Method A): https + private LAN IPv4 or localhost + explicit port, else ignored', () => {
+  const ok = {'https://192.168.68.52:8765': 'https://192.168.68.52:8765', 'https://10.0.0.5:8765/': 'https://10.0.0.5:8765',
+    'https://172.16.0.1:9000': 'https://172.16.0.1:9000', 'https://172.31.255.254:8765': 'https://172.31.255.254:8765',
+    'https://localhost:8765': 'https://localhost:8765', 'HTTPS://192.168.1.2:8765': 'https://192.168.1.2:8765'};
+  for (const [raw, want] of Object.entries(ok)) assert.equal(XA.serverOrigin(raw), want, raw);
+  for (const raw of ['http://192.168.68.52:8765', 'https://192.168.68.52', 'https://192.168.68.52:443', 'https://8.8.8.8:8765',
+    'https://172.32.0.1:8765', 'https://172.15.0.1:8765', 'https://192.169.1.1:8765', 'https://evil.example:8765', 'https://doe2park.github.io:8765',
+    'https://192.168.1.2.nip.io:8765', 'https://user:pw@192.168.1.2:8765', 'https://192.168.1.2:8765/api', 'https://192.168.1.2:8765?x=1',
+    'https://192.168.1.2:8765#a', 'https://[::1]:8765', 'https://0x7f.0.0.1:8765', 'https://192.168.001.2:8765', 'https://256.168.1.2:8765',
+    'javascript:alert(1)', '//192.168.1.2:8765', '', ' ']) assert.equal(XA.serverOrigin(raw), null, raw);
+  const p = XA.parseParams('?mode=ar&ask=1&server=https://192.168.68.52:8765');
+  assert.deepEqual([p.enabled, p.server, p.serverIgnored], [true, 'https://192.168.68.52:8765', false]);
+  const bad = XA.parseParams('?ask=1&server=https://evil.example:8765');
+  assert.deepEqual([bad.server, bad.serverIgnored], [null, true]);
+  assert.equal(XA.parseParams('?ask=1').server, null);
+  assert.equal(XA.parseParams('?ask=1&voice=headset').preferVoice, 'browser');
+  assert.equal(XA.apiUrl(null, 'ask'), 'api/ask');
+  assert.equal(XA.apiUrl('https://192.168.68.52:8765', 'health'), 'https://192.168.68.52:8765/api/health');
+});
+
+test('health problem: one-tap trust link only for the validated laptop origin', () => {
+  const p = XA.healthProblem({server: 'https://192.168.68.52:8765', error: 'network or certificate'});
+  assert.equal(p.trustUrl, 'https://192.168.68.52:8765/trust');
+  assert.equal(p.trustLabel, 'Open https://192.168.68.52:8765/ once to trust it');
+  assert.equal(XA.healthProblem({}).trustUrl, null);
+  assert.match(XA.healthProblem({ignored: true}).text, /ignored/);
+});
+
+test('waiting feedback: progress lines from server events, earcons, hold-to-ask gate', () => {
+  assert.equal(XA.progressText({type: 'status', phase: 'thinking', text: 'Thinking…'}), 'Thinking…');
+  assert.equal(XA.progressText({type: 'status', text: 'retrying'}), null);
+  assert.equal(XA.progressText({type: 'tool', name: 'connected_run', input: {}}, {layer: 'duct'}), 'Following the ducts…');
+  assert.equal(XA.progressText({type: 'tool', name: 'elements_near', input: {above_only: true}}), 'Checking what is above it…');
+  assert.equal(XA.progressText({type: 'tool', name: 'sensor_readings', input: {}}), 'Reading the demo sensors (simulated)…');
+  assert.equal(XA.progressText({type: 'text', text: 'x'}), 'Writing the answer…');
+  for (const k of ['listen', 'send', 'done', 'miss']) assert.ok(XA.EARCONS[k].every(([f, t, d, g]) => f > 100 && d <= .2 && g <= .2), k);
+  assert.ok(XA.HOLD_MS >= 250 && XA.HOLD_MS <= 600); assert.equal(XA.FILLER_MS, 1500);
+  const base = {on: true, placed: true};
+  assert.equal(XA.holdAskAllowed(base), true);
+  for (const k of [{hoverPanel: 'ask'}, {aiming: true}, {grip: true}, {placing: true}, {placed: false}, {busy: true}, {on: false}])
+    assert.equal(XA.holdAskAllowed({...base, ...k}), false, JSON.stringify(k));
+  const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, {phase: 'thinking', model: {question: 'q'}, progress: 'Following the ducts…', steps: []});
+  assert.ok(ctx.calls.includes('Following the ducts…'));
 });

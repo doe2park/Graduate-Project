@@ -263,7 +263,7 @@ async function ask(question) {
       + `<span>Sources: design BIM · geometry · <b>simulated</b> demo sensors</span>`;
     state.history.push({q: question, a: text}); state.history = state.history.slice(-3);
     await showCitations(state.lastCites, text);
-    if ($('#atSpeak').checked) speak(text);
+    if ($('#atSpeak').checked) speak(final.spoken || text, !!final.spoken);   // server's short spoken version (lead + one check)
   } catch (e) {
     card.className = 'at-card on err';
     card.innerHTML = `<p><strong>Could not answer.</strong> ${esc(e.message)}</p>`;
@@ -279,9 +279,9 @@ $('#atClear').onclick = () => { api.clearHighlights(); clearBoxes(); state.histo
   $('#atCard').className = 'at-card'; $('#atSteps').className = 'at-steps'; $('#atFoot').textContent = ''; };
 
 // ---------- voice: push-to-talk in, speechSynthesis out ----------
-function speak(text) {
+function speak(text, ready = false) {
   if (!window.speechSynthesis) return;
-  const plain = text.replace(/\[\[([^\]]+)\]\]/g, (_, id) => (state.lastCites.find(c => c.id === id)?.type || 'element'))
+  const plain = ready ? text : text.replace(/\[\[([^\]]+)\]\]/g, (_, id) => (state.lastCites.find(c => c.id === id)?.type || 'element'))
     .replace(/\*\(mock mode[^)]*\)\*/g, '').replace(/[*#]/g, '').replace(/~/g, 'about ').replace(/·/g, ',').replace(/\bdegC\b/g, 'degrees')
     .split('\n').filter(l => !/^Limits:/.test(l.trim())).slice(0, 8).join('. ');
   const u = new SpeechSynthesisUtterance(plain); u.rate = 1.05; u.lang = 'en-US';

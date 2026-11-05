@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=1"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=2"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -773,7 +773,7 @@ function updatePointer(c,o,d,isLens){const u=c.userData,ray=u.ray,ret=u.reticle;
  if(kind==='floor'){ret.rotation.set(-Math.PI/2,0,0);ret.scale.setScalar(clamp(dist*.02,.03,.25));}else{ret.lookAt(_head);ret.scale.setScalar(clamp(dist*.012,.006,.1));}
  ret.userData.mat.color.set(col);ret.visible=true;}
 /* Trigger: acts only on what the ray highlights. Menu/panel button > (right or 'both' flashlight hand) info card. */
-function onSelect(c){const u=c.userData;rayOf(c,u.o,u.d);const o=u.o.clone(),d=u.d.clone(),h=u.hover;
+function onSelect(c){const u=c.userData;if(ASK?.on&&askHoldSwallow(c))return;rayOf(c,u.o,u.d);const o=u.o.clone(),d=u.d.clone(),h=u.hover;
  if(h&&h.panel){if(h.button>=0){buzz(c,.6,30);if(h.panel==='mr')mrButton(h.button);else if(h.panel==='ask')askButton(h.button,c);else menuAction(h.button);}return;}
  if(MODE_AR)return mrSelect(c,o,d);
  if(u.aiming)return;
@@ -1156,8 +1156,8 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
    (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
    and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
 var ASK=null;
-const XA=globalThis.XRAsk,XAOK=XA?.API===1;
-ASK={on:XAOK&&XA.parseParams(location.search).enabled,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
+const XA=globalThis.XRAsk,XAOK=XA?.API===2,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
+ASK={on:!!XAP.enabled,base:XAP.server||null,prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
  paths:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
  hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0};
 ASK.glow.name='ask: cited elements (render-only glow)';bimRoot.add(ASK.glow);
@@ -1166,6 +1166,13 @@ const askCard=makeSurface(1024,800,.6,.469,61),askBar=makeSurface(1024,300,.6,.1
 const askLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:0xD97757,transparent:true,opacity:.9,depthTest:false,depthWrite:false,toneMapped:false}));
 askLine.renderOrder=61;askLine.visible=false;askLine.frustumCulled=false;scene.add(askLine);
 const askReduced=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
+/* "Listening…" ring at the pointed element while the trigger is held (point-and-ask). */
+const askRing=new THREE.Mesh(new THREE.RingGeometry(.07,.095,40),new THREE.MeshBasicMaterial({color:0xff4d6d,transparent:true,opacity:.9,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
+askRing.renderOrder=63;askRing.visible=false;askRing.frustumCulled=false;scene.add(askRing);
+const askApi=name=>XA.apiUrl(ASK.base,name);
+/* Earcons: short Web Audio tones (XA.EARCONS), no files. */
+function askEarcon(name){try{askUnlockAudio();const a=ASK.audio?.ctx,tones=XA.EARCONS[name];if(!a||!tones)return;const t0=a.currentTime+.01;
+ for(const [f,st,d,g] of tones){const o=a.createOscillator(),v=a.createGain();o.type='sine';o.frequency.value=f;v.gain.setValueAtTime(0,t0+st);v.gain.linearRampToValueAtTime(g,t0+st+.012);v.gain.exponentialRampToValueAtTime(.0001,t0+st+d);o.connect(v);v.connect(a.destination);o.start(t0+st);o.stop(t0+st+d+.02);}}catch(e){}}
 function askNote(t){ASK.voiceNote=t||'';const n=$('askNote');if(n)n.textContent=t||'';}
 /* Pick -> ask bar under the info card (the info card itself is unchanged). point = world hit point. */
 function askOnPick({id,layer,point,sensor=null}){if(!ASK.on)return;
@@ -1180,16 +1187,17 @@ function askPlace(){const a=ASK.anchor;if(!a)return;const up=new THREE.Vector3(0
  if(ASK.el){const top=c.clone().addScaledVector(up,(h/2)*s);askLine.geometry.setFromPoints([top,ASK.el.world]);askLine.visible=cardOn;}}
 function askButtons(){return XA.barButtons({busy:ASK.busy,voice:ASK.voice,voiceNote:ASK.voiceNote});}
 function askDrawBar(){if(!ASK.on)return;XA.drawBar(askBar.ctx,askBar.canvas.width,askBar.canvas.height,askButtons(),ASK.hover);askBar.texture.needsUpdate=true;invalidate();}
+function askFooter(){const h=ASK.health;return ['Answers from read-only tools over the twin · '+(h?.mode==='mock'?(h.note||'MOCK: scripted from real tool results'):h?.model||''),'Design BIM · inferred geometry and rooms · demo sensors SIMULATED · not headset-verified'];}
 function askDraw(){ASK.dirty=false;ASK.lastDraw=performance.now();
  const run=ASK.run?'Lit run: '+(ASK.run.ids.length-1)+' steps along touching pieces, cited source to here · inferred from geometry, no flow direction in the model':'';
  XA.drawAnswer(askCard.ctx,askCard.canvas.width,askCard.canvas.height,{phase:ASK.phase,model:ASK.model||{question:ASK.question,level:ASK.level},steps:ASK.steps,error:ASK.error,speech:ASK.speech,runNote:run,
-  modeLabel:ASK.health?.mode==='live'?'LIVE':ASK.health?.mode==='mock'?'MOCK':'',footer:['Answers from read-only tools over the twin · '+(ASK.health?.mode==='mock'?'MOCK: scripted from real tool results':ASK.health?.model||''),'Design BIM · inferred geometry and rooms · demo sensors SIMULATED · not headset-verified']});
+  progress:ASK.progress,modeLabel:ASK.health?.mode==='live'?'LIVE':ASK.health?.mode==='mock'?'MOCK':'',footer:askFooter()});
  askCard.texture.needsUpdate=true;invalidate();}
 /* Remove the answer (glow, run, speech) but keep the pick. */
-function askResetAnswer(){ASK.epoch++;try{ASK.abort?.abort();}catch(e){}ASK.abort=null;ASK.busy=false;askStopSpeech();
+function askResetAnswer(){ASK.epoch++;try{ASK.abort?.abort();}catch(e){}ASK.abort=null;ASK.busy=false;askStopSpeech();clearTimeout(ASK.filler);ASK.progress='';
  for(const o of [...ASK.glow.children]){ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();}ASK.run=null;
  ASK.phase=null;ASK.model=null;ASK.final=null;ASK.text='';ASK.steps=[];ASK.paths=[];ASK.error=null;askCard.mesh.visible=false;askLine.visible=false;}
-function askClear(){if(!ASK?.on)return;askResetAnswer();if(ASK.voice==='recording')askRecStop(true);ASK.el=null;ASK.anchor=null;askBar.mesh.visible=false;ASK.hover.clear();invalidate();}
+function askClear(){if(!ASK?.on)return;askResetAnswer();if(ASK.voice==='recording')askRecStop(true);askRing.visible=false;ASK.el=null;ASK.anchor=null;askBar.mesh.visible=false;ASK.hover.clear();invalidate();}
 /* Glow: a render-only copy of the element's own batch vertices (never modifies the batches), additive, always on top. Element not drawn
    (layer not loaded, other level, not a drawn layer): a box outline from the server's bbox (viewer frame = bimRoot-local). */
 function askGlowFor(id,layer,bbox,color,opacity){const st=layerState[layer];const geo=st&&st.loaded?sensorElementGeom(st,id,true):null;let o;
@@ -1206,61 +1214,78 @@ function askHighlight(final){const cites=(final.citations||[]).filter(c=>c.verif
  if(meshes.length)ASK.run={meshes,t0:performance.now(),ids};}
 /* Per frame (XR and desktop): glow pulse, run lighting, throttled card redraw. Returns true while something animates (desktop keeps drawing). */
 function askTick(){if(!ASK?.on)return false;const now=performance.now();let anim=false;
+ askRing.visible=ASK.voice==='recording'&&!!ASK.el;
+ if(askRing.visible){askRing.position.copy(ASK.el.world);camera.getWorldPosition(_head);askRing.lookAt(_head);const d=_head.distanceTo(ASK.el.world),k=clamp(d*.35,.25,3)*(1+.18*Math.sin(now/140));askRing.scale.setScalar(k);anim=true;}
  if(ASK.dirty&&now-ASK.lastDraw>120)askDraw();
  if(ASK.glow.children.length){const red=askReduced(),ph=red?0:Math.sin(now/260)*.5+.5;
   for(const o of ASK.glow.children){if(o.userData.kind==='glow'||o.userData.kind==='box')o.material.opacity=o.userData.base*(.7+.6*ph);}
   if(ASK.run){const n=ASK.run.meshes.length,t=now-ASK.run.t0;for(const {o,i} of ASK.run.meshes){const a=XA.runGlow(i,n,t,{reduced:red});o.material.opacity=a;o.visible=a>.01;}}
-  anim=!red;}
+  anim=anim||!red;}
  return anim||ASK.busy||ASK.speech==='speaking';}
-/* Ask: POST /api/ask (SSE). The selected element and the clicked point go along (bimRoot-local = the server's viewer frame). */
+/* Ask: POST /api/ask (SSE). The selected element and the clicked point go along (bimRoot-local = the server's viewer frame).
+   While waiting: a send earcon, the card's progress line from the server events ("Thinking…", "Following the ducts…"), and
+   "One moment." if nothing has been said after XA.FILLER_MS. The server's 'speak' events (short lead, then one check) are
+   spoken as soon as they arrive, before the rest of the card. */
 async function askQuestion(level,text){if(!ASK.on)return null;if(!ASK.el){status('Ask: point at an element and pull the trigger first');return null;}if(ASK.busy)return null;
  const L=level?XA.LEVELS.find(l=>l.level===level):null,question=(text||L?.question||'').trim();if(!question)return null;
  askResetAnswer();const epoch=ASK.epoch,ac=typeof AbortController!=='undefined'?new AbortController():null;ASK.abort=ac;
- ASK.busy=true;ASK.asked++;ASK.question=question;ASK.level=L?.level||null;ASK.phase='thinking';ASK.model={question,level:ASK.level};card.mesh.visible=false;askCard.mesh.visible=true;askPlace();askDraw();askDrawBar();
- const t0=performance.now();
- try{const res=await fetch('api/ask',{method:'POST',headers:{'Content-Type':'application/json'},signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
+ ASK.busy=true;ASK.asked++;ASK.question=question;ASK.level=L?.level||null;ASK.phase='thinking';ASK.progress='Thinking…';ASK.saidAny=false;ASK.model={question,level:ASK.level};card.mesh.visible=false;askCard.mesh.visible=true;askPlace();askDraw();askDrawBar();
+ askEarcon('send');ASK.filler=setTimeout(()=>{if(epoch===ASK.epoch&&ASK.busy&&!ASK.saidAny)askSay('One moment.',epoch);},XA.FILLER_MS);
+ const t0=performance.now();let spoke=false;
+ try{const res=await fetch(askApi('ask'),{method:'POST',headers:{'Content-Type':'application/json'},signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
   if(!res.ok||!res.body)throw new Error('ask server '+res.status+(res.status===404||res.status===501?' · open this page from scripts/ask_twin_server.py':''));
   let fail=null;const sp=XA.createStream(ev=>{if(epoch!==ASK.epoch)return;
+   const pr=XA.progressText(ev,ASK.el);if(pr&&ASK.phase==='thinking'&&pr!==ASK.progress){ASK.progress=pr;ASK.dirty=true;}
    if(ev.type==='tool'){ASK.steps.push(ev.name+' · '+(ev.summary||''));if(Array.isArray(ev.paths))ASK.paths.push(...ev.paths);ASK.dirty=true;}
-   else if(ev.type==='status'){ASK.steps.push(ev.text);ASK.dirty=true;}
+   else if(ev.type==='status'){if(ev.phase!=='thinking'){ASK.steps.push(ev.text);ASK.dirty=true;}}
+   else if(ev.type==='speak'){spoke=true;askSay(ev.text,epoch);}
    else if(ev.type==='text')ASK.text+=ev.text;else if(ev.type==='final')ASK.final=ev;else if(ev.type==='error')fail=ev.message||'server error';});
   const reader=res.body.getReader(),dec=new TextDecoder();
   for(;;){const {value,done}=await reader.read();if(done)break;sp.push(dec.decode(value,{stream:true}));if(fail||epoch!==ASK.epoch)break;}
   sp.end();if(epoch!==ASK.epoch)return null;if(fail)throw new Error(fail);if(!ASK.final)throw new Error('the answer stream ended early');
-  const f=ASK.final,answer=f.answer||ASK.text;ASK.text=answer;ASK.model=XA.cardModel({question,answer,final:f,level:ASK.level});ASK.phase='answer';ASK.tAnswer=Math.round(performance.now()-t0);
-  askHighlight(f);askDraw();ASK.busy=false;askDrawBar();askSpeak(XA.speakable(answer,f.citations));
+  clearTimeout(ASK.filler);
+  const f=ASK.final,answer=f.answer||ASK.text;ASK.text=answer;ASK.model=XA.cardModel({question,answer,final:f,level:ASK.level});if(ASK.health?.note&&f.mode==='mock')ASK.model.footer[0]=ASK.model.footer[0].replace(/^MOCK · scripted from real tool results/,'MOCK · '+ASK.health.note);ASK.phase='answer';ASK.tAnswer=Math.round(performance.now()-t0);
+  askHighlight(f);askDraw();ASK.busy=false;askDrawBar();if(!ASK.saidAny)askEarcon('done');
+  if(!spoke)askSay(f.spoken||XA.speakable(answer,f.citations),epoch);   // older server: no 'speak' events
   return {ms:ASK.tAnswer,final:f};
- }catch(e){if(epoch!==ASK.epoch||e?.name==='AbortError')return null;ASK.phase='error';ASK.error=String(e?.message||e);console.warn('[ask]',e);askDraw();return {error:ASK.error};}
+ }catch(e){clearTimeout(ASK.filler);if(epoch!==ASK.epoch||e?.name==='AbortError')return null;ASK.phase='error';ASK.error=String(e?.message||e);console.warn('[ask]',e);askEarcon('miss');askDraw();return {error:ASK.error};}
  finally{if(epoch===ASK.epoch){ASK.busy=false;askDrawBar();}}}
-/* ── voice out ── speechSynthesis if a voice exists (2.5 s start watchdog), else the laptop voice (/api/speak WAV via Web Audio), else text only. */
+/* ── voice out ── a queue of short parts. Laptop voice first (best installed macOS voice, /api/speak WAV via Web Audio) unless
+   the viewer chose the headset voice (2D toggle or &voice=headset); else speechSynthesis (2.5 s start watchdog); else text only. */
 function askUnlockAudio(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!ASK.audio)ASK.audio={ctx:new C(),src:null};if(ASK.audio.ctx.state==='suspended')ASK.audio.ctx.resume().catch(()=>{});}catch(e){}}
-function askStopSpeech(){try{window.speechSynthesis?.cancel();}catch(e){}try{ASK.audio?.src?.stop();}catch(e){}if(ASK.audio)ASK.audio.src=null;if(ASK.speech==='speaking')ASK.speech=null;}
+function askStopSpeech(){ASK.sq=[];ASK.sqBusy=false;ASK.sqGen=(ASK.sqGen||0)+1;try{window.speechSynthesis?.cancel();}catch(e){}try{ASK.audio?.src?.stop();}catch(e){}if(ASK.audio)ASK.audio.src=null;if(ASK.speech==='speaking')ASK.speech=null;}
 function askSetSpeech(s,epoch){if(epoch!==ASK.epoch)return;ASK.speech=s;ASK.dirty=true;}
-async function askSpeakServer(text,epoch){try{askUnlockAudio();if(!ASK.audio)throw new Error('no Web Audio');
-  const r=await fetch('api/speak',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!r.ok)throw new Error('speak '+r.status);
-  const buf=await ASK.audio.ctx.decodeAudioData(await r.arrayBuffer());if(epoch!==ASK.epoch)return;
-  const src=ASK.audio.ctx.createBufferSource();src.buffer=buf;src.connect(ASK.audio.ctx.destination);src.onended=()=>{if(ASK.audio?.src===src){ASK.audio.src=null;askSetSpeech('read',epoch);}};
-  ASK.audio.src=src;src.start();askSetSpeech('speaking',epoch);ASK.speechEngine='laptop voice';}
- catch(e){console.warn('[ask] laptop voice',e);askSetSpeech('text only',epoch);}}
-function askSpeak(text){if(!text)return;const epoch=ASK.epoch,S=window.speechSynthesis,voices=S?.getVoices?.().length||0,server=!!ASK.health?.tts?.available;
- const plan=XA.ttsPlan({synth:!!S&&typeof SpeechSynthesisUtterance!=='undefined',voices,server});ASK.speechPlan=plan;
- if(plan==='server')return askSpeakServer(text,epoch);
- if(plan==='none'){askSetSpeech('text only',epoch);return;}
- let started=false;const u=new SpeechSynthesisUtterance(text);u.rate=1.05;u.lang='en-US';
- u.onstart=()=>{started=true;ASK.speechEngine='browser voice';askSetSpeech('speaking',epoch);};u.onend=()=>askSetSpeech('read',epoch);
- u.onerror=()=>{if(started)return askSetSpeech('read',epoch);started=true;if(server)askSpeakServer(text,epoch);else askSetSpeech('text only',epoch);};
- try{S.cancel();S.speak(u);}catch(e){u.onerror();}
- setTimeout(()=>{if(!started&&epoch===ASK.epoch){started=true;try{S.cancel();}catch(e){}if(server)askSpeakServer(text,epoch);else askSetSpeech('text only',epoch);}},2500);}
+function askSay(text,epoch=ASK.epoch){if(!text||epoch!==ASK.epoch)return;ASK.saidAny=true;ASK.sq.push(text);askPump(epoch);}
+async function askPump(epoch){if(ASK.sqBusy)return;ASK.sqBusy=true;const gen=ASK.sqGen;
+ try{while(ASK.sq.length&&epoch===ASK.epoch&&gen===ASK.sqGen){const t=ASK.sq.shift();if(!(await askSpeakOne(t,epoch)))break;}}
+ finally{if(gen===ASK.sqGen){ASK.sqBusy=false;if(ASK.speech==='speaking')askSetSpeech('read',epoch);}}}
+async function askSpeakServer(text,epoch){askUnlockAudio();if(!ASK.audio)throw new Error('no Web Audio');
+ const r=await fetch(askApi('speak'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!r.ok)throw new Error('speak '+r.status);
+ const buf=await ASK.audio.ctx.decodeAudioData(await r.arrayBuffer());if(epoch!==ASK.epoch)return true;
+ await new Promise(res=>{const src=ASK.audio.ctx.createBufferSource();src.buffer=buf;src.connect(ASK.audio.ctx.destination);src.onended=()=>{if(ASK.audio?.src===src)ASK.audio.src=null;res();};
+  try{ASK.audio.src?.stop();}catch(e){}ASK.audio.src=src;src.start();askSetSpeech('speaking',epoch);ASK.speechEngine='laptop voice'+(ASK.health?.tts?.voice?' ('+ASK.health.tts.voice+')':'');});
+ return true;}
+function askSpeakBrowser(text,epoch){const S=window.speechSynthesis;return new Promise((res,rej)=>{let started=false;const u=new SpeechSynthesisUtterance(text);u.rate=1.0;u.lang='en-US';
+ u.onstart=()=>{started=true;ASK.speechEngine='headset browser voice';askSetSpeech('speaking',epoch);};u.onend=()=>res(true);u.onerror=()=>started?res(true):rej(new Error('speech error'));
+ try{S.speak(u);}catch(e){rej(e);}setTimeout(()=>{if(!started){try{S.cancel();}catch(e){}rej(new Error('no browser voice started'));}},2500);});}
+async function askSpeakOne(text,epoch){const S=window.speechSynthesis,synth=!!S&&typeof SpeechSynthesisUtterance!=='undefined',voices=S?.getVoices?.().length||0,server=!!ASK.health?.tts?.available;
+ const plan=XA.ttsPlan({synth,voices,server,prefer:ASK.prefer});ASK.speechPlan=plan;
+ if(plan==='none'){askSetSpeech('text only',epoch);return false;}
+ for(const way of plan==='server'?['server','browser']:['browser','server']){
+  try{if(way==='server'&&server)return await askSpeakServer(text,epoch);if(way==='browser'&&synth)return await askSpeakBrowser(text,epoch);}catch(e){console.warn('[ask] voice',way,e);}}
+ askSetSpeech('text only',epoch);return false;}
+/* The 2D "Test voice" button. */
+function askSpeak(text){askStopSpeech();askSay(text,ASK.epoch);}
 /* ── voice in ── the microphone is opened on the 2D page (button) before entering, because the permission prompt cannot show inside
    an immersive session; the stream stays open and is recorded only while the trigger is held on "Hold to speak". */
 function askVoicePlan(){const p=XA.micPlan({secure:isSecureContext,getUserMedia:!!navigator.mediaDevices?.getUserMedia,mediaRecorder:typeof MediaRecorder!=='undefined',stt:!!ASK.health?.stt?.available,haveStream:!!ASK.stream,presenting:renderer.xr.isPresenting});
  ASK.voice=p.mode==='ready'?(ASK.voice==='recording'||ASK.voice==='transcribing'?ASK.voice:'ready'):p.mode==='off'?'off':'ready';askNote(p.note);ASK.voicePlan=p.mode;return p;}
-async function askOpenMic(){try{const gum=navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});   // in a session the prompt may be invisible: give up after 6 s
-  ASK.stream=renderer.xr.isPresenting?await Promise.race([gum,new Promise((_,no)=>setTimeout(()=>no(new Error('no answer to the mic prompt inside the session')),6000))]):await gum;askVoicePlan();askNote('Microphone ready · in the headset hold the trigger on "Hold to speak"');}
+async function askOpenMic(){try{const gum=navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1}});   // in a session the prompt may be invisible: give up after 6 s
+  ASK.stream=renderer.xr.isPresenting?await Promise.race([gum,new Promise((_,no)=>setTimeout(()=>no(new Error('no answer to the mic prompt inside the session')),6000))]):await gum;askVoicePlan();askNote('Microphone ready · in the headset: point at an element and hold the trigger while you speak');}
  catch(e){ASK.stream=null;askNote('Microphone refused or unavailable ('+(e?.name||e)+') · use the four preset buttons');ASK.voice='off';}askDrawBar();return !!ASK.stream;}
 async function askRecStart(){if(ASK.voice==='recording'||ASK.voice==='transcribing'||ASK.busy)return;if(!ASK.stream){const p=askVoicePlan();if(p.mode==='off')return;if(!(await askOpenMic()))return;}
  try{const type=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(t=>MediaRecorder.isTypeSupported?.(t))||'';
-  ASK.rec=new MediaRecorder(ASK.stream,type?{mimeType:type}:undefined);ASK.chunks=[];ASK.rec.ondataavailable=e=>{if(e.data.size)ASK.chunks.push(e.data);};ASK.rec.start(250);ASK.recT0=performance.now();ASK.voice='recording';
+  ASK.rec=new MediaRecorder(ASK.stream,type?{mimeType:type}:undefined);ASK.chunks=[];ASK.rec.ondataavailable=e=>{if(e.data.size)ASK.chunks.push(e.data);};ASK.rec.start(250);ASK.recT0=performance.now();ASK.voice='recording';askStopSpeech();askEarcon('listen');invalidate();
   clearTimeout(ASK.recTimer);ASK.recTimer=setTimeout(()=>{if(ASK.voice==='recording')askRecStop();},15000);status('Listening… release the trigger to ask');}
  catch(e){ASK.rec=null;ASK.voice='off';askNote('Recording failed ('+(e?.name||e)+') · use the preset buttons');}askDrawBar();}
 async function askRecStop(discard=false){const r=ASK.rec;ASK.rec=null;clearTimeout(ASK.recTimer);if(!r){if(ASK.voice==='recording')ASK.voice='ready';askDrawBar();return;}
@@ -1268,8 +1293,8 @@ async function askRecStop(discard=false){const r=ASK.rec;ASK.rec=null;clearTimeo
  const blob=new Blob(ASK.chunks,{type:r.mimeType||'audio/webm'});
  if(blob.size<1500||performance.now()-ASK.recT0<500){ASK.voice='ready';status('Too short: hold the trigger on "Hold to speak" while you talk');askDrawBar();return;}
  ASK.voice='transcribing';askDrawBar();
- try{const res=await fetch('api/transcribe',{method:'POST',headers:{'Content-Type':blob.type},body:blob}),j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
-  ASK.voice='ready';askDrawBar();if(j.text){status('Heard: “'+j.text+'”');await askQuestion(null,j.text);}else status('Nothing heard · try again or use 1-4');}
+ try{const res=await fetch(askApi('transcribe'),{method:'POST',headers:{'Content-Type':blob.type},body:blob}),j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
+  ASK.voice='ready';askDrawBar();if(j.text&&!j.no_speech){status('Heard: “'+j.text+'”');await askQuestion(null,j.text);}else{askEarcon('miss');status('Didn’t catch that · hold the trigger and speak, or use 1-4');}}
  catch(e){ASK.voice='ready';askDrawBar();status('Speech-to-text failed ('+(e?.message||e)+') · use the preset buttons');}}
 /* Trigger on the bar: selectstart on "Hold to speak" starts recording, selectend after > 0.45 s stops and asks (a short tap toggles). */
 function askSelectStart(c){const h=c.userData.hover;if(!ASK.on||h?.panel!=='ask')return;const b=askButtons()[h.button];if(b?.id!=='mic')return;
@@ -1284,25 +1309,50 @@ function askPanelHit(o,d){if(!ASK?.on||!askBar.mesh.visible)return null;raycaste
  return {panel:'ask',button:XA.barHit(h.uv.x,h.uv.y),point:h.point.clone(),distance:h.distance};}
 function askRefreshHover(){if(!ASK?.on)return;const want=new Set([...controllers,mouse].filter(c=>c.userData.hoverPanel==='ask'&&c.userData.hoverBtn>=0).map(c=>c.userData.hoverBtn));
  if(want.size===ASK.hover.size&&[...want].every(i=>ASK.hover.has(i)))return;ASK.hover=want;if(askBar.mesh.visible)askDrawBar();}
-for(const c of controllers){c.addEventListener('selectstart',()=>askSelectStart(c));c.addEventListener('selectend',()=>askSelectEnd(c));}
+/* Point-and-ask: hold the trigger on an element (not on a panel) for XA.HOLD_MS -> the element is picked (info card + ask bar),
+   a chime plays and a "Listening…" ring pulses on it; release -> the recording is transcribed and asked about that element.
+   A shorter press stays the usual trigger click. The 'select' event that ends a hold is swallowed (askHoldSwallow). */
+function askHoldStart(c){const u=c.userData,gp=u.source?.gamepad;if(!ASK?.on)return;
+ const ok=XA.holdAskAllowed({on:true,hoverPanel:u.hover?.panel||null,aiming:!!u.aiming,grip:!!gp?.buttons?.[1]?.pressed,busy:ASK.busy||ASK.voice==='transcribing'||ASK.voice==='recording',
+  placing:MODE_AR&&(mr.demoPending||mr.session?.phase==='capture'||mr.checkIdx>=0),placed:MODE_AR?!!mr.T:true});
+ if(!ok)return;clearTimeout(u.askHoldT);u.askHold='armed';
+ u.askHoldT=setTimeout(async()=>{if(u.askHold!=='armed')return;u.askHold='active';rayOf(c,u.o,u.d);
+  const r=await pickAlong(u.o.clone(),u.d.clone());if(u.askHold!=='active')return;
+  if(!r||!ASK.el){u.askHold='dead';askEarcon('miss');status('Point-and-ask: no service element on the ray');return;}
+  buzz(c,.5,40);await askRecStart();if(ASK.voice!=='recording')u.askHold='dead';},XA.HOLD_MS);}
+function askHoldSwallow(c){const u=c.userData;clearTimeout(u.askHoldT);if(u.askHold==='armed'){u.askHold=null;return false;}return !!u.askHold;}
+function askHoldEnd(c){const u=c.userData;clearTimeout(u.askHoldT);const was=u.askHold;u.askHold=null;
+ if(was==='active'&&ASK.voice==='recording')askRecStop();}
+for(const c of controllers){c.addEventListener('selectstart',()=>{askSelectStart(c);askHoldStart(c);});c.addEventListener('selectend',()=>{askSelectEnd(c);askHoldEnd(c);});}
 /* 2D page box: server status, and the two things that need a 2D click before entering the headset session (mic permission, audio unlock). */
 async function askBoot(){if(!ASK.on)return;
  const box=document.createElement('section');box.id='askBox';box.setAttribute('aria-label','Ask the twin');
- box.style.cssText='position:fixed;right:8px;top:50px;z-index:7;width:min(330px,calc(100% - 16px));padding:10px 12px;border-radius:10px;background:rgba(5,10,18,.92);border:1px solid #D97757;font:500 12px/1.4 Arial,Helvetica,sans-serif;color:#cfe3f5';
- box.innerHTML='<b style="color:#fff">Ask the twin</b> <span id="askMode" style="color:#fcd34d"></span><div class="row" style="display:flex;gap:4px;margin-top:6px"><button id="askMicBtn" class="b">Allow mic</button><button id="askVoiceBtn" class="b">Test voice</button></div><p id="askNote" style="margin:6px 0 0;color:#8aa2b8"></p><p style="margin:4px 0 0;color:#8aa2b8">Trigger on a service element → ask bar under the card. Before Enter MR/VR: press Allow mic (voice) and Test voice (unlocks sound). Not headset-verified.</p>';
+ box.style.cssText='position:fixed;right:8px;top:50px;z-index:7;width:min(340px,calc(100% - 16px));padding:10px 12px;border-radius:10px;background:rgba(5,10,18,.92);border:1px solid #D97757;font:500 12px/1.4 Arial,Helvetica,sans-serif;color:#cfe3f5';
+ box.innerHTML='<b style="color:#fff">Ask the twin</b> <span id="askMode" style="color:#fcd34d"></span><p id="askKeyNote" hidden style="margin:4px 0 0;color:#fcd34d"></p><div class="row" style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap"><button id="askMicBtn" class="b">Allow mic</button><button id="askVoiceBtn" class="b">Test voice</button><button id="askPreferBtn" class="b"></button><button id="askRetryBtn" class="b" style="display:none">Retry</button></div><p id="askTrust" hidden style="margin:6px 0 0"><a id="askTrustLink" target="_blank" rel="noopener" style="color:#ffd479;font-weight:700"></a></p><p id="askNote" style="margin:6px 0 0;color:#8aa2b8"></p><p style="margin:4px 0 0;color:#8aa2b8">In the headset: point at a duct, pipe or light and <b>hold the trigger</b> while you speak, release to ask (a short trigger press shows the 1-4 buttons). Before Enter MR/VR: Allow mic, then Test voice. Not headset-verified.</p>';
  document.body.appendChild(box);
  addEventListener('pointerdown',askUnlockAudio,{capture:true});$('enterMR')?.addEventListener('click',askUnlockAudio,{capture:true});$('enterVR')?.addEventListener('click',askUnlockAudio,{capture:true});
  $('askMicBtn').onclick=()=>{askUnlockAudio();askOpenMic();};
  $('askVoiceBtn').onclick=()=>{askUnlockAudio();askSpeak('Ask the twin is ready.');};
- try{const r=await fetch('api/health',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);ASK.health=await r.json();
-  $('askMode').textContent=(ASK.health.mode||'').toUpperCase()+' · '+(ASK.health.model||'')+' · voice in: '+(ASK.health.stt?.available?'laptop whisper':'off')+' · voice out: browser'+(ASK.health.tts?.available?' / laptop':'');}
- catch(e){ASK.healthError=String(e?.message||e);$('askMode').textContent='server not reachable';askNote('Open this page from scripts/ask_twin_server.py (--mock --lan for the Quest); GitHub Pages has no ask server');}
+ const prefer=()=>{$('askPreferBtn').textContent='Voice: '+(ASK.prefer==='browser'?'headset':'laptop');};prefer();
+ $('askPreferBtn').onclick=()=>{ASK.prefer=ASK.prefer==='browser'?'laptop':'browser';prefer();};
+ $('askRetryBtn').onclick=()=>askHealth();
+ await askHealth();}
+/* Server status. Method A (&server=): a failed fetch is usually the not-yet-accepted certificate -> one-tap trust link + Retry. */
+async function askHealth(){const sameOrigin=!ASK.base;$('askRetryBtn').style.display='none';$('askTrust').hidden=true;$('askMode').textContent='connecting…';
+ if(XAP.serverIgnored){ASK.healthError='server= ignored';$('askMode').textContent='server= ignored';askNote(XA.healthProblem({ignored:true}).text);askVoicePlan();askDrawBar();return;}
+ try{const r=await fetch(askApi('health'),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);ASK.health=await r.json();ASK.healthError=null;
+  const h=ASK.health;$('askMode').textContent=(h.mode||'').toUpperCase()+' · '+(h.mode==='live'?h.model:'scripted answers')+(ASK.base?' · laptop '+ASK.base.replace('https://',''):'')+' · voice in: '+(h.stt?.available?'laptop whisper':'off')+' · voice out: '+(h.tts?.available?'laptop'+(h.tts.voice?' ('+h.tts.voice+')':''):'headset');
+  $('askKeyNote').hidden=!h.note;$('askKeyNote').textContent=h.note||'';askNote('');if(ASK.phase)ASK.dirty=true;}
+ catch(e){ASK.health=null;ASK.healthError=String(e?.message||e);const p=XA.healthProblem({server:ASK.base,error:e?.name==='TypeError'?'network or certificate':ASK.healthError,sameOrigin});
+  $('askMode').textContent='server not reachable';askNote(p.text);$('askRetryBtn').style.display='';
+  if(p.trustUrl){$('askTrust').hidden=false;$('askTrustLink').href=p.trustUrl;$('askTrustLink').textContent=p.trustLabel;}}
  askVoicePlan();askDrawBar();}
 function askInspection(){if(!ASK?.on)return {on:false,available:XAOK};const w=new THREE.Vector3();
  return {on:true,health:ASK.health?{mode:ASK.health.mode,model:ASK.health.model,stt:!!ASK.health.stt?.available,tts:!!ASK.health.tts?.available}:null,healthError:ASK.healthError,
   el:ASK.el&&{id:ASK.el.id,layer:ASK.el.layer,bim:ASK.el.bim,sensor:ASK.el.sensor},phase:ASK.phase,busy:ASK.busy,question:ASK.question,level:ASK.level,steps:ASK.steps.slice(),error:ASK.error,answerMs:ASK.tAnswer,
   lead:ASK.model?.lead||null,primary:ASK.model?.primary||null,chips:ASK.model?.chips||[],citations:(ASK.final?.citations||[]).map(c=>({id:c.id,verified:c.verified,layer:c.layer})),
   glow:ASK.glow.children.map(o=>({id:o.userData.id,kind:o.userData.kind})),run:ASK.run?{pieces:ASK.run.meshes.length,ids:ASK.run.ids.length}:null,speech:ASK.speech,speechPlan:ASK.speechPlan||null,speechEngine:ASK.speechEngine||null,
+  base:ASK.base,prefer:ASK.prefer,progress:ASK.progress,note:ASK.health?.note||null,ring:askRing.visible,
   voice:ASK.voice,voicePlan:ASK.voicePlan||null,voiceNote:ASK.voiceNote,bar:askBar.mesh.visible?askButtons().map(b=>b.id):null,cardVisible:askCard.mesh.visible,infoCardVisible:card.mesh.visible,
   cardWorld:askCard.mesh.visible?askCard.mesh.getWorldPosition(w).toArray():null};}
 /* ── Loop ── */
@@ -1371,7 +1421,12 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
  ask:{pickId:id=>{id=String(id);const k=Object.keys(layerState).find(k=>layerState[k].loaded&&layerState[k].meta?.[id]);if(!k)return null;const g=sensorElementGeom(layerState[k],id,false);if(!g)return null;
    const c=[0,0,0],n=g.pos.length/3;for(let i=0;i<n;i++)for(let j=0;j<3;j++)c[j]+=g.pos[i*3+j]/n;bimRoot.updateMatrixWorld(true);const w=new THREE.Vector3().fromArray(c).applyMatrix4(bimRoot.matrixWorld),o=camera.getWorldPosition(new THREE.Vector3()),d=w.clone().sub(o).normalize();
    yaw=Math.atan2(-d.x,-d.z)-rig.rotation.y;pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();const look={yaw,pitch};return pickAlong(o,d).then(r=>r&&{...r,look});},
-  question:(level,text)=>askQuestion(level,text),button:i=>askButton(i,null),barButtonNdc:i=>{const r=XA.barRects()[i];if(!r||!askBar.mesh.visible)return null;askBar.mesh.updateMatrixWorld(true);camera.updateMatrixWorld(true);
+  question:(level,text)=>askQuestion(level,text),button:i=>askButton(i,null),health:()=>askHealth(),
+  // point-and-ask through the real hold path with a stand-in controller aimed from the camera at the element (desktop test only)
+  holdSim:async(id,ms=2500)=>{id=String(id);const k=Object.keys(layerState).find(k=>layerState[k].loaded&&layerState[k].meta?.[id]);if(!k)return null;const g=sensorElementGeom(layerState[k],id,false);if(!g)return null;
+   const cc=[0,0,0],n=g.pos.length/3;for(let i=0;i<n;i++)for(let j=0;j<3;j++)cc[j]+=g.pos[i*3+j]/n;bimRoot.updateMatrixWorld(true);const w=new THREE.Vector3().fromArray(cc).applyMatrix4(bimRoot.matrixWorld);
+   const c=new THREE.Object3D();camera.getWorldPosition(c.position);c.lookAt(c.position.clone().multiplyScalar(2).sub(w));c.userData={o:new THREE.Vector3(),d:new THREE.Vector3(),hover:null};
+   askHoldStart(c);await new Promise(r=>setTimeout(r,XA.HOLD_MS+ms));const mid={voice:ASK.voice,ring:askRing.visible,el:ASK.el?.id||null};const swallowed=askHoldSwallow(c);askHoldEnd(c);return {...mid,swallowed};},barButtonNdc:i=>{const r=XA.barRects()[i];if(!r||!askBar.mesh.visible)return null;askBar.mesh.updateMatrixWorld(true);camera.updateMatrixWorld(true);
    const p=new THREE.Vector3((r.x+r.w/2-.5)*.6,(.5-(r.y+r.h/2))*.176,0).applyMatrix4(askBar.mesh.matrixWorld).project(camera);return [p.x,p.y];},
   state:()=>askInspection(),clear:()=>askClear()},
  // cost of one element-hover raycast along the centre ray (what the flashlight hand pays per throttled cast), median of n

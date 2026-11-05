@@ -13,7 +13,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 1;
+const API = 2;
 const CITE_RX = /\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g;
 const LEVELS = [
   {level: 1, id: 'q1', label: 'What is this?', hint: 'look up', question: 'What is this, and what room am I in?'},
@@ -24,10 +24,43 @@ const LEVELS = [
 const COLORS = {primary: 0xff3df0, other: 0x22d3ee, run: 0x22d3ee};   // same magenta / cyan as the laptop panel (twin/ask-twin.js)
 const CLAUDE = {orange: '#D97757', cream: '#F4EFE6'};
 
-/* ?ask=1 turns the feature on. Anything else (absent, 0, off) leaves the page exactly as it was. */
+/* ?ask=1 turns the feature on. Anything else (absent, 0, off) leaves the page exactly as it was.
+   &server=https://<laptop LAN IP>:<port> ("Method A"): the page itself comes from anywhere (e.g. GitHub Pages) and only the
+   AI calls (health, ask, transcribe, speak) go to the laptop. Validated by serverOrigin; an invalid value is ignored.
+   &voice=headset prefers the headset browser's own voice over the laptop voice. */
 function parseParams(search) {
-  const q = new URLSearchParams(search || '');
-  return {enabled: q.get('ask') === '1'};
+  const q = new URLSearchParams(search || ''), raw = q.get('server');
+  const server = raw == null ? null : serverOrigin(raw);
+  return {enabled: q.get('ask') === '1', server, serverIgnored: raw != null && !server, preferVoice: q.get('voice') === 'headset' ? 'browser' : 'laptop'};
+}
+/* server= must be https, a private-LAN IPv4 (10/8, 172.16/12, 192.168/16) or localhost, with an explicit port and nothing
+   else (no path, query, user). Returns the origin "https://host:port" or null. Nothing is ever sent to any other host. */
+function privateIPv4(host) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host || '');
+  if (!m) return false;
+  const o = m.slice(1).map(Number);
+  if (o.some(n => n > 255) || m.slice(1).some(t => t.length > 1 && t[0] === '0')) return false;
+  return o[0] === 10 || (o[0] === 172 && o[1] >= 16 && o[1] <= 31) || (o[0] === 192 && o[1] === 168) || (o[0] === 127 && o[1] === 0 && o[2] === 0 && o[3] === 1);
+}
+function serverOrigin(raw) {
+  const s = String(raw || '').trim();
+  if (!/^https:\/\/[^/?#@\s]+(\/)?$/i.test(s)) return null;   // https only, no path, query, fragment or credentials
+  let u; try { u = new URL(s); } catch (e) { return null; }
+  if (u.protocol !== 'https:' || u.username || u.password || !u.port) return null;   // explicit (non-443) port required
+  const host = u.hostname.toLowerCase(), typed = /^https:\/\/([^:/]+)/i.exec(s)[1].toLowerCase();
+  if (typed !== host) return null;   // refuse anything the URL parser had to rewrite (0x7f.1, 192.168.001.2, ...)
+  if (!(host === 'localhost' || privateIPv4(host))) return null;
+  return 'https://' + host + ':' + u.port;
+}
+/* API URL: same origin (relative, as before) or the validated laptop origin. */
+function apiUrl(base, name) { return (base ? base + '/' : '') + 'api/' + name; }
+/* Health check failed: what the 2D box says, and (Method A) the one-tap link that makes the headset accept the laptop's
+   self-signed certificate (a fetch cannot show the certificate warning; opening the address once in a tab can). */
+function healthProblem({server = null, error = '', ignored = false, sameOrigin = true} = {}) {
+  if (ignored) return {text: 'server= ignored: use https://<private LAN IP>:<port>, e.g. https://192.168.1.20:8765', trustUrl: null};
+  if (server) return {text: 'Laptop not reached (' + (error || 'network') + '). Same Wi-Fi? Server running with --lan? First time: open the link below once and accept the certificate, then Retry.',
+    trustUrl: server + '/trust', trustLabel: 'Open ' + server + '/ once to trust it'};
+  return {text: sameOrigin ? 'Open this page from scripts/ask_twin_server.py (--lan for the Quest), or add &server=https://<laptop IP>:8765' : 'No ask server', trustUrl: null};
 }
 
 /* Server-Sent Events from /api/ask: "data: {json}\n\n" blocks, split across arbitrary network chunks. */
@@ -102,16 +135,54 @@ function cardModel({question = '', answer = '', final = null, level = null, tool
   };
 }
 
-/* Spoken reply: lead, evidence, first check; ids read as their element type; Limits skipped (it stays on the card). */
+/* Spoken reply (fallback when the server sends no 'speak' events): lead + the first check only; ids read as their
+   element type; evidence, other candidates and Limits stay on the card. The server's version (speech.py) is preferred. */
 function speakable(answer, citations = []) {
   const byId = new Map((citations || []).map(c => [c.id, c]));
   const S = sections(answer);
   const say = s => plainLine(s, id => byId.get(id)?.type || 'element')   // ids stay on the card; read aloud they would be noise
     .replace(/\s*·\s*confidence:\s*(low|medium|high)/i, '. Confidence $1')
     .replace(/~/g, 'about ').replace(/·/g, ',').replace(/(\d)\s?m\b/g, '$1 metres').replace(/\bdegC\b|°C/g, ' degrees').replace(/\s+/g, ' ').trim();
-  const parts = [S.lead, ...(S.sections.Why || S.sections.Closest || []).slice(0, 2), ...(S.sections['Check first'] || []).slice(0, 1).map(t => 'Check first: ' + t)];
+  const lead = String(S.lead || '').replace(/\s*·\s*confidence:\s*(low|medium|high)/i, '').replace(/\s*\([^()]*\)/g, '');
+  const parts = [lead, ...(S.sections['Check first'] || []).slice(0, 1).map(t => 'First, ' + t.replace(/^\w/, c => c.toLowerCase()))];
   return parts.filter(Boolean).map(say).map(t => /[.!?]$/.test(t) ? t : t + '.').join(' ');
 }
+
+/* Waiting feedback: a friendly progress line from each server event ("Checking the ducts…"). */
+const LAYER_WORDS = {duct: 'ducts', fire: 'sprinkler pipes', plumbing: 'plumbing pipes', hydronic: 'heating and cooling pipes', lighting: 'lights', equipment: 'equipment'};
+function progressText(ev, el = null) {
+  if (!ev) return 'Thinking…';
+  if (ev.type === 'status') return ev.phase === 'thinking' ? ev.text || 'Thinking…' : null;
+  if (ev.type === 'text') return 'Writing the answer…';
+  if (ev.type !== 'tool') return null;
+  const layers = (ev.input && ev.input.layers) || [], lw = LAYER_WORDS[(el && el.layer) || ''] || 'services';
+  switch (ev.name) {
+    case 'elements_near': return ev.input && ev.input.above_only ? 'Checking what is above it…' : layers.length === 1 && LAYER_WORDS[layers[0]] ? 'Checking the ' + LAYER_WORDS[layers[0]] + ' nearby…' : 'Checking what is around it…';
+    case 'connected_run': return 'Following the ' + lw + '…';
+    case 'room_of': return 'Finding the room…';
+    case 'get_element': return 'Looking it up…';
+    case 'find_elements': return 'Searching the model…';
+    case 'list_sensors': return 'Finding the demo sensors…';
+    case 'sensor_readings': return 'Reading the demo sensors (simulated)…';
+    default: return 'Checking the twin…';
+  }
+}
+/* Earcons (Web Audio tones): [frequency Hz, start s, duration s, gain]. listen = recording started, send = question sent,
+   done = answer ready, miss = nothing heard / error. Short and quiet so they do not cover speech. */
+const EARCONS = {
+  listen: [[660, 0, .07, .16], [990, .08, .09, .16]],
+  send: [[880, 0, .06, .12]],
+  done: [[784, 0, .07, .12], [1175, .08, .11, .12]],
+  miss: [[330, 0, .12, .14], [262, .13, .14, .12]],
+};
+/* Point-and-ask: hold the trigger on an element for HOLD_MS (not on a panel, not while placing/aligning) -> pick + record;
+   release -> ask about that element. A shorter press is the usual trigger click (info card). */
+const HOLD_MS = 400;
+function holdAskAllowed({on = false, hoverPanel = null, aiming = false, grip = false, placing = false, placed = true, busy = false} = {}) {
+  return !!on && !hoverPanel && !aiming && !grip && !placing && !!placed && !busy;
+}
+/* Spoken filler while waiting: only if nothing has been said FILLER_MS after the question was sent. */
+const FILLER_MS = 1500;
 
 /* connected_run paths from the tool events -> the element ids to light up, from the cited source to the picked element.
    The model has no flow direction: the order only follows the answer ("source" = the cited terminal unit / AHU). */
@@ -163,8 +234,11 @@ function micPlan({secure = false, getUserMedia = false, mediaRecorder = false, s
   if (haveStream) return {mode: 'ready', note: ''};
   return presenting ? {mode: 'try', note: 'mic not opened before entering: trying'} : {mode: 'ask', note: 'press "Allow mic" before entering'};
 }
-/* Voice out: a browser voice if one exists, else the laptop (macOS say -> WAV over the LAN), else text only. */
-function ttsPlan({synth = false, voices = 0, server = false} = {}) {
+/* Voice out: the laptop voice (macOS say, best installed English voice -> WAV over the LAN) when available, because the
+   headset browser's voice is robotic; prefer = 'browser' (&voice=headset or the 2D toggle) uses the headset voice first.
+   Otherwise a browser voice if one exists, else text only. */
+function ttsPlan({synth = false, voices = 0, server = false, prefer = 'laptop'} = {}) {
+  if (server && prefer !== 'browser') return 'server';
   if (synth && voices > 0) return 'browser';
   if (server) return 'server';
   return synth ? 'browser-unknown' : 'none';
@@ -229,7 +303,7 @@ function drawAnswer(ctx, W, H, view) {
   let y = 128;
   if (m.question) { ctx.font = 'italic 28px Arial'; ctx.fillStyle = '#a9c1d6'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y); y += 36; } y += 8; }
   if (view.phase === 'thinking') {
-    ctx.font = '600 34px Arial'; ctx.fillStyle = '#e8f1f8'; ctx.fillText('Looking it up in the twin…', pad, y + 12); y += 60;
+    ctx.font = '600 34px Arial'; ctx.fillStyle = '#e8f1f8'; fit(ctx, view.progress || 'Thinking…', pad, y + 12, W - 2 * pad, 34, '600'); y += 60;
     ctx.font = '28px Arial';
     for (const s of (view.steps || []).slice(-6)) { ctx.fillStyle = '#34d399'; ctx.fillText('✓', pad, y); ctx.fillStyle = '#cfe3f5'; fit(ctx, s, pad + 34, y, W - 2 * pad - 34, 28); y += 40; }
   } else if (view.phase === 'error') {
@@ -286,5 +360,6 @@ function drawBar(ctx, W, H, buttons, hover = new Set()) {
 }
 
 return {API, LEVELS, COLORS, CLAUDE, BAR, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
-  barRects, barHit, barButtons, micPlan, ttsPlan, wrap, drawBadge, drawAnswer, drawBar};
+  barRects, barHit, barButtons, micPlan, ttsPlan, wrap, drawBadge, drawAnswer, drawBar,
+  serverOrigin, privateIPv4, apiUrl, healthProblem, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

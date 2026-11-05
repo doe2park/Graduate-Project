@@ -412,3 +412,199 @@ class KeyHandlingTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ---------------- Method A (public page + laptop API), voice, speech, routing ----------------
+def _req(base, path, method='GET', headers=None, body=None):
+    req = urllib.request.Request(base + path, data=body, method=method, headers=headers or {})
+    try:
+        with urllib.request.urlopen(req) as r:
+            return r.status, dict(r.headers), r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), e.read()
+
+
+class CorsTests(ServerTests):
+    """CORS / Private Network Access: exactly https://doe2park.github.io (and the server's own origin / localhost)."""
+    PUB = 'https://doe2park.github.io'
+
+    def test_preflight_from_public_page_with_private_network(self):
+        code, h, _ = _req(self.base, '/api/ask', 'OPTIONS', {'Origin': self.PUB, 'Access-Control-Request-Method': 'POST',
+                                                              'Access-Control-Request-Headers': 'content-type',
+                                                              'Access-Control-Request-Private-Network': 'true'})
+        self.assertEqual(code, 204)
+        self.assertEqual(h.get('Access-Control-Allow-Origin'), self.PUB)
+        self.assertEqual(h.get('Access-Control-Allow-Private-Network'), 'true')
+        self.assertIn('POST', h.get('Access-Control-Allow-Methods'))
+        self.assertIn('Content-Type', h.get('Access-Control-Allow-Headers'))
+        # no PNA header unless the browser asks for it
+        code, h, _ = _req(self.base, '/api/health', 'OPTIONS', {'Origin': self.PUB, 'Access-Control-Request-Method': 'GET'})
+        self.assertEqual(code, 204)
+        self.assertNotIn('Access-Control-Allow-Private-Network', h)
+
+    def test_other_origins_are_refused(self):
+        for o in ('https://evil.example', 'http://doe2park.github.io', 'https://doe2park.github.io.evil.example',
+                  'https://evil.github.io', 'null', 'https://doe2park.github.io:8443'):
+            code, h, _ = _req(self.base, '/api/ask', 'OPTIONS', {'Origin': o, 'Access-Control-Request-Method': 'POST',
+                                                                  'Access-Control-Request-Private-Network': 'true'})
+            self.assertEqual(code, 403, o)
+            self.assertNotIn('Access-Control-Allow-Origin', h)
+            self.assertNotIn('Access-Control-Allow-Private-Network', h)
+            code, h, _ = _req(self.base, '/api/health', headers={'Origin': o})
+            self.assertNotIn('Access-Control-Allow-Origin', h, o)
+            code, _, _ = _req(self.base, '/api/ask', 'POST', {'Origin': o, 'Content-Type': 'application/json'}, b'{"question":"x"}')
+            self.assertEqual(code, 403, o)
+        self.assertEqual(_req(self.base, '/scan-xr.html', 'OPTIONS', {'Origin': self.PUB})[0], 404)
+
+    def test_public_origin_can_read_api_responses(self):
+        code, h, body = _req(self.base, '/api/health', headers={'Origin': self.PUB})
+        self.assertEqual((code, h.get('Access-Control-Allow-Origin')), (200, self.PUB))
+        self.assertIn('Origin', h.get('Vary', ''))
+        code, h, body = _req(self.base, '/api/ask', 'POST', {'Origin': self.PUB, 'Content-Type': 'application/json'},
+                             json.dumps({'question': 'What is above this ceiling tile?', 'element_id': '388279'}).encode())
+        self.assertEqual((code, h.get('Access-Control-Allow-Origin')), (200, self.PUB))
+        evs = [json.loads(l[6:]) for l in body.decode().split('\n\n') if l.startswith('data: ')]
+        speak = [e for e in evs if e['type'] == 'speak']
+        self.assertEqual([e['part'] for e in speak], ['lead', 'check'])
+        self.assertLess(evs.index(speak[0]), len(evs) - 1)   # spoken lead arrives before the final event
+        self.assertEqual(evs[-1]['spoken'], ' '.join(e['text'] for e in speak))
+        # static files carry no CORS header (only the API is shared)
+        self.assertNotIn('Access-Control-Allow-Origin', _req(self.base, '/twin/xr-ask.js', headers={'Origin': self.PUB})[1])
+
+    def test_trust_page(self):
+        code, h, body = _req(self.base, '/trust')
+        self.assertEqual(code, 200)
+        self.assertIn(b'Retry', body)
+
+
+
+class CorsUnitTests(unittest.TestCase):
+    def test_cors_ok_rules(self):
+        import ask_twin_server as S
+        app = S.App(None, 'mock', 'm', types.SimpleNamespace(box={}, index={'layers': []}, sensors=[]), None, 8765, lan=True)
+        ok = lambda o, host='192.168.68.52:8765': app.cors_ok(o, host)   # noqa: E731
+        self.assertTrue(ok('https://doe2park.github.io'))
+        self.assertTrue(ok('https://192.168.68.52:8765'))          # its own origin
+        self.assertFalse(ok('http://192.168.68.52:8765'))          # own host, wrong scheme
+        self.assertTrue(ok('https://localhost:8765'))
+        self.assertFalse(ok('https://localhost:9999'))
+        self.assertFalse(ok(''))
+        self.assertFalse(ok('null'))
+        self.assertFalse(ok('https://doe2park.github.io/'))       # Origin never has a path; exact match only
+
+
+class NoKeyNoteTests(unittest.TestCase):
+    def test_auto_without_key_runs_scripted_and_says_so(self):
+        import ask_twin_server as S
+        saved = os.environ.pop('ANTHROPIC_API_KEY', None)
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                app = S.build_app(S.parse_args(['--auto', '--no-stt', '--no-tts', '--env-file', str(Path(d) / 'missing'), '--port', '0']), log=lambda *a: None)
+                self.assertEqual(app.mode, 'mock')
+                self.assertEqual(app.health()['note'], 'Live AI needs a key on the laptop; running scripted answers')
+                app = S.build_app(S.parse_args(['--mock', '--no-stt', '--no-tts', '--env-file', str(Path(d) / 'missing'), '--port', '0']), log=lambda *a: None)
+                self.assertEqual(app.health()['note'], S.NO_KEY_NOTE)
+        finally:
+            if saved is not None:
+                os.environ['ANTHROPIC_API_KEY'] = saved
+
+    def test_live_loop_says_thinking_first(self):
+        script = [('**Answer:** [[12442]] is a recessed light.\n', [], 'end_turn')]
+        evs = list(A.LiveAgent(twin(), FakeClient(script)).ask('What is this?', LIGHT))
+        self.assertEqual((evs[0]['type'], evs[0].get('phase')), ('status', 'thinking'))
+        self.assertEqual(evs[-1]['type'], 'final')
+
+
+class VoiceTests(unittest.TestCase):
+    LISTING = '\n'.join([
+        'Albert              en_US    # Hello! My name is Albert.',
+        'Daniel              en_GB    # Hello! My name is Daniel.',
+        'Eddy (영어(미국))       en_US    # Hello! My name is Eddy.',
+        'Samantha            en_US    # Hello! My name is Samantha.',
+        'Yuna                ko_KR    # 안녕하세요.',
+    ])
+
+    def test_parse_and_fallback_to_samantha(self):
+        import ask_twin_server as S
+        v = S.parse_voices(self.LISTING)
+        self.assertIn({'name': 'Eddy (영어(미국))', 'locale': 'en_US', 'quality': 'standard'}, v)
+        best, note = S.pick_voice(v)
+        self.assertEqual(best['name'], 'Samantha')
+        self.assertIn('no Premium', note)
+
+    def test_premium_then_enhanced_and_override(self):
+        import ask_twin_server as S
+        listing = self.LISTING + '\n' + '\n'.join([
+            'Serena (Premium)    en_GB    # Hello! My name is Serena.',
+            'Ava (Enhanced)      en_US    # Hello! My name is Ava.',
+            'Zoe (Premium)       en_US    # Hello! My name is Zoe.',
+            'Lee (Premium)       en_AU    # Hello! My name is Lee.',
+            'Nathan (고품질)      en_US    # Hello! My name is Nathan.'])
+        v = S.parse_voices(listing)
+        self.assertEqual(S.pick_voice(v)[0]['name'], 'Zoe (Premium)')            # Premium en_US first, en_AU ignored
+        no_prem = [x for x in v if x['quality'] != 'premium']
+        self.assertIn(S.pick_voice(no_prem)[0]['name'], ('Ava (Enhanced)', 'Nathan (고품질)'))
+        self.assertEqual(S.pick_voice(no_prem)[0]['quality'], 'enhanced')
+        self.assertEqual(S.pick_voice(v, 'Daniel')[0]['name'], 'Daniel')
+        self.assertEqual(S.pick_voice(v, 'serena')[0]['name'], 'Serena (Premium)')   # name before ' (' works
+        best, note = S.pick_voice(v, 'Nobody')
+        self.assertEqual(best['name'], 'Zoe (Premium)')
+        self.assertIn('not installed', note)
+
+
+class SpokenTextTests(unittest.TestCase):
+    def spoken(self, q, eid):
+        from ask_twin.speech import spoken_text
+        f = list(A.MockAgent(twin(), delay=0).ask(q, eid))[-1]
+        t = twin()
+        return spoken_text(f['answer'], lambda i: t.summary(i) if i in t.box else None, eid)
+
+    def test_feed_answer_is_short_and_plain(self):
+        s = self.spoken('Which VAV box feeds this?', '388279')
+        self.assertTrue(s.startswith('Most likely the VAV box'), s)
+        self.assertIn('First, trace the duct from here to the VAV box', s)
+        for bad in ('[[', '400766', '388279', '**', 'confidence', 'mock', '(', '·', 'Limits'):
+            self.assertNotIn(bad, s)
+        self.assertLessEqual(s.count('.'), 3)
+
+    def test_leak_and_lookup(self):
+        s = self.spoken("There's a water stain, what is leaking?", LIGHT)
+        self.assertIn('about 1.1 metres above', s)
+        self.assertNotIn('Other candidates', s)
+        self.assertNotIn('simulated', s)   # evidence bullets stay on the card
+        self.assertEqual(self.spoken('What is this, and what room am I in?', '388279'), 'This is an air outlet on level 1.')
+
+    def test_streaming_parts_and_live_preamble(self):
+        from ask_twin.speech import SpokenStream, with_speech
+        st = SpokenStream(lambda i: {'type': 'Terminal unit', 'layer': 'duct'}, '1')
+        self.assertEqual(st.feed('**Answer:** [[2]] VAV box, 3 steps from [[1]] · confidence: low'), [])   # line not complete yet
+        self.assertEqual(st.feed('\n**Why:**\n- x\n'), [('lead', 'Most likely the VAV box, 3 steps from here.')])
+        self.assertEqual(st.feed('**Check first:**\n- The damper of [[2]] and its airflow.\n'), [('check', 'First, check the damper of the VAV box and its airflow.')])
+        evs = [{'type': 'text', 'text': 'Let me look around it.\n'}, {'type': 'tool', 'name': 'elements_near'},
+               {'type': 'text', 'text': '**Answer:** [[2]] is above.\n'}, {'type': 'final', 'answer': '...'}]
+        out = list(with_speech(evs, lambda i: {'type': 'Duct', 'layer': 'duct'}, '1'))
+        self.assertEqual([e['text'] for e in out if e['type'] == 'speak'], ['The duct is above.'])
+        self.assertEqual(out[-1]['spoken'], 'The duct is above.')
+
+
+class MockRouteTests(unittest.TestCase):
+    def test_keywords_reach_the_four_scripted_answers(self):
+        cases = {
+                 'What is this, and what room am I in?': 'lookup', "what's this": 'lookup',
+                 'What is above this ceiling tile within 2 m?': 'above', "what's over the ceiling here": 'above',
+                 'Which VAV box feeds this?': 'feed', 'Where does the air come from?': 'feed', 'where does the air in this go': 'feed',
+                 'Why is it so warm in here?': 'comfort', 'it is hot': 'comfort', 'why': 'comfort',
+                 'What is leaking?': 'leak', 'which valve shuts this off': 'valve', 'So pipe, no, is it?': 'describe'}
+        for q, want in cases.items():
+            self.assertEqual(A.mock_route(q), want, q)
+
+
+class TranscriptTests(unittest.TestCase):
+    def test_no_speech_and_prompt_echo_are_dropped(self):
+        import ask_twin_server as S
+        seg = lambda t, ns=0.0, lp=-0.2: types.SimpleNamespace(text=t, no_speech_prob=ns, avg_logprob=lp)   # noqa: E731
+        self.assertEqual(S.clean_transcript([seg(' Which pipe is above this tile?')]), 'Which pipe is above this tile?')
+        self.assertEqual(S.clean_transcript([seg(' you', ns=0.9, lp=-1.4)]), '')
+        self.assertEqual(S.clean_transcript([seg(' the duct, the diffuser, the VAV box.')]), '')   # echo of the prompt
+        self.assertEqual(S.clean_transcript([seg(' What is above this ceiling tile?')]), 'What is above this ceiling tile?')
+        self.assertEqual(S.clean_transcript([]), '')

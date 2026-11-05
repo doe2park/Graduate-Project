@@ -6,6 +6,8 @@ Both modes emit the same event stream (dicts) so the browser and the tests do no
   {'type': 'text', 'text'}                answer text delta (markdown-ish, citations as [[element id]])
   {'type': 'final', 'answer', 'citations', 'tools_used', 'mode', 'model', ...}
   {'type': 'error', 'message'}
+  {'type': 'status', 'phase': 'thinking', 'text'}   live: before each model round ("Thinking…")
+The server adds {'type': 'speak', 'part': 'lead'|'check', 'text'} and final['spoken'] (scripts/ask_twin/speech.py).
 Citations are verified server-side: an id counts as grounded only if it is the selected element or appeared in a
 tool result during this answer. Unverified ids are returned flagged and are not highlighted.
 """
@@ -147,6 +149,8 @@ class LiveAgent:
             if self.fallbacks:
                 kwargs.update(betas=['server-side-fallback-2026-07-01'], fallbacks='default')
             round_text = ''
+            # visible "Thinking…" while the model reasons before its first tool call or text (adaptive thinking)
+            yield {'type': 'status', 'phase': 'thinking', 'text': 'Thinking…' if not used else 'Thinking about what the twin returned…'}
             try:
                 with self.client.beta.messages.stream(**kwargs) as stream:
                     for event in stream:
@@ -216,6 +220,24 @@ def _water_score(el):
     return w
 
 
+# Mock mode routes a question (typed, a preset, or a speech-to-text transcript) by keywords to a scripted, tool-grounded
+# answer. Order matters: the first match wins. Anything else gets the generic description of the element and its neighbours.
+MOCK_ROUTES = (
+    ('leak', re.compile(r'leak|stain|drip|wet|water damage|moist|mold|mould|puddle')),
+    ('valve', re.compile(r'valve|shut ?off|isolat')),
+    ('comfort', re.compile(r'\bwarm|\bhot\b|\bcold\b|stuffy|comfort|too (warm|hot|cold)|\bwhy\b|temperature|\bheat')),
+    ('feed', re.compile(r'feed|\bfed\b|\bserv(e|es|ed|ing)\b|supplie|upstream|comes? from|where does (the |this |that )?air|'
+                        r'\bahu\b|air handler|which vav|what vav')),
+    ('above', re.compile(r'\babove\b|\bover (this|the|my|me|here)\b|overhead|plenum|on top of|behind (this|the) ceiling')),
+    ('lookup', re.compile(r"what(?: i|')s (this|that|it)\b|what is this|what room|which room|where am i|what am i looking at|identify|what kind")),
+)
+
+
+def mock_route(question: str) -> str:
+    q = ' '.join(str(question or '').lower().split())
+    return next((name for name, rx in MOCK_ROUTES if rx.search(q)), 'describe')
+
+
 class MockAgent:
     """Scripted answers built only from real tool results (no API key). Labelled MOCK in every answer."""
 
@@ -246,22 +268,11 @@ class MockAgent:
             ref = {'point': list(point)} if (large and point) else {'element_id': str(element_id)}
         elif point:
             ref = {'point': list(point)}
+        route = mock_route(question)
         if ref is None:
             text = '**Answer:** Select an element in the viewer first (click it), then ask again. *(mock mode)*'
-        elif re.search(r'leak|stain|drip|wet|water damage|moist|mold|mould|puddle', q):
-            text = yield from self._leak(ref, used, grounded)
-        elif re.search(r'valve|shut ?off|isolat', q):
-            text = yield from self._valve(ref, used, grounded)
-        elif re.search(r'\bwarm|\bhot\b|\bcold\b|stuffy|comfort|too (warm|hot|cold)', q):
-            text = yield from self._comfort(ref, used, grounded)
-        elif re.search(r'feed|serv|supplied|upstream|where does .* come from|ahu|air handler', q):
-            text = yield from self._feed(ref, used, grounded)
-        elif re.search(r'\babove\b|\bover (this|the) (ceiling|tile)|plenum', q):
-            text = yield from self._above(ref, used, grounded)
-        elif re.search(r'what room|which room|where am i', q):
-            text = yield from self._lookup(ref, used, grounded)
         else:
-            text = yield from self._describe(ref, used, grounded)
+            text = yield from getattr(self, '_' + route)(ref, used, grounded)
         yield from self._stream(text)
         yield {'type': 'final', 'answer': text, 'citations': verify_citations(self.twin, text, grounded), 'tools_used': used,
                'mode': 'mock', 'model': 'mock (scripted, tool-grounded)', 'seconds': round(time.time() - t0, 1)}

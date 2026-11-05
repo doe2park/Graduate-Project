@@ -44,7 +44,22 @@ The server refuses an env file inside the repository, never prints the key, and 
 `--mock` hint) when no key is set. `.gitignore` also lists `ask-twin.env` / `.env.ask-twin` in case a copy is made.
 
 Options: `--model claude-opus-5-5` (default `claude-sonnet-5-5`), `--effort low|medium|high` (default `medium`),
-`--port`, `--no-stt`, `--stt-model small.en`, `--no-tts` (no laptop voice for `/api/speak`), `--no-fallbacks`, `--lan` (private-LAN HTTPS, see Headset below), `--verbose`.
+`--port`, `--no-stt`, `--stt-model small.en`, `--stt-beam 1` (default 5), `--no-tts` (no laptop voice for `/api/speak`),
+`--voice "Zoe (Premium)"` (default: best installed English voice), `--no-fallbacks`, `--lan` (private-LAN HTTPS, see Headset
+below), `--auto` (live Claude when a key is found, else scripted answers with the note *Live AI needs a key on the laptop;
+running scripted answers* on the 2D page and the answer card), `--verbose`.
+
+### Switching the running headset server to live answers (owner)
+
+1. Put the key in `~/.config/ask-twin/env` (see above; `chmod 600`).
+2. Stop the running server (Ctrl+C, or `pkill -f "ask_twin_server.py --mock --lan"`), then start it without `--mock`:
+   `python3 scripts/ask_twin_server.py --lan` (or `--auto --lan`, which falls back to scripted answers if the key is missing).
+3. Reload the page in the headset. The 2D box shows `LIVE · claude-sonnet-5-5` and the key note disappears.
+
+Expected latency (live, not measured here: no key on this Mac): the card says *Thinking…* within ~0.1 s, the first tool
+step after ~1-3 s, the spoken lead ~4-10 s after the question (2-4 tool rounds), the full card ~6-15 s. *One moment.* is
+spoken when nothing has been said 1.5 s after the question. Speech-to-text adds ~0.4 s (base.en, beam 5, measured on
+this Mac with synthetic speech).
 If the API rejects an optional request feature (the refusal-fallback beta or eager tool streaming) with a 400, the
 server retries that question once without them.
 
@@ -122,7 +137,27 @@ the spiral duct `#401233` (demo airflow sensor anchor).
 - *"What feeds this duct?"* → reheat-coil terminal units a few touching segments away; low confidence.
 - *"What is this and what is around it?"* → identity and nearby elements.
 
-## Voice (Milestone B)
+## Voice (Milestone B, revised Nov 5 2026)
+
+- **Spoken answer is short:** the server turns the streamed answer into `speak` events (`scripts/ask_twin/speech.py`): the lead
+  sentence and at most one *check first* sentence, in plain words ("Most likely the VAV box, 11 steps along touching ducts
+  from here. First, trace the duct from here to the VAV box on the mechanical drawings."). Ids become names (*the VAV box*),
+  the selected element becomes *this/here*; markdown, `[[ids]]`, parentheses, CAD codes and *confidence* are dropped. Each
+  part is sent as soon as its line is complete, so speech starts before the card has finished. Text a live model writes
+  before its tool calls ("Let me check…") is never spoken. The card keeps all details.
+- **Laptop voice first:** `/api/speak` uses the best installed macOS English voice: a *(Premium)* en_US/en_GB voice (Zoe, Ava,
+  Evan, Nathan, … preferred in that order, US before GB), else *(Enhanced)*, else Samantha; `--voice` overrides. Localized
+  names are recognised (e.g. `(프리미엄)`, `(고품질)` on a Korean-language Mac). The headset page uses the laptop voice when
+  the server has one (the Quest browser voice sounds robotic); the 2D box button *Voice: laptop / headset* or `&voice=headset`
+  switches. Download a natural voice once (free): **System Settings → Accessibility → Spoken Content → System voice →
+  Manage Voices… → English (US) → Zoe (Premium)** and/or **Ava (Premium)**; restart the server; it prints the voice it chose.
+  A local neural TTS (e.g. Kokoro-82M, ~330 MB model + `kokoro`/`onnxruntime` packages) would sound better still; not installed.
+- **Speech-to-text:** faster-whisper `base.en`, beam 5, VAD (trims leading/trailing silence; `min_silence_duration_ms` 400),
+  a domain `initial_prompt` and `hotwords` (Grimes, duct, diffuser, VAV box, damper, airflow, sprinkler pipe, valve, ceiling
+  tile). Segments that look like no speech (no_speech_prob > 0.6 with avg_logprob < −1) and transcripts that only echo the
+  prompt are dropped; an empty result returns `no_speech: true` and the headset says *Didn't catch that* instead of asking.
+  Measured on this Mac (synthetic `say` speech, not a Quest recording): 0.3-0.4 s per question. `small.en` (~480 MB
+  download) was not measured; try `--stt-model small.en` if Quest transcripts stay poor.
 
 - **Push-to-talk:** hold 🎙 → browser `MediaRecorder` (webm/opus) → `POST /api/transcribe` → local
   **faster-whisper** `base.en` (CPU, int8; ~0.6 s for a short question on this Mac) → the question is asked.
@@ -137,6 +172,39 @@ the spiral duct `#401233` (demo airflow sensor anchor).
 
 ## Headset (WebXR) on Quest 3
 
+### Method A: the public page, AI calls to the laptop (owner steps)
+
+The page comes from GitHub Pages; only `/api/health`, `/api/ask`, `/api/transcribe` and `/api/speak` go to the laptop. Nothing
+costs money publicly: the laptop server answers only on the owner's Wi-Fi, and only for `https://doe2park.github.io` (exact
+CORS allow-list; preflights including Chrome's Private Network Access are answered for that origin only).
+
+1. Mac and Quest on the same Wi-Fi. On the Mac (`feat/ask-twin-ai` worktree, or `main` once published):
+   `python3 scripts/ask_twin_server.py --mock --lan` (live: drop `--mock` once the key is in place). It prints the exact address.
+2. **Once per headset (certificate):** in Quest Browser open `https://192.168.68.52:8765/trust` (the laptop's address as printed),
+   tap **Advanced → Proceed**, see *Laptop server reached*, close the tab.
+3. Open `https://doe2park.github.io/Graduate-Project/mr/?ask=1&server=https://192.168.68.52:8765`.
+   If Quest Browser asks to let the page **access devices on your local network**, tap **Allow** (Chrome's Local Network Access;
+   desktop Chrome 156 requires it; whether Quest Browser asks is not verified). If the box says *server not reachable*, tap the
+   link *Open https://…/ once to trust it*, accept, come back and press **Retry**.
+4. Press **Allow mic**, then **Test voice**, then **Enter MR**.
+
+`server=` is used only if it is `https://` + a private-LAN IPv4 (10/8, 172.16/12, 192.168/16) or `localhost` + an explicit port,
+with nothing else (no path, query, user, hex or zero-padded IP); otherwise it is ignored and the box says so. Without `?ask=1`
+the public page is unchanged.
+
+### Asking in the headset (Nov 5 2026 flow)
+
+- **Point and ask:** point at a duct, pipe, light or diffuser and **hold the trigger** (≥ 0.4 s): a short chime, a red
+  *Listening…* ring pulses on the element and the info card + ask bar appear; speak; **release** → the question is sent with
+  that element. A short trigger press works as before (info card + ask bar with the four level buttons). The hold is not
+  armed while pointing at a panel, aiming a move, holding the grip, placing the demo, aligning or while an answer is busy.
+- **While waiting:** a send tone; the card shows *Thinking…* and then a line per server step (*Checking what is above it…*,
+  *Following the ducts…*, *Reading the demo sensors (simulated)…*); if nothing has been said after 1.5 s the voice says
+  *One moment.*
+- **Answer:** the spoken lead starts as soon as it arrives, then one *First, …* sentence; the card, citations, glow and
+  lit run are as before; the provenance footer stays. In scripted mode with no key the card footer and the 2D box say
+  *Live AI needs a key on the laptop; running scripted answers*.
+
 **Status: built and checked on the Mac only. Not tested on a headset.** The four question levels work inside the immersive
 MR/VR page (`scan-xr.html`, the page behind `/mr`) in mock mode; nothing below is verified on Quest hardware.
 
@@ -146,6 +214,7 @@ MR/VR page (`scan-xr.html`, the page behind `/mr`) in mock mode; nothing below i
 
 ### What you do in the headset
 
+0. (New) Hold the trigger on an element to ask by voice: see *Asking in the headset* above.
 1. Trigger on a service element (duct, pipe, light…) or on a demo-sensor pin: the usual info card appears, plus an
    **ask bar** under it: `1 · What is this?` (look up), `2 · What's above?` (nearby in 3D), `3 · What feeds it?`
    (trace a system), `4 · Why is it warm?` (reason across sources), **Hold to speak**, **Close**.
@@ -158,9 +227,12 @@ MR/VR page (`scan-xr.html`, the page behind `/mr`) in mock mode; nothing below i
    answer used `connected_run` (levels 3 and 4), the run lights up piece by piece from the cited terminal unit to the
    picked element, then a pulse travels along it. The card says the run is inferred from touching geometry and that the
    model has no flow direction.
-5. The answer is read aloud: the browser voice if `speechSynthesis` has a voice (2.5 s start watchdog), else the laptop's
-   macOS voice (`POST /api/speak` → WAV played with Web Audio), else the card says *text only*.
+5. The short answer is read aloud: the laptop's macOS voice (`POST /api/speak` → WAV played with Web Audio) when the server
+   has one, else the browser voice if `speechSynthesis` has one (2.5 s start watchdog), else the card says *text only*.
 
+Mock mode routes any question (typed, preset or spoken) by keywords (`mock_route` in `agent.py`): leak/stain → leak,
+valve/shut off → valve, warm/hot/cold/why → comfort (level 4), feed/come from/where does the air/which VAV → feed (level 3),
+above/over the ceiling/plenum → above (level 2), what is this/what room → look up (level 1), anything else → a description.
 The mock answers for the four levels are scripted from real tool runs (`MockAgent._lookup`, `_above`, `_feed`,
 `_comfort` in `scripts/ask_twin/agent.py`). With a key the same page gets live Claude answers.
 
@@ -192,6 +264,8 @@ developer mode; this was not done for the prototype.
 
 | Part | Expectation | Fallback built in |
 |---|---|---|
+| Method A from the public page | Desktop Chrome 156 (headless smoke, `tests/xr-ask-methoda-smoke.cjs`): works after the *local network* permission and the certificate are accepted. Quest Browser's handling of Local Network Access / Private Network Access is not verified. | Same-origin page from the laptop (`https://<ip>:8765/mr/?ask=1`) as before. |
+| Point-and-ask hold | Desktop check through the real hold path with a stand-in controller (`xrDebug.ask.holdSim`) and Chrome's fake mic playing a recorded question. Real controller timing on Quest not verified. | The 1-4 buttons and *Hold to speak* on the bar. |
 | Microphone inside an immersive session | The permission prompt is a 2D dialog that cannot show in VR/MR, so the mic is opened on the 2D page **before** Enter MR and kept open; recording itself (`MediaRecorder`) during the session is expected to work but is not verified. | If no stream: one in-session `getUserMedia` try, then *voice off: use 1-4*; the preset buttons never need the mic. |
 | Text-to-speech | Quest Browser may have no `speechSynthesis` voice. | Laptop voice over the LAN (`/api/speak`, macOS `say`, local), then *text only* on the card. |
 | Audio autoplay in XR | Web Audio is unlocked by the 2D click (Test voice / Enter MR). | The card still shows the answer. |
@@ -216,7 +290,9 @@ IWER) was not run for this feature.
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_ask_twin      # index, tools, citations, mock (4 levels), live loop (fake client), server
-node --test tests/xr-ask.test.cjs                                       # headset helpers: stream, card model, speech text, run path, bar hit, drawing
+node --test tests/xr-ask.test.cjs                                       # headset helpers: stream, card model, speech text, run path, bar hit, drawing, server= validation, progress, hold gate
+# Method A, desktop Chrome against the running --lan server (public origin served from this checkout by Playwright):
+PLAYWRIGHT_MODULE=/path/to/playwright-core FAKE_AUDIO=/abs/question.wav node tests/xr-ask-methoda-smoke.cjs https://<lan-ip>:8765
 python3 scripts/ask_twin_server.py --mock &                             # then the headless browser check:
 PLAYWRIGHT_MODULE=/path/to/playwright-core CHROME_EXECUTABLE=/path/to/chrome-headless-shell \
   [FAKE_AUDIO=/abs/question.wav] node tests/ask-twin-smoke.cjs          # screenshots -> work/ask-twin/shots/
@@ -227,7 +303,7 @@ The headless check loads three element layers under software WebGL and takes abo
 ## Files
 
 - `scripts/ask_twin_server.py` — server (static read-only + `/api/health`, `/api/ask` SSE, `/api/transcribe`, `/api/speak`)
-- `scripts/ask_twin/index.py` — element box index; `tools.py` — read-only tools + schemas; `agent.py` — live and mock loops
+- `scripts/ask_twin/index.py` — element box index; `tools.py` — read-only tools + schemas; `agent.py` — live and mock loops (+ `mock_route`); `speech.py` — short spoken version and `speak` events
 - `twin/ask-twin.js` — panel, citation chips, highlights, fly-to, push-to-talk, spoken reply
 - `twin/xr-ask.js` — headset helpers and canvas drawing (ask bar, answer card, Claude badge); `scan-xr.html` `?ask=1` block wires it into the XR page
 - `tests/xr-ask.test.cjs`, `tests/xr-ask-smoke.cjs` — headset helper tests and the desktop-simulation smoke
