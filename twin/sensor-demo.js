@@ -34,6 +34,7 @@ const str = (v, n = 300) => typeof v === 'string' ? v.slice(0, n) : '';
 const clamp01 = v => Math.min(1, Math.max(0, v));
 
 /* ?scene=<scenario id> shows one scenario's sensors (its tint, fibre and links too); absent or unknown-format = all */
+const DRAW_ZONE_TINTS = false;
 function parseSceneParam(search) {
   try { const v = new URLSearchParams(search || '').get('scene'); return v && /^[a-z0-9-]{1,30}$/.test(v) ? v : null; } catch (e) { return null; }
 }
@@ -505,7 +506,8 @@ function mountParent(ctx) {
     const visOf = {}; for (const it of L.items || []) visOf[it[0]] = it[4];
     const faint = id => !(visOf[id] >= MIN_VIS);   /* beyond the Range or not reported: draw nothing for that sensor */
     if (shown) {
-      for (const [id, pts] of L.zones || []) {
+      /* Comfort-zone tints are not drawn (a dashed ring read as a highlight); the zone sensor keeps its pin and card */
+      for (const [id, pts] of DRAW_ZONE_TINTS ? (L.zones || []) : []) {
         const s = byId.get(id); if (!s || faint(id) || pts.some(p => !p[2])) continue;
         const xy = pts.map(p => at(R, p[0], p[1]));
         gZones.appendChild(el('polygon', {points: xy.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '), fill: s.color || '#E8590C', 'fill-opacity': '.2', stroke: s.color || '#E8590C', 'stroke-opacity': '.8', 'stroke-width': '2', 'stroke-dasharray': '6 5'}));
@@ -587,7 +589,9 @@ function mountParent(ctx) {
   main.addEventListener('pointerdown', e => { if (!e.target.closest || !e.target.closest('.sd-pin')) { if (pinned) { pinned = null; renderCard(); } } }, true);
   fetch(ctx.configUrl || CONFIG_URL, {cache: 'no-store'}).then(r => { if (!r.ok) throw Error('config ' + r.status); return r.json(); }).then(cfg => {
     const v = validateConfig(cfg); cfgAll = cfg; for (const s of filterScene(v.sensors, ctx.sceneFilter || null)) byId.set(s.id, s);
-    primaryId = primaryFor(cfg, ctx.sceneFilter || null, ctx.focus || null, [...byId.keys()]); auto = !!primaryId; schedule();
+    primaryId = primaryFor(cfg, ctx.sceneFilter || null, ctx.focus || null, [...byId.keys()]);
+      /* Standalone the Lens follows the mouse so the ceiling can be explored; it rests on the sensor in a deck embed or with ?focus= */
+      auto = !!primaryId && (embedded || !!ctx.focus); schedule();
     if (ctx.feedModule) { feed = ctx.feedModule.create({registry: cfg}); refreshFeed(); setInterval(refreshFeed, 15000); }
   }).catch(e => { failed = String(e && e.message || e); count.textContent = '· not loaded'; });
   const api = {poseChanged: schedule,
