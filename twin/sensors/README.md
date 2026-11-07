@@ -7,6 +7,7 @@
 - **Feed contract:** `FEED.md`. JSON Schemas: `registry.schema.json`, `observation.schema.json`, `feed.schema.json`.
 - **Viewer adapter:** `feed.js` (`SensorFeed.create({registry}).getLatest(ids)`).
 - **Snapshot generator:** `../../tools/sensor_sim.py`.
+- **Live test (phone as a temporary sensor):** `registry.live-test.json` + `../../tools/sensor_gateway.py` + `../../tools/sensor-phone.html`, opt-in `?sensors=live&feed=…`. See `FEED.md`, "Live test with a phone".
 
 ## Add a real sensor
 1. **Registry row.** Add the sensor or edit a demo row:

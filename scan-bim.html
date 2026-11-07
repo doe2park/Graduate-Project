@@ -3155,11 +3155,13 @@ document.getElementById('mobileElementClose').onclick=()=>{document.getElementBy
 
 /* SENSOR DEMO (opt-in ?sensors=demo from scan-compare, BIM pane only; twin/sensor-demo.js). Illustrative sensors anchored
    to real element ids: a render-only gradient copy for DTS plus projected anchors posted to the parent after each render.
+   ?sensors=live (live test): the same anchoring for the test devices in twin/sensors/registry.live-test.json.
    Without the parameter nothing here loads or runs. */
 let sensorDemo=null;
-if(splitPane==='bim'&&new URLSearchParams(location.search).get('sensors')==='demo'){
+if(splitPane==='bim'&&['demo','live'].includes(new URLSearchParams(location.search).get('sensors'))){
+ const sdLive=new URLSearchParams(location.search).get('sensors')==='live';
  const sdRay=new THREE.Ray(),sdEye=new THREE.Vector3(),sdP=new THREE.Vector3();
- const sdScript=document.createElement('script');sdScript.src='twin/sensor-demo.js?v=1';
+ const sdScript=document.createElement('script');sdScript.src='twin/sensor-demo.js?v=2';
  /* layers the Overlay skips on this device (same rule as setOverlay: fire on phones / coarse-pointer browsers incl. Quest)
     get only their anchored elements, from the chunk named by the sensor config, as a render-only group outside layerState */
  const sdSkipped=key=>key==='fire'&&mobileQuality;
@@ -3174,7 +3176,7 @@ if(splitPane==='bim'&&new URLSearchParams(location.search).get('sensors')==='dem
   for(const im of tier.meshes)ovPatchMaterial(im.material);
   const group=new THREE.Group();group.name='sensor-demo anchors:'+key;for(const im of tier.meshes)group.add(im);scene.add(group);_kick();
   return {group,meshes:tier.meshes,meta,subset:true};};
- sdScript.onload=()=>{sensorDemo=window.SensorDemo.mountBim({THREE,scene,camera,sceneFilter:window.SensorDemo.parseSceneParam(location.search),skipped:k=>overlayOn&&sdSkipped(k),loadSubset:sdLoadSubset,getLayer:k=>layerState[k],elementInfo,kick:()=>_kick(),post:m=>window.parent.postMessage(m,location.origin),
+ sdScript.onload=()=>{sensorDemo=window.SensorDemo.mountBim({THREE,scene,camera,sceneFilter:sdLive?null:window.SensorDemo.parseSceneParam(location.search),configUrl:sdLive?window.SensorDemo.LIVE_CONFIG_URL:undefined,skipped:k=>overlayOn&&sdSkipped(k),loadSubset:sdLoadSubset,getLayer:k=>layerState[k],elementInfo,kick:()=>_kick(),post:m=>window.parent.postMessage(m,location.origin),
   /* Overlay Range fade x wall occlusion at the anchor (same rules as the element fragments); 1 outside Overlay */
   visibility:p=>{if(!overlayOn)return 1;camera.getWorldPosition(sdEye);sdP.set(p[0],p[1],p[2]);const d=sdEye.distanceTo(sdP);if(!(d>1e-6))return 1;
    let v=OV.rangeFade(d,ovPreset);sdRay.origin.copy(sdEye);sdRay.direction.copy(sdP).sub(sdEye).normalize();if(!(ovWallDistance(sdRay)<d-.15))return v;

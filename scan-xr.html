@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=1"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -298,8 +298,9 @@ const fireOn=()=>!!layerState.fire&&layerState.fire.group.visible;
 const raycaster=new THREE.Raycaster();raycaster.params.Line.threshold=.04;
 /* ── Simulated sensors state (opt-in &sensors=demo; functions further down) ── pins/chips/DTS colouring live in a group under bimRoot,
    so VR photo registration, MR alignment and the Demo-here placement move them with the services. Illustrative: nothing is installed. */
-const SX=globalThis.SensorXR,SXOK=SX?.API===1,SXP=SXOK?SX.parseParams(location.search):{enabled:false,scene:'leak'},SXN=SXOK?SX.SCENE_NAMES:{};
-const SENS={on:SXP.enabled,scene:SXP.scene,libs:null,cfg:null,all:[],feed:null,recs:new Map(),states:{},obs:{},center:null,ready:false,loading:false,epoch:0,picked:null,error:null,lastFeed:0,feeding:false,lastInv:0,pinTex:new Map(),ringTex:null,group:new THREE.Group()};
+const SX=globalThis.SensorXR,SXOK=SX?.API===2,SXP=SXOK?SX.parseParams(location.search):{enabled:false,scene:'leak',live:false},SXN=SXOK?SX.SCENE_NAMES:{};
+/* live test (?sensors=live&feed=<private-LAN or localhost URL>): temporary test devices with real gateway observations, labelled LIVE / STALE / NO DATA */
+const SENS={on:SXP.enabled,live:!!SXP.live,gw:null,hist:{},scene:SXP.scene,libs:null,cfg:null,all:[],feed:null,recs:new Map(),states:{},obs:{},center:null,ready:false,loading:false,epoch:0,picked:null,error:null,lastFeed:0,feeding:false,lastInv:0,pinTex:new Map(),ringTex:null,group:new THREE.Group()};
 SENS.group.name='sensors (simulated, illustrative)';SENS.group.visible=false;bimRoot.add(SENS.group);
 function pickables(){const out=[];for(const st of Object.values(layerState))if(st.group.visible)for(const m of st.meshes)if(m.visible)out.push(m);return out;}
 let cardData=null,cardDataP=null;
@@ -353,9 +354,10 @@ async function pickAlong(origin,dir){
 const sensorsActive=()=>SENS.on&&SENS.ready;
 const sdl=src=>new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>no(new Error(src.split('?')[0]+' failed to load'));document.head.appendChild(e);});
 function sensorLibs(){if(!SXOK)return Promise.reject(new Error('twin/sensor-xr.js is out of date · reload the page'));
- return SENS.libs=SENS.libs||(async()=>{await sdl('twin/sensors/feed.js?v=1');await sdl('twin/sensor-demo.js?v=1');
-  const reg=await fetchJson('twin/sensors/registry.json'),v=globalThis.SensorDemo.validateConfig(reg);if(!v.sensors.length)throw new Error('sensor registry has no valid sensors');
-  if(!v.ok)console.warn('[sensors] entries skipped:',v.errors);SENS.cfg=reg;SENS.all=v.sensors;SENS.feed=globalThis.SensorFeed.create({registry:{...reg,sensors:v.sensors}});})().catch(e=>{SENS.libs=null;throw e;});}
+ return SENS.libs=SENS.libs||(async()=>{await sdl('twin/sensors/feed.js?v=2');await sdl('twin/sensor-demo.js?v=2');
+  const reg=await fetchJson(SENS.live?globalThis.SensorDemo.LIVE_CONFIG_URL:'twin/sensors/registry.json'),v=globalThis.SensorDemo.validateConfig(reg);if(!v.sensors.length)throw new Error('sensor registry has no valid sensors');
+  if(SENS.live)SENS.gw=globalThis.SensorFeed.liveFeedUrl(location.search,location.href);   // only this computer or a private-LAN address
+  if(!v.ok)console.warn('[sensors] entries skipped:',v.errors);SENS.cfg=reg;SENS.all=v.sensors;SENS.feed=globalThis.SensorFeed.create(SENS.live?{registry:{...reg,sensors:v.sensors},gateway:SENS.gw}:{registry:{...reg,sensors:v.sensors}});})().catch(e=>{SENS.libs=null;throw e;});}
 function sensorPinTex(style){const key=style.icon+style.color;let t=SENS.pinTex.get(key);if(t)return t;
  const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.fillStyle=style.color;g.beginPath();g.arc(64,64,58,0,7);g.fill();g.lineWidth=8;g.strokeStyle='#fff';g.stroke();
  g.save();g.translate(28,28);g.scale(3,3);g.lineWidth=2.2;g.lineCap=g.lineJoin='round';g.strokeStyle='#fff';try{g.stroke(new Path2D(style.icon));}catch(e){}g.restore();
@@ -367,6 +369,7 @@ function sensorChip(r){const c=r.chipCv||(r.chipCv=Object.assign(document.create
  g.fillStyle='rgba(8,16,28,.88)';g.beginPath();g.roundRect(2,2,508,68,34);g.fill();g.strokeStyle='#FDB515';g.lineWidth=4;g.stroke();g.fillStyle='#f1f5f9';g.textAlign='center';fitText(g,r.chipText,256,50,470,36,'Arial');
  if(!r.chipTex){r.chipTex=new THREE.CanvasTexture(c);r.chipTex.colorSpace=THREE.SRGBColorSpace;r.chip.material.map=r.chipTex;r.chip.material.needsUpdate=true;}else r.chipTex.needsUpdate=true;}
 const sensorValueText=s=>{const o=SENS.obs[s.id];return o&&o.quality!=='missing'&&o.value!=null?globalThis.SensorFeed.formatValue(o.value,s.unit):'—';};
+const sensorAssess=s=>globalThis.SensorFeed.assess(SENS.obs[s.id],s,Date.now(),SENS.feed?.staleAfter);   // live test: LIVE / STALE / NO DATA
 /* Raw vertices of one element in bimRoot-local (BIM) coordinates, straight from the runtime batches (never modified). */
 function sensorElementGeom(st,id,tris){const pos=[],idx=[],m4=new THREE.Matrix4(),v=new THREE.Vector3();
  for(const mesh of st.meshes){const ids=mesh.userData.ids;if(!ids||!ids.includes(id))continue;const g=mesh.geometry,P3=g.attributes.position,line=!!mesh.isLine||!!mesh.isLineSegments;
@@ -394,7 +397,7 @@ async function sensorsSetScene(scene){
  try{
   await sensorLibs();if(epoch!==SENS.epoch)return;
   const SD=globalThis.SensorDemo,list=SD.filterScene(SENS.all,scene),need=[...new Set(list.map(s=>s.anchor.layer))].filter(k=>LAYERS[k]);
-  status('Demo sensors · '+SXN[scene]+' · loading '+need.map(k=>LAYERS[k].label).join(', ')+'…',true);
+  status((SENS.live?'Live test · ':'Demo sensors · ')+SXN[scene]+' · loading '+need.map(k=>LAYERS[k].label).join(', ')+'…',true);
   for(const k of need){if(!layerState[k])setLayer(k,true);else{layerState[k].group.visible=true;if(k==='fire')$('fire').setAttribute('aria-pressed','true');}await layerState[k].pending;if(epoch!==SENS.epoch)return;}
   const pts=[];
   for(const s of list){const st=layerState[s.anchor.layer],info=st?.meta?.[s.anchor.id],bad=m=>{SENS.states[s.id]={status:'refused',reason:m};};
@@ -409,17 +412,20 @@ async function sensorsSetScene(scene){
      SENS.group.add(r.pin,r.chip);SENS.recs.set(s.id,r);pts.push(point);SENS.states[s.id]={status:'attached',layer:s.anchor.layer,element:s.anchor.id};}}}
   if(!SENS.recs.size)throw new Error('none of the '+SXN[scene]+' sensors could be placed ('+Object.values(SENS.states).map(x=>x.reason).join('; ')+')');
   SENS.center=SX.clusterCenter(pts);SENS.ready=true;SENS.group.visible=true;await sensorsFeed();
-  status('Demo sensors · '+SXN[scene]+' · '+SENS.recs.size+' simulated sensors · illustrative, not installed',false);
+  status(SENS.live?'Live test · '+SENS.recs.size+' temporary test device'+(SENS.recs.size>1?'s':'')+' · '+(SENS.gw?.error||'gateway feed'):'Demo sensors · '+SXN[scene]+' · '+SENS.recs.size+' simulated sensors · illustrative, not installed',false);
   if(MODE_AR)mrSensorsChanged();
- }catch(e){if(epoch!==SENS.epoch)return;SENS.error=String(e.message||e);console.error('[sensors]',e);status('Demo sensors unavailable · '+SENS.error);}
+ }catch(e){if(epoch!==SENS.epoch)return;SENS.error=String(e.message||e);console.error('[sensors]',e);status((SENS.live?'Live test unavailable · ':'Demo sensors unavailable · ')+SENS.error);}
  finally{if(epoch===SENS.epoch){SENS.loading=false;if(state.menu)drawMenu();if(MODE_AR)mrRefresh();invalidate();}}}
 async function sensorsEnable(on){
  if(on){SENS.on=true;await sensorsSetScene(SENS.scene);return;}
- SENS.on=false;SENS.epoch++;SENS.loading=false;sensorsClear();SENS.group.visible=false;status('Demo sensors off');if(MODE_AR)mrSensorsChanged();if(state.menu)drawMenu();invalidate();}
-const sensorsNextScene=()=>sensorsSetScene(SX.nextScene(SENS.scene));
-function sensorsMenuCycle(){if(!SENS.on)return sensorsEnable(true);if(SENS.scene===SX.SCENES[SX.SCENES.length-1]){SENS.scene=SX.DEFAULT_SCENE;return sensorsEnable(false);}return sensorsNextScene();}
+ SENS.on=false;SENS.epoch++;SENS.loading=false;sensorsClear();SENS.group.visible=false;status(SENS.live?'Live test off':'Demo sensors off');if(MODE_AR)mrSensorsChanged();if(state.menu)drawMenu();invalidate();}
+const sensorsNextScene=()=>sensorsSetScene(SENS.live?SENS.scene:SX.nextScene(SENS.scene));   // live test: one scene, no demo cycle
+function sensorsMenuCycle(){if(!SENS.on)return sensorsEnable(true);if(SENS.live)return sensorsEnable(false);if(SENS.scene===SX.SCENES[SX.SCENES.length-1]){SENS.scene=SX.DEFAULT_SCENE;return sensorsEnable(false);}return sensorsNextScene();}
 async function sensorsFeed(){if(SENS.feeding||!SENS.recs.size)return;SENS.feeding=true;
- try{SENS.obs=await SENS.feed.getLatest([...SENS.recs.keys()]);for(const r of SENS.recs.values()){r.chipText=SX.chipText(r.style.short,sensorValueText(r.s));sensorChip(r);}SENS.lastFeed=performance.now();invalidate();}
+ try{SENS.obs=await SENS.feed.getLatest([...SENS.recs.keys()]);for(const r of SENS.recs.values()){r.chipText=SENS.live?SX.chipText(r.style.short,sensorValueText(r.s),SX.liveTag(sensorAssess(r.s))):SX.chipText(r.style.short,sensorValueText(r.s));sensorChip(r);}
+  if(SENS.live){for(const [id,o] of Object.entries(SENS.obs)){const h=SENS.hist[id]||(SENS.hist[id]=[]);if(o&&o.ts&&Number.isFinite(o.value)&&h[h.length-1]?.ts!==o.ts){h.push({ts:o.ts,v:o.value});if(h.length>60)h.shift();}}
+   if(SENS.picked&&card.mesh.visible)sensorsDrawCard(SENS.picked);}   // the open card follows the live value
+  SENS.lastFeed=performance.now();invalidate();}
  catch(e){console.warn('[sensors] feed',e);}finally{SENS.feeding=false;}}
 const _sw=new THREE.Vector3();
 /* Per frame (inside xrFrameSafe in XR): pin/chip size from the viewing distance, alert pulse, feed refresh every 20 s. */
@@ -431,20 +437,24 @@ function sensorsTick(){if(!sensorsActive())return;const now=performance.now();ca
   r.pin.position.fromArray(r.point);r.pin.scale.setScalar(sz);
   r.chip.scale.set(sz*4.6,sz*.65,1);r.chip.position.set(r.point[0],r.point[1]+sz*1.05,r.point[2]);r.d=d;
   if(r.ring){const ph=reduce?.4:(now%1800)/1800;r.ring.position.fromArray(r.point);r.ring.scale.setScalar(sz*(1.4+ph*3.2));r.ring.material.opacity=.95*(1-ph);if(!reduce)pulse=true;}}
- if(now-SENS.lastFeed>20000&&!SENS.feeding)sensorsFeed();
+ if(now-SENS.lastFeed>(SENS.live?2500:20000)&&!SENS.feeding)sensorsFeed();
  if(pulse&&now-SENS.lastInv>120){SENS.lastInv=now;invalidate();}}
 function sensorsPins(){const out=[];for(const [id,r] of SENS.recs){if(!r.pin.visible)continue;_sw.fromArray(r.point).applyMatrix4(bimRoot.matrixWorld);out.push({id,p:_sw.toArray(),r:SX.pinSize(r.d??5)*.75});}return out;}
 function sensorsPick(origin,dir){if(!sensorsActive())return null;return SX.pickPin(origin.toArray(),dir.toArray(),sensorsPins(),60);}   // pins are drawn up to 60 m, so they are pickable that far
-function sensorsShowCard(sp){hideCard();const r=SENS.recs.get(sp.id);if(!r)return null;
- const s=r.s,SF=globalThis.SensorFeed,SD=globalThis.SensorDemo,series=SX.simSeries(SF.simulate,s,Date.now(),24),info=layerState[s.anchor.layer]?.meta?.[s.anchor.id],vt=sensorValueText(s);
+function sensorsCardLines(r){const s=r.s,SF=globalThis.SensorFeed,SD=globalThis.SensorDemo,info=layerState[s.anchor.layer]?.meta?.[s.anchor.id],vt=sensorValueText(s);
  const cap=MODE_AR?mrAlignText():(capture?capture.label+' · '+capture.alignmentText:'');
- const lines=SX.cardLines({sensor:s,element:info,typeName:SD.TYPES[s.type],sceneName:SXN[SENS.scene],valueText:vt==='—'?'':vt,series:series.length>1?series:s.reading.series,alignText:cap});
+ if(SENS.live){const a=sensorAssess(s);return SX.liveCardLines({sensor:s,element:info,typeName:SD.TYPES[s.type],obs:SENS.obs[s.id],a,valueText:vt,age:SF.ageText(a.ageS),series:(SENS.hist[s.id]||[]).map(h=>h.v),alignText:cap});}
+ const series=SX.simSeries(SF.simulate,s,Date.now(),24);
+ return SX.cardLines({sensor:s,element:info,typeName:SD.TYPES[s.type],sceneName:SXN[SENS.scene],valueText:vt==='—'?'':vt,series:series.length>1?series:s.reading.series,alignText:cap});}
+function sensorsDrawCard(id){const r=SENS.recs.get(id);if(r)drawCard(sensorsCardLines(r));}
+function sensorsShowCard(sp){hideCard();const r=SENS.recs.get(sp.id);if(!r)return null;
+ const s=r.s,lines=sensorsCardLines(r);
  drawCard(lines);camera.getWorldPosition(_head);const w=new THREE.Vector3().fromArray(sp.point),toHit=_v.copy(w).sub(_head),dist=clamp(toHit.length()*.7,.8,1.8);
  card.mesh.position.copy(_head).addScaledVector(toHit.normalize(),dist);card.mesh.position.y-=.1*dist;card.mesh.scale.setScalar(dist/1.4);card.mesh.lookAt(_head);card.mesh.visible=true;
- marker.position.copy(w);marker.visible=true;SENS.picked=s.id;invalidate();return {sensor:s.id,simulated:true,lines,distance:sp.distance};}
-function sensorsInspection(){return {enabled:SENS.on,scene:SENS.scene,ready:SENS.ready,loading:SENS.loading,error:SENS.error,center:SENS.center,card:SENS.picked,scenes:SXOK?SX.SCENES:[],
+ marker.position.copy(w);marker.visible=true;SENS.picked=s.id;invalidate();return {sensor:s.id,simulated:!SENS.live,lines,distance:sp.distance};}
+function sensorsInspection(){return {enabled:SENS.on,live:SENS.live,feed:SENS.gw,scene:SENS.scene,ready:SENS.ready,loading:SENS.loading,error:SENS.error,center:SENS.center,card:SENS.picked,scenes:SXOK?SX.SCENES:[],
  states:SENS.states,dtsMeshes:[...SENS.recs.values()].filter(r=>r.mesh).length,rings:[...SENS.recs.values()].filter(r=>r.ring).length,drawables:SENS.group.children.length,
- sensors:[...SENS.recs.values()].map(r=>({id:r.s.id,type:r.s.type,layer:r.s.anchor.layer,element:r.s.anchor.id,point:r.point,pinVisible:r.pin.visible,chip:r.chipText,simulated:SENS.obs[r.s.id]?.simulated===true,source:SENS.obs[r.s.id]?.source??null}))};}
+ sensors:[...SENS.recs.values()].map(r=>({id:r.s.id,type:r.s.type,layer:r.s.anchor.layer,element:r.s.anchor.id,point:r.point,pinVisible:r.pin.visible,chip:r.chipText,simulated:SENS.obs[r.s.id]?.simulated===true,source:SENS.obs[r.s.id]?.source??null,obs:SENS.obs[r.s.id]??null}))};}
 /* ── XR menu panel (2026-10-22 redesign after the first headset test) ── at most 5 large buttons (Capture, Lens/All, Photo/Gaussian,
    Recenter, More ▸); More holds Flashlight hands, Opacity, Photo 2K/4K, Exit VR and the layer toggles. ~0.8 m in front, slightly below
    eye height, facing the head; it rides with the rig (jumps, snap turns). B/Y opens/closes; it also closes 1.5 s after every ray left it.
@@ -829,7 +839,7 @@ for(const c of controllers){const t=new THREE.Mesh(tipGeo,tipMat);t.position.z=-
 const mrShort=()=>mr.area?mr.area.name.replace(/^Level 1 · /,'L1 · '):'MR';
 const mrDemoOn=()=>!!(mr.demo||mr.demoPending);
 /* One caption for panel, info cards and the 2D page. Demo placement: no RMS, no 'manual alignment' claim. */
-function mrDemoText(){return MR.demoLabel(mr.area)+(mr.demo?.sensorScene?' · placed around the demo-sensor scene "'+SXN[mr.demo.sensorScene]+'" (simulated sensors)':'');}
+function mrDemoText(){return MR.demoLabel(mr.area)+(mr.demo?.sensorScene?' · placed around the '+(SENS.live?'live-test sensor':'demo-sensor scene "'+SXN[mr.demo.sensorScene]+'" (simulated sensors)'):'');}
 function mrAlignText(){if(mrDemoOn()&&mr.area)return mrDemoText()+(mr.nudged?' · nudged':'');return MR.LABEL+(mr.fit?.ok?' · RMS '+MR.cm(mr.fit.rmsM).toFixed(1)+' cm':mr.source.startsWith('anchor (restored')&&mr.record?.rmsCm!=null?' · restored via Quest anchor · RMS '+mr.record.rmsCm.toFixed(1)+' cm at save':'')+(mr.nudged?' · nudged':'');}
 function mrCardCapture(){return {label:'MR · '+mrShort(),alignmentText:mrAlignText()};}
 function mrCullRadius(){const l=OV.cullLimit(mr.rangeKey);return Number.isFinite(l)?l:1e6;}
@@ -1088,9 +1098,9 @@ function mrRender2D(){const box=$('mr');if(!box||box.hidden||!mr.area)return;
  $('mrDemo').setAttribute('aria-pressed',String(mrDemoOn()||mr.demoWanted));
  const demoM=mrModeIsDemo(),pr=(id,on)=>$(id).setAttribute('aria-pressed',String(!!on));
  pr('chDemo',demoM&&SENS.on);pr('chFoyer',!demoM&&mr.area.id==='l1-auditorium-foyer');pr('chEast',!demoM&&mr.area.id==='l1-east-entrance');pr('chSens',SENS.on);
- $('chSens').textContent='Sensors: '+(SENS.loading?'loading…':SENS.on?'ON (simulated)':'OFF')+' · tap to switch';
+ $('chSens').textContent='Sensors: '+(SENS.loading?'loading…':SENS.on?(SENS.live?'ON (live test)':'ON (simulated)'):'OFF')+' · tap to switch';
  for(const b of document.querySelectorAll('#mrChoices [data-scene]'))pr(b.id,SENS.on&&SENS.scene===b.dataset.scene);
- $('mrNow').textContent='Now: '+(demoM?'DEMO placement (not aligned to this building)':'Grimes alignment ('+mr.area.name+')')+' · sensors '+(SENS.on?SXN[SENS.scene]+' (simulated)':'off');}
+ $('mrNow').textContent='Now: '+(demoM?'DEMO placement (not aligned to this building)':'Grimes alignment ('+mr.area.name+')')+' · sensors '+(SENS.on?SXN[SENS.scene]+(SENS.live?' (temporary test device, live)':' (simulated)'):'off');}
 function mrDownloadAlignments(){const blob=new Blob([JSON.stringify(MR.exportAlignments(localStorage),null,1)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='grimes-mr-alignments-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
 function mrDownloadChecks(){const rows=MR.loadChecks(localStorage);const blob=new Blob([JSON.stringify({schema:'grimes-mr-checks/1',label:'design (BIM) vs installed; manual alignment, not surveyed',rows},null,1)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='grimes-mr-checks-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}

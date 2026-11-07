@@ -1,7 +1,9 @@
 /* Simulated-sensor helpers for the headset page (scan-xr.html, opt-in ?sensors=demo). ILLUSTRATIVE ONLY: no sensor is installed in
    Grimes; every value comes from twin/sensors/feed.js (demo-sim) and every caption says so. Pure logic only (no DOM, no three.js),
    unit-tested in tests/sensor-xr.test.cjs. The 3D drawing, picking and cards are in scan-xr.html and reuse the registry and the
-   geometry helpers of twin/sensor-demo.js (principalAxis, anchorPoint, colorAt, dtsValue) instead of copying them. */
+   geometry helpers of twin/sensor-demo.js (principalAxis, anchorPoint, colorAt, dtsValue) instead of copying them.
+   API 2 (live test): ?sensors=live[&feed=<url>] shows the temporary test devices of twin/sensors/registry.live-test.json (scene
+   LIVE_SCENE) with real gateway observations; liveCardLines / chipText(..., tag) label them LIVE / STALE / NO DATA, never SIMULATED. */
 (function (root, factory) {
   const api = factory();
   if (root) root.SensorXR = api;
@@ -9,9 +11,11 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 1;
+const API = 2;
 const SCENES = ['leak', 'air', 'water', 'elec', 'rotating'];
-const SCENE_NAMES = {leak: 'Leak', air: 'Air', water: 'Water', elec: 'Power', rotating: 'Rotating'};
+const LIVE_SCENE = 'live-test';   // ?sensors=live only; never part of the demo scene cycle
+const SCENE_NAMES = {leak: 'Leak', air: 'Air', water: 'Water', elec: 'Power', rotating: 'Rotating', 'live-test': 'Live test'};
+const LIVE_CAPTION = 'Temporary test device · real measurement via laptop gateway · not a permanent sensor';
 const DEFAULT_SCENE = 'leak';
 const CAPTION = 'Demo sensor — illustrative, not installed · values simulated';
 const BADGE = 'SIMULATED';
@@ -21,8 +25,9 @@ const finite = v => typeof v === 'number' && Number.isFinite(v);
    Note ?scene=gaussian belongs to the photo/Gaussian switch and is not a sensor scene. */
 function parseParams(search) {
   let p; try { p = new URLSearchParams(search || ''); } catch (e) { p = new URLSearchParams(''); }
-  const sc = p.get('scene');
-  return {enabled: p.get('sensors') === 'demo', scene: SCENES.includes(sc) ? sc : DEFAULT_SCENE};
+  const sc = p.get('scene'), v = p.get('sensors');
+  if (v === 'live') return {enabled: true, scene: LIVE_SCENE, live: true};   // feed URL: SensorFeed.liveFeedUrl (private LAN / localhost only)
+  return {enabled: v === 'demo', scene: SCENES.includes(sc) ? sc : DEFAULT_SCENE, live: false};
 }
 function nextScene(cur, step) {
   const i = SCENES.indexOf(cur), n = SCENES.length;
@@ -33,7 +38,7 @@ function nextScene(cur, step) {
 function withState(search, {mode, sensors, scene, area} = {}) {
   const p = new URLSearchParams(search || '');
   if (mode === 'demo') p.set('place', 'demo'); else if (mode === 'align') p.set('place', 'grimes');
-  if (sensors === true) p.set('sensors', 'demo'); else if (sensors === false) { p.set('sensors', 'off'); }
+  if (sensors === true) p.set('sensors', p.get('sensors') === 'live' ? 'live' : 'demo'); else if (sensors === false) { p.set('sensors', 'off'); }
   if (scene && SCENES.includes(scene)) p.set('scene', scene);
   if (area) p.set('area', area);
   return '?' + p.toString();
@@ -82,8 +87,22 @@ function pickPin(origin, dir, pins, far) {
   return best;
 }
 
-/* Short world-locked chip text: type + SIMULATED value. */
-function chipText(typeShort, valueText) { return (typeShort || 'Sensor') + ' · ' + (valueText || '—') + ' · SIM'; }
+/* Short world-locked chip text: type + value + provenance tag (SIM for the demo; LIVE / STALE / NO DATA for a live test device). */
+function chipText(typeShort, valueText, tag) { return (typeShort || 'Sensor') + ' · ' + (valueText || '—') + ' · ' + (tag || 'SIM'); }
+/* Live-test tag from SensorFeed.assess: a demo-sim observation can never be shown as LIVE. */
+function liveTag(a) { return !a ? 'NO DATA' : a.badge === 'Simulated' ? 'SIM' : a.state === 'ok' ? 'LIVE' : a.state === 'stale' ? 'STALE' : a.state === 'missing' ? 'NO DATA' : 'SUSPECT'; }
+/* Headset card for a live test device: the value with its age, quality and source from the gateway observation (assess a). */
+function liveCardLines({sensor, element, typeName, obs, a, valueText, age, series, alignText}) {
+  const clip = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+  const where = sensor.anchor.layer + ':' + sensor.anchor.id, el = element ? clip(element.name || element.type || 'Element', 40) : clip(sensor.anchor.name || where, 40);
+  const tag = liveTag(a), st = a ? a.state : 'missing';
+  const first = st === 'ok' ? 'Live value: ' + valueText + (age ? ' · ' + age : '') : st === 'stale' ? 'Stale: last ' + valueText + (age ? ' · ' + age : '') : st === 'missing' ? 'No data: ' + ((a && a.reason) || 'no observation') : (a.label || 'Suspect') + ': ' + valueText;
+  const rows = [first, clip(['quality ' + (obs && obs.quality || 'missing'), 'source ' + (obs && obs.source || sensor.data_source), sensor.test_device ? 'temporary test device' : null].filter(Boolean).join(' · '), 80),
+    'Anchored to BIM element ' + el + ' · ' + where];
+  return {title: clip((sensor.k ? sensor.k + ' · ' : '') + sensor.label, 44), sub: clip([typeName, 'Live test'].filter(Boolean).join(' · '), 70),
+    badge: tag, tier: tag, cls: tag === 'LIVE' ? 'live' : tag === 'STALE' || tag === 'SUSPECT' ? 'mod' : 'none', rows, footer: [LIVE_CAPTION, clip(alignText || '', 140)],
+    spark: Array.isArray(series) && series.length > 1 && series.every(finite) ? series.slice() : null, sparkColor: sensor.color || '#22d3ee'};
+}
 
 /* Lines for the headset card (same shape as xr-core cardLines: title, sub, badge, cls, rows, footer) + an optional sparkline.
    Never presents a value as a real reading: badge SIMULATED, caption on the first footer line, alignment caption on the second. */
@@ -109,5 +128,5 @@ function simSeries(simulate, sensor, nowMs, n) {
   return out;
 }
 
-return {API, SCENES, SCENE_NAMES, DEFAULT_SCENE, CAPTION, BADGE, parseParams, nextScene, withState, mrDefaults, clusterCenter, demoArea, pinSize, pickPin, chipText, cardLines, simSeries};
+return {API, SCENES, LIVE_SCENE, LIVE_CAPTION, SCENE_NAMES, DEFAULT_SCENE, CAPTION, BADGE, parseParams, liveTag, liveCardLines, nextScene, withState, mrDefaults, clusterCenter, demoArea, pinSize, pickPin, chipText, cardLines, simSeries};
 });

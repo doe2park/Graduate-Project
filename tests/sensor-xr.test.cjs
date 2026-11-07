@@ -4,9 +4,9 @@ const ROOT = path.join(__dirname, '..'), read = f => fs.readFileSync(path.join(R
 const registry = JSON.parse(read('twin/sensors/registry.json'));
 
 test('params: sensors=demo opt-in, scene default leak, ?scene=gaussian is not a sensor scene', () => {
-  assert.deepEqual(SX.parseParams(''), {enabled: false, scene: 'leak'});
-  assert.deepEqual(SX.parseParams('?mode=ar&sensors=demo&scene=air'), {enabled: true, scene: 'air'});
-  assert.deepEqual(SX.parseParams('?sensors=demo&scene=gaussian'), {enabled: true, scene: 'leak'});
+  assert.deepEqual(SX.parseParams(''), {enabled: false, scene: 'leak', live: false});
+  assert.deepEqual(SX.parseParams('?mode=ar&sensors=demo&scene=air'), {enabled: true, scene: 'air', live: false});
+  assert.deepEqual(SX.parseParams('?sensors=demo&scene=gaussian'), {enabled: true, scene: 'leak', live: false});
   assert.equal(SX.parseParams('?sensors=off').enabled, false);
   assert.deepEqual(SX.SCENES, ['leak', 'air', 'water', 'elec', 'rotating']);
   assert.equal(SX.nextScene('leak'), 'air'); assert.equal(SX.nextScene('rotating'), 'leak'); assert.equal(SX.nextScene('leak', -1), 'rotating'); assert.equal(SX.nextScene('zzz'), 'air');
@@ -65,7 +65,8 @@ test('page wiring: loadProgressText, versions, no real-reading claims', () => {
   assert.equal(X.loadProgressText('Duct', 30e6, 21.1e6), 'Duct · 30.0 MB loaded'); assert.equal(X.loadProgressText('X', 3e6), 'X · 3.0 MB loaded'); assert.equal(X.loadProgressText('X', NaN, 5), 'X · loading…');
   assert.ok(!/p\.total/.test(html), 'compressed Content-Length is never used as a denominator');
   for (const f of ['twin/sensor-xr.js', 'twin/sensor-demo.js', 'twin/sensors/feed.js']) assert.ok(html.includes(f + '?v='), f + ' loaded with ?v=');
-  assert.match(html, /globalThis\.SensorXR,SXOK=SX\?\.API===1/, 'stale-cache guard for the sensor helper');
+  assert.match(html, /globalThis\.SensorXR,SXOK=SX\?\.API===2/, 'stale-cache guard for the sensor helper');
+  assert.equal(SX.API, 2); assert.ok(html.includes('twin/sensor-xr.js?v=2'), 'page loads the API 2 helper');
   const menu = X.menuButtons('more', {layers: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(k => ({key: k, label: k})), sensorsLabel: 'Leak'});
   assert.equal(menu.length, X.menuLayout(X.MENU_PAGES.more).length); assert.equal(menu[13].id, 'sensors'); assert.equal(menu[13].value, 'Leak'); assert.equal(menu[13].tone, 'on');
 });

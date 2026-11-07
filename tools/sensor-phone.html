@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Phone test sensor</title>
+<!-- Live-test phone page, served by tools/sensor_gateway.py at /phone (twin/sensors/FEED.md, "Live test with a phone").
+     Reads the phone accelerometer (DeviceMotion), computes the vibration RMS of each window and POSTs one grimes-sensor-feed/1
+     observation per window to the gateway on the laptop. A temporary test device, not a calibrated vibration sensor. -->
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#111a2e;--line:#24324d;--text:#e2e8f0;--muted:#94a3b8;--live:#34d399;--warn:#fbbf24;--bad:#f87171;--accent:#38bdf8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+main{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:19px;margin:4px 0 0}
+.tag{display:inline-block;font:700 11px/1 ui-monospace,monospace;letter-spacing:.4px;padding:4px 7px;border-radius:5px;background:rgba(52,211,153,.18);color:var(--live)}
+.note{color:var(--muted);font-size:13.5px;margin:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+#value{font:700 52px/1.05 system-ui,sans-serif;font-variant-numeric:tabular-nums}
+#value small{font-size:20px;font-weight:600;color:var(--muted)}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:var(--muted);margin-top:6px}
+.row b{color:var(--text);font-weight:600}
+button{font:700 20px system-ui,sans-serif;width:100%;padding:18px;border-radius:14px;border:0;background:var(--live);color:#052e1f;cursor:pointer}
+button.stop{background:#334155;color:var(--text)}
+button:disabled{opacity:.5}
+select{width:100%;font:16px system-ui;padding:10px;border-radius:10px;background:var(--panel);color:var(--text);border:1px solid var(--line)}
+#status{font-size:14px;min-height:1.4em}
+.ok{color:var(--live)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+canvas{width:100%;height:60px;display:block}
+</style>
+</head>
+<body>
+<main>
+ <div><span class="tag">TEMPORARY TEST DEVICE</span>
+ <h1>Phone accelerometer → Grimes twin</h1>
+ <p class="note">This phone stands in for a wireless vibration sensor during the live test. Values are real measurements from the
+ phone's accelerometer, but the phone is not calibrated and not mounted on the duct.</p></div>
+
+ <label class="panel" for="sensor" id="sensorBox"><span class="note">Sends as sensor</span>
+  <select id="sensor"></select></label>
+
+ <div class="panel" aria-live="polite">
+  <div class="note">Vibration, acceleration RMS (gravity removed)</div>
+  <div id="value">—</div>
+  <canvas id="spark" width="600" height="80" aria-hidden="true"></canvas>
+  <div class="row"><span>Samples</span><b id="rate">—</b></div>
+  <div class="row"><span>Signal</span><b id="mode">—</b></div>
+  <div class="row"><span>Window / send every</span><b id="win">—</b></div>
+  <div class="row"><span>Sent / accepted</span><b id="count">0 / 0</b></div>
+ </div>
+
+ <button id="start" type="button">Start sensor</button>
+ <div id="status" class="note"></div>
+
+ <p class="note">How it is computed: for each window the per-axis mean is removed from the linear acceleration (x, y, z), and the
+ RMS of the remaining magnitude is sent in m/s². This is acceleration, not the ISO 10816 velocity in mm/s; phone browsers sample at
+ roughly 60–100 Hz, so vibration above about 30 Hz is not captured. Keep this page open and the screen on while testing.</p>
+</main>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let sensors = [], sensor = null, running = false, timer = 0, samples = [], gravityOnly = false, sent = 0, accepted = 0, wake = null, spark = [];
+const setStatus = (t, cls) => { $('status').textContent = t; $('status').className = 'note ' + (cls || ''); };
+
+async function loadSensors() {
+  if (!window.isSecureContext) { setStatus('This page needs HTTPS (or localhost) for the accelerometer. Start the gateway with --lan and open its https address.', 'bad'); $('start').disabled = true; }
+  try {
+    const r = await fetch('/api/sensors/registry.json', {cache: 'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    sensors = (await r.json()).sensors || [];
+  } catch (e) { setStatus('Cannot reach the gateway: ' + e.message, 'bad'); return; }
+  $('sensor').replaceChildren(...sensors.map(s => Object.assign(document.createElement('option'), {value: s.id, textContent: s.label + ' (' + s.id + ', ' + s.unit + ')'})));
+  $('sensorBox').hidden = sensors.length < 2;
+  pick();
+}
+function pick() {
+  sensor = sensors.find(s => s.id === $('sensor').value) || sensors[0] || null;
+  $('win').textContent = sensor ? sensor.sampling_interval_s + ' s' : '—';
+  if (sensor && sensor.unit !== 'm/s2') setStatus('This sensor expects ' + sensor.unit + '; the phone measures m/s². Pick another sensor.', 'bad');
+}
+$('sensor').onchange = pick;
+
+function onMotion(e) {
+  const a = e.acceleration, g = e.accelerationIncludingGravity;
+  const ok = v => v && [v.x, v.y, v.z].every(Number.isFinite);
+  if (ok(a)) { samples.push([a.x, a.y, a.z]); gravityOnly = false; }
+  else if (ok(g)) { samples.push([g.x, g.y, g.z]); gravityOnly = true; }
+}
+/* RMS of the acceleration magnitude after removing each axis' window mean (removes gravity and sensor bias). */
+function windowRms(xs) {
+  const n = xs.length, m = [0, 1, 2].map(k => xs.reduce((s, v) => s + v[k], 0) / n);
+  return Math.sqrt(xs.reduce((s, v) => s + (v[0] - m[0]) ** 2 + (v[1] - m[1]) ** 2 + (v[2] - m[2]) ** 2, 0) / n);
+}
+function drawSpark() {
+  const c = $('spark'), g = c.getContext('2d'), W = c.width, H = c.height; g.clearRect(0, 0, W, H);
+  if (spark.length < 2) return;
+  const mx = Math.max(...spark, 0.05); g.strokeStyle = '#34d399'; g.lineWidth = 3; g.beginPath();
+  spark.forEach((v, i) => { const x = i / (spark.length - 1) * W, y = H - 4 - v / mx * (H - 8); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+}
+async function tick() {
+  if (!running || !sensor) return;
+  const xs = samples; samples = [];
+  const iv = sensor.sampling_interval_s, end = new Date(), rate = xs.length / iv;
+  let obs;
+  if (xs.length < 3) {
+    obs = {sensor_id: sensor.id, ts: end.toISOString(), value: null, unit: sensor.unit, quality: 'missing', source: 'gateway', reason: 'no accelerometer samples in this window (page in background or motion access denied)'};
+    $('value').innerHTML = 'No data';
+  } else {
+    const v = Math.round(windowRms(xs) * 1000) / 1000;
+    const reasons = [];
+    if (gravityOnly) reasons.push('only acceleration including gravity available; window mean removed');
+    if (rate < 20) reasons.push('low sample rate ' + rate.toFixed(0) + ' Hz');
+    obs = {sensor_id: sensor.id, ts: end.toISOString(), value: v, unit: sensor.unit, quality: reasons.length ? 'suspect' : 'good', source: 'gateway', simulated: false};
+    if (reasons.length) obs.reason = reasons.join('; ');
+    $('value').innerHTML = v.toFixed(3) + ' <small>m/s² RMS</small>';
+    spark.push(v); if (spark.length > 60) spark.shift(); drawSpark();
+  }
+  $('rate').textContent = xs.length + ' in ' + iv + ' s (' + rate.toFixed(0) + ' Hz)';
+  $('mode').textContent = xs.length < 3 ? 'none' : gravityOnly ? 'with gravity (mean removed) · suspect' : 'linear acceleration';
+  sent++;
+  try {
+    const r = await fetch('/api/sensors/observations', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({observations: [obs]})});
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.accepted) { accepted++; setStatus('Sent ' + end.toLocaleTimeString() + ' · accepted by the gateway · quality ' + obs.quality, obs.quality === 'good' ? 'ok' : 'warn'); }
+    else setStatus('Rejected: ' + ((j.rejected && j.rejected[0] && j.rejected[0].reason) || j.error || ('HTTP ' + r.status)), 'bad');
+  } catch (e) { setStatus('Send failed: ' + e.message + ' (same Wi-Fi? gateway running?)', 'bad'); }
+  $('count').textContent = sent + ' / ' + accepted;
+}
+async function start() {
+  if (!sensor) return;
+  try {
+    /* iOS 13+: motion access needs a user tap and an explicit permission */
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const p = await DeviceMotionEvent.requestPermission();
+      if (p !== 'granted') { setStatus('Motion access was not granted. In Safari: Settings › Safari › Motion & Orientation Access, then reload.', 'bad'); return; }
+    }
+    if (typeof DeviceMotionEvent === 'undefined') { setStatus('This browser has no DeviceMotion support.', 'bad'); return; }
+  } catch (e) { setStatus('Motion permission failed: ' + e.message, 'bad'); return; }
+  window.addEventListener('devicemotion', onMotion);
+  try { wake = navigator.wakeLock ? await navigator.wakeLock.request('screen') : null; } catch (e) { wake = null; }
+  running = true; samples = [];
+  timer = setInterval(tick, sensor.sampling_interval_s * 1000);
+  $('start').textContent = 'Stop'; $('start').classList.add('stop'); $('sensor').disabled = true;
+  setStatus('Measuring… first value in ' + sensor.sampling_interval_s + ' s', 'ok');
+}
+function stop() {
+  running = false; clearInterval(timer); window.removeEventListener('devicemotion', onMotion);
+  try { wake && wake.release(); } catch (e) {} wake = null;
+  $('start').textContent = 'Start sensor'; $('start').classList.remove('stop'); $('sensor').disabled = false;
+  setStatus('Stopped. The twin shows this sensor as Stale after 3 missed intervals.', 'warn');
+}
+$('start').onclick = () => running ? stop() : start();
+document.addEventListener('visibilitychange', async () => { if (running && document.visibilityState === 'visible' && navigator.wakeLock) { try { wake = await navigator.wakeLock.request('screen'); } catch (e) {} } });
+loadSensors();
+</script>
+</body>
+</html>

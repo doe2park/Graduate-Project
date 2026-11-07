@@ -195,7 +195,8 @@
        "%",
        "L/s",
        "kW",
-       "A"
+       "A",
+       "m/s2"
       ]
      },
      "location": {
@@ -227,7 +228,8 @@
        "planned",
        "demo",
        "installed",
-       "retired"
+       "retired",
+       "test"
       ]
      },
      "data_source": {
@@ -328,6 +330,30 @@
       "type": "array",
       "items": {
        "type": "string"
+      }
+     },
+     "test_device": {
+      "type": "object",
+      "required": [
+       "device",
+       "temporary",
+       "note"
+      ],
+      "properties": {
+       "device": {
+        "type": "string",
+        "minLength": 3
+       },
+       "temporary": {
+        "type": "boolean",
+        "enum": [
+         true
+        ]
+       },
+       "note": {
+        "type": "string",
+        "minLength": 10
+       }
       }
      }
     }

@@ -170,8 +170,8 @@ test('scene filter: ?scene=<scenario> keeps only that scenario; absent = all; li
   }
   assert.deepEqual(SD.filterScene(all, 'nope'), []);
   /* both pages pass the scene on: compare -> BIM frame URL, and to its own mount */
-  assert.match(compare, /mountParent\(\{main:mainEl,frame:frames\[1\],sceneFilter:SensorDemo\.parseSceneParam\(location\.search\),/);
-  assert.match(bim, /mountBim\(\{THREE,scene,camera,sceneFilter:window\.SensorDemo\.parseSceneParam\(location\.search\),/);
+  assert.match(compare, /mountParent\(\{main:mainEl,frame:frames\[1\],sceneFilter:sdLive\?null:SensorDemo\.parseSceneParam\(location\.search\),/);
+  assert.match(bim, /mountBim\(\{THREE,scene,camera,sceneFilter:sdLive\?null:window\.SensorDemo\.parseSceneParam\(location\.search\),/);
 });
 
 test('temperature colour map and DTS profile: cool ends, hottest at the alert position', () => {
@@ -247,9 +247,11 @@ test('scan-compare.html: no static script tag, the BIM frame URL is unchanged wi
   assert.equal(src('?view=overlay&sensors=demo&scene=leak'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1&sensors=demo&scene=leak');
   assert.equal(src('?view=overlay&sensors=demo&scene=%3Cx%3E'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1&sensors=demo');
   assert.equal(src('?view=overlay&scene=leak'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1', 'scene alone does nothing');
-  /* the loader block is the last script, behind the guard */
+  /* live test: the BIM pane gets sensors=live (no scene), nothing else */
+  assert.equal(src('?view=overlay&sensors=live&feed=http://127.0.0.1:8931/api/sensors/latest.json&scene=leak'), 'scan-bim.html?pane=bim&revision=overlay2&overlay=1&sensors=live');
+  /* the loader block is the last script, behind the guard (demo or live, nothing else) */
   const block = compare.slice(compare.lastIndexOf('/* SENSOR DEMO'));
-  assert.match(block, /^\/\* SENSOR DEMO[\s\S]*?\nif\(new URLSearchParams\(location\.search\)\.get\('sensors'\)==='demo'\)\{[\s\S]*twin\/sensor-demo\.js/);
+  assert.match(block, /^\/\* SENSOR DEMO[\s\S]*?\nif\(\['demo','live'\]\.includes\(new URLSearchParams\(location\.search\)\.get\('sensors'\)\)\)\{[\s\S]*twin\/sensor-demo\.js/);
 });
 
 test('scan-bim.html: loader only for the BIM pane with sensors=demo; render loop calls a null hook otherwise', () => {
@@ -257,7 +259,8 @@ test('scan-bim.html: loader only for the BIM pane with sensors=demo; render loop
   const a = bim.indexOf('/* SENSOR DEMO'), b = bim.indexOf('let _lastT = 0');
   assert.ok(a > 0 && b > a, 'block sits right before the render loop');
   const block = bim.slice(a, b);
-  assert.match(block, /let sensorDemo=null;\nif\(splitPane==='bim'&&new URLSearchParams\(location\.search\)\.get\('sensors'\)==='demo'\)\{/);
+  assert.match(block, /let sensorDemo=null;\nif\(splitPane==='bim'&&\['demo','live'\]\.includes\(new URLSearchParams\(location\.search\)\.get\('sensors'\)\)\)\{/);
+  assert.match(block, /configUrl:sdLive\?window\.SensorDemo\.LIVE_CONFIG_URL:undefined,/, 'live: the BIM pane anchors the live-test registry');
   for (const i of [...bim.matchAll(/sensor-demo\.js/g)].map(m => m.index)) assert.ok(i > a && i < b, 'script injected only inside the guarded block');
   assert.match(bim, /if \(typeof sensorDemo !== 'undefined' && sensorDemo\) sensorDemo\.frame\(\);/);
   assert.equal([...bim.matchAll(/sensorDemo\.frame\(\)/g)].length, 1);

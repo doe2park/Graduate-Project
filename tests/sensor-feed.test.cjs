@@ -105,7 +105,7 @@ test('viewer wiring: feed only behind ?sensors=demo; the standard Lens card is u
   const compare = read('scan-compare.html');
   assert.ok(!/<script src="twin\/sensors\/feed\.js/.test(compare), 'never a static script tag');
   const block = compare.slice(compare.lastIndexOf('/* SENSOR DEMO'));
-  assert.match(block, /^\/\* SENSOR DEMO[\s\S]*?\nif\(new URLSearchParams\(location\.search\)\.get\('sensors'\)==='demo'\)\{[\s\S]*twin\/sensors\/feed\.js/);
+  assert.match(block, /^\/\* SENSOR DEMO[\s\S]*?\nif\(\['demo','live'\]\.includes\(new URLSearchParams\(location\.search\)\.get\('sensors'\)\)\)\{[\s\S]*twin\/sensors\/feed\.js/);
   assert.match(compare, /try\{if\(window\.sdElementFeedApply\)window\.sdElementFeedApply\(lensCard,pick\.hit\.layer,pick\.hit\.id,tier\);\}catch\(e\)\{\}/);
   assert.equal([...compare.matchAll(/window\.sdElementFeedApply=/g)].length, 1);
   assert.ok(compare.lastIndexOf('window.sdElementFeedApply=') > compare.lastIndexOf('/* SENSOR DEMO'), 'defined only inside the demo block');

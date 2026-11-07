@@ -1,0 +1,62 @@
+{
+ "schema": "grimes-sensor-registry/1",
+ "scope": "LIVE TEST registry (twin/sensors/FEED.md, \"Live test with a phone\"). Loaded ONLY with ?sensors=live&feed=<private-LAN or localhost URL>; the public ?sensors=demo views read registry.json and never this file. One temporary test device: the owner's phone accelerometer, posting real measurements through tools/sensor_gateway.py on the laptop (data_source gateway, the same adapter path a real wireless gateway will use). It is not a permanent Grimes sensor and is not mounted on the duct: the anchor says which BIM element the test stands in for.",
+ "feed": {
+  "contract": "twin/sensors/FEED.md",
+  "stale_after_intervals": 3,
+  "timezone": "America/Los_Angeles"
+ },
+ "types": {
+  "vibration": {
+   "short": "Vibration",
+   "color": "#087F8C",
+   "icon": "M3 9v6M7 5v14M11 8v8M15 4v16M19 9v6"
+  }
+ },
+ "sensors": [
+  {
+   "id": "test-phone-vib",
+   "scenario": "live-test",
+   "k": 1,
+   "type": "vibration",
+   "color": "#087F8C",
+   "label": "Test device: phone accelerometer",
+   "kind": "Temporary test device · phone accelerometer, vibration RMS · via laptop gateway",
+   "anchor": {
+    "layer": "duct",
+    "id": "399665",
+    "name": "Straight Rect_ - Straight Rect__ 3_ - 4_-1471398-MD01 EXPORT",
+    "guid": "f092de44-3a22-5ff0-844a-912675d0e883",
+    "t": 0.45
+   },
+   "reading": {
+    "value": "Live acceleration RMS from the phone (m/s², gravity removed)",
+    "detail": "RMS of the phone's linear acceleration magnitude over each 2 s window, per-axis mean removed. Acceleration, not ISO 10816 velocity (mm/s): a phone cannot integrate to velocity honestly."
+   },
+   "test_device": {
+    "device": "Owner's phone (browser DeviceMotion accelerometer)",
+    "temporary": true,
+    "note": "Temporary test device for the end-to-end live path; not mounted on duct 399665 and not calibrated. Held or placed by hand."
+   },
+   "point_kind": "sensor",
+   "quantity": "vibration_acceleration_rms",
+   "unit": "m/s2",
+   "location": {
+    "level": "L1",
+    "space": null
+   },
+   "install_status": "test",
+   "data_source": "gateway",
+   "future_source": "gateway",
+   "source_point": "gw:phone-test:accel-rms",
+   "sampling_interval_s": 2,
+   "alert_rule": null,
+   "brick": {
+    "class": "brick:Vibration_Sensor",
+    "status": "candidate",
+    "isPointOf": "urn:grimes:bim-guid:f092de44-3a22-5ff0-844a-912675d0e883"
+   },
+   "provenance": "Live test: real measurements from the owner's phone accelerometer (tools/sensor-phone.html) received by tools/sensor_gateway.py on the laptop. Temporary, uncalibrated, not mounted on the duct."
+  }
+ ]
+}
