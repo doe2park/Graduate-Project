@@ -300,11 +300,13 @@ function cardLines(id, meta, tier, capture) {
   return {title, sub: clip(sub, 70), badge: tier.label, tier: tier.tier, cls: tier.cls, rows, footer};
 }
 
-/* ── Gaussian scene mode (2026-10-19) ──
+/* ── Gaussian scene mode (2026-10-19; Oct 18 zones 2026-11-07) ──
    The splat scene lives in the capture's SCAN frame (manifest frame 'scan-y-up-metres'), exactly like the photo stations,
    so it is added to the scene root untransformed and the BIM keeps the same inverse-registration group.
-   Gaussian = trained appearance, not surveyed geometry. Only the May 6 scene is published. */
-const PUBLISHED_GAUSSIANS = {'2026-05-06': 'scan-assets/gaussian/2026-05-06/viewer.json'};
+   Gaussian = trained appearance, not surveyed geometry. Same data contract as scan-compare.html CAPTURE_GAUSSIAN:
+   May 6 = one manifest; Oct 18 = a zone index listing only the published zones (A, C, D; zone B is not published). */
+const PUBLISHED_GAUSSIANS = {'2026-05-06': {kind: 'manifest', path: 'scan-assets/gaussian/2026-05-06/viewer.json'},
+  '2026-10-18': {kind: 'zones', path: 'scan-assets/gaussian/2026-10-18/zones/index.json'}};
 const SCENES = ['photo', 'gaussian'];
 function sceneRequest(value) { return value === 'gaussian' ? 'gaussian' : 'photo'; }
 /* Dev hosts that may preview unpublished local packages: loopback and private RFC1918 IPv4 (the Quest dev server binds one). */
@@ -339,24 +341,29 @@ function gaussianAsset(m, {xr = false, prefer = null} = {}) {
   if (count > budget) return {ok: false, error: 'Gaussian scene exceeds the ' + (xr ? 'headset' : 'device') + ' splat budget'};
   return {ok: true, file, count, mobile: useMobile, shDegree: xr || useMobile ? 0 : 2};
 }
-/* Which Gaussian (if any) belongs to this capture: the published one, or a validated local override for the same capture date. */
+/* Which Gaussian (if any) belongs to this capture: the published one, or a validated local override (one manifest) for the same capture date. */
 function gaussianFor(captureDate, override) {
-  if (override && override.capture === captureDate) return {path: override.path, local: true};
-  if (Object.prototype.hasOwnProperty.call(PUBLISHED_GAUSSIANS, captureDate)) return {path: PUBLISHED_GAUSSIANS[captureDate], local: false};
+  if (override && override.capture === captureDate) return {path: override.path, local: true, kind: 'manifest'};
+  if (Object.prototype.hasOwnProperty.call(PUBLISHED_GAUSSIANS, captureDate)) { const g = PUBLISHED_GAUSSIANS[captureDate]; return {path: g.path, local: false, kind: g.kind}; }
   return null;
+}
+/* "May 6, Oct 18 zones": what is published, for the "no Gaussian for this capture" note. */
+function publishedGaussianText() {
+  return Object.keys(PUBLISHED_GAUSSIANS).sort().map(d => dateLabel(d).replace(/, \d{4}$/, '') + (PUBLISHED_GAUSSIANS[d].kind === 'zones' ? ' zones' : '')).join(', ');
 }
 /* Toggle logic: a request for 'gaussian' without a scene for this capture stays in Photo and explains why. */
 function resolveScene(requested, captureLabel, source) {
   if (sceneRequest(requested) !== 'gaussian') return {scene: 'photo', note: null};
-  if (!source) return {scene: 'photo', note: 'No Gaussian scene for ' + (captureLabel || 'this capture') + ' · staying in Photo (published Gaussian: May 6 only)'};
+  if (!source) return {scene: 'photo', note: 'No Gaussian scene for ' + (captureLabel || 'this capture') + ' · staying in Photo (published Gaussian: ' + publishedGaussianText() + ')'};
   return {scene: 'gaussian', note: null};
 }
 function toggleScene(current) { return current === 'gaussian' ? 'photo' : 'gaussian'; }
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function dateLabel(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); return m ? MONTHS[Number(m[2]) - 1] + ' ' + Number(m[3]) + ', ' + m[1] : String(iso || ''); }
 /* Honest caption: capture date, zone, 'experimental appearance, not surveyed', provisional alignment where it applies, local preview. */
-function gaussianLabel(m, capture, {local = false} = {}) {
-  const zone = m?.zone && typeof m.zone.id === 'string' ? 'zone ' + m.zone.id + (m.zone.name ? ' (' + m.zone.name + ')' : '') : 'whole capture';
+function gaussianLabel(m, capture, {local = false, published = null} = {}) {
+  let zone = m?.zone && typeof m.zone.id === 'string' ? 'zone ' + m.zone.id + (m.zone.name ? ' (' + m.zone.name + ')' : '') : 'whole capture';
+  if (Array.isArray(published) && published.length && m?.zone) zone = (m.zone.name || m.zone.id) + ' loaded (published zones ' + zoneShortNames(published) + ')';
   const parts = ['Gaussian · ' + dateLabel(m?.capture), zone, 'experimental appearance, not surveyed'];
   if (capture?.provisional) parts.push('provisional alignment');
   if (local) parts.push('local preview, unpublished');
@@ -366,6 +373,66 @@ function gaussianLabel(m, capture, {local = false} = {}) {
 function gaussianStations(m, stations) {
   const ids = Array.isArray(m?.zone?.stations) ? new Set(m.zone.stations) : null;
   return stations.map((s, i) => i).filter(i => !ids || ids.has(stations[i].id));
+}
+
+/* ── Zoned Gaussian (Oct 18) ── zones/index.json lists only the PUBLISHED zones (zone B stays local: seated people).
+   Same validation rules as scan-splat.html normalizeZoneIndex / scan-compare.html gaussianZoneSummary. A zone manifest
+   path must be a plain sibling path ("l1-a/viewer.json"): no traversal, no absolute or external URL. */
+const finiteBox = b => !!b && Array.isArray(b.min) && Array.isArray(b.max) && b.min.length === 3 && b.max.length === 3 && b.min.concat(b.max).every(Number.isFinite);
+function gaussianZoneIndex(index) {
+  if (!index || index.schema !== 1 || index.frame !== 'scan-y-up-metres' || !Array.isArray(index.zones) || !index.zones.length) return {ok: false, error: 'Unsupported Gaussian zones index'};
+  if (index.status !== 'experimental-trained') return {ok: false, error: 'Zones index is not an experimental-trained layer'};
+  if (typeof index.capture !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(index.capture)) return {ok: false, error: 'Zones index has no capture date'};
+  const ids = new Set(), zones = [];
+  for (const z of index.zones) {
+    if (!z || typeof z.id !== 'string' || !/^[\w-]{1,40}$/.test(z.id) || ids.has(z.id) || typeof z.manifest !== 'string' || !finiteBox(z.bounds) || !finiteBox(z.coreBounds)) return {ok: false, error: 'Invalid zone entry in zones index'};
+    if (!/^[\w-]+(\/[\w-]+)*\/[\w.-]+\.json$/.test(z.manifest) || z.manifest.split('/').some(p => p.startsWith('.'))) return {ok: false, error: 'Zone manifest must be a relative path inside the zones folder'};
+    ids.add(z.id);
+    const core = Array.isArray(z.corePositions) ? z.corePositions.filter(p => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)) : [];
+    zones.push({id: z.id, name: typeof z.name === 'string' && z.name ? z.name : z.id, manifest: z.manifest, bounds: z.bounds, coreBounds: z.coreBounds, corePositions: core});
+  }
+  const def = zones.find(z => z.id === index.defaultZone) || zones[0];
+  const str = (v, n = 300) => typeof v === 'string' ? v.slice(0, n) : '';
+  return {ok: true, capture: index.capture, defaultZone: def.id, zones, scope: str(index.scope), privacy: str(index.privacy), alignment: str(index.alignment, 60)};
+}
+/* "A, C, D" from "Zone A" / "Zone C" / "Zone D" (falls back to the full name). */
+function zoneShortNames(zones) { return (zones || []).map(z => String(z.name || z.id).replace(/^Zone\s+/i, '')).join(', '); }
+function zoneBoxDistance(b, x, z) { return Math.hypot(Math.max(b.min[0] - x, 0, x - b.max[0]), Math.max(b.min[2] - z, 0, z - b.max[2])); }
+/* XZ distance to the zone's core stations (index corePositions), else to its core box (scan-splat.html zoneCoreDistance). */
+function zoneCoreDistance(zone, x, z) {
+  const pts = zone.corePositions;
+  if (!Array.isArray(pts) || !pts.length) return zoneBoxDistance(zone.coreBounds, x, z);
+  let best = Infinity; for (const p of pts) { const d = Math.hypot(p[0] - x, p[1] - z); if (d < best) best = d; }
+  return best;
+}
+const ZONE_HYSTERESIS = 1.5;   // metres: another zone must be this much closer (to its core) before the loaded zone changes
+/* Which ONE zone to keep resident for an eye position p (scan frame). Coverage is station-based: the capture station nearest
+   to p (any station of the capture) is "covered" when it is one of the training stations of a published zone (zone.stations
+   from that zone's viewer.json). Covered: among the zones that trained that station, the one whose core is nearest, but the
+   current zone is kept unless another is ZONE_HYSTERESIS closer (overlap stations belong to two zones). Not covered (e.g. the
+   unpublished zone B area): outside = true; the current zone stays loaded, or with none loaded the zone with the nearest core.
+   Returns {zone, outside, station, candidates}. */
+function gaussianZoneFor(zones, stations, p, {current = null, hysteresis = ZONE_HYSTERESIS} = {}) {
+  const list = Array.isArray(zones) ? zones.filter(z => z && typeof z.id === 'string') : [];
+  if (!list.length || !Array.isArray(p) || !Number.isFinite(p[0]) || !Number.isFinite(p[2])) return {zone: current, outside: false, station: -1, candidates: []};
+  const x = p[0], z = p[2], near = nearestStation(stations || [], p), sid = near.index >= 0 ? stations[near.index].id : null;
+  const candidates = sid == null ? [] : list.filter(zn => Array.isArray(zn.stations) && zn.stations.includes(sid));
+  const cur = list.find(zn => zn.id === current) || null;
+  const pool = candidates.length ? candidates : list;
+  let best = null, bd = Infinity;
+  for (const zn of pool) { const d = zoneCoreDistance(zn, x, z); if (d < bd) { bd = d; best = zn; } }
+  if (!candidates.length) return {zone: cur ? cur.id : best.id, outside: true, station: near.index, candidates: []};
+  const keep = cur && candidates.includes(cur) && zoneCoreDistance(cur, x, z) <= bd + hysteresis;
+  return {zone: keep ? cur.id : best.id, outside: false, station: near.index, candidates: candidates.map(zn => zn.id)};
+}
+/* Station indices covered by any published zone (Gaussian-mode jump targets / teleport anchors). */
+function zoneStationIndices(zones, stations) {
+  const ids = new Set(); for (const zn of zones || []) for (const s of zn.stations || []) ids.add(s);
+  return stations.map((s, i) => i).filter(i => ids.has(stations[i].id));
+}
+/* Honest note when the eye is outside every published zone (the area of an unpublished zone, or untrained). */
+function gaussianOutsideNote(zones) {
+  return 'Outside published Gaussian zones ' + zoneShortNames(zones) + ' · not published here · appearance missing or blurred';
 }
 
 /* ── Point-and-teleport (Gaussian mode only; a photo has one optical centre) ──
@@ -422,13 +489,14 @@ function xrQuality(ua, params) {
 
 /* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
    Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
-const API = 4;
+const API = 5;
 
 return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
   chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines,
   loadProgressText, MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,
   controllerRoles, stickIntent, aimUpdate, stepConeHalf, routeDistances, stationTarget, arcPoints, targetLabel,
-  PUBLISHED_GAUSSIANS, SCENES, sceneRequest, isDevHost, gaussianOverride, SPLAT_BUDGET, gaussianAsset, gaussianFor, resolveScene, toggleScene,
-  dateLabel, gaussianLabel, gaussianStations, floorHit, nearestStation, teleportTarget};
+  PUBLISHED_GAUSSIANS, SCENES, sceneRequest, isDevHost, gaussianOverride, SPLAT_BUDGET, gaussianAsset, gaussianFor, publishedGaussianText, resolveScene, toggleScene,
+  dateLabel, gaussianLabel, gaussianStations, gaussianZoneIndex, zoneShortNames, zoneCoreDistance, ZONE_HYSTERESIS, gaussianZoneFor, zoneStationIndices, gaussianOutsideNote,
+  floorHit, nearestStation, teleportTarget};
 });

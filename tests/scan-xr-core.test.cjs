@@ -291,7 +291,7 @@ test('Gaussian manifest: frame/status checks, mobile file in XR, full on desktop
   assert.equal(X.gaussianAsset({...MAY_G, status: 'draft'}).ok, false);
   assert.equal(X.gaussianAsset({...MAY_G, capture: undefined}).ok, false);
   for (const file of ['../trained.ksplat', 'sub/x.ply', '.hidden.ply', 'x.glb', 'https://evil.example/x.ply']) assert.equal(X.gaussianAsset({...MAY_G, file}).ok, false, file);
-  assert.equal(MAY_G.capture, '2026-05-06'); assert.equal(X.PUBLISHED_GAUSSIANS['2026-05-06'], 'scan-assets/gaussian/2026-05-06/viewer.json');
+  assert.equal(MAY_G.capture, '2026-05-06'); assert.deepEqual(X.PUBLISHED_GAUSSIANS['2026-05-06'], {kind: 'manifest', path: 'scan-assets/gaussian/2026-05-06/viewer.json'});
   if (fs.existsSync(path.join(root, OCT_G_PATH))) {   // local, unpublished Oct 18 zone l1-a package (ignored work/)
     const oct = json(OCT_G_PATH), a = X.gaussianAsset(oct, {xr: true});
     assert.deepEqual([a.ok, a.file, oct.capture, oct.zone.id], [true, 'mobile.ply', '2026-10-18', 'l1-a']);
@@ -311,15 +311,19 @@ test('?gaussian= override: dev hosts only (loopback + RFC1918), never the public
   assert.ok(html.includes("X.gaussianOverride(location.hostname,q.get('gaussian'))") && html.includes("if(url.origin!==location.origin)throw Error('Use a same-origin Gaussian manifest')"));
 });
 
-test('scene mode toggling: May published, Sep none (stays Photo with a reason), Oct only via a local override', () => {
+test('scene mode toggling: May published, Sep none (stays Photo with a reason), Oct 18 published zones, local override = one manifest', () => {
   assert.equal(X.sceneRequest('gaussian'), 'gaussian'); assert.equal(X.sceneRequest('GAUSSIAN'), 'photo'); assert.equal(X.sceneRequest(null), 'photo');
   assert.equal(X.toggleScene('photo'), 'gaussian'); assert.equal(X.toggleScene('gaussian'), 'photo');
   const may = X.gaussianFor('2026-05-06', null), sep = X.gaussianFor('2026-09-17', null), oct = X.gaussianFor('2026-10-18', null);
-  assert.deepEqual(may, {path: 'scan-assets/gaussian/2026-05-06/viewer.json', local: false}); assert.equal(sep, null); assert.equal(oct, null);
+  assert.deepEqual(may, {path: 'scan-assets/gaussian/2026-05-06/viewer.json', local: false, kind: 'manifest'}); assert.equal(sep, null);
+  assert.deepEqual(oct, {path: 'scan-assets/gaussian/2026-10-18/zones/index.json', local: false, kind: 'zones'}, 'Oct 18 = the published zone index');
   const ov = {path: OCT_G_PATH, capture: '2026-10-18'};
-  assert.deepEqual(X.gaussianFor('2026-10-18', ov), {path: OCT_G_PATH, local: true});
+  assert.deepEqual(X.gaussianFor('2026-10-18', ov), {path: OCT_G_PATH, local: true, kind: 'manifest'}, 'a dev-host override still wins for its capture');
   assert.deepEqual(X.gaussianFor('2026-05-06', ov), may, 'an Oct override never replaces May');
-  assert.deepEqual(X.gaussianFor('2026-05-06', {path: 'x/viewer.json', capture: '2026-05-06'}), {path: 'x/viewer.json', local: true});
+  assert.deepEqual(X.gaussianFor('2026-05-06', {path: 'x/viewer.json', capture: '2026-05-06'}), {path: 'x/viewer.json', local: true, kind: 'manifest'});
+  assert.equal(X.publishedGaussianText(), 'May 6, Oct 18 zones');
+  assert.match(X.resolveScene('gaussian', 'Sep 17, 2026', sep).note, /published Gaussian: May 6, Oct 18 zones\)/);
+  assert.doesNotMatch(X.resolveScene('gaussian', 'Sep 17, 2026', sep).note, /May 6 only/);
   assert.deepEqual(X.resolveScene('gaussian', 'May 6, 2026', may), {scene: 'gaussian', note: null});
   const r = X.resolveScene('gaussian', 'Sep 17, 2026', sep);
   assert.equal(r.scene, 'photo'); assert.match(r.note, /No Gaussian scene for Sep 17, 2026 · staying in Photo/);
@@ -403,4 +407,105 @@ test('headset quality: Quest 3 / 3S default to scale 1.0 + foveation 0.2, Quest 
   assert.equal(X.xrQuality(UA.q3, P('xrscale=abc&foveation=zzz')).xrScale, 1); assert.equal(X.xrQuality(UA.q3, P('foveation=5')).foveation, 1);
   const html = read('scan-xr.html');
   assert.ok(html.includes('X.xrQuality(navigator.userAgent,q)') && html.includes('foveation:P.foveation,device:XQ.device'), 'page uses the profile and reports it in xrInspection');
+});
+
+/* ── Oct 18 Gaussian zones in XR (2026-11-07) ── published index lists A, C, D only; one zone resident at a time. */
+const ZDIR = 'scan-assets/gaussian/2026-10-18/zones/', OCT_IX = json(ZDIR + 'index.json');
+const OCT_ST = json('scan-assets/captures/2026-10-18/panoramas/manifest.json').stations;
+const octZones = () => { const ix = X.gaussianZoneIndex(OCT_IX); assert.equal(ix.ok, true, ix.error); for (const z of ix.zones) z.stations = json(ZDIR + z.manifest).zone.stations; return ix; };
+
+test('XR Gaussian per capture = scan-compare CAPTURE_GAUSSIAN (same data contract, every host)', () => {
+  const html = read('scan-compare.html'), m = html.match(/CAPTURE_GAUSSIAN=(\{[^;]*?\}\});/);
+  assert.ok(m, 'scan-compare CAPTURE_GAUSSIAN found');
+  const cg = vm.runInNewContext('(' + m[1] + ')');
+  assert.deepEqual(JSON.parse(JSON.stringify(X.PUBLISHED_GAUSSIANS)), JSON.parse(JSON.stringify(cg)));
+  assert.match(html, /const LOCAL_ONLY_GAUSSIAN=\[\];/, 'scan-compare offers the Oct 18 zones on every host too');
+  assert.ok(!/isDevHost\([^)]*\)\s*&&\s*X\.gaussianFor/.test(read('scan-xr.html')), 'XR does not gate the published zones by host');
+});
+
+test('zone index: published A, C, D only (no zone B), honest labels, malformed or unsafe indexes refused', () => {
+  const ix = X.gaussianZoneIndex(OCT_IX);
+  assert.equal(ix.ok, true); assert.equal(ix.capture, '2026-10-18'); assert.equal(ix.defaultZone, 'l1-a');
+  assert.deepEqual(ix.zones.map(z => z.id), ['l1-a', 'l1-c', 'l1-d']); assert.ok(!ix.zones.some(z => z.id === 'l1-b'), 'zone B is never listed');
+  assert.match(ix.privacy, /Zone B is not published/); assert.equal(ix.alignment, 'project-frame-provisional'); assert.match(ix.scope, /not surveyed/);
+  assert.equal(X.zoneShortNames(ix.zones), 'A, C, D');
+  const bad = o => X.gaussianZoneIndex({...OCT_IX, ...o}).ok;
+  assert.equal(bad({status: 'draft'}), false); assert.equal(bad({status: undefined}), false); assert.equal(bad({frame: 'bim'}), false);
+  assert.equal(bad({schema: 2}), false); assert.equal(bad({zones: []}), false); assert.equal(bad({capture: 'x'}), false);
+  for (const manifest of ['../l1-b/viewer.json', '/abs/viewer.json', 'https://evil.example/viewer.json', 'l1-a/.hidden.json', 'l1-a/viewer.js', 'l1-a//viewer.json'])
+    assert.equal(bad({zones: [{...OCT_IX.zones[0], manifest}]}), false, manifest);
+  assert.equal(bad({zones: [OCT_IX.zones[0], OCT_IX.zones[0]]}), false, 'duplicate zone id');
+  assert.equal(bad({zones: [{...OCT_IX.zones[0], bounds: {min: [0, 0], max: [1, 1, 1]}}]}), false, 'bad bounds');
+  // published zone manifests: Oct 18, provisional alignment, XR picks the reduced mobile file (19.6 MB, 350k SH0) over the 48 MB KSplat
+  for (const z of ix.zones) {
+    const m = json(ZDIR + z.manifest), a = X.gaussianAsset(m, {xr: true}), d = X.gaussianAsset(m, {xr: false});
+    assert.deepEqual([m.capture, m.zone.id, m.alignment], ['2026-10-18', z.id, 'project-frame-provisional']);
+    assert.deepEqual([a.ok, a.file, a.count, a.shDegree], [true, 'mobile.ply', 350000, 0]); assert.equal(d.file, 'trained.ksplat');
+    assert.ok(m.provenance.mobileBytes < m.provenance.desktopBytes / 2, 'mobile file is under half the KSplat size');
+  }
+});
+
+test('zone choice from position: covering zone per station, B area = outside (current zone kept), hysteresis on overlap, one zone per answer', () => {
+  const ix = octZones(), at = id => OCT_ST.find(s => s.id === id).position;
+  // each zone's own initial station is covered by that zone
+  for (const z of ix.zones) { const init = json(ZDIR + z.manifest).provenance.initialStation, r = X.gaussianZoneFor(ix.zones, OCT_ST, at(init)); assert.deepEqual([r.zone, r.outside], [z.id, false], z.id); }
+  // every capture station gets exactly one zone; the 23 stations trained only by the unpublished zone B are "outside"
+  const counts = {};
+  for (const s of OCT_ST) { const r = X.gaussianZoneFor(ix.zones, OCT_ST, s.position); assert.ok(['l1-a', 'l1-c', 'l1-d'].includes(r.zone)); const k = r.outside ? 'out' : r.zone; counts[k] = (counts[k] || 0) + 1; }
+  assert.deepEqual(counts, {'l1-a': 27, 'l1-c': 26, 'l1-d': 24, out: 23});
+  const zones = json('scripts/gaussian_zones.json').captures['2026-10-18'].zones, B = zones.find(z => z.id === 'l1-b');
+  const pub = new Set(ix.zones.flatMap(z => z.stations)), bOnly = B.stations.filter(id => !pub.has(id));
+  assert.equal(bOnly.length, 23);
+  for (const id of bOnly) {
+    const r = X.gaussianZoneFor(ix.zones, OCT_ST, at(id), {current: 'l1-c'});
+    assert.equal(r.outside, true, id); assert.equal(r.zone, 'l1-c', 'outside keeps the resident zone (no reload)');
+    assert.ok(['l1-a', 'l1-c', 'l1-d'].includes(X.gaussianZoneFor(ix.zones, OCT_ST, at(id)).zone), 'nothing loaded: nearest published zone, never B');
+  }
+  // overlap stations (trained by two zones): the resident zone stays unless the other zone's core is > ZONE_HYSTERESIS closer
+  const [A, C] = ix.zones, shared = A.stations.filter(id => C.stations.includes(id) && OCT_ST.some(s => s.id === id));
+  assert.ok(shared.length >= 2, 'A and C share overlap stations');
+  for (const id of shared) {
+    const p = at(id), dA = X.zoneCoreDistance(A, p[0], p[2]), dC = X.zoneCoreDistance(C, p[0], p[2]);
+    if (X.nearestStation(OCT_ST, p).index !== OCT_ST.findIndex(s => s.id === id)) continue;
+    const rA = X.gaussianZoneFor(ix.zones, OCT_ST, p, {current: 'l1-a'}).zone, rC = X.gaussianZoneFor(ix.zones, OCT_ST, p, {current: 'l1-c'}).zone;
+    assert.equal(rA, dA <= Math.min(dA, dC) + X.ZONE_HYSTERESIS ? 'l1-a' : 'l1-c', id);
+    assert.equal(rC, dC <= Math.min(dA, dC) + X.ZONE_HYSTERESIS ? 'l1-c' : 'l1-a', id);
+    assert.equal(rA, rC, 'standing on a recorded overlap station gives one answer whichever zone is resident: ' + id);
+  }
+  // free positions (teleport landings) between two zones: hysteresis keeps the resident zone near the boundary
+  const fz = [{id: 'p', name: 'Zone P', stations: ['s0', 's1'], corePositions: [[0, 0]], coreBounds: {min: [0, 0, 0], max: [0, 0, 0]}},
+    {id: 'q', name: 'Zone Q', stations: ['s1', 's2'], corePositions: [[10, 0]], coreBounds: {min: [10, 0, 0], max: [10, 0, 0]}}];
+  const fs3 = [{id: 's0', position: [0, 6, 0]}, {id: 's1', position: [5, 6, 0]}, {id: 's2', position: [10, 6, 0]}];
+  assert.equal(X.gaussianZoneFor(fz, fs3, [5.5, 6, 0], {current: 'p'}).zone, 'p', 'within 1.5 m of even: keep P');
+  assert.equal(X.gaussianZoneFor(fz, fs3, [5.5, 6, 0], {current: null}).zone, 'q', 'nothing resident: nearest core');
+  assert.equal(X.gaussianZoneFor(fz, fs3, [6.9, 6, 0], {current: 'p'}).zone, 'q', '> 1.5 m closer to Q: switch');
+  assert.equal(X.gaussianZoneFor(fz, fs3, [1, 6, 0], {current: 'q'}).zone, 'p', 'station s0 only trained by P');
+  // moving from zone A deep into zone D switches; covered stations = union of A, C, D training stations
+  assert.equal(X.gaussianZoneFor(ix.zones, OCT_ST, at(json(ZDIR + 'l1-d/viewer.json').provenance.initialStation), {current: 'l1-a'}).zone, 'l1-d');
+  assert.equal(X.zoneStationIndices(ix.zones, OCT_ST).length, 77);
+  assert.deepEqual(X.gaussianZoneFor([], OCT_ST, [0, 0, 0], {current: 'x'}), {zone: 'x', outside: false, station: -1, candidates: []});
+});
+
+test('zone labels: loaded zone, published zones, experimental + provisional, outside note says "not published", no "May 6 only"', () => {
+  const ix = octZones(), m = json(ZDIR + 'l1-c/viewer.json');
+  assert.equal(X.gaussianLabel(m, X.captureConfig('2026-10-18'), {published: ix.zones}),
+    'Gaussian · Oct 18, 2026 · Zone C loaded (published zones A, C, D) · experimental appearance, not surveyed · provisional alignment');
+  assert.equal(X.gaussianOutsideNote(ix.zones), 'Outside published Gaussian zones A, C, D · not published here · appearance missing or blurred');
+  const html = read('scan-xr.html');
+  assert.ok(!/May 6 only/.test(html) && !/May 6 only/.test(read('twin/xr-core.js')));
+  assert.ok(html.includes('X.gaussianOutsideNote(gauss.zones.zones)') && html.includes("published:zoned?gauss.zones.zones:null"));
+});
+
+test('scan-xr.html zone wiring: index validated, one DropInViewer resident (old zone disposed before the next loads), swaps after jumps/teleports', () => {
+  const html = read('scan-xr.html');
+  const load = html.slice(html.indexOf('async function loadGaussian(src){'), html.indexOf('function hideGaussian()'));
+  assert.ok(load.indexOf('await disposeGaussian()') >= 0 && load.indexOf('await disposeGaussian()') < load.indexOf('new GS.DropInViewer('), 'dispose before constructing the next scene');
+  assert.ok(html.includes('const ix=X.gaussianZoneIndex(await fetchJson(url.href));if(!ix.ok)throw Error(ix.error);'));
+  assert.ok(html.includes("if(url.origin!==location.origin)throw Error('Use a same-origin Gaussian zones index')"));
+  assert.ok(html.includes('X.gaussianZoneFor(gauss.zones.zones,stations,viewPos,{current:gauss.zoneId})'));
+  assert.ok(/else if\(gauss\.scene==='gaussian'&&gauss\.zones\)syncZone\(\);/.test(html), 'station jumps re-check the zone');
+  assert.ok(html.includes(' if(gauss.zones)syncZone();\n return t;}'), 'teleports re-check the zone');
+  assert.ok(html.includes('bounds:gauss.zones?null:gauss.manifest?.zone?.bounds||null'), 'teleport not boxed into one zone');
+  assert.ok(html.includes('residentScenes:gauss.live') && /gauss\.live\+\+;const d=pendingGS=new GS\.DropInViewer/.test(html));
+  assert.ok(!/l1-b/.test(html) && !/l1-b/.test(read('twin/xr-core.js')), 'no zone B path anywhere in the XR code');
 });
