@@ -410,7 +410,8 @@ const ZONE_HYSTERESIS = 1.5;   // metres: another zone must be this much closer 
    to p (any station of the capture) is "covered" when it is one of the training stations of a published zone (zone.stations
    from that zone's viewer.json). Covered: among the zones that trained that station, the one whose core is nearest, but the
    current zone is kept unless another is ZONE_HYSTERESIS closer (overlap stations belong to two zones). Not covered (e.g. the
-   unpublished zone B area): outside = true; the current zone stays loaded, or with none loaded the zone with the nearest core.
+   unpublished zone B area): outside = true; the current zone stays loaded (the page hides it and shows the station photo), or with
+   none loaded the zone with the nearest core.
    Returns {zone, outside, station, candidates}. */
 function gaussianZoneFor(zones, stations, p, {current = null, hysteresis = ZONE_HYSTERESIS} = {}) {
   const list = Array.isArray(zones) ? zones.filter(z => z && typeof z.id === 'string') : [];
@@ -430,10 +431,10 @@ function zoneStationIndices(zones, stations) {
   const ids = new Set(); for (const zn of zones || []) for (const s of zn.stations || []) ids.add(s);
   return stations.map((s, i) => i).filter(i => ids.has(stations[i].id));
 }
-/* Honest note when the eye is outside every published zone (the area of an unpublished zone, or untrained). */
-function gaussianOutsideNote(zones) {
-  return 'Outside published Gaussian zones ' + zoneShortNames(zones) + ' · not published here · appearance missing or blurred';
-}
+/* Label while the eye is outside every published zone (the area of an unpublished zone, or untrained): the page hides the
+   splats there (a neighbouring zone renders as smeared streaks) and shows that station's 360 photo instead. */
+const GAUSSIAN_FALLBACK_NOTE = 'Gaussian not published for this area · showing the 360 photo';
+function gaussianOutsideNote() { return GAUSSIAN_FALLBACK_NOTE; }
 
 /* ── Point-and-teleport (Gaussian mode only; a photo has one optical centre) ──
    The floor is an invisible horizontal plane `eyeHeight` below the current view height (assumed capture-camera height,
@@ -497,6 +498,6 @@ return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, CAPTURES, DE
   loadProgressText, MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,
   controllerRoles, stickIntent, aimUpdate, stepConeHalf, routeDistances, stationTarget, arcPoints, targetLabel,
   PUBLISHED_GAUSSIANS, SCENES, sceneRequest, isDevHost, gaussianOverride, SPLAT_BUDGET, gaussianAsset, gaussianFor, publishedGaussianText, resolveScene, toggleScene,
-  dateLabel, gaussianLabel, gaussianStations, gaussianZoneIndex, zoneShortNames, zoneCoreDistance, ZONE_HYSTERESIS, gaussianZoneFor, zoneStationIndices, gaussianOutsideNote,
+  dateLabel, gaussianLabel, gaussianStations, gaussianZoneIndex, zoneShortNames, zoneCoreDistance, ZONE_HYSTERESIS, gaussianZoneFor, zoneStationIndices, GAUSSIAN_FALLBACK_NOTE, gaussianOutsideNote,
   floorHit, nearestStation, teleportTarget};
 });

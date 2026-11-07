@@ -128,7 +128,9 @@ const SPLAT_PREF=['mobile','full'].includes(q.get('splat'))?q.get('splat'):null;
 const EYE_H=clamp(Number(q.get('eye'))||1.5,.8,2.2),TELEPORT_MAX=8,TELEPORT_STATION_RADIUS=6,ZONE_PAD=1.5;
 const gauss={scene:'photo',override:null,overrideNote:null,source:null,dropIn:null,module:null,manifest:null,asset:null,label:'',loading:false,error:null,loadMs:null,count:0,key:null,stationIdx:null,pendingSort:false,busyFrames:0,epoch:0,teleports:0,
  // Oct 18 zones (2026-11-07): validated index + each zone's training stations; ONE zone resident at a time (Quest memory)
- zones:null,zoneId:null,outside:false,zoneLoads:0,zoneBusy:false,failedZone:null,live:0};
+ zones:null,zoneId:null,outside:false,zoneLoads:0,zoneBusy:false,failedZone:null,live:0,
+ // outside zones A/C/D (2026-11-07): splats hidden (zone kept loaded for a quick return), that station's 360 photo on the sphere
+ fallback:false};
 let viewPos=[0,0,0];   // eye position in the scan frame: the station in Photo mode, a teleport landing in Gaussian mode
 // Full-view fade (child of the camera) for Gaussian jumps/teleports; the photo path keeps its own sphere/service fade.
 const fader=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0,depthTest:false,depthWrite:false,toneMapped:false}));
@@ -206,7 +208,7 @@ const timing={firstPhotoMs:null,layersDoneMs:null};
 let yaw=0,pitch=0;const axisQ=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
 function setDesktopLook(){camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));invalidate();}
 const photoURL=s=>new URL((state.hiRes?'':'mobile/')+s.file,manifestURL).href;
-function updateAlign(){const a=$('align');a.textContent=(gauss.scene==='gaussian'&&gauss.label?gauss.label+' · '+(gauss.outside&&gauss.zones?X.gaussianOutsideNote(gauss.zones.zones)+' · ':''):'')+'Grimes L1 · '+capture.label+' · '+capture.alignmentText+' · Design (BIM) positions';a.classList.toggle('prov',capture.provisional);updateSceneUI();}
+function updateAlign(){const a=$('align');a.textContent=(gauss.scene==='gaussian'&&gauss.fallback?X.gaussianOutsideNote()+' · ':gauss.scene==='gaussian'&&gauss.label?gauss.label+' · ':'')+'Grimes L1 · '+capture.label+' · '+capture.alignmentText+' · Design (BIM) positions';a.classList.toggle('prov',capture.provisional);updateSceneUI();}
 async function loadCapture(date){
  const epoch=++captureEpoch,cfg=X.captureConfig(date);status('Loading '+cfg.label+' capture…',true);
  const [m,r]=await Promise.all([fetchJson(cfg.photo),fetchJson(cfg.registration)]);
@@ -227,23 +229,25 @@ async function openStation(index,{instant=false,initialLook=false,force=false}={
  if(i===active&&!force)return;
  busyStation=true;const epoch=captureEpoch,doFade=active>=0&&!instant;
  try{
-  const s=stations[i],gMode=gauss.scene==='gaussian';let tex=null;
-  if(!gMode){status('Loading photo '+(i+1)+'/'+stations.length+'…',true);
+  // Gaussian mode outside the published zones (Oct 18 zone B area): photo fallback instead of smeared splats from a neighbouring zone
+  const s=stations[i],gMode=gauss.scene==='gaussian',fb=gMode&&!!gauss.zones&&X.gaussianZoneFor(gauss.zones.zones,stations,s.position,{current:gauss.zoneId}).outside,usePhoto=!gMode||fb;let tex=null;
+  if(usePhoto){status('Loading photo '+(i+1)+'/'+stations.length+'…',true);
    tex=await texLoader.loadAsync(photoURL(s));tex.colorSpace=THREE.SRGBColorSpace;
-   if(epoch!==captureEpoch||gauss.scene==='gaussian'){tex.dispose();return;}}
+   if(epoch!==captureEpoch||(gauss.scene==='gaussian')!==gMode){tex.dispose();return;}}
   if(doFade)await fade(0,140);
   hideCard();
   if(tex){const old=sphereMat.map;sphereMat.map=tex;sphereMat.needsUpdate=true;if(old)old.dispose();}
-  active=i;viewPos=s.position.slice();sphere.position.fromArray(s.position);sphere.quaternion.fromArray(X.stationQuaternion(s.e57Quaternion,0));sphere.visible=!gMode&&!!sphereMat.map;
+  active=i;viewPos=s.position.slice();sphere.position.fromArray(s.position);sphere.quaternion.fromArray(X.stationQuaternion(s.e57Quaternion,0));sphere.visible=usePhoto&&!!sphereMat.map;
+  if(gMode){if(fb){gauss.fallback=true;gauss.outside=true;if(gauss.dropIn)gauss.dropIn.visible=false;applyShaderState();updateAlign();}else if(gauss.fallback)leaveFallback();}
   if(initialLook&&!xrSession){const f=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().fromArray(s.e57Quaternion)).applyQuaternion(axisQ);yaw=Math.atan2(-f.x,-f.z);pitch=0;setDesktopLook();}
   placeRig();stationBim=X.applyReg(reg,viewPos);updateRadius();
   $('station').value=String(i);$('prev').disabled=i===0;$('next').disabled=i===stations.length-1;
   if(timing.firstPhotoMs==null)timing.firstPhotoMs=Math.round(performance.now()-T0);
   if(xrSession)placeTag();
-  const zr=gMode&&gauss.zones?X.gaussianZoneFor(gauss.zones.zones,stations,viewPos,{current:gauss.zoneId}):null,outside=zr?zr.outside:gMode&&gauss.stationIdx&&!gauss.stationIdx.includes(i);
-  status((i+1)+'/'+stations.length+' · '+capture.label+(gMode?' · Gaussian'+(outside?' · '+(zr?X.gaussianOutsideNote(gauss.zones.zones):'outside the trained zone, appearance missing'):''):'')+(capture.provisional?' · provisional alignment':''));
+  const outside=!gauss.zones&&gMode&&gauss.stationIdx&&!gauss.stationIdx.includes(i);   // single-manifest scenes keep the old note
+  status((i+1)+'/'+stations.length+' · '+capture.label+(gMode?' · '+(fb?X.gaussianOutsideNote():'Gaussian'+(outside?' · outside the trained zone, appearance missing':'')):'')+(capture.provisional?' · provisional alignment':''));
   if(doFade)await fade(1,200);else{U.fade.value=1;sphereMat.color.setScalar(1);fader.visible=false;}
-  if(!gMode)prefetchNeighbors(i);if(state.menu)drawMenu();
+  if(usePhoto)prefetchNeighbors(i);if(state.menu)drawMenu();
  }catch(e){console.error(e);status('Photo unavailable · choose another capture');}
  finally{busyStation=false;invalidate();if(pendingStation){const n=pendingStation;pendingStation=null;openStation(n.index,n.opts);}else if(gauss.scene==='gaussian'&&gauss.zones)syncZone();}
 }
@@ -459,7 +463,7 @@ function drawMenu(){const {ctx,canvas}=menu,W=canvas.width,H=canvas.height,{butt
  ctx.fillStyle='#fff';fitFont(ctx,more?'More · settings and layers':'Grimes L1 · Scan↔BIM',36,64,W-300,48,'700');ctx.fillStyle='#9fb6cb';ctx.textAlign='right';ctx.font='600 30px Arial';ctx.fillText('B/Y closes',W-36,62);ctx.textAlign='left';
  const rows=more?[[`Opacity is fixed (Lens ${Math.round(state.opacity.lens*100)} %, All ${Math.round(state.opacity.all*100)} %) · Right stick ↑↓ widens / narrows the flashlight (${state.coneDeg}°)`,'#cfe3f5'],
    ['Layers load on demand · loading inside VR can stutter for a few seconds','#9fb6cb'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · Design (BIM) positions`,'#9fb6cb']]
-  :[[`${capture?.label||''} · capture ${active+1}/${stations.length}${gauss.scene==='gaussian'&&gauss.label?' · '+gauss.label+(gauss.outside?' · outside published zones, not published here':''):''}`,gauss.scene==='gaussian'?'#ffd9a0':'#e8f1f8'],
+  :[[`${capture?.label||''} · capture ${active+1}/${stations.length}${gauss.scene==='gaussian'&&gauss.fallback?' · '+X.gaussianOutsideNote():gauss.scene==='gaussian'&&gauss.label?' · '+gauss.label:''}`,gauss.scene==='gaussian'?'#ffd9a0':'#e8f1f8'],
    [`Alignment: ${capture?.alignmentText||''} · Design (BIM) positions`,capture?.provisional?'#ffb4a8':'#ffe495'],
    ['Left stick ↑ hold: aim · release: go · ←→ turn 30° · Right hand: flashlight, trigger = info card · A/X Lens/All','#9fb6cb']];
  let y=150;for(const [t,c] of rows){ctx.fillStyle=c;fitText(ctx,t,36,y,W-72,32,'Arial');y+=56;}
@@ -477,7 +481,7 @@ function setMenu(on){state.menu=on;menuHover.clear();menuSeen=false;menuAway=0;i
 function menuAutoClose(){if(!state.menu)return;const now=performance.now(),on=controllers.some(c=>c.userData.hover?.panel==='menu');if(on){menuSeen=true;menuAway=now;}else if(menuSeen&&now-menuAway>MENU_AWAY_MS)setMenu(false);}
 function placeTag(){const {ctx,canvas}=tag,W=canvas.width,H=canvas.height,g=gauss.scene==='gaussian';ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,W-4,H-4,40);ctx.fill();ctx.textAlign='center';
  ctx.fillStyle=capture.provisional?'#ffb4a8':'#ffe495';fitText(ctx,capture.label+' · '+(capture.provisional?'PROVISIONAL alignment':'registered, not surveyed')+' · B/Y menu',W/2,g?56:72,W-60,40,'Arial');
- if(g){ctx.fillStyle='#ffd9a0';const zn=gauss.zones&&gauss.manifest?.zone?(gauss.manifest.zone.name||gauss.manifest.zone.id)+' · ':'';fitText(ctx,gauss.outside&&gauss.zones?'Gaussian · '+X.gaussianOutsideNote(gauss.zones.zones):'Gaussian · '+zn+'experimental appearance, not surveyed geometry',W/2,108,W-60,34,'Arial');}
+ if(g){ctx.fillStyle='#ffd9a0';const zn=gauss.zones&&gauss.manifest?.zone?(gauss.manifest.zone.name||gauss.manifest.zone.id)+' · ':'';fitText(ctx,gauss.fallback?X.gaussianOutsideNote():'Gaussian · '+zn+'experimental appearance, not surveyed geometry',W/2,108,W-60,34,'Arial');}
  ctx.fillStyle='#9fb6cb';fitText(ctx,'Left stick ↑ hold: aim, release: go · ←→ turn · Right trigger: info',W/2,g?160:140,W-60,32,'Arial');
  ctx.textAlign='left';tag.texture.needsUpdate=true;placeInFront(tag.mesh,1.3,.75);tag.mesh.visible=true;}
 function setLayer(k,on){if(!LAYERS[k])return;const st=layerState[k];if(on&&!st){loadLayer(k);status(LAYERS[k].label+' loading'+(xrSession?' · frames may stutter':''));}else if(st)st.group.visible=on;
@@ -559,8 +563,8 @@ async function syncZone(){
   let ok=await loadGaussian(zoneSource(r.zone));
   if(!ok&&gauss.scene==='gaussian'){gauss.failedZone={id:r.zone,until:performance.now()+15000};const err=gauss.error;if(prev)ok=await loadGaussian(zoneSource(prev));status(z.name+' unavailable · '+(err||'load failed')+(ok?' · kept '+gauss.manifest.zone.name:''));}
   if(!ok||gauss.scene!=='gaussian')return;
-  gauss.dropIn.visible=true;applyShaderState();gauss.pendingSort=true;updateAlign();if(xrSession)placeTag();if(state.menu)drawMenu();
-  if(gauss.zoneId===r.zone)status(gauss.label+' · '+gauss.count.toLocaleString()+' splats'+(r.outside?' · '+X.gaussianOutsideNote(gauss.zones.zones):''));
+  gauss.dropIn.visible=!gauss.fallback;applyShaderState();gauss.pendingSort=true;updateAlign();if(xrSession)placeTag();if(state.menu)drawMenu();
+  if(gauss.zoneId===r.zone)status(gauss.fallback?X.gaussianOutsideNote():gauss.label+' · '+gauss.count.toLocaleString()+' splats');
  }finally{gauss.zoneBusy=false;invalidate();}
  if(gauss.scene==='gaussian'&&gauss.zones&&X.gaussianZoneFor(gauss.zones.zones,stations,viewPos,{current:gauss.zoneId}).zone!==gauss.zoneId)syncZone();   // moved during the load
 }
@@ -592,7 +596,10 @@ async function loadGaussian(src){
   return true;
  }catch(e){gauss.error=String(e.message||e);console.warn('[gaussian]',e);if(pendingGS){dropGS(pendingGS);pendingGS=null;}return false;}   // a failed download frees its viewer too
  finally{if(epoch===gauss.epoch){gauss.loading=false;updateSceneUI();}}}
-function hideGaussian(){gauss.scene='photo';if(gauss.dropIn)gauss.dropIn.visible=false;ring.visible=false;fader.visible=false;}
+/* Back inside a published zone: splats again, the fallback photo texture freed (headset memory). */
+function leaveFallback(){gauss.fallback=false;gauss.outside=false;sphere.visible=false;const old=sphereMat.map;sphereMat.map=null;sphereMat.needsUpdate=true;if(old)old.dispose();
+ if(gauss.dropIn)gauss.dropIn.visible=true;gauss.pendingSort=true;applyShaderState();updateAlign();invalidate();}
+function hideGaussian(){gauss.fallback=false;gauss.scene='photo';if(gauss.dropIn)gauss.dropIn.visible=false;ring.visible=false;fader.visible=false;}
 /* Photo <-> Gaussian. A capture without a Gaussian explains and stays in Photo. Leaving Gaussian returns to the nearest station's photo. */
 async function setScene(want,{boot=false}={}){
  if(!capture)return gauss.scene;
@@ -615,7 +622,7 @@ async function setScene(want,{boot=false}={}){
  }
  const ok=load?await loadGaussian(load):false;
  if(!ok){if(gauss.scene!=='gaussian')return gauss.scene;hideGaussian();applyShaderState();await openStation(active,{instant:true,force:true});updateAlign();status('Gaussian unavailable · '+(gauss.error||'load failed')+' · staying in Photo');return 'photo';}
- sphere.visible=false;const old=sphereMat.map;sphereMat.map=null;sphereMat.needsUpdate=true;if(old)old.dispose();   // free the photo texture on the headset
+ gauss.fallback=false;sphere.visible=false;const old=sphereMat.map;sphereMat.map=null;sphereMat.needsUpdate=true;if(old)old.dispose();   // free the photo texture on the headset
  gauss.dropIn.visible=true;applyShaderState();
  const ids=gauss.stationIdx,init=gauss.manifest.provenance?.initialStation,initIdx=stations.findIndex(s=>s.id===init);
  if(zoneJump>=0)await openStation(zoneJump,{instant:true,force:true});
@@ -630,8 +637,10 @@ function teleportPreview(origin,dir){return X.teleportTarget(origin.toArray(),di
 async function teleportTo(t){
  if(gauss.scene!=='gaussian'||!gauss.dropIn||active<0||busyStation)return null;
  if(!t?.ok){status(t?.reason||'No teleport target');return t;}
+ // landing outside the published zones: photo fallback at the station nearest the landing (a photo has one optical centre)
+ if(gauss.zones){const r=X.gaussianZoneFor(gauss.zones.zones,stations,t.landing,{current:gauss.zoneId});if(r.outside&&r.station>=0){gauss.teleports++;await openStation(r.station,{force:true});return {...t,fallback:true,station:r.station};}}
  busyStation=true;
- try{await fade(0,120);hideCard();viewPos=t.landing;active=t.nearest;placeRig();stationBim=X.applyReg(reg,viewPos);updateRadius();gauss.teleports++;
+ try{await fade(0,120);hideCard();if(gauss.fallback)leaveFallback();viewPos=t.landing;active=t.nearest;placeRig();stationBim=X.applyReg(reg,viewPos);updateRadius();gauss.teleports++;
   $('station').value=String(active);$('prev').disabled=active===0;$('next').disabled=active===stations.length-1;
   if(xrSession)placeTag();status('Teleported · nearest capture '+(active+1)+'/'+stations.length+' · '+gauss.label);await fade(1,180);}
  finally{busyStation=false;invalidate();if(state.menu)drawMenu();}
@@ -1162,12 +1171,14 @@ function inspection(){const heap=performance.memory?Math.round(performance.memor
   aim:deskAim?{ok:deskAim.ok,kind:deskAim.kind,index:deskAim.index??null,method:deskAim.method??null,reason:deskAim.reason??null}:null,
   scene:{mode:gauss.scene,available:!!gaussianSource(),manifest:gauss.source?.path??null,local:!!gauss.source?.local,label:gauss.label||null,file:gauss.asset?.file??null,mobile:gauss.asset?.mobile??null,shDegree:gauss.asset?.shDegree??null,
    splats:gauss.count,loadMs:gauss.loadMs,loading:gauss.loading,error:gauss.error,overrideNote:gauss.overrideNote,override:gauss.override,zone:gauss.manifest?.zone?.id??null,zoneStations:gauss.stationIdx?.length??null,
-   zones:gauss.zones?{index:gauss.zones.path,published:gauss.zones.zones.map(z=>z.id),loaded:gauss.zoneId,outside:gauss.outside,loads:gauss.zoneLoads,busy:gauss.zoneBusy,coveredStations:gauss.stationIdx?.length??null,privacy:gauss.zones.privacy}:null,
+   zones:gauss.zones?{index:gauss.zones.path,published:gauss.zones.zones.map(z=>z.id),loaded:gauss.zoneId,outside:gauss.outside,photoFallback:gauss.fallback,loads:gauss.zoneLoads,busy:gauss.zoneBusy,coveredStations:gauss.stationIdx?.length??null,privacy:gauss.zones.privacy}:null,
    residentScenes:gauss.live,sceneGraphSplats:scene.children.filter(c=>c.name==='gaussian (scan frame, untransformed)').length,
    sortRunning:!!gauss.dropIn?.viewer.sortRunning,splatVisible:!!gauss.dropIn?.visible,teleports:gauss.teleports,eyeHeight:EYE_H,sharedMemory:false,renderer:'GaussianSplats3D 0.4.7 DropInViewer'}};}
 window.xrInspection=inspection;
 window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};return lastInfo;},
  openStation:i=>openStation(i),mr:{demo:(pt,hy)=>mrPlaceDemo(pt,'debug',hy),beginDemo:()=>mrBeginDemo(),simulate:o=>mrSimulate(o),button:i=>mrButton(i),panel:on=>mrSetPanel(on),range:k=>mrApplyRange(k),startAlign:id=>mrStartAlign(id),capture:p=>mrCapture(p,'debug'),skip:()=>mrSkip(),solve:()=>mrSolveNow(),accept:()=>mrAccept(),nudge:(k,d)=>mrNudge(k,d),nextCheck:()=>mrNextCheck(),check:p=>mrCheck(p,'debug'),toggleLayer:k=>mrToggleLayer(k),forget:()=>mrForget(),restoreWith:ss=>mrRestoreOrAlign(ss),anchorPose:(p,o)=>mrApplyAnchorPose(p,o),useGrimes:id=>mrUseGrimes(id)},walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,setScene,recenter,syncZone,
+ // straight-down teleport onto scan-frame floor point (x, z) through the normal preview + teleport path (desktop test aid)
+ teleportAt:(x,z)=>teleportTo(teleportPreview(new THREE.Vector3(x,viewPos[1],z),new THREE.Vector3(0,-1,0))),
  frameStats:()=>{renderer.render(scene,camera);const gl=renderer.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,px=new Uint8Array(4);let lit=0,n=0;
   for(let i=1;i<24;i++)for(let j=1;j<16;j++){gl.readPixels(Math.floor(w*i/24),Math.floor(h*j/16),1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);n++;if(px[0]+px[1]+px[2]>45)lit++;}const r=renderer.info.render;return {litFraction:lit/n,calls:r.calls,triangles:r.triangles};},
  look:(y,p)=>{yaw=y;pitch=p;setDesktopLook();camera.updateMatrixWorld(true);coneFromView();},

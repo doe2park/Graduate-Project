@@ -490,10 +490,10 @@ test('zone labels: loaded zone, published zones, experimental + provisional, out
   const ix = octZones(), m = json(ZDIR + 'l1-c/viewer.json');
   assert.equal(X.gaussianLabel(m, X.captureConfig('2026-10-18'), {published: ix.zones}),
     'Gaussian · Oct 18, 2026 · Zone C loaded (published zones A, C, D) · experimental appearance, not surveyed · provisional alignment');
-  assert.equal(X.gaussianOutsideNote(ix.zones), 'Outside published Gaussian zones A, C, D · not published here · appearance missing or blurred');
+  assert.equal(X.gaussianOutsideNote(), 'Gaussian not published for this area · showing the 360 photo'); assert.equal(X.GAUSSIAN_FALLBACK_NOTE, X.gaussianOutsideNote());
   const html = read('scan-xr.html');
   assert.ok(!/May 6 only/.test(html) && !/May 6 only/.test(read('twin/xr-core.js')));
-  assert.ok(html.includes('X.gaussianOutsideNote(gauss.zones.zones)') && html.includes("published:zoned?gauss.zones.zones:null"));
+  assert.ok(html.includes('X.gaussianOutsideNote()') && html.includes("published:zoned?gauss.zones.zones:null"));
 });
 
 test('scan-xr.html zone wiring: index validated, one DropInViewer resident (old zone disposed before the next loads), swaps after jumps/teleports', () => {
@@ -508,4 +508,25 @@ test('scan-xr.html zone wiring: index validated, one DropInViewer resident (old 
   assert.ok(html.includes('bounds:gauss.zones?null:gauss.manifest?.zone?.bounds||null'), 'teleport not boxed into one zone');
   assert.ok(html.includes('residentScenes:gauss.live') && /gauss\.live\+\+;const d=pendingGS=new GS\.DropInViewer/.test(html));
   assert.ok(!/l1-b/.test(html) && !/l1-b/.test(read('twin/xr-core.js')), 'no zone B path anywhere in the XR code');
+});
+
+test('outside the published zones: splats hidden (zone kept, still one viewer), the station 360 photo shown, splats back inside a zone', () => {
+  const html = read('scan-xr.html');
+  const open = html.slice(html.indexOf('async function openStation('), html.indexOf('/* Put the tracked head exactly on the capture station'));
+  assert.ok(open.includes("fb=gMode&&!!gauss.zones&&X.gaussianZoneFor(gauss.zones.zones,stations,s.position,{current:gauss.zoneId}).outside,usePhoto=!gMode||fb"), 'decided from the target station before loading');
+  assert.ok(open.includes('if(usePhoto){') && open.includes('tex=await texLoader.loadAsync(photoURL(s))'), 'the fallback loads that station photo like Photo mode');
+  assert.ok(open.includes('sphere.visible=usePhoto&&!!sphereMat.map'));
+  assert.ok(open.includes('if(fb){gauss.fallback=true;gauss.outside=true;if(gauss.dropIn)gauss.dropIn.visible=false;') && open.includes('else if(gauss.fallback)leaveFallback();'));
+  assert.ok(!/disposeGaussian\(\)/.test(open), 'the hidden zone is kept loaded (quick return), not disposed and not duplicated');
+  const leave = html.slice(html.indexOf('function leaveFallback(){'), html.indexOf('function hideGaussian()'));
+  assert.ok(leave.includes('sphere.visible=false') && leave.includes('old.dispose()') && leave.includes('gauss.dropIn.visible=true'), 'back in a zone: splats on, photo texture freed');
+  assert.ok(html.includes('gauss.dropIn.visible=!gauss.fallback;'), 'a zone swap never reveals splats during the fallback');
+  const tp = html.slice(html.indexOf('async function teleportTo(t){'), html.indexOf('function teleport(origin,dir)'));
+  assert.ok(tp.includes('if(r.outside&&r.station>=0){gauss.teleports++;await openStation(r.station,{force:true});return {...t,fallback:true,station:r.station};}'), 'outside landing -> nearest station photo');
+  assert.ok(tp.includes('if(gauss.fallback)leaveFallback();'), 'teleport from the photo back into a zone shows the splats');
+  assert.ok(html.includes("gauss.scene==='gaussian'&&gauss.fallback?X.gaussianOutsideNote()+' · '"), 'caption says Gaussian is not published here');
+  // every one of the 23 zone-B-only stations falls back; every covered station does not
+  const ix = octZones(); let fb = 0;
+  for (const s of OCT_ST) if (X.gaussianZoneFor(ix.zones, OCT_ST, s.position, {current: 'l1-c'}).outside) fb++;
+  assert.equal(fb, 23);
 });
