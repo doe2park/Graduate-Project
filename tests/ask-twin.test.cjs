@@ -36,3 +36,37 @@ test('ask and transcribe send the code; the panel offers a code box on 401', () 
   assert.match(src, /showCodeBox/);
   assert.doesNotMatch(src, /localStorage|sessionStorage/);   // the code lives in the URL / memory only
 });
+
+// Live answers (Nov 2026): one plain paragraph for non-experts, then "Evidence: [[id]] ..." (ids only as chips).
+const PLAIN = 'This is a supply air vent (diffuser) in the ceiling of Level 1, probably in room 120. It blows in air that a VAV box upstream controls.\nEvidence: [[388279]] [[400766]]';
+const CARD = '**Answer:** [[388279]] is an air outlet on L1 · confidence: low\n**Why:**\n- design record';
+
+test('plain answers split into the visible paragraph and the evidence ids', () => {
+  assert.equal(H.isCard(PLAIN), false);
+  assert.equal(H.isCard(CARD), true);
+  assert.equal(H.isCard('**Answer:** slip\nEvidence: [[1]]'), false);   // an Evidence line means the plain format
+  const {body, evidence} = H.splitAnswer(PLAIN);
+  assert.equal(body, PLAIN.split('\n')[0]);
+  assert.deepEqual(evidence, ['388279', '400766']);
+  assert.deepEqual(H.splitAnswer('Comes from [[400766]].\nEvidence: [[388279]] [[400766]]').evidence, ['388279', '400766']);
+  assert.deepEqual(H.splitAnswer('Evidence: [[38').evidence, []);   // half-streamed line: no chip yet
+});
+
+test('the primary (highlighted, marker) element is the first Evidence id, or the card lead id', () => {
+  assert.equal(H.primaryId(PLAIN), '388279');
+  assert.equal(H.primaryId('The air comes from a VAV box.\nEvidence: [[400766]] [[388279]]'), '400766');
+  assert.equal(H.primaryId(CARD), '388279');
+  assert.equal(H.primaryId('No evidence here.'), null);
+});
+
+test('spoken fallback says the card paragraph with units spelled out, never the ids', () => {
+  assert.equal(H.speakPlain('The VAV box is ~3 m away, 2.4 °C warm.'), 'The VAV box is about 3 metres away, 2.4 degrees warm.');
+  assert.equal(H.speakPlain('Fed by [[400766]].', id => 'VAV box'), 'Fed by the VAV box.');
+});
+
+test('the panel renders plain answers as a paragraph plus an Evidence chip row', () => {
+  assert.match(src, /if \(!H\.isCard\(text\)\) \{/);
+  assert.match(src, /class="at-ev"><span class="at-ev-k">Evidence<\/span>/);
+  assert.match(src, /const primary = H\.primaryId\(answer\)/);
+  assert.match(src, /c\?\.label \|\| c\?\.type/);   // chips use the plain label (diffuser, VAV box), not the CAD code
+});

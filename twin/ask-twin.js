@@ -1,6 +1,6 @@
 /* Ask the twin — local demo panel for grimes-bim-viewer.html?ask=1 (served by scripts/ask_twin_server.py).
    Click an element, ask a question (typed or push-to-talk); the local server answers with Claude + read-only tools
-   (or scripted mock answers). Cited elements ([[id]]) become chips: verified ones are highlighted in the model and
+   (or scripted mock answers). Live answers are one plain paragraph plus an Evidence line; cited elements ([[id]]) become chips: verified ones are highlighted in the model and
    fly the camera on click. Nothing here writes model data; highlights are render-time colours only. */
 (function () {
 'use strict';
@@ -16,6 +16,31 @@ const H = {
       : 'Access code needed. Open the link printed in the laptop terminal (it ends with &code=…), or type the code below.';
     if (status === 429) return b.error || `Too many requests right now.${b.retry_after_s ? ` Try again in ${b.retry_after_s} s.` : ''}`;   // server text says when
     return null;
+  },
+  /* Answer formats. Plain (live, since Nov 2026): one 2-3 sentence paragraph, then "Evidence: [[id]] ...". Card (mock and
+     older answers): "**Answer:** / **Most likely source:** [[id]] …" plus bold sections. */
+  isCard(text) { const t = String(text || ''); return /^\s*\*\*(?:Most likely source|Answer):\*\*/m.test(t) && !/^\s*(?:\*\*)?Evidence:/im.test(t); },
+  /* plain answer -> {body, evidence: [ids]}; ids written in the body (should not be there) join the evidence list */
+  splitAnswer(text) {
+    const ev = [], lines = String(text || '').split('\n'), body = [];
+    for (const l of lines) {
+      const m = /^\s*(?:\*\*)?Evidence:(?:\*\*)?\s*(.*)$/i.exec(l);
+      if (m) { for (const x of m[1].matchAll(/\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g)) ev.push(x[1]); } else body.push(l);
+    }
+    const b = body.join('\n').trim();
+    for (const x of b.matchAll(/\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g)) ev.push(x[1]);
+    return {body: b, evidence: [...new Set(ev)]};
+  },
+  /* the element the answer is about: the lead line's first id (card) or the first Evidence id (plain) */
+  primaryId(text) {
+    if (!H.isCard(text)) return H.splitAnswer(text).evidence[0] || null;
+    const lead = /^\s*\*\*(?:Most likely source|Answer):\*\*[^\n]*?\[\[([A-Za-z0-9_.:-]{1,40})\]\]/.exec(String(text || ''));
+    return lead ? lead[1] : null;
+  },
+  /* plain body -> words to speak when the server sent no 'spoken' text: the same sentence, units spelled out */
+  speakPlain(body, nameOf = () => 'element') {
+    return String(body || '').replace(/\[\[([^\]]+)\]\]/g, (_, id) => 'the ' + nameOf(id)).replace(/\*\*?/g, '')
+      .replace(/~/g, 'about ').replace(/(\d)\s?m\b/g, '$1 metres').replace(/(\d)\s?(°C|degC)\b/g, '$1 degrees').replace(/\s+/g, ' ').trim();
   },
 };
 if (typeof module === 'object' && module && module.exports) module.exports = H;
@@ -88,6 +113,9 @@ const css = `
 #askTwin .at-code{display:flex;gap:6px;margin-top:6px}
 #askTwin .at-code input{flex:1;min-width:0;border:1px solid #c9b88a;border-radius:7px;padding:5px 8px;font:600 14px/1.3 ui-monospace,Menlo,monospace;letter-spacing:2px;text-transform:uppercase}
 #askTwin .at-code button{border:0;border-radius:7px;background:#0b1f3a;color:#fff;font:inherit;font-weight:700;padding:0 12px;cursor:pointer}
+#askTwin .at-card .at-plain{font-size:15px;line-height:1.55;margin:0 0 9px;color:#0b1f3a}
+#askTwin .at-ev{display:flex;flex-wrap:wrap;align-items:center;gap:4px;border-top:1px solid #0b1f3a1f;padding-top:7px;font-size:11.5px;color:#5b6b85}
+#askTwin .at-ev .at-ev-k{font-weight:700;letter-spacing:.3px;text-transform:uppercase;font-size:10.5px;margin-right:2px}
 #askTwin .at-cursor::after{content:'▍';color:#d4a72c;animation:atBlink 1s steps(2) infinite}
 @keyframes atBlink{50%{opacity:0}}
 #askTwinMarker{position:fixed;z-index:110;pointer-events:none;transform:translate(-50%,-100%);display:none}
@@ -166,11 +194,21 @@ fetch('/api/health').then(r => r.json()).then(h => {
 function chip(id) {
   const c = state.lastCites.find(x => x.id === id);
   const meta = api.meta(id);
-  const label = (c?.type || meta?.type || c?.layer || 'element');
+  const label = (c?.label || c?.type || meta?.type || c?.layer || 'element');
   if (c && !c.verified) return `<span class="at-chip bad" title="Not returned by any tool in this answer: not highlighted">${esc(id)}</span>`;
   return `<button class="at-chip" data-id="${esc(id)}" title="Fly to and select #${esc(id)}">${esc(label)} <i>#${esc(id)}</i></button>`;
 }
+function nameOf(id) {   // a plain name for an id written into a sentence (fallback only: the plain format keeps ids off the text)
+  const c = state.lastCites.find(x => x.id === id), meta = api.meta(id);
+  return String(c?.label || c?.type || meta?.type || 'element');
+}
 function render(text) {
+  if (!H.isCard(text)) {   // plain format: the answer paragraph, then the evidence chips
+    const {body, evidence} = H.splitAnswer(text);
+    const para = esc(body).replace(/\*\*(.+?)\*\*/g, '$1').replace(/\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g, (_, id) => 'the ' + esc(nameOf(id)));
+    const paras = para.split(/\n+/).filter(p => p.trim()).map(p => `<p class="at-plain">${p}</p>`).join('');
+    return paras + (evidence.length ? `<div class="at-ev"><span class="at-ev-k">Evidence</span>${evidence.map(chip).join('')}</div>` : '');
+  }
   const lines = esc(text).split('\n');
   let html = '', inList = false, first = true;
   for (let line of lines) {
@@ -230,8 +268,7 @@ function addBox(b, color, pad) {
 }
 async function showCitations(cites, answer) {
   api.clearHighlights(); clearBoxes();
-  const lead = /^\s*\*\*(Most likely source|Answer):\*\*[^\n]*?\[\[([A-Za-z0-9_.:-]+)\]\]/.exec(answer || '');
-  const primary = lead ? lead[2] : null;
+  const primary = H.primaryId(answer);
   const ok = cites.filter(c => c.verified && c.in_viewer);
   const layers = [...new Set(ok.map(c => c.layer))];
   for (const key of layers) {
@@ -253,7 +290,7 @@ $('#atCard').addEventListener('click', async e => {
   if (c && c.in_viewer) { api.highlight([id], OTHER); api.select(id); }
   flyTo(boxOf(id));
   if (c) state.markerAt = [(c.bbox_m[0] + c.bbox_m[3]) / 2, c.bbox_m[4], (c.bbox_m[2] + c.bbox_m[5]) / 2];
-  setTimeout(() => { if (b.isConnected && !b.querySelector('i')) b.innerHTML = `${esc(c?.type || 'element')} <i>#${esc(id)}</i>`; }, 50);
+  setTimeout(() => { if (b.isConnected && !b.querySelector('i')) b.innerHTML = `${esc(c?.label || c?.type || 'element')} <i>#${esc(id)}</i>`; }, 50);
 });
 
 // ---------- ask ----------
@@ -319,7 +356,7 @@ $('#atClear').onclick = () => { api.clearHighlights(); clearBoxes(); state.histo
 // ---------- voice: push-to-talk in, speechSynthesis out ----------
 function speak(text, ready = false) {
   if (!window.speechSynthesis) return;
-  const plain = ready ? text : text.replace(/\[\[([^\]]+)\]\]/g, (_, id) => (state.lastCites.find(c => c.id === id)?.type || 'element'))
+  const plain = ready ? text : !H.isCard(text) ? H.speakPlain(H.splitAnswer(text).body, nameOf) : text.replace(/\[\[([^\]]+)\]\]/g, (_, id) => (state.lastCites.find(c => c.id === id)?.type || 'element'))
     .replace(/\*\(mock mode[^)]*\)\*/g, '').replace(/[*#]/g, '').replace(/~/g, 'about ').replace(/·/g, ',').replace(/\bdegC\b/g, 'degrees')
     .split('\n').filter(l => !/^Limits:/.test(l.trim())).slice(0, 8).join('. ');
   const u = new SpeechSynthesisUtterance(plain); u.rate = 1.05; u.lang = 'en-US';

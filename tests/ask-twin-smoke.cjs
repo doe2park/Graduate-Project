@@ -48,7 +48,7 @@ async function ask(page, i) {
   await page.fill('#atQ', '');
   const leak = await ask(page, 0);
   await page.screenshot({path: path.join(OUT, '1-water-stain.png')});
-  assert.ok(!leak.err && /Most likely source/.test(leak.card) && /278123/.test(leak.card), 'leak answer cites the demo pipe');
+  assert.ok(!leak.err && /Most likely source|evidence/i.test(leak.card) && /278123/.test(leak.card), 'leak answer cites the demo pipe');
   assert.equal(leak.bad, 0); assert.equal(leak.marker, 'block');
   // 2) valve, same selection
   const valve = await ask(page, 1);

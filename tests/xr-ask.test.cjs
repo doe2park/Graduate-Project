@@ -202,3 +202,18 @@ test('access code (API 3): code= from the URL, X-Ask-Code on ask/transcribe/spea
   for (const name of ['ask', 'speak', 'transcribe']) assert.match(page, new RegExp(`fetch\\(askApi\\('${name}'\\),\\{method:'POST',headers:XA\\.askHeaders\\(ASK\\.code`), name);
   assert.match(page, /askRefusal\(res\)/);
 });
+
+test('plain live answers: the paragraph is the lead, the first Evidence id is the primary, chips use plain labels', () => {
+  const plain = 'The air comes from a VAV box about 3 m away, above the ceiling. The model suggests this from touching ducts, so check the drawings.\nEvidence: [[400766]] [[388279]]';
+  const S = XA.sections(plain);
+  assert.equal(S.lead, plain.split('\n')[0]);
+  assert.equal(XA.leadId(plain), '400766');
+  const m = XA.cardModel({question: 'Where does the air come from?', answer: plain,
+    final: {mode: 'live', model: 'claude-sonnet-5-5', tools_used: [{}], citations: [
+      {id: '400766', known: true, verified: true, type: 'Terminal unit', label: 'VAV box'}, {id: '388279', known: true, verified: true, type: 'M-HVAC-CDFF', label: 'diffuser'}]}});
+  assert.equal(m.primary, '400766');
+  assert.deepEqual(m.chips.map(c => c.label), ['VAV box', 'diffuser']);
+  assert.equal(m.confidence, null);
+  assert.doesNotMatch(m.lead, /Evidence|\[\[/);
+  assert.equal(XA.sections('Let me check.\n**Answer:** [[1]] x').lead, '[[1]] x');   // a header lead replaces a preamble line
+});

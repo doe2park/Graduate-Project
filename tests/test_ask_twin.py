@@ -592,6 +592,68 @@ class SpokenTextTests(unittest.TestCase):
         self.assertEqual(out[-1]['spoken'], 'The duct is above.')
 
 
+PLAIN = ('The air comes from a VAV box (a box that controls how much air goes to this area) about 3 m away, above the ceiling. '
+         'The model suggests this from touching duct pieces, so check the drawings before relying on it.\nEvidence: [[400766]] [[388279]]')
+
+
+class PlainAnswerTests(unittest.TestCase):
+    """Live answers for non-experts: one plain 2-3 sentence paragraph, then an Evidence line with the cited ids."""
+
+    def test_prompt_asks_for_plain_words_and_an_evidence_line(self):
+        p = A.SYSTEM_PROMPT
+        for must in ('AT MOST 3 short sentences', 'at most 55 words', 'first sentence answers exactly the question asked', 'in parentheses at most once',
+                     'No markdown', 'no element ids', 'CAD layer or system codes', 'no "confidence: low/medium/high"',
+                     'Evidence: [[id]]', 'probably', 'not read aloud', 'Write nothing before or between tool calls',
+                     'call connected_run from the selected element', 'not pick a source by straight-line proximity',
+                     'BEFORE the selected element'):
+            self.assertIn(must, p)
+        for gone in ('**Most likely source:**', '**Why:**', '**Check first:**', '**Limits:**'):
+            self.assertNotIn(gone, p)
+
+    def test_split_and_tidy_keep_ids_off_the_text(self):
+        body, ids = A.split_answer(PLAIN)
+        self.assertEqual(ids, ['400766', '388279'])
+        self.assertNotIn('[[', body)
+        self.assertEqual(A.tidy_answer(twin(), PLAIN, '388279'), PLAIN)   # already clean: unchanged
+        messy = ('**Answer:** [[388279]] is a supply air vent (M-HVAC-CDFF) in the ceiling on Level 1 · confidence: low.\n'
+                 'It is probably in room 120.\nEvidence: [[388279]]')
+        t = A.tidy_answer(twin(), messy, '388279')
+        body, ids = A.split_answer(t)
+        for bad in ('**', 'Answer:', '[[', 'M-HVAC', 'confidence'):
+            self.assertNotIn(bad, body)
+        self.assertTrue(body.startswith('This element is a supply air vent in the ceiling on Level 1.'), body)
+        self.assertEqual(ids, ['388279'])
+        no_ev = A.tidy_answer(twin(), 'The air comes from [[400766]], probably.', '388279')
+        self.assertEqual(no_ev, 'The air comes from the VAV box, probably.\nEvidence: [[400766]]')
+        card = '**Answer:** [[388279]] x · confidence: low\n**Why:**\n- y'
+        self.assertEqual(A.tidy_answer(twin(), card, '388279'), card)   # older card format (mock) left alone
+
+    def test_live_answer_is_the_last_round_only_and_citations_are_verified(self):
+        client = FakeClient([
+            ('Let me look this up.', [_block(type='tool_use', id='t1', name='connected_run', input={'element_id': '388279', 'max_elements': 250})], 'tool_use'),
+            (PLAIN, [], 'end_turn'),
+        ])
+        f = list(A.LiveAgent(twin(), client).ask('Where does the air from this vent come from?', '388279'))[-1]
+        self.assertEqual(f['answer'], PLAIN)
+        self.assertEqual({c['id']: c['verified'] for c in f['citations']}, {'400766': True, '388279': True})
+        self.assertEqual({c['id']: c['label'] for c in f['citations']}, {'400766': 'VAV box', '388279': 'diffuser'})
+
+    def test_spoken_text_matches_the_card_paragraph(self):
+        from ask_twin.speech import plain_speech, with_speech, spoken_text
+        want = ('The air comes from a VAV box (a box that controls how much air goes to this area) about 3 metres away, above the '
+                'ceiling. The model suggests this from touching duct pieces, so check the drawings before relying on it.')
+        self.assertEqual(plain_speech(PLAIN), want)
+        self.assertEqual(spoken_text(PLAIN), want)
+        evs = [{'type': 'text', 'text': 'Let me check.\n'}, {'type': 'tool', 'name': 'connected_run'},
+               *[{'type': 'text', 'text': c} for c in (PLAIN[:40], PLAIN[40:150], PLAIN[150:])],
+               {'type': 'final', 'answer': PLAIN}]
+        out = list(with_speech(evs))
+        self.assertEqual([e['text'] for e in out if e['type'] == 'speak'], [want])
+        self.assertEqual(out[-1]['spoken'], want)
+        for bad in ('Evidence', '[[', '400766'):
+            self.assertNotIn(bad, out[-1]['spoken'])
+
+
 class MockRouteTests(unittest.TestCase):
     def test_keywords_reach_the_four_scripted_answers(self):
         cases = {

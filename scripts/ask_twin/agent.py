@@ -3,7 +3,7 @@
 Both modes emit the same event stream (dicts) so the browser and the tests do not care which one ran:
   {'type': 'status', 'text'}              progress line
   {'type': 'tool', 'name', 'input', 'summary'}
-  {'type': 'text', 'text'}                answer text delta (markdown-ish, citations as [[element id]])
+  {'type': 'text', 'text'}                answer text delta (live: plain paragraph + 'Evidence: [[id]] ...'; mock: card markdown)
   {'type': 'final', 'answer', 'citations', 'tools_used', 'mode', 'model', ...}
   {'type': 'error', 'message'}
   {'type': 'status', 'phase': 'thinking', 'text'}   live: before each model round ("Thinking…")
@@ -37,19 +37,34 @@ Data you can reach only through the read-only tools:
 
 Rules:
 1. Every fact must come from a tool result in this conversation or from the selected-element context below. If the data cannot answer, say so plainly and name what record would answer it (e.g. plumbing isometrics, valve tags, BAS points). Never invent elements, distances, readings, rooms or connections.
-2. Cite every element you mention as [[id]] with an id that a tool returned (the viewer turns these into clickable, highlighted chips). Do not cite ids you have not seen in a tool result.
-3. If the selected element is large (a ceiling, slab, beam or long run, > ~3 m), query around the clicked point instead of the whole element. Use the tools efficiently: usually elements_near (above_only for anything seen on a ceiling), then get_element / connected_run / list_sensors / sensor_readings as needed. Prefer parallel tool calls when independent. Stop after at most ~6 tool calls.
+2. Cite every element your answer relies on as [[id]] on the Evidence line, with an id that a tool returned (the viewer turns these into clickable, highlighted chips). Do not cite ids you have not seen in a tool result.
+3. If the selected element is large (a ceiling, slab, beam or long run, > ~3 m), query around the clicked point instead of the whole element. Use the tools efficiently: usually elements_near (above_only for anything seen on a ceiling), then get_element / connected_run / list_sensors / sensor_readings as needed. For "where does the air/water come from", "what feeds this" or "which VAV box", call connected_run from the selected element (or the nearest duct/pipe) and name the first terminal unit / AHU on that run, giving its distance as the number of pieces along the run (hops); do not pick a source by straight-line proximity alone. Prefer parallel tool calls when independent. Stop after at most ~6 tool calls.
 4. Use the numbers the tools give (vertical_gap_m, horizontal_gap_m). Describe direction as above / below / beside plus horizontal distance; do not use compass directions (north is not verified in this frame).
-5. Any sensor value must be written as "simulated demo" (e.g. "demo sensor (simulated): +8.8 degC above baseline").
-6. Be honest about confidence: high only when geometry and a sensor signal agree; medium when one strong water/air source is directly above; low when it rests on proximity or name heuristics alone.
+5. Any sensor value must be called simulated (e.g. "a simulated demo sensor reads 8.8 degC above normal").
+6. Be honest about how sure you are, in plain words: sure only when geometry and a sensor signal agree; "probably" when one strong water/air source is directly above; "possibly ..., check on site" when it rests on proximity or name heuristics alone.
 
-Answer format (plain text with light markdown, at most ~170 words):
-**Most likely source:** [[id]] <short description> - ~N m above (M m horizontally) · confidence: low|medium|high
-**Why:** 2-4 short bullets with the evidence (type/service, distance, demo sensor trend).
-**Check first:** 1-3 short bullets (what to inspect, in order).
-**Other candidates:** up to 3 bullets with [[id]] and distance.
-**Limits:** one line on what the twin cannot tell.
-For a non-diagnostic question (e.g. "what is this?", "which valve...?"), replace the first line with **Answer:** and keep the same sections that apply."""
+Who reads the answer: facilities staff, students and visitors, most of them not engineers. It is shown on a card and read
+aloud, so write the way you would explain it to a colleague standing next to you.
+
+Answer format (strict):
+- Line 1: the answer itself, one paragraph of AT MOST 3 short sentences and at most 55 words in total. Leave out
+  anything that does not answer the question (sizes, extra elements, how a tool works).
+  - The first sentence answers exactly the question asked, in plain English ("This is a supply air vent in the
+    ceiling." / "The air comes from a VAV box above the ceiling, about 10 duct pieces upstream."). For a two-part
+    question, answer both parts in the first two sentences.
+  - Plain words first. Give a technical term in parentheses at most once, right after its plain words
+    ("supply air vent (diffuser)", "VAV box (a box that controls how much air goes to this area)").
+  - Then where it is (room, level, distance in metres) and why it matters or what to check, one short sentence each.
+  - No markdown, no bullets, no headings, no "Answer:", no element ids or [[...]], no CAD layer or system codes
+    (e.g. M-HVAC-CDFF), no family or catalog names, no "confidence: low/medium/high".
+  - Be honest about uncertainty in plain words: "probably", "the model shows ..., so check on site", "the twin cannot
+    tell ...". A room found from nearby labels is "probably room X"; a duct run found from touching pieces is "the model
+    suggests"; any sensor value comes from "a simulated demo sensor".
+- Line 2: Evidence: [[id]] [[id]] ...  (the element ids behind the answer, each returned by a tool or the selected element;
+  first the element the answer is mainly about: the selected element for "what is this"; the source (e.g. the VAV box)
+  BEFORE the selected element for "where does it come from" / "what feeds this"; the closest element for "what is
+  above"; at most 6). The viewer turns this line into clickable chips; it is not read aloud.
+Write nothing before or between tool calls; write only these two lines at the end."""
 
 
 def context_block(twin: Twin, element_id=None, point=None) -> tuple[str, set]:
@@ -77,10 +92,63 @@ def verify_citations(twin: Twin, text: str, grounded: set) -> list:
         row = {'id': cid, 'known': known, 'verified': known and cid in grounded}
         if known:
             s = twin.summary(cid)
-            row.update({'layer': s['layer'], 'type': s.get('type'), 'name': s.get('name'), 'level': s.get('level'),
+            from .speech import spoken_name
+            row.update({'layer': s['layer'], 'type': s.get('type'), 'label': spoken_name(s), 'name': s.get('name'), 'level': s.get('level'),
                         'bbox_m': twin.box[cid], 'in_viewer': s['layer'] in ix.VIEWER_LAYERS})
         out.append(row)
     return out
+
+
+LEGACY_LEAD_RX = re.compile(r'^\s*\*\*(?:Most likely source|Answer):\*\*', re.M)
+EVIDENCE_RX = re.compile(r'^[ \t]*(?:\*\*)?Evidence:(?:\*\*)?[ \t]*(.*)$', re.M | re.I)
+CAD_CODE_RX = re.compile(r'\b[A-Z]-[A-Z]{2,}(?:-[A-Z0-9]+)+\b')
+MAX_EVIDENCE = 6
+
+
+def split_answer(text: str) -> tuple[str, list]:
+    """Plain answer format -> (visible body, evidence ids in order). Ids written in the body are moved to the evidence list."""
+    text = str(text or '')
+    ev = []
+    for m in EVIDENCE_RX.finditer(text):
+        ev += CITE_RX.findall(m.group(1))
+    body = EVIDENCE_RX.sub('', text)
+    ev += CITE_RX.findall(body)
+    seen, ids = set(), []
+    for i in ev:
+        if i not in seen:
+            seen.add(i)
+            ids.append(i)
+    return body.strip(), ids
+
+
+def tidy_answer(twin: Twin, text: str, selected=None) -> str:
+    """Live answers in the plain format: one clean paragraph + 'Evidence: [[id]] ...'. The model is asked for exactly this;
+    this only repairs slips (markdown, an 'Answer:' label, ids or CAD codes in the sentence). Answers in the older card
+    format (**Answer:** / **Most likely source:** lead and no Evidence line) are returned unchanged."""
+    text = str(text or '').strip()
+    if not text or (LEGACY_LEAD_RX.search(text) and not EVIDENCE_RX.search(text)):
+        return text
+    from .speech import spoken_name   # local import: speech imports nothing from here, but keep agent importable alone
+    body, ids = split_answer(text)
+
+    def name(m):
+        cid = m.group(1)
+        if selected is not None and cid == str(selected):
+            return 'this element'
+        return 'the ' + spoken_name(twin.summary(cid) if cid in twin.box else None)
+    body = CITE_RX.sub(name, body)
+    body = re.sub(r'\*\*(.+?)\*\*', r'\1', body).replace('**', '')
+    body = re.sub(r'^\s*(?:Answer|Most likely source)\s*:\s*', '', body, flags=re.I)
+    body = re.sub(r'\s*\([^()]*' + CAD_CODE_RX.pattern + r'[^()]*\)', '', body)
+    body = CAD_CODE_RX.sub('', body)
+    body = re.sub(r'\s*[·,;]?\s*confidence:\s*(low|medium|high)\b', '', body, flags=re.I)
+    body = re.sub(r'^\s*[-•]\s+', '', body, flags=re.M)
+    body = re.sub(r'\s+', ' ', body).strip()
+    body = re.sub(r'\s+([,.;:!?])', r'\1', body)
+    body = body[:1].upper() + body[1:]
+    if not ids:
+        return body
+    return body + '\nEvidence: ' + ' '.join(f'[[{i}]]' for i in ids[:MAX_EVIDENCE])
 
 
 def tool_event(name, args, result) -> dict:
@@ -238,6 +306,8 @@ class LiveAgent:
                 results.append({'type': 'tool_result', 'tool_use_id': b.id, 'content': json.dumps(res, separators=(',', ':')),
                                 **({'is_error': True} if 'error' in res else {})})
             messages.append({'role': 'user', 'content': results})   # all results in one user turn
+        # The card shows the last round's text only: anything written before a tool call was a preamble, not the answer.
+        answer = tidy_answer(self.twin, round_text if round_text.strip() else answer, element_id)
         yield {'type': 'final', 'answer': answer.strip(), 'citations': verify_citations(self.twin, answer, grounded),
                'tools_used': used, 'mode': 'live', 'model': self.model, 'effort': self.effort, 'usage': usage,
                'seconds': round(time.time() - t0, 1)}

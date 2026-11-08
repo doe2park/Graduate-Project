@@ -131,8 +131,15 @@ There is no terminal QR code (that would need a new dependency).
 | `connected_run(id)` | touching-box run on the same layer; valves, terminal units, AHUs, heaters, drain pans on it | inferred |
 | `list_sensors(near)` / `sensor_readings(id, hours)` | demo sensors, simulated series, alert rule | **demo-sim** |
 
-3. Claude answers in a fixed card format (*Most likely source · confidence*, *Why*, *Check first*, *Other candidates*,
-   *Limits*), citing elements as `[[id]]`.
+3. Claude answers for non-experts (live format since Nov 7, 2026): **one plain-English paragraph of 2-3 short sentences**
+   (the first sentence answers directly, e.g. *"This is a supply air vent (diffuser) in the ceiling."*; plain words first,
+   a technical term in parentheses at most once; no markdown, ids, CAD codes or *confidence:* labels; uncertainty in plain
+   words such as *probably* or *check on site*), then one line `Evidence: [[id]] [[id]] …` with the main element first.
+   The server tidies slips (`agent.tidy_answer`: markdown, an *Answer:* label, ids or CAD codes in the sentence are moved
+   or removed) and keeps only the last model round's text, so a *Let me check…* preamble never reaches the card. The
+   laptop card shows the paragraph and an **Evidence** row of chips with plain labels (*diffuser*, *VAV box*); the spoken
+   reply is the same paragraph with units spelled out. Mock answers keep the older card format (*Answer / Most likely
+   source*, *Why*, *Check first*, *Limits*); both clients read both formats.
 4. **Citation check:** the server marks a cited id as verified only if it is the selected element or appeared in a tool
    result during that answer. Unverified ids are shown struck through and are never highlighted.
 5. The viewer colours verified citations (most likely source magenta, others cyan), draws box outlines on top, loads
@@ -193,6 +200,9 @@ the spiral duct `#401233` (demo airflow sensor anchor).
 
 ## Voice (Milestone B, revised Nov 5 2026)
 
+- **Spoken answer = the card paragraph** for live (plain-format) answers: one `speak` event when the `Evidence:` line
+  arrives, and `final.spoken` is the tidied paragraph with units spelled out (`speech.plain_speech`); the Evidence line is
+  never read. For card-format (mock) answers:
 - **Spoken answer is short:** the server turns the streamed answer into `speak` events (`scripts/ask_twin/speech.py`): the lead
   sentence and at most one *check first* sentence, in plain words ("Most likely the VAV box, 11 steps along touching ducts
   from here. First, trace the duct from here to the VAV box on the mechanical drawings."). Ids become names (*the VAV box*),

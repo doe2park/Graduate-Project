@@ -6,6 +6,9 @@ The card keeps everything (ids, confidence, evidence, limits). The voice says on
 Element ids become plain names ("the VAV box"), the selected element becomes "this"/"here", and markdown, [[ids]],
 parentheses, CAD layer codes and "confidence: low" are dropped. Nothing is added that is not in the answer text.
 
+Plain answers (the live format since Nov 2026: one 2-3 sentence paragraph, then "Evidence: [[id]] ..."): the voice says
+the paragraph exactly as the card shows it, with units spelled out ("3 m" -> "3 metres"); the Evidence line is never read.
+
 SpokenStream turns the streamed text into 'speak' events as soon as each part's line is complete, so the headset can
 start talking before the rest of the card has arrived.
 """
@@ -25,6 +28,9 @@ DESCRIBING = {'fire', 'sprinkler', 'vav', 'terminal', 'duct', 'ductwork', 'pipe'
 IMPERATIVE = {'lift', 'open', 'trace', 'check', 'inspect', 'compare', 'look', 'confirm', 'read', 'ask', 'verify', 'measure',
               'find', 'walk', 'test', 'feel', 'listen', 'shut', 'close', 'turn', 'call', 'review', 'pull', 'see', 'use'}
 MAX_PART = 220
+MAX_PLAIN = 480
+EVIDENCE_LINE_RX = re.compile(r'^(?:\*\*)?Evidence:(?:\*\*)?(?:\s|$)', re.I)
+LEGACY_LEAD_RX = re.compile(r'^\s*\*\*(?:Most likely source|Answer):\*\*', re.M)
 
 
 def spoken_name(summary: dict | None) -> str:
@@ -118,6 +124,25 @@ def plain(s: str, type_of=lambda _id: None, selected=None) -> str:
     return s
 
 
+def plain_speech(body: str, type_of=lambda _id: None, selected=None) -> str:
+    """A plain-format answer paragraph -> the words to say. Same text as the card; only ids (should not be there) become
+    names, markdown and CAD codes go, and units are spelled out. Parenthesised plain explanations are kept."""
+    s = MOCK_TAG.sub('', str(body or ''))
+    s = '\n'.join(l for l in s.split('\n') if not EVIDENCE_LINE_RX.match(l.strip()))
+    s = _ids_to_words(s, type_of, selected).replace('\x00 ', '').replace('\x00', '')
+    s = re.sub(r'\*\*(.+?)\*\*', r'\1', s).replace('*', '')
+    s = re.sub(r'\s*[·,]?\s*confidence:\s*(low|medium|high)\b', '', s, flags=re.I)
+    s = re.sub(r'\s*\(\s*\)', '', CAD_CODE_RX.sub('', s))
+    s = s.replace('~', 'about ').replace('·', ',')
+    s = re.sub(r'(\d)\s?°C\b|(\d)\s?degC\b', lambda m: (m.group(1) or m.group(2)) + ' degrees', s)
+    s = re.sub(r'(\d)\s?%', r'\1 percent', s)
+    s = re.sub(r'(\d)\s?m\b', r'\1 metres', s)
+    s = re.sub(r'(\d)\s?cm\b', r'\1 centimetres', s)
+    s = re.sub(r'\s+([,.;:!?])', r'\1', s)
+    s = re.sub(r'\s+', ' ', s).strip(' ,;:')
+    return _end(_clip(s, MAX_PLAIN)) if s else ''
+
+
 def _sentences(s: str, limit=170) -> str:
     parts = re.split(r'(?<=[.!?])\s+(?=[A-Z])', s)
     out = parts[0]
@@ -178,14 +203,22 @@ class SpokenStream:
 
     def reset(self):
         """Forget unspoken text (a live model's preamble before its tool calls is not the answer)."""
-        self.buf, self.lead_done, self.check_done, self.in_check, self.loose = '', False, False, False, ''
+        self.buf, self.lead_done, self.check_done, self.in_check, self.loose, self.saw_header = '', False, False, False, '', False
 
     def _line(self, line: str):
         line = line.strip()
         if not line or self.check_done:
             return []
         out = []
+        if EVIDENCE_LINE_RX.match(line):   # plain format: the paragraph above is the whole spoken answer
+            if not self.lead_done and self.loose and not self.saw_header:
+                text = plain_speech(self.loose, self.type_of, self.selected)
+                if text:
+                    out.append(('lead', text))
+            self.lead_done = self.check_done = True
+            return out
         h = HEADER_RX.match(line)
+        self.saw_header = self.saw_header or bool(h)
         if not self.lead_done:
             if h and h.group(1).strip() in ('Most likely source', 'Answer'):
                 text = lead_sentence(h.group(1).strip(), h.group(2), self.type_of, self.selected)
@@ -193,7 +226,7 @@ class SpokenStream:
                 text = self.loose and lead_sentence('Answer', self.loose, self.type_of, self.selected)   # card without a lead line
             else:
                 # plain text before the card (e.g. a live model's "Let me check…"): only a fallback lead, used if no card follows
-                self.loose = self.loose or line
+                self.loose = f'{self.loose} {line}' if self.loose else line
                 return []
             self.lead_done = True
             if text:
@@ -230,7 +263,8 @@ class SpokenStream:
         out = self._line(self.buf) if self.buf.strip() else []
         self.buf = ''
         if not self.lead_done and self.loose:
-            text = lead_sentence('Answer', self.loose, self.type_of, self.selected)
+            text = (lead_sentence('Answer', self.loose, self.type_of, self.selected) if self.saw_header
+                    else plain_speech(self.loose, self.type_of, self.selected))   # plain answer without an Evidence line
             self.lead_done = True
             if text:
                 out.append(('lead', text))
@@ -260,7 +294,11 @@ def with_speech(events, type_of=lambda _id: None, selected=None):
             if not s.parts and ev.get('answer'):   # no streamed text (should not happen): speak from the final answer
                 for part, text in (s.feed(ev['answer']) + s.finish()):
                     yield {'type': 'speak', 'part': part, 'text': text}
-            ev = dict(ev, spoken=s.text)
+            spoken = s.text
+            ans = ev.get('answer') or ''
+            if ans and (re.search(r'^(?:\*\*)?Evidence:', ans, re.M | re.I) or (not LEGACY_LEAD_RX.search(ans) and not s.saw_header)):   # plain format: say exactly the final (tidied) paragraph
+                spoken = plain_speech(ans, type_of, selected) or spoken
+            ev = dict(ev, spoken=spoken)
             yield ev
             continue
         if ev.get('type') == 'tool' and not s.parts:

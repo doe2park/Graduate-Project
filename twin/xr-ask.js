@@ -101,7 +101,10 @@ function plainLine(s, idText = id => '#' + id) {
 /* The first cited id of the lead line (**Most likely source:** / **Answer:**): the element the answer is about. */
 function leadId(answer) {
   const m = /^\s*\*\*(?:Most likely source|Answer):\*\*[^\n]*?\[\[([A-Za-z0-9_.:-]{1,40})\]\]/.exec(answer || '');
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // plain format (live answers since Nov 2026): one paragraph, then "Evidence: [[id]] ..." with the main element first
+  const ev = /^\s*(?:\*\*)?Evidence:(?:\*\*)?\s*\[\[([A-Za-z0-9_.:-]{1,40})\]\]/im.exec(answer || '');
+  return ev && !/^\s*\*\*(?:Most likely source|Answer):\*\*/m.test(answer || '') ? ev[1] : null;
 }
 /* Markdown-lite answer -> {lead, sections: {name: [lines]}, limits}. Sections are the bold "**Name:**" lines of the card format. */
 function sections(answer) {
@@ -109,10 +112,11 @@ function sections(answer) {
   let cur = null;
   for (const raw of String(answer || '').replace(MOCK_TAG, '').split('\n')) {
     const line = raw.trim(); if (!line) continue;
+    if (/^(?:\*\*)?Evidence:/i.test(line)) continue;   // plain format: ids for the chips, not text
     const h = /^\*\*([A-Za-z ]{2,30}):\*\*\s*(.*)$/.exec(line);
     if (h) {
       const name = h[1].trim();
-      if (!out.lead && /^(Most likely source|Answer)$/.test(name)) { out.lead = h[2]; out.leadKind = name; cur = null; continue; }
+      if (!out.leadKind && /^(Most likely source|Answer)$/.test(name)) { out.lead = h[2]; out.leadKind = name; cur = null; continue; }
       if (name === 'Limits') { out.limits = h[2]; cur = null; continue; }
       cur = name; out.sections[cur] = out.sections[cur] || []; out.order.push(cur);
       if (h[2]) out.sections[cur].push(h[2]);
@@ -120,7 +124,7 @@ function sections(answer) {
     }
     const li = /^[-•]\s+(.*)$/.exec(line);
     if (cur) out.sections[cur].push(li ? li[1] : line);
-    else if (!out.lead) out.lead = line;
+    else if (!out.leadKind && !out.order.length) out.lead = out.lead ? out.lead + ' ' + line : line;   // plain paragraph (or preamble)
   }
   return out;
 }
@@ -136,7 +140,7 @@ function cardModel({question = '', answer = '', final = null, level = null, tool
   const evidence = S.sections.Why || S.sections.Closest || S.sections.Where || S.sections['Nearby (1 m)'] || [];
   const check = (S.sections['Check first'] || [])[0];
   const bullets = [...evidence.slice(0, 2).map(t => ({kind: 'why', text: plainLine(t)})), ...(check ? [{kind: 'check', text: plainLine(check)}] : [])];
-  const chips = cites.filter(c => c.known !== false).map(c => ({id: c.id, label: c.type || c.layer || 'element', verified: !!c.verified, primary: c.id === primary}))
+  const chips = cites.filter(c => c.known !== false).map(c => ({id: c.id, label: c.label || c.type || c.layer || 'element', verified: !!c.verified, primary: c.id === primary}))
     .sort((a, b) => (b.primary - a.primary) || (b.verified - a.verified)).slice(0, 4);
   const nv = cites.filter(c => c.verified).length, mode = final ? final.mode : null;
   return {question: plainLine(question), level, lead, leadKind: S.leadKind, confidence: conf, bullets, chips, primary: primary && byId.get(primary)?.verified ? primary : null,
@@ -324,7 +328,7 @@ function drawAnswer(ctx, W, H, view) {
     ctx.font = '30px Arial'; ctx.fillStyle = '#e8f1f8'; for (const t of wrap(ctx, view.error || '', W - 2 * pad, 4)) { ctx.fillText(t, pad, y); y += 40; }
   } else {
     ctx.font = '700 36px Arial'; ctx.fillStyle = '#ffffff';
-    for (const t of wrap(ctx, m.lead || '', W - 2 * pad, 3)) { ctx.fillText(t, pad, y + 10); y += 46; }
+    for (const t of wrap(ctx, m.lead || '', W - 2 * pad, (m.bullets || []).length ? 3 : 6)) { ctx.fillText(t, pad, y + 10); y += 46; }
     if (m.confidence) { ctx.font = '700 24px Arial'; const t = 'confidence: ' + m.confidence, w = ctx.measureText(t).width + 26; ctx.fillStyle = m.confidence === 'high' ? '#14532d' : m.confidence === 'medium' ? '#6a4a10' : '#3b2a4a'; rr(ctx, pad, y - 10, w, 36, 18); ctx.fill(); ctx.fillStyle = '#f1f5f9'; ctx.fillText(t, pad + 13, y + 16); y += 40; }
     y += 10;
     for (const b of m.bullets || []) {
