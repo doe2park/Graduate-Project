@@ -15,7 +15,7 @@ const URL_ = BASE + '/scan-xr.html?mode=ar&place=demo&sensors=demo&scene=air&lay
 (async () => {
   fs.mkdirSync(OUT, {recursive: true});
   const browser = await chromium.launch({headless: true, executablePath: process.env.CHROME_EXECUTABLE || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=metal', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required']});
+    args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=metal', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required', '--mute-audio']});
   const context = await browser.newContext({viewport: {width: 1600, height: 900}, deviceScaleFactor: 1});
   await context.grantPermissions(['microphone'], {origin: BASE});
   await context.route(/\.(jpe?g|webp|png)(\?.*)?$/i, r => r.request().url().includes('/scan-assets/') || r.request().url().includes('/scans/') ? r.abort() : r.continue());
@@ -83,6 +83,22 @@ const URL_ = BASE + '/scan-xr.html?mode=ar&place=demo&sensors=demo&scene=air&lay
     await page.evaluate(() => xrDebug.ask.button(5));
     st = await page.evaluate(() => xrInspection().ask);
     assert.equal(st.bar, null); assert.equal(st.glow.length, 0); assert.equal(st.cardVisible, false);
+
+    // 4. stand-in controller (desktop preview only): controller 1's own ray + reticle onto the element, trigger -> pick;
+    //    onto a bar button -> that button is hovered (nothing pressed); null hides it
+    const sim = await page.evaluate(id => xrDebug.ask.simController({id}, {trigger: true}), DIFFUSER);
+    assert.equal(sim?.kind, 'element'); assert.equal(sim.hitId, DIFFUSER); assert.equal(sim.picked?.id, DIFFUSER);
+    st = await page.evaluate(() => xrInspection().ask);
+    assert.equal(st.el.id, DIFFUSER); assert.deepEqual(st.bar, ['q1', 'q2', 'q3', 'q4', 'mic', 'close']);
+    const simBtn = await page.evaluate(() => xrDebug.ask.simController({button: 0}));
+    assert.equal(simBtn?.kind, 'button'); assert.equal(simBtn.button, 0); assert.equal(simBtn.pressed, undefined);
+    st = await page.evaluate(() => xrInspection().ask);
+    assert.equal(st.phase, null, 'hover alone asks nothing');
+    await page.waitForTimeout(200);
+    await shot('05-sim-controller-on-button.png', 'stand-in controller ray + reticle on button 1 (desktop preview only)');
+    assert.deepEqual(await page.evaluate(() => xrDebug.ask.simController(null)), {hidden: true});
+    report.simController = {element: {hitId: sim.hitId, distance: sim.distance}, button: simBtn.button};
+    await page.evaluate(() => xrDebug.ask.button(5));
     assert.deepEqual(errors, []);
     report.ok = true;
   } catch (e) { report.ok = false; report.error = String(e.stack || e); report.errors = errors; process.exitCode = 1; }

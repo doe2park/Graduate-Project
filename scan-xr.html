@@ -1432,7 +1432,35 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
    const c=new THREE.Object3D();camera.getWorldPosition(c.position);c.lookAt(c.position.clone().multiplyScalar(2).sub(w));c.userData={o:new THREE.Vector3(),d:new THREE.Vector3(),hover:null};
    askHoldStart(c);await new Promise(r=>setTimeout(r,XA.HOLD_MS+ms));const mid={voice:ASK.voice,ring:askRing.visible,el:ASK.el?.id||null};const swallowed=askHoldSwallow(c);askHoldEnd(c);return {...mid,swallowed};},barButtonNdc:i=>{const r=XA.barRects()[i];if(!r||!askBar.mesh.visible)return null;askBar.mesh.updateMatrixWorld(true);camera.updateMatrixWorld(true);
    const p=new THREE.Vector3((r.x+r.w/2-.5)*.6,(.5-(r.y+r.h/2))*.176,0).applyMatrix4(askBar.mesh.matrixWorld).project(camera);return [p.x,p.y];},
-  state:()=>askInspection(),clear:()=>askClear()},
+  state:()=>askInspection(),clear:()=>askClear(),
+  // desktop preview only: show controller 1's own laser ray + reticle from a stand-in hand pose (camera-local offset) to an element
+  // ({id}: its centroid, else the first of its vertices (pulled 15% toward the centroid) that the ray reaches before any other element),
+  // an ask-bar button ({button}) or a world point ({world}); the bar button under the ray highlights as in the headset.
+  // lens: the Lens cone follows this ray (as the flashlight hand does in XR). trigger: then act as the trigger would (pick the element
+  // along the ray / press the button). null hides it.
+  simController:async(target,{hand=[.16,-.22,-.3],lens=true,trigger=false}={})=>{if(renderer.xr.isPresenting)return null;const c=controllers[1],u=c.userData,ray=u.ray,ret=u.reticle;
+   if(!target){c.visible=false;ray.visible=false;ret.visible=false;setHover(c,null);invalidate();return {hidden:true};}
+   camera.updateMatrixWorld(true);bimRoot.updateMatrixWorld(true);rig.updateMatrixWorld(true);let w=null;const o=new THREE.Vector3().fromArray(hand).applyMatrix4(camera.matrixWorld);
+   const firstId=(from,to)=>{raycaster.set(from,to.clone().sub(from).normalize());raycaster.far=P.radius+6;const h=raycaster.intersectObjects(pickables(),false)[0];return h?{id:resolveHit(h.object,h.instanceId,h.faceIndex,h.index),h}:null;};
+   if(target.id!=null){const id=String(target.id),k=Object.keys(layerState).find(k=>layerState[k].loaded&&layerState[k].meta?.[id]),g=k?sensorElementGeom(layerState[k],id,false):null;if(!g)return null;
+    const cc=[0,0,0],n=g.pos.length/3;for(let i=0;i<n;i++)for(let j=0;j<3;j++)cc[j]+=g.pos[i*3+j]/n;const toW=a=>new THREE.Vector3().fromArray(a).applyMatrix4(bimRoot.matrixWorld);
+    const cands=[cc];for(let i=0;i<n;i+=Math.max(1,Math.floor(n/200)))cands.push([0,1,2].map(j=>g.pos[i*3+j]*.85+cc[j]*.15));
+    for(const a of cands){const pw=toW(a),f=firstId(o,pw);if(f&&String(f.id)===id){w=pw;break;}}if(!w)w=toW(cc);}
+   else if(target.button!=null){const r=XA.barRects()[target.button];if(!r||!askBar.mesh.visible)return null;askBar.mesh.updateMatrixWorld(true);w=new THREE.Vector3((r.x+r.w/2-.5)*.6,(.5-(r.y+r.h/2))*.176,0).applyMatrix4(askBar.mesh.matrixWorld);}
+   else if(Array.isArray(target.world))w=new THREE.Vector3().fromArray(target.world);
+   if(!w)return null;
+   const d=w.clone().sub(o).normalize(),qW=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(o,w,new THREE.Vector3(0,1,0)));
+   c.matrixAutoUpdate=false;c.matrix.copy(rig.matrixWorld.clone().invert().multiply(new THREE.Matrix4().compose(o,qW,new THREE.Vector3(1,1,1))));c.matrixWorldNeedsUpdate=true;c.visible=true;c.updateMatrixWorld(true);
+   const hit=panelHit(o,d);setHover(c,hit);let kind=hit?(hit.button>=0?'button':'panel'):null,dist=hit?.distance,point=hit?.point,hitId=null;
+   if(!kind){const f=firstId(o,w);if(f){kind='element';dist=f.h.distance;point=f.h.point;hitId=f.id!=null?String(f.id):null;}}
+   if(!kind){kind='point';dist=o.distanceTo(w);point=w;}
+   const col=kind==='button'?0xffd479:kind==='element'?0xffb020:0xffffff;
+   ray.visible=true;ray.scale.z=Math.max(.05,dist);ray.material.color.set(col);ray.material.opacity=kind==='button'?.9:.55;
+   ret.position.copy(point);camera.getWorldPosition(_head);ret.lookAt(_head);ret.scale.setScalar(clamp(dist*.012,.006,.1));ret.userData.mat.color.set(col);ret.visible=true;
+   if(lens&&kind!=='button'&&kind!=='panel'){U.coneOrigin.value.copy(o);U.coneDir.value.copy(d);}
+   invalidate();const out={kind,distance:+dist.toFixed(3),button:hit?.button??null,hitId,origin:o.toArray(),point:point.toArray()};
+   if(trigger){if(kind==='button')out.pressed=askButton(hit.button,c);else if(kind==='element'){const r=await pickAlong(o,d);out.picked=r&&{id:r.id,layer:r.layer};}}
+   return out;}},
  // cost of one element-hover raycast along the centre ray (what the flashlight hand pays per throttled cast), median of n
  rayCostMs:(n=15)=>{const [o,d]=xrDebug.ndcRay(0,0),t=[];for(let k=0;k<n;k++){const t0=performance.now();raycaster.set(o,d);raycaster.far=P.radius+6;raycaster.intersectObjects(pickables(),false);t.push(performance.now()-t0);}t.sort((a,b)=>a-b);return +t[n>>1].toFixed(2);},
  lookAtBim:p=>{const s=new THREE.Vector3().fromArray(X.invertReg(reg,p)),c=camera.getWorldPosition(new THREE.Vector3()),d=s.sub(c).normalize();yaw=Math.atan2(-d.x,-d.z);pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();return d.toArray();},
