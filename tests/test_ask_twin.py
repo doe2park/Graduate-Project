@@ -605,7 +605,7 @@ class PlainAnswerTests(unittest.TestCase):
                      'No markdown', 'no element ids', 'CAD layer or system codes', 'no "confidence: low/medium/high"',
                      'Evidence: [[id]]', 'probably', 'not read aloud', 'Write nothing before or between tool calls',
                      'call connected_run from the selected element', 'not pick a source by straight-line proximity',
-                     'BEFORE the selected element'):
+                     'BEFORE the selected element', 'Never a 4th sentence'):
             self.assertIn(must, p)
         for gone in ('**Most likely source:**', '**Why:**', '**Check first:**', '**Limits:**'):
             self.assertNotIn(gone, p)
