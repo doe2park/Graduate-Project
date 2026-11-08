@@ -37,7 +37,7 @@ async function ask(page, i) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  await page.goto(BASE + '/', {waitUntil: 'load'});
+  await page.goto(BASE + '/' + (process.env.ASK_CODE ? '?code=' + encodeURIComponent(process.env.ASK_CODE) : ''), {waitUntil: 'load'});   // ASK_CODE = the code the server printed (or start it with --no-code)
   await page.waitForFunction(() => window.twinViewerApi && document.getElementById('askTwin') && !/connecting/.test(document.getElementById('atMode').textContent));
   const mode = await page.textContent('#atMode');
   await page.evaluate(async () => { try { dismissWelcome(); } catch {} for (const k of ['lighting', 'duct', 'fire']) await toggleLayer(k); });

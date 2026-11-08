@@ -4,8 +4,23 @@
    fly the camera on click. Nothing here writes model data; highlights are render-time colours only. */
 (function () {
 'use strict';
-const api = window.twinViewerApi;
-if (!api) { console.warn('[ask-twin] viewer API missing'); return; }
+/* Access code (scripts/ask_twin_server.py prints the page link with &code=…): read from this page's URL and sent as the
+   X-Ask-Code header on every call that spends credits or runs speech. Pure helpers, unit-tested in tests/ask-twin.test.cjs. */
+const H = {
+  accessCode(search) { return String(new URLSearchParams(search || '').get('code') || '').replace(/[\s-]+/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32); },
+  headers(code, extra = {}) { return code ? {...extra, 'X-Ask-Code': code} : {...extra}; },
+  /* 401 / 429 from the server -> the sentence the panel shows (null for any other status). */
+  refusalText(status, body = {}) {
+    const b = body || {};
+    if (status === 401) return b.reason === 'code_wrong' ? 'Wrong access code. Use the link printed in the laptop terminal, or type the code below.'
+      : 'Access code needed. Open the link printed in the laptop terminal (it ends with &code=…), or type the code below.';
+    if (status === 429) return b.error || `Too many requests right now.${b.retry_after_s ? ` Try again in ${b.retry_after_s} s.` : ''}`;   // server text says when
+    return null;
+  },
+};
+if (typeof module === 'object' && module && module.exports) module.exports = H;
+const api = typeof window !== 'undefined' && window.twinViewerApi;
+if (!api) { if (typeof window !== 'undefined' && window.document) console.warn('[ask-twin] viewer API missing'); return; }
 const PRIMARY = 0xff3df0, OTHER = 0x22d3ee;   // magenta / cyan: distinct from layer colours and the amber pick
 const AUTOLOAD_MAX_MB = 25;   // larger layers (fire 86 MB) load only when their chip is clicked
 const EXAMPLES = [
@@ -70,6 +85,9 @@ const css = `
 #askTwin .at-chip.bad{background:#fde2e2;color:#991b1b;text-decoration:line-through;cursor:help}
 #askTwin .at-foot{font-size:11px;color:#9fb0cc;display:flex;flex-wrap:wrap;gap:4px 10px}
 #askTwin .at-foot b{color:#e5e9f2;font-weight:600}
+#askTwin .at-code{display:flex;gap:6px;margin-top:6px}
+#askTwin .at-code input{flex:1;min-width:0;border:1px solid #c9b88a;border-radius:7px;padding:5px 8px;font:600 14px/1.3 ui-monospace,Menlo,monospace;letter-spacing:2px;text-transform:uppercase}
+#askTwin .at-code button{border:0;border-radius:7px;background:#0b1f3a;color:#fff;font:inherit;font-weight:700;padding:0 12px;cursor:pointer}
 #askTwin .at-cursor::after{content:'▍';color:#d4a72c;animation:atBlink 1s steps(2) infinite}
 @keyframes atBlink{50%{opacity:0}}
 #askTwinMarker{position:fixed;z-index:110;pointer-events:none;transform:translate(-50%,-100%);display:none}
@@ -103,7 +121,23 @@ document.body.appendChild(marker);
 // Typing in the panel must not drive the viewer's keyboard shortcuts (Walk, cards, ...).
 for (const t of ['keydown', 'keyup', 'keypress']) panel.addEventListener(t, e => e.stopPropagation());
 
-const state = {sel: null, point: null, busy: false, history: [], markerAt: null, stt: false, health: null, lastCites: []};
+const state = {sel: null, point: null, busy: false, history: [], markerAt: null, stt: false, health: null, lastCites: [],
+  code: H.accessCode(location.search), lastQuestion: ''};
+class Refused extends Error { constructor(msg, status) { super(msg); this.status = status; } }
+async function refusal(res) {   // 401 / 429 -> Refused with the friendly text; other errors -> null
+  let body = {}; try { body = await res.clone().json(); } catch (e) { /* not JSON */ }
+  const t = H.refusalText(res.status, body);
+  return t ? new Refused(t, res.status) : null;
+}
+function showCodeBox(msg) {
+  const card = $('#atCard');
+  card.className = 'at-card on err';
+  card.innerHTML = `<p><strong>Could not answer.</strong> ${esc(msg)}</p><div class="at-code"><input id="atCode" placeholder="Access code" maxlength="32" autocomplete="off" spellcheck="false"><button id="atCodeGo">Use code</button></div>`;
+  const go = () => { const c = H.accessCode('?code=' + encodeURIComponent($('#atCode').value)); if (!c) return; state.code = c;
+    card.className = 'at-card'; if (state.lastQuestion) ask(state.lastQuestion); };
+  $('#atCodeGo').onclick = go;
+  $('#atCode').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+}
 
 // ---------- selection context (fed by the viewer's pickEquipment) ----------
 window.__askTwin = {
@@ -124,6 +158,7 @@ fetch('/api/health').then(r => r.json()).then(h => {
   m.textContent = h.mode === 'live' ? `LIVE · ${h.model}` : 'MOCK · no API key';
   m.title = h.mode === 'live' ? 'Answers from the Claude API using read-only twin tools' : 'Scripted answers built from the same read-only tools (no API call)';
   state.stt = !!h.stt?.available;
+  if (h.access?.code_required && !state.code) showCodeBox(H.refusalText(401, {reason: 'code_required'}));
   $('#atStt').textContent = state.stt ? '🎙 local whisper' : (webSpeech() ? '🎙 browser speech' : '');
 }).catch(() => { $('#atMode').textContent = 'server offline'; });
 
@@ -225,6 +260,7 @@ $('#atCard').addEventListener('click', async e => {
 async function ask(question) {
   question = (question || '').trim();
   if (!question || state.busy) return;
+  state.lastQuestion = question;
   state.busy = true; $('#atAsk').disabled = true; $('#atAsk').textContent = '…';
   speechSynthesis?.cancel?.();
   const steps = $('#atSteps'), card = $('#atCard'), foot = $('#atFoot');
@@ -234,9 +270,10 @@ async function ask(question) {
   let text = '', final = null, pending = false;
   const paint = () => { pending = false; card.innerHTML = render(text) + (final ? '' : '<span class="at-cursor"></span>'); };
   try {
-    const res = await fetch('/api/ask', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    const res = await fetch('/api/ask', {method: 'POST', headers: H.headers(state.code, {'Content-Type': 'application/json'}),
       body: JSON.stringify({question, element_id: state.sel, point: state.point, history: state.history})});
-    if (!res.ok || !res.body) throw new Error(`server ${res.status}`);
+    if (!res.ok) throw (await refusal(res)) || new Error(`server ${res.status}`);
+    if (!res.body) throw new Error(`server ${res.status}`);
     const reader = res.body.getReader(), dec = new TextDecoder();
     let buf = '';
     for (;;) {
@@ -265,6 +302,7 @@ async function ask(question) {
     await showCitations(state.lastCites, text);
     if ($('#atSpeak').checked) speak(final.spoken || text, !!final.spoken);   // server's short spoken version (lead + one check)
   } catch (e) {
+    if (e instanceof Refused && e.status === 401) { steps.classList.remove('on'); showCodeBox(e.message); return; }
     card.className = 'at-card on err';
     card.innerHTML = `<p><strong>Could not answer.</strong> ${esc(e.message)}</p>`;
   } finally {
@@ -325,7 +363,8 @@ async function stopTalk() {
     if (blob.size < 1500 || performance.now() - recStarted < 500) { $('#atQ').placeholder = 'Too short: hold 🎙 while you speak, then release'; return; }
     $('#atQ').value = 'Transcribing…';
     try {
-      const res = await fetch('/api/transcribe', {method: 'POST', headers: {'Content-Type': blob.type}, body: blob});
+      const res = await fetch('/api/transcribe', {method: 'POST', headers: H.headers(state.code, {'Content-Type': blob.type}), body: blob});
+      if (!res.ok) { const r = await refusal(res); if (r) { $('#atQ').value = ''; if (r.status === 401) showCodeBox(r.message); throw r; } }
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || res.status);
       $('#atQ').value = j.text || '';

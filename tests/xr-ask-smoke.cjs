@@ -10,7 +10,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), path = re
 const BASE = process.argv[2] || 'http://127.0.0.1:8766';
 const OUT = process.argv[3] || path.join(__dirname, '..', 'work', 'ask-twin', 'xr-shots');
 const DIFFUSER = '388279';   // Level 1 supply diffuser, anchor of the demo comfort / CO2 sensors (air scene)
-const URL_ = BASE + '/scan-xr.html?mode=ar&place=demo&sensors=demo&scene=air&layers=duct&ask=1';
+const URL_ = BASE + '/scan-xr.html?mode=ar&place=demo&sensors=demo&scene=air&layers=duct&ask=1' + (process.env.ASK_CODE ? '&code=' + encodeURIComponent(process.env.ASK_CODE) : '');   // ASK_CODE = the printed access code
 
 (async () => {
   fs.mkdirSync(OUT, {recursive: true});

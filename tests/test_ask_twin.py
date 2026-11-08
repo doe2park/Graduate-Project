@@ -296,11 +296,14 @@ class LiveDowngradeTests(unittest.TestCase):
 
 # ---------------- HTTP server in mock mode ----------------
 class ServerTests(unittest.TestCase):
+    CODE = 'TEST42'
+
     @classmethod
     def setUpClass(cls):
         import ask_twin_server as S
         cls.S = S
-        args = S.parse_args(['--mock', '--no-stt', '--port', '0'])
+        cls.usage_tmp = tempfile.TemporaryDirectory()
+        args = S.parse_args(['--mock', '--no-stt', '--port', '0', '--code', cls.CODE, '--per-minute', '100', '--usage-dir', cls.usage_tmp.name])
         app = S.build_app(args, log=lambda *a: None)
         S.Handler.app = app
         cls.httpd = ThreadingHTTPServer(('127.0.0.1', 0), S.Handler)
@@ -311,6 +314,7 @@ class ServerTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.httpd.shutdown()
+        cls.usage_tmp.cleanup()
 
     def get(self, path):
         try:
@@ -320,7 +324,7 @@ class ServerTests(unittest.TestCase):
             return e.code, e.read()
 
     def post(self, path, body, headers=None):
-        req = urllib.request.Request(self.base + path, data=json.dumps(body).encode(), headers={'Content-Type': 'application/json', **(headers or {})})
+        req = urllib.request.Request(self.base + path, data=json.dumps(body).encode(), headers={'Content-Type': 'application/json', 'X-Ask-Code': self.CODE, **(headers or {})})
         try:
             with urllib.request.urlopen(req) as r:
                 return r.status, r.read().decode()
@@ -437,6 +441,7 @@ class CorsTests(ServerTests):
         self.assertEqual(h.get('Access-Control-Allow-Private-Network'), 'true')
         self.assertIn('POST', h.get('Access-Control-Allow-Methods'))
         self.assertIn('Content-Type', h.get('Access-Control-Allow-Headers'))
+        self.assertIn('X-Ask-Code', h.get('Access-Control-Allow-Headers'))
         # no PNA header unless the browser asks for it
         code, h, _ = _req(self.base, '/api/health', 'OPTIONS', {'Origin': self.PUB, 'Access-Control-Request-Method': 'GET'})
         self.assertEqual(code, 204)
@@ -460,7 +465,7 @@ class CorsTests(ServerTests):
         code, h, body = _req(self.base, '/api/health', headers={'Origin': self.PUB})
         self.assertEqual((code, h.get('Access-Control-Allow-Origin')), (200, self.PUB))
         self.assertIn('Origin', h.get('Vary', ''))
-        code, h, body = _req(self.base, '/api/ask', 'POST', {'Origin': self.PUB, 'Content-Type': 'application/json'},
+        code, h, body = _req(self.base, '/api/ask', 'POST', {'Origin': self.PUB, 'Content-Type': 'application/json', 'X-Ask-Code': self.CODE},
                              json.dumps({'question': 'What is above this ceiling tile?', 'element_id': '388279'}).encode())
         self.assertEqual((code, h.get('Access-Control-Allow-Origin')), (200, self.PUB))
         evs = [json.loads(l[6:]) for l in body.decode().split('\n\n') if l.startswith('data: ')]
@@ -608,3 +613,240 @@ class TranscriptTests(unittest.TestCase):
         self.assertEqual(S.clean_transcript([seg(' the duct, the diffuser, the VAV box.')]), '')   # echo of the prompt
         self.assertEqual(S.clean_transcript([seg(' What is above this ceiling tile?')]), 'What is above this ceiling tile?')
         self.assertEqual(S.clean_transcript([]), '')
+
+
+# ---------------- limits: access code, rate limits, daily budget, idle shutdown ----------------
+from ask_twin import limits as LIM  # noqa: E402
+
+
+class FakeClock:
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+
+class AccessCodeTests(unittest.TestCase):
+    def limits(self, **kw):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        return LIM.Limits('K7PX3M', LIM.Budget(Path(d.name), 1000, 50, persist=False), **kw)
+
+    def test_generated_code_is_short_and_unambiguous(self):
+        for _ in range(50):
+            c = LIM.make_code()
+            self.assertEqual(len(c), 6)
+            self.assertFalse(set(c) & set('01OIL'))
+            self.assertTrue(set(c) <= set(LIM.ALPHABET))
+
+    def test_missing_wrong_right(self):
+        lim = self.limits()
+        status, body, _ = lim.admit('ask', '10.0.0.2', None)
+        self.assertEqual((status, body['reason']), (401, 'code_required'))
+        status, body, _ = lim.admit('ask', '10.0.0.2', 'K7PX3N')
+        self.assertEqual((status, body['reason']), (401, 'code_wrong'))
+        self.assertIsNone(lim.admit('ask', '10.0.0.2', 'k7px-3m'))   # case, dashes and spaces do not matter
+        self.assertIsNone(lim.admit('speech', '10.0.0.2', 'K7PX3M'))
+        self.assertNotIn('K7PX3M', json.dumps(lim.public()))       # health never carries the code
+
+    def test_wrong_codes_are_rate_limited_per_ip(self):
+        lim = self.limits(bad_codes_per_minute=3)
+        for _ in range(3):
+            self.assertEqual(lim.admit('ask', '10.0.0.3', 'NOPE00')[0], 401)
+        status, body, wait = lim.admit('ask', '10.0.0.3', 'NOPE00')
+        self.assertEqual((status, body['reason']), (429, 'rate_bad_code'))
+        self.assertGreater(wait, 0)
+        self.assertEqual(lim.admit('ask', '10.0.0.4', 'NOPE00')[0], 401)   # another client is not affected
+
+    def test_no_code_mode(self):
+        lim = LIM.Limits(None, LIM.Budget(Path('.'), 0, 0, persist=False))
+        self.assertFalse(lim.code_required)
+        self.assertIsNone(lim.admit('ask', '127.0.0.1', None))
+
+
+class RateLimitTests(unittest.TestCase):
+    def test_per_ip_window_and_recovery(self):
+        clock = FakeClock()
+        lim = LIM.Limits(None, LIM.Budget(Path('.'), 0, 0, persist=False), per_minute=3, clock=clock)
+        for _ in range(3):
+            self.assertIsNone(lim.admit('ask', '10.0.0.5'))
+        status, body, wait = lim.admit('ask', '10.0.0.5')
+        self.assertEqual((status, body['reason']), (429, 'rate_ip'))
+        self.assertTrue(1 <= wait <= 60)
+        self.assertEqual(body['retry_after_s'], wait)
+        self.assertIsNone(lim.admit('ask', '10.0.0.6'))          # per client
+        clock.t += 61
+        self.assertIsNone(lim.admit('ask', '10.0.0.5'))          # window slid
+
+    def test_daily_question_cap(self):
+        lim = LIM.Limits(None, LIM.Budget(Path('.'), 0, 2, persist=False))
+        self.assertIsNone(lim.admit('ask', 'a'))
+        self.assertIsNone(lim.admit('ask', 'b'))
+        status, body, wait = lim.admit('ask', 'c')
+        self.assertEqual((status, body['reason']), (429, 'rate_day'))
+        self.assertGreater(wait, 0)
+        self.assertIsNone(lim.admit('speech', 'c'))              # speech is not a question
+
+
+class BudgetTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        self.day = [__import__('datetime').date(2026, 11, 7)]
+
+    def budget(self, tokens=1000, per_day=0):
+        return LIM.Budget(self.dir, tokens, per_day, persist=True, today=lambda: self.day[0])
+
+    def test_counts_persist_and_roll_over_by_date(self):
+        b = self.budget()
+        b.add_usage({'input_tokens': 100, 'output_tokens': 50, 'cache_read_input_tokens': 1001, 'cache_creation_input_tokens': 20})
+        b.add_question()
+        saved = json.loads((self.dir / 'usage-2026-11-07.json').read_text())
+        self.assertEqual(saved['budget_tokens'], 100 + 50 + 20 + 101)   # cache reads count one tenth, rounded up
+        self.assertEqual((saved['questions'], saved['cache_read_input_tokens']), (1, 1001))
+        again = self.budget()                                           # restart: same day reads the file back
+        self.assertEqual(again.snapshot()['budget_tokens'], 271)
+        self.day[0] = __import__('datetime').date(2026, 11, 8)          # midnight: a fresh counter, old file kept
+        self.assertEqual(again.snapshot()['budget_tokens'], 0)
+        self.assertEqual(again.snapshot()['date'], '2026-11-08')
+        again.add_question()
+        self.assertTrue((self.dir / 'usage-2026-11-07.json').is_file())
+        self.assertEqual(json.loads((self.dir / 'usage-2026-11-08.json').read_text())['questions'], 1)
+
+    def test_budget_reached_refuses_without_counting(self):
+        b = self.budget(tokens=300)
+        lim = LIM.Limits(None, b)
+        b.add_usage({'input_tokens': 250, 'output_tokens': 60})
+        status, body, wait = lim.admit('ask', '10.0.0.7')
+        self.assertEqual((status, body['reason']), (429, 'budget'))
+        self.assertGreater(wait, 0)
+        self.assertEqual(b.snapshot()['questions'], 0)
+        self.assertLessEqual(b.tokens_left(), 0)
+
+    def test_memory_only_in_mock(self):
+        b = LIM.Budget(self.dir, 1000, 0, persist=False)
+        b.add_question()
+        b.add_usage({'input_tokens': 5})
+        self.assertEqual(list(self.dir.iterdir()), [])
+
+
+class LiveLimitsTests(unittest.TestCase):
+    def test_usage_hook_caching_and_max_tokens(self):
+        seen = []
+        client = FakeClient([
+            ('', [_block(type='tool_use', id='t1', name='get_element', input={'element_id': LIGHT})], 'tool_use'),
+            ('**Answer:** [[%s]] light.' % LIGHT, [], 'end_turn')])
+        evs = list(A.LiveAgent(twin(), client, on_usage=seen.append).ask('what is this', LIGHT))
+        self.assertEqual(evs[-1]['type'], 'final')
+        self.assertEqual(len(seen), 2)
+        self.assertEqual(seen[0]['input_tokens'], 10)
+        self.assertIn('cache_creation_input_tokens', evs[-1]['usage'])
+        first, second = client.calls
+        self.assertEqual(first['max_tokens'], 4000)
+        self.assertEqual(first['tools'][-1]['cache_control'], {'type': 'ephemeral'})
+        self.assertNotIn('cache_control', first['tools'][0])
+        self.assertEqual(first['system'][0]['cache_control'], {'type': 'ephemeral'})
+        self.assertEqual(first['messages'][-1]['content'][-1]['cache_control'], {'type': 'ephemeral'})
+        # second round: the breakpoint moved to the tool results; at most 4 breakpoints in the request
+        marks = json.dumps(second).count('"cache_control"')
+        self.assertLessEqual(marks, 4)
+        self.assertEqual(second['messages'][-1]['content'][-1]['cache_control'], {'type': 'ephemeral'})
+        self.assertNotIn('cache_control', second['messages'][0]['content'][-1])
+
+    def test_budget_spent_stops_before_next_round(self):
+        client = FakeClient([('', [_block(type='tool_use', id='t1', name='get_element', input={'element_id': LIGHT})], 'tool_use')])
+        evs = list(A.LiveAgent(twin(), client, budget_left=lambda: 0).ask('what is this', LIGHT))
+        self.assertEqual(evs[-1]['type'], 'error')
+        self.assertIn('budget', evs[-1]['message'])
+        self.assertEqual(len(client.calls), 1)
+
+
+class LimitedServerTests(unittest.TestCase):
+    """The HTTP paths in mock mode: 401 without / with a wrong code, 200 with it (header or ?code=), 429 past the limit."""
+    @classmethod
+    def setUpClass(cls):
+        import ask_twin_server as S
+        cls.S, cls.tmp = S, tempfile.TemporaryDirectory()
+        app = S.build_app(S.parse_args(['--mock', '--no-stt', '--no-tts', '--port', '0', '--code', 'AB23CD', '--per-minute', '2',
+                                        '--usage-dir', cls.tmp.name]), log=lambda *a: None)
+        cls.app = app
+        cls.httpd = ThreadingHTTPServer(('127.0.0.1', 0), type('H', (S.Handler,), {'app': app}))
+        app.port = cls.httpd.server_address[1]
+        cls.base = f'http://127.0.0.1:{app.port}'
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.tmp.cleanup()
+
+    def ask(self, headers=None, query=''):
+        return _req(self.base, '/api/ask' + query, 'POST', {'Content-Type': 'application/json', **(headers or {})},
+                    json.dumps({'question': 'What is this?', 'element_id': LIGHT}).encode())
+
+    def test_code_rate_limit_and_health(self):
+        code, _, body = self.ask()
+        self.assertEqual((code, json.loads(body)['reason']), (401, 'code_required'))
+        code, _, body = self.ask({'X-Ask-Code': 'WRONG1'})
+        self.assertEqual((code, json.loads(body)['reason']), (401, 'code_wrong'))
+        self.assertEqual(_req(self.base, '/api/transcribe', 'POST', {'Content-Type': 'audio/webm'}, b'x' * 300)[0], 401)
+        code, _, body = self.ask({'X-Ask-Code': 'ab23cd'})
+        self.assertEqual(code, 200)
+        self.assertIn('"type": "final"', body.decode())
+        self.assertEqual(self.ask(query='?code=AB23CD')[0], 200)
+        code, h, body = self.ask({'X-Ask-Code': 'AB23CD'})
+        self.assertEqual((code, json.loads(body)['reason']), (429, 'rate_ip'))
+        self.assertTrue(int(h['Retry-After']) > 0)
+        hl = json.loads(_req(self.base, '/api/health')[2])
+        self.assertTrue(hl['access']['code_required'])
+        self.assertEqual(hl['usage_today']['questions'], 2)
+        self.assertEqual(hl['usage_today']['budget_tokens'], 0)    # mock answers cost nothing
+        self.assertEqual(hl['limits']['daily_tokens'], 2_000_000)
+        self.assertNotIn('AB23CD', json.dumps(hl))
+        self.assertEqual(list(Path(self.tmp.name).iterdir()), [])   # mock keeps the counter in memory
+
+    def test_root_redirect_keeps_the_code(self):
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **kw):
+                return None
+        try:
+            urllib.request.build_opener(NoRedirect).open(self.base + '/?code=AB23CD')
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 302)
+            self.assertEqual(e.headers['Location'], '/grimes-bim-viewer.html?ask=1&code=AB23CD')
+
+
+class LimitArgsTests(unittest.TestCase):
+    def test_flags_defaults_and_refusals(self):
+        import contextlib
+        import io
+        import ask_twin_server as S
+        a = S.parse_args([])
+        self.assertEqual((a.per_minute, a.per_day, a.daily_tokens, a.max_tokens, a.idle_minutes, a.code, a.no_code),
+                         (10, 300, 2_000_000, 4000, 120, None, False))
+        for bad in (['--no-code', '--lan'], ['--code', 'x!'], ['--code', 'ABCD', '--no-code']):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                S.parse_args(bad)
+
+    def test_banner_urls_carry_the_code(self):
+        import ask_twin_server as S
+        u = S.page_urls('https', '192.168.1.20', 8765, 'AB23CD', lan=True)
+        self.assertEqual(u['laptop'], 'https://192.168.1.20:8765/grimes-bim-viewer.html?ask=1&code=AB23CD')
+        self.assertEqual(u['headset'], 'https://192.168.1.20:8765/mr/?ask=1&code=AB23CD')
+        self.assertEqual(u['public'], 'https://doe2park.github.io/Graduate-Project/mr/?ask=1&server=https://192.168.1.20:8765&code=AB23CD')
+        self.assertNotIn('code', S.page_urls('http', '127.0.0.1', 8765, None)['laptop'])
+
+    def test_usage_dir_inside_repo_is_refused(self):
+        import ask_twin_server as S
+        with self.assertRaises(SystemExit):
+            S.build_app(S.parse_args(['--mock', '--no-stt', '--no-tts', '--usage-dir', str(ROOT / 'work')]), log=lambda *a: None)
+
+    def test_idle_watch_stops_the_server(self):
+        import ask_twin_server as S
+        stopped = threading.Event()
+        lim = types.SimpleNamespace(last_question=0.0)
+        t = S.idle_watch(types.SimpleNamespace(shutdown=stopped.set), lim, 0.001, log=lambda *a, **k: None, poll=0.01)
+        self.assertTrue(stopped.wait(5))
+        t.join(1)

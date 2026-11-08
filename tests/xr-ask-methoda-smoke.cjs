@@ -36,7 +36,7 @@ const TYPES = {html: 'text/html', js: 'text/javascript', mjs: 'text/javascript',
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_FAILED|net::/.test(m.text())) errors.push('console: ' + m.text()); });
   const report = {server: SERVER};
   try {
-    const url = PUB + 'mr/?ask=1&scene=air&layers=duct&server=' + encodeURIComponent(SERVER);
+    const url = PUB + 'mr/?ask=1&scene=air&layers=duct&server=' + encodeURIComponent(SERVER) + (process.env.ASK_CODE ? '&code=' + encodeURIComponent(process.env.ASK_CODE) : '');   // ASK_CODE = the printed access code
     await page.goto(url, {waitUntil: 'load'});
     await page.waitForFunction(() => { try { const i = xrInspection(); return i.layers.duct?.loaded && i.mr?.demo && (i.ask?.health || i.ask?.healthError); } catch (e) { return false; } }, null, {timeout: 180000});
     report.pageUrl = page.url();

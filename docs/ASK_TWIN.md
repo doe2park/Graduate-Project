@@ -12,8 +12,10 @@ re-encoded. The viewer loads the panel only with `?ask=1`; without it the page b
 ```bash
 python3 scripts/ask_twin_server.py --mock   # no key needed: scripted, tool-grounded answers (badge: MOCK)
 python3 scripts/ask_twin_server.py          # live Claude (badge: LIVE · claude-sonnet-5-5)
-open http://127.0.0.1:8765/                 # redirects to grimes-bim-viewer.html?ask=1
+# open the "laptop page" link it prints: http://127.0.0.1:8765/grimes-bim-viewer.html?ask=1&code=<CODE>
 ```
+
+The server prints a short **access code** at start, and its links already include it (see *Limits and access code* below).
 
 Then: open **Layers** and load the layers you want to see (lighting, ductwork, fire piping…), click an element, and
 ask, or press an example chip. Hold 🎙 to talk; tick *Speak answers* for a spoken reply.
@@ -47,7 +49,8 @@ Options: `--model claude-opus-5-5` (default `claude-sonnet-5-5`), `--effort low|
 `--port`, `--no-stt`, `--stt-model small.en`, `--stt-beam 1` (default 5), `--no-tts` (no laptop voice for `/api/speak`),
 `--voice "Zoe (Premium)"` (default: best installed English voice), `--no-fallbacks`, `--lan` (private-LAN HTTPS, see Headset
 below), `--auto` (live Claude when a key is found, else scripted answers with the note *Live AI needs a key on the laptop;
-running scripted answers* on the 2D page and the answer card), `--verbose`.
+running scripted answers* on the 2D page and the answer card), `--verbose`. Limits and access: `--code`, `--no-code`, `--per-minute`,
+`--per-day`, `--daily-tokens`, `--max-tokens`, `--idle-minutes`, `--usage-dir` (next section).
 
 ### Switching the running headset server to live answers (owner)
 
@@ -62,6 +65,57 @@ spoken when nothing has been said 1.5 s after the question. Speech-to-text adds 
 this Mac with synthetic speech).
 If the API rejects an optional request feature (the refusal-fallback beta or eager tool streaming) with a 400, the
 server retries that question once without them.
+
+## Limits and access code
+
+Sensible defaults for demos: people can try it, strangers on the same Wi-Fi cannot, and a day's spending has a ceiling.
+
+| What | Default | Flag |
+|---|---|---|
+| Access code (random 6 characters, no 0/O/1/I/L, case-insensitive) on `/api/ask`, `/api/transcribe`, `/api/speak` | a new code every start | `--code K7PX3M` (fixed), `--no-code` (localhost only; refused with `--lan`) |
+| Questions per minute, per client IP | 10 | `--per-minute N` (0 = off) |
+| Questions per day, whole server | 300 | `--per-day N` (0 = off) |
+| Daily token budget (live only) | 2,000,000 | `--daily-tokens N` (0 = off) |
+| `max_tokens` per model round (rounds per answer stay at 8) | 4000 | `--max-tokens N` |
+| Stop after no questions for | 120 min | `--idle-minutes N` (0 = never) |
+| Usage counter folder (outside the repo) | `~/.config/ask-twin/` | `--usage-dir DIR` |
+
+- **Code.** The page links printed at start carry `&code=…`; the laptop page and the headset page read it from their URL and send it
+  as the `X-Ask-Code` header (`?code=` on the API also works, for curl). Without it the page says *Access code needed*, with a wrong one
+  *Wrong access code*. On the laptop page you can also type it into the box that appears. Wrong codes are limited to 10 a minute per IP.
+  `/api/health` stays open but shows only flags and numbers (never the code).
+- **Rate limits** answer `429` with a short sentence and `Retry-After`; the voice endpoints have their own limit (30/min per IP).
+- **Budget.** Every API response's usage is added to `~/.config/ask-twin/usage-YYYY-MM-DD.json` (local date; a restart keeps it, a new
+  day starts at zero): budget tokens = `input_tokens` + `cache_creation_input_tokens` + `output_tokens` + `cache_read_input_tokens` / 10
+  (cache reads are billed at about a tenth of the input price). Once today's count reaches the budget, `/api/ask` answers *Daily budget
+  reached* without calling the API, and a running answer stops before its next model round. The banner and `/api/health` show today's numbers.
+- **Prompt caching.** The tool definitions and the system prompt are cached (`cache_control: ephemeral` on the last tool and on the
+  system prompt), and a rolling breakpoint on the newest turn lets each model round reuse the earlier rounds of the same answer.
+- **Mock mode** goes through the same code and rate-limit checks; its counter stays in memory and its budget stays at 0.
+
+Start commands (the owner copies the printed links; nothing else to configure):
+
+```bash
+python3 scripts/ask_twin_server.py --lan                      # live, Quest on the same Wi-Fi: random code, default limits
+python3 scripts/ask_twin_server.py --lan --code K7PX3M        # same code every time (e.g. printed on a demo card)
+python3 scripts/ask_twin_server.py --mock --lan               # try the whole flow without a key
+python3 scripts/ask_twin_server.py --no-code                  # laptop only, no code
+python3 scripts/ask_twin_server.py --lan --per-minute 20 --daily-tokens 5000000 --idle-minutes 240   # a long, busy demo
+```
+
+The start banner looks like this (example addresses):
+
+```
+[ask-twin] access code: K7PX3M   (the links below include it; people without it get "Access code needed")
+[ask-twin] laptop page:  https://192.168.68.52:8765/grimes-bim-viewer.html?ask=1&code=K7PX3M   (Ctrl+C to stop)
+[ask-twin] headset page: https://192.168.68.52:8765/mr/?ask=1&code=K7PX3M
+[ask-twin] public page + this laptop (Method A): https://doe2park.github.io/Graduate-Project/mr/?ask=1&server=https://192.168.68.52:8765&code=K7PX3M
+[ask-twin] limits: 10 questions/min per client · 300 questions/day · budget 2000000 tokens/day · max_tokens 4000/round
+[ask-twin] today (2026-11-07): 0 questions · 0 budget tokens (input 0, output 0, cache read 0, cache write 0)
+[ask-twin] stops after 120 min without a question (first check: 19:18; --idle-minutes 0 keeps it running)
+```
+
+There is no terminal QR code (that would need a new dependency).
 
 ## How an answer is made
 
@@ -182,7 +236,9 @@ CORS allow-list; preflights including Chrome's Private Network Access are answer
    `python3 scripts/ask_twin_server.py --mock --lan` (live: drop `--mock` once the key is in place). It prints the exact address.
 2. **Once per headset (certificate):** in Quest Browser open `https://192.168.68.52:8765/trust` (the laptop's address as printed),
    tap **Advanced → Proceed**, see *Laptop server reached*, close the tab.
-3. Open `https://doe2park.github.io/Graduate-Project/mr/?ask=1&server=https://192.168.68.52:8765`.
+3. Open the *public page + this laptop* link the server printed, e.g.
+   `https://doe2park.github.io/Graduate-Project/mr/?ask=1&server=https://192.168.68.52:8765&code=K7PX3M` (the code is required;
+   the published page sends it only once this branch is on `main`).
    If Quest Browser asks to let the page **access devices on your local network**, tap **Allow** (Chrome's Local Network Access;
    desktop Chrome 156 requires it; whether Quest Browser asks is not verified). If the box says *server not reachable*, tap the
    link *Open https://…/ once to trust it*, accept, come back and press **Retry**.
@@ -293,16 +349,20 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_ask_twin      # index, 
 node --test tests/xr-ask.test.cjs                                       # headset helpers: stream, card model, speech text, run path, bar hit, drawing, server= validation, progress, hold gate
 # Method A, desktop Chrome against the running --lan server (public origin served from this checkout by Playwright):
 PLAYWRIGHT_MODULE=/path/to/playwright-core FAKE_AUDIO=/abs/question.wav node tests/xr-ask-methoda-smoke.cjs https://<lan-ip>:8765
-python3 scripts/ask_twin_server.py --mock &                             # then the headless browser check:
+node --test tests/ask-twin.test.cjs                                     # laptop panel: code= from the URL, X-Ask-Code header, 401/429 text
+python3 scripts/ask_twin_server.py --mock --no-code &                   # then the headless browser check (or keep the code and pass ASK_CODE=<code>):
 PLAYWRIGHT_MODULE=/path/to/playwright-core CHROME_EXECUTABLE=/path/to/chrome-headless-shell \
   [FAKE_AUDIO=/abs/question.wav] node tests/ask-twin-smoke.cjs          # screenshots -> work/ask-twin/shots/
 ```
+
+The smoke scripts (`ask-twin-smoke`, `xr-ask-smoke`, `xr-ask-methoda-smoke`) append `code=$ASK_CODE` to their page URL when it is set.
 
 The headless check loads three element layers under software WebGL and takes about 2-4 minutes of full CPU.
 
 ## Files
 
 - `scripts/ask_twin_server.py` — server (static read-only + `/api/health`, `/api/ask` SSE, `/api/transcribe`, `/api/speak`)
+- `scripts/ask_twin/limits.py` — access code, rate limits, daily token budget (usage JSON outside the repo)
 - `scripts/ask_twin/index.py` — element box index; `tools.py` — read-only tools + schemas; `agent.py` — live and mock loops (+ `mock_route`); `speech.py` — short spoken version and `speak` events
 - `twin/ask-twin.js` — panel, citation chips, highlights, fly-to, push-to-talk, spoken reply
 - `twin/xr-ask.js` — headset helpers and canvas drawing (ask bar, answer card, Claude badge); `scan-xr.html` `?ask=1` block wires it into the XR page

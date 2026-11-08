@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=2"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=3"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -1156,8 +1156,8 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
    (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
    and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
 var ASK=null;
-const XA=globalThis.XRAsk,XAOK=XA?.API===2,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
-ASK={on:!!XAP.enabled,base:XAP.server||null,prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
+const XA=globalThis.XRAsk,XAOK=XA?.API===3,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
+ASK={on:!!XAP.enabled,base:XAP.server||null,code:XAP.code||'',prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
  paths:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
  hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0};
 ASK.glow.name='ask: cited elements (render-only glow)';bimRoot.add(ASK.glow);
@@ -1170,6 +1170,8 @@ const askReduced=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
 const askRing=new THREE.Mesh(new THREE.RingGeometry(.07,.095,40),new THREE.MeshBasicMaterial({color:0xff4d6d,transparent:true,opacity:.9,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
 askRing.renderOrder=63;askRing.visible=false;askRing.frustumCulled=false;scene.add(askRing);
 const askApi=name=>XA.apiUrl(ASK.base,name);
+/* 401 / 429 (access code, rate limit, daily budget) -> the server's friendly sentence; else null. */
+async function askRefusal(res){let b={};try{b=await res.clone().json();}catch(e){}return XA.refusalText(res.status,b);}
 /* Earcons: short Web Audio tones (XA.EARCONS), no files. */
 function askEarcon(name){try{askUnlockAudio();const a=ASK.audio?.ctx,tones=XA.EARCONS[name];if(!a||!tones)return;const t0=a.currentTime+.01;
  for(const [f,st,d,g] of tones){const o=a.createOscillator(),v=a.createGain();o.type='sine';o.frequency.value=f;v.gain.setValueAtTime(0,t0+st);v.gain.linearRampToValueAtTime(g,t0+st+.012);v.gain.exponentialRampToValueAtTime(.0001,t0+st+d);o.connect(v);v.connect(a.destination);o.start(t0+st);o.stop(t0+st+d+.02);}}catch(e){}}
@@ -1232,7 +1234,8 @@ async function askQuestion(level,text){if(!ASK.on)return null;if(!ASK.el){status
  ASK.busy=true;ASK.asked++;ASK.question=question;ASK.level=L?.level||null;ASK.phase='thinking';ASK.progress='Thinking…';ASK.saidAny=false;ASK.model={question,level:ASK.level};card.mesh.visible=false;askCard.mesh.visible=true;askPlace();askDraw();askDrawBar();
  askEarcon('send');ASK.filler=setTimeout(()=>{if(epoch===ASK.epoch&&ASK.busy&&!ASK.saidAny)askSay('One moment.',epoch);},XA.FILLER_MS);
  const t0=performance.now();let spoke=false;
- try{const res=await fetch(askApi('ask'),{method:'POST',headers:{'Content-Type':'application/json'},signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
+ try{const res=await fetch(askApi('ask'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'}),signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
+  if(!res.ok){const rt=await askRefusal(res);if(rt)throw new Error(rt);}
   if(!res.ok||!res.body)throw new Error('ask server '+res.status+(res.status===404||res.status===501?' · open this page from scripts/ask_twin_server.py':''));
   let fail=null;const sp=XA.createStream(ev=>{if(epoch!==ASK.epoch)return;
    const pr=XA.progressText(ev,ASK.el);if(pr&&ASK.phase==='thinking'&&pr!==ASK.progress){ASK.progress=pr;ASK.dirty=true;}
@@ -1260,7 +1263,7 @@ async function askPump(epoch){if(ASK.sqBusy)return;ASK.sqBusy=true;const gen=ASK
  try{while(ASK.sq.length&&epoch===ASK.epoch&&gen===ASK.sqGen){const t=ASK.sq.shift();if(!(await askSpeakOne(t,epoch)))break;}}
  finally{if(gen===ASK.sqGen){ASK.sqBusy=false;if(ASK.speech==='speaking')askSetSpeech('read',epoch);}}}
 async function askSpeakServer(text,epoch){askUnlockAudio();if(!ASK.audio)throw new Error('no Web Audio');
- const r=await fetch(askApi('speak'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!r.ok)throw new Error('speak '+r.status);
+ const r=await fetch(askApi('speak'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'}),body:JSON.stringify({text})});if(!r.ok)throw new Error('speak '+r.status);
  const buf=await ASK.audio.ctx.decodeAudioData(await r.arrayBuffer());if(epoch!==ASK.epoch)return true;
  await new Promise(res=>{const src=ASK.audio.ctx.createBufferSource();src.buffer=buf;src.connect(ASK.audio.ctx.destination);src.onended=()=>{if(ASK.audio?.src===src)ASK.audio.src=null;res();};
   try{ASK.audio.src?.stop();}catch(e){}ASK.audio.src=src;src.start();askSetSpeech('speaking',epoch);ASK.speechEngine='laptop voice'+(ASK.health?.tts?.voice?' ('+ASK.health.tts.voice+')':'');});
@@ -1293,7 +1296,7 @@ async function askRecStop(discard=false){const r=ASK.rec;ASK.rec=null;clearTimeo
  const blob=new Blob(ASK.chunks,{type:r.mimeType||'audio/webm'});
  if(blob.size<1500||performance.now()-ASK.recT0<500){ASK.voice='ready';status('Too short: hold the trigger on "Hold to speak" while you talk');askDrawBar();return;}
  ASK.voice='transcribing';askDrawBar();
- try{const res=await fetch(askApi('transcribe'),{method:'POST',headers:{'Content-Type':blob.type},body:blob}),j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
+ try{const res=await fetch(askApi('transcribe'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':blob.type}),body:blob});if(!res.ok){const rt=await askRefusal(res);if(rt)throw new Error(rt);}const j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
   ASK.voice='ready';askDrawBar();if(j.text&&!j.no_speech){status('Heard: “'+j.text+'”');await askQuestion(null,j.text);}else{askEarcon('miss');status('Didn’t catch that · hold the trigger and speak, or use 1-4');}}
  catch(e){ASK.voice='ready';askDrawBar();status('Speech-to-text failed ('+(e?.message||e)+') · use the preset buttons');}}
 /* Trigger on the bar: selectstart on "Hold to speak" starts recording, selectend after > 0.45 s stops and asks (a short tap toggles). */
@@ -1342,7 +1345,8 @@ async function askHealth(){const sameOrigin=!ASK.base;$('askRetryBtn').style.dis
  if(XAP.serverIgnored){ASK.healthError='server= ignored';$('askMode').textContent='server= ignored';askNote(XA.healthProblem({ignored:true}).text);askVoicePlan();askDrawBar();return;}
  try{const r=await fetch(askApi('health'),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);ASK.health=await r.json();ASK.healthError=null;
   const h=ASK.health;$('askMode').textContent=(h.mode||'').toUpperCase()+' · '+(h.mode==='live'?h.model:'scripted answers')+(ASK.base?' · laptop '+ASK.base.replace('https://',''):'')+' · voice in: '+(h.stt?.available?'laptop whisper':'off')+' · voice out: '+(h.tts?.available?'laptop'+(h.tts.voice?' ('+h.tts.voice+')':''):'headset');
-  $('askKeyNote').hidden=!h.note;$('askKeyNote').textContent=h.note||'';askNote('');if(ASK.phase)ASK.dirty=true;}
+  const codeNote=h.access?.code_required&&!ASK.code?XA.refusalText(401,{reason:'code_required'}):'';
+  $('askKeyNote').hidden=!(h.note||codeNote);$('askKeyNote').textContent=[codeNote,h.note].filter(Boolean).join(' · ');askNote('');if(ASK.phase)ASK.dirty=true;}
  catch(e){ASK.health=null;ASK.healthError=String(e?.message||e);const p=XA.healthProblem({server:ASK.base,error:e?.name==='TypeError'?'network or certificate':ASK.healthError,sameOrigin});
   $('askMode').textContent='server not reachable';askNote(p.text);$('askRetryBtn').style.display='';
   if(p.trustUrl){$('askTrust').hidden=false;$('askTrustLink').href=p.trustUrl;$('askTrustLink').textContent=p.trustLabel;}}

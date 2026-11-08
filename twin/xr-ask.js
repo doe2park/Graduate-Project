@@ -13,7 +13,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 2;
+const API = 3;   // 3: access code (code=, X-Ask-Code, refusalText)
 const CITE_RX = /\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g;
 const LEVELS = [
   {level: 1, id: 'q1', label: 'What is this?', hint: 'look up', question: 'What is this, and what room am I in?'},
@@ -31,7 +31,20 @@ const CLAUDE = {orange: '#D97757', cream: '#F4EFE6'};
 function parseParams(search) {
   const q = new URLSearchParams(search || ''), raw = q.get('server');
   const server = raw == null ? null : serverOrigin(raw);
-  return {enabled: q.get('ask') === '1', server, serverIgnored: raw != null && !server, preferVoice: q.get('voice') === 'headset' ? 'browser' : 'laptop'};
+  return {enabled: q.get('ask') === '1', server, serverIgnored: raw != null && !server, preferVoice: q.get('voice') === 'headset' ? 'browser' : 'laptop',
+    code: accessCode(search)};
+}
+/* &code=… : the access code the laptop server prints at start (letters/digits, case-insensitive). Sent only to the ask server,
+   as the X-Ask-Code header on ask / transcribe / speak. */
+function accessCode(search) { return String(new URLSearchParams(search || '').get('code') || '').replace(/[\s-]+/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32); }
+function askHeaders(code, extra = {}) { return code ? Object.assign({}, extra, {'X-Ask-Code': code}) : Object.assign({}, extra); }
+/* 401 / 429 from the ask server -> the sentence the card shows (null for any other status). */
+function refusalText(status, body = {}) {
+  const b = body || {};
+  if (status === 401) return b.reason === 'code_wrong' ? 'Wrong access code: reopen this page with the link printed in the laptop terminal.'
+    : 'Access code needed: open the link printed in the laptop terminal (it ends with &code=…).';
+  if (status === 429) return b.error || ('Too many requests right now.' + (b.retry_after_s ? ' Try again in ' + b.retry_after_s + ' s.' : ''));
+  return null;
 }
 /* server= must be https, a private-LAN IPv4 (10/8, 172.16/12, 192.168/16) or localhost, with an explicit port and nothing
    else (no path, query, user). Returns the origin "https://host:port" or null. Nothing is ever sent to any other host. */
@@ -361,5 +374,5 @@ function drawBar(ctx, W, H, buttons, hover = new Set()) {
 
 return {API, LEVELS, COLORS, CLAUDE, BAR, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
   barRects, barHit, barButtons, micPlan, ttsPlan, wrap, drawBadge, drawAnswer, drawBar,
-  serverOrigin, privateIPv4, apiUrl, healthProblem, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
+  serverOrigin, privateIPv4, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

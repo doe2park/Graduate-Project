@@ -6,7 +6,7 @@
     open http://127.0.0.1:8765/                   # -> grimes-bim-viewer.html?ask=1
 
 Serves this checkout read-only (GET/HEAD; dot-files, work/, capture-local/ and node_modules refused) plus:
-    GET  /api/health      mode, model, index and speech-to-text status
+    GET  /api/health      mode, model, index, speech-to-text status, limits and today's usage (numbers only; open)
     GET  /trust           a tiny page to open once in the headset so it accepts the self-signed certificate (Method A)
     POST /api/ask         {question, element_id?, point?, history?} -> text/event-stream of agent events
     POST /api/transcribe  raw audio body (webm/ogg/wav/mp4) -> {text} via local faster-whisper (optional)
@@ -14,6 +14,9 @@ Serves this checkout read-only (GET/HEAD; dot-files, work/, capture-local/ and n
 CORS: the API also answers the public GitHub Pages site (PUBLIC_ORIGINS, exact match) so the published /mr page can use
 this laptop for the AI calls only ("Method A", docs/ASK_TWIN.md); preflights, including Chrome's Private Network Access
 preflight, are answered for those origins only. Every other cross-origin request is refused as before.
+Limits (scripts/ask_twin/limits.py, docs/ASK_TWIN.md "Limits and access code"): POST /api/ask, /api/transcribe and /api/speak
+need the access code printed at start (header X-Ask-Code, or ?code=); questions are rate limited per client and per day, and
+answers stop at a daily token budget counted from the API's own usage numbers. --idle-minutes stops an unused server.
 The API key is read only from ANTHROPIC_API_KEY (optionally loaded from an env file OUTSIDE the repo). It is never
 printed, logged, written or sent anywhere except to the Anthropic API.
 """
@@ -32,7 +35,7 @@ import time
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = Path.home() / '.venvs' / 'ask-twin'
@@ -49,6 +52,8 @@ STT_PROMPT = ('Questions about the Grimes building services: the duct, the diffu
               'the sprinkler pipe, a valve, the ceiling tile, a light, what is above it, where the air comes from.')
 STT_HOTWORDS = 'Grimes duct diffuser VAV box damper airflow sprinkler pipe valve ceiling tile'
 XR_ENTRY = '/mr/?ask=1'   # the headset page: /mr -> scan-xr.html?mode=ar&place=demo&sensors=demo&ask=1
+CODE_HEADER = 'X-Ask-Code'
+PUBLIC_MR = 'https://doe2park.github.io/Graduate-Project/mr/?ask=1'
 
 
 def maybe_reexec_in_venv():
@@ -301,6 +306,7 @@ class Handler(SimpleHTTPRequestHandler):
             origin = self._cors_origin()
             if origin:
                 self.send_header('Access-Control-Allow-Origin', origin)
+                self.send_header('Access-Control-Expose-Headers', 'Retry-After')
             self.send_header('Vary', 'Origin')
         super().end_headers()
 
@@ -318,7 +324,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(405, {'error': 'method not allowed'})
         self.send_response(204)
         self.send_header('Access-Control-Allow-Methods', 'GET, POST')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', f'Content-Type, {CODE_HEADER}')
         self.send_header('Access-Control-Max-Age', '600')
         if (self.headers.get('Access-Control-Request-Private-Network') or '').lower() == 'true':
             self.send_header('Access-Control-Allow-Private-Network', 'true')
@@ -333,8 +339,9 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path == '/':
+            code = (parse_qs(urlparse(self.path).query).get('code') or [''])[0]
             self.send_response(HTTPStatus.FOUND)
-            self.send_header('Location', ENTRY)
+            self.send_header('Location', ENTRY + ('&' + urlencode({'code': code[:32]}) if code else ''))
             self.end_headers()
             return
         if path == '/api/health':
@@ -366,10 +373,12 @@ class Handler(SimpleHTTPRequestHandler):
             raise ValueError('request body too large')
         return self.rfile.read(n) if n else b''
 
-    def _json(self, code, obj):
+    def _json(self, code, obj, retry_after=None):
         data = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
+        if retry_after:
+            self.send_header('Retry-After', str(int(retry_after)))
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -378,6 +387,15 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if not self.app.origin_ok(self.headers.get('Origin'), self.headers.get('Host')):
             return self._json(403, {'error': 'cross-origin request refused'})
+        if path in ('/api/ask', '/api/transcribe', '/api/speak') and self.app.limits:
+            given = self.headers.get(CODE_HEADER) or (parse_qs(urlparse(self.path).query).get('code') or [None])[0]
+            refused = self.app.limits.admit('ask' if path == '/api/ask' else 'speech', self.client_address[0], given)
+            if refused:
+                status, body, wait = refused
+                if body.get('reason') in ('budget', 'rate_day'):
+                    sys.stderr.write(f'[ask-twin] refused: {body["reason"]}\n')
+                self.rfile.read(min(int(self.headers.get('Content-Length') or 0), MAX_BODY))   # drain so the client sees the reply
+                return self._json(status, body, wait)
         try:
             if path == '/api/ask':
                 return self._ask(json.loads(self._body() or b'{}'))
@@ -454,9 +472,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 class App:
-    def __init__(self, agent, mode, model, twin, stt, port, verbose=False, lan=False, tts=None):
+    def __init__(self, agent, mode, model, twin, stt, port, verbose=False, lan=False, tts=None, limits=None):
         self.agent, self.mode, self.model, self.twin, self.stt, self.port, self.verbose, self.lan = agent, mode, model, twin, stt, port, verbose, lan
-        self.tts, self.note = tts, None
+        self.tts, self.note, self.limits = tts, None, limits
 
     def cors_ok(self, origin, host):
         """Exact allow-list: this server's own origin, localhost/127.0.0.1 on this port, or a PUBLIC_ORIGINS entry."""
@@ -484,12 +502,14 @@ class App:
                 'stt': {'available': bool(self.stt and self.stt.available), 'loaded': bool(self.stt and self.stt.model),
                         'engine': f'faster-whisper {self.stt.model_name}' if self.stt else None, 'error': self.stt.error if self.stt else None},
                 'tts': {'available': bool(self.tts and self.tts.available), 'engine': f'macOS say {self.tts.voice or "default voice"} (local)' if self.tts and self.tts.available else None,
-                        'voice': self.tts.voice if self.tts else None, 'quality': self.tts.quality if self.tts else None, 'prefer': 'laptop'}}
+                        'voice': self.tts.voice if self.tts else None, 'quality': self.tts.quality if self.tts else None, 'prefer': 'laptop'},
+                **(self.limits.public() if self.limits else {})}
 
 
 def build_app(args, log=print):
     sys.path.insert(0, str(ROOT / 'scripts'))
     from ask_twin.agent import DEFAULT_MODEL, LiveAgent, MockAgent
+    from ask_twin.limits import Budget, Limits, make_code
     from ask_twin.tools import Twin
     note = None
     if not args.mock and not os.environ.get('ANTHROPIC_API_KEY'):
@@ -511,14 +531,24 @@ def build_app(args, log=print):
             sys.exit(f'The anthropic package is not installed. Run: python3 -m venv ~/.venvs/ask-twin && '
                      f'~/.venvs/ask-twin/bin/pip install anthropic faster-whisper   (or use --mock)')
         mode, model = 'live', args.model or DEFAULT_MODEL
+    usage_dir = Path(args.usage_dir).expanduser()
+    try:
+        usage_dir.resolve().relative_to(ROOT.resolve())
+        sys.exit(f'Refusing to keep the usage counter inside the repository ({usage_dir}). Use e.g. {DEFAULT_ENV_FILE.parent}.')
+    except ValueError:
+        pass
+    # mock answers cost nothing: same code and rate-limit paths, counter kept in memory only (budget stays 0)
+    budget = Budget(usage_dir, args.daily_tokens, args.per_day, persist=(mode == 'live'))
+    limits = Limits(None if args.no_code else (args.code or make_code()), budget, per_minute=args.per_minute)
     twin = Twin(log=log)
     if mode == 'live':
         client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'], max_retries=2, timeout=120)
-        agent = LiveAgent(twin, client, model=model, effort=args.effort, fallbacks=not args.no_fallbacks)
+        agent = LiveAgent(twin, client, model=model, effort=args.effort, max_tokens=args.max_tokens, fallbacks=not args.no_fallbacks,
+                          on_usage=budget.add_usage, budget_left=budget.tokens_left)
     else:
         agent = MockAgent(twin)
     stt = None if args.no_stt else STT(args.stt_model, beam_size=args.stt_beam)
-    app = App(agent, mode, model, twin, stt, args.port, args.verbose, args.lan, tts=TTS(not args.no_tts, voice=args.voice))
+    app = App(agent, mode, model, twin, stt, args.port, args.verbose, args.lan, tts=TTS(not args.no_tts, voice=args.voice), limits=limits)
     app.note = note
     return app
 
@@ -538,8 +568,51 @@ def parse_args(argv=None):
     ap.add_argument('--voice', default=None, help='macOS voice for /api/speak, e.g. "Zoe (Premium)" or Ava (default: best installed English voice)')
     ap.add_argument('--no-fallbacks', action='store_true', help='do not send the server-side refusal fallback beta')
     ap.add_argument('--lan', action='store_true', help='HTTPS on the private LAN address (Quest on the same Wi-Fi), self-signed dev certificate from scripts/serve_quest_https.py')
+    lim = ap.add_argument_group('limits and access (docs/ASK_TWIN.md "Limits and access code")')
+    lim.add_argument('--code', default=None, help='access code to require (4-32 letters/digits; default: a random 6-character code each start)')
+    lim.add_argument('--no-code', action='store_true', help='no access code (localhost only; refused with --lan)')
+    lim.add_argument('--per-minute', type=int, default=10, help='questions per minute per client IP (default 10; 0 = no limit)')
+    lim.add_argument('--per-day', type=int, default=300, help='questions per day, whole server (default 300; 0 = no limit)')
+    lim.add_argument('--daily-tokens', type=int, default=2_000_000, help='daily token budget, counted from API usage (default 2000000; 0 = no budget)')
+    lim.add_argument('--max-tokens', type=int, default=4000, help='max_tokens per model round (default 4000)')
+    lim.add_argument('--idle-minutes', type=float, default=120, help='stop after this many minutes without a question (default 120; 0 = never)')
+    lim.add_argument('--usage-dir', default=str(DEFAULT_ENV_FILE.parent), help='folder for usage-YYYY-MM-DD.json (outside the repo)')
     ap.add_argument('--verbose', action='store_true')
-    return ap.parse_args(argv)
+    args = ap.parse_args(argv)
+    if args.code is not None and not re.fullmatch(r'[A-Za-z0-9]{4,32}', args.code):
+        ap.error('--code must be 4-32 letters or digits')
+    if args.no_code and args.code:
+        ap.error('use either --code or --no-code')
+    if args.no_code and args.lan:
+        ap.error('--no-code is for localhost only; with --lan an access code is required (omit --no-code, or pass --code)')
+    if args.max_tokens < 256:
+        ap.error('--max-tokens must be at least 256')
+    return args
+
+
+def page_urls(scheme, host, port, code=None, lan=False):
+    """The addresses printed at start (with the access code). Keys: laptop, headset, and with --lan: public, trust."""
+    c = ('&' + urlencode({'code': code})) if code else ''
+    base = f'{scheme}://{host}:{port}'
+    out = {'laptop': f'{base}{ENTRY}{c}', 'headset': f'{base}{XR_ENTRY}{c}'}
+    if lan:
+        out.update(public=f'{PUBLIC_MR}&server={base}{c}', trust=f'{base}/trust')
+    return out
+
+
+def idle_watch(httpd, limits, minutes, log=print, poll=30.0):
+    """Stop the server after `minutes` without a question (limits.last_question). Runs in a daemon thread."""
+    def run():
+        while True:
+            time.sleep(min(poll, minutes * 60))
+            idle = time.monotonic() - limits.last_question
+            if idle >= minutes * 60:
+                log(f'[ask-twin] no questions for {minutes:g} min: stopping at {time.strftime("%H:%M")} (--idle-minutes)', flush=True)
+                httpd.shutdown()
+                return
+    t = threading.Thread(target=run, daemon=True, name='ask-twin-idle')
+    t.start()
+    return t
 
 
 def main(argv=None):
@@ -569,12 +642,27 @@ def main(argv=None):
     if app.tts and app.tts.available:
         tip = '' if app.tts.quality in ('premium', 'enhanced') else '  (more natural: download "Zoe (Premium)" or "Ava (Premium)" in System Settings > Accessibility > Spoken Content > System voice > Manage Voices)'
         print(f'[ask-twin] laptop voice: {app.tts.voice or "system default"} · {app.tts.note}{tip}', flush=True)
-    print(f'[ask-twin] open {scheme}://{host}:{args.port}/   (Ctrl+C to stop)', flush=True)
-    print(f'[ask-twin] headset (WebXR MR + ask): {scheme}://{host}:{args.port}{XR_ENTRY}'
+    lim = app.limits
+    urls = page_urls(scheme, host, args.port, lim.code, args.lan)
+    pub = lim.public()
+    u, L = pub['usage_today'], pub['limits']
+    print(f'[ask-twin] access code: {lim.code}   (the links below include it; people without it get "Access code needed")' if lim.code
+          else '[ask-twin] access code: off (--no-code, localhost only)', flush=True)
+    print(f'[ask-twin] laptop page:  {urls["laptop"]}   (Ctrl+C to stop)', flush=True)
+    print(f'[ask-twin] headset page: {urls["headset"]}'
           + ('\n[ask-twin] self-signed dev certificate: accept the warning only for this address; same Wi-Fi required' if args.lan else ''), flush=True)
     if args.lan:
-        print(f'[ask-twin] public page + this laptop (Method A): https://doe2park.github.io/Graduate-Project/mr/?ask=1&server={scheme}://{host}:{args.port}'
-              f'\n[ask-twin]   first time in the headset: open {scheme}://{host}:{args.port}/trust once and accept the certificate', flush=True)
+        print(f'[ask-twin] public page + this laptop (Method A): {urls["public"]}'
+              f'\n[ask-twin]   first time in the headset: open {urls["trust"]} once and accept the certificate', flush=True)
+    print(f'[ask-twin] limits: {L["questions_per_minute_per_client"] or "no"} questions/min per client · {L["questions_per_day"] or "no"} questions/day · '
+          f'budget {L["daily_tokens"] or "none"} tokens/day · max_tokens {args.max_tokens}/round'
+          + (' · mock: counted in memory, 0 tokens' if app.mode == 'mock' else ''), flush=True)
+    print(f'[ask-twin] today ({u["date"]}): {u["questions"]} questions · {u["budget_tokens"]} budget tokens '
+          f'(input {u["input_tokens"]}, output {u["output_tokens"]}, cache read {u["cache_read_input_tokens"]}, cache write {u["cache_creation_input_tokens"]})', flush=True)
+    if args.idle_minutes > 0:
+        stop_at = time.strftime('%H:%M', time.localtime(time.time() + args.idle_minutes * 60))
+        print(f'[ask-twin] stops after {args.idle_minutes:g} min without a question (first check: {stop_at}; --idle-minutes 0 keeps it running)', flush=True)
+        idle_watch(httpd, lim, args.idle_minutes)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

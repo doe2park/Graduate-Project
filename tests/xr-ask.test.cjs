@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=2"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=3"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -185,4 +185,20 @@ test('waiting feedback: progress lines from server events, earcons, hold-to-ask 
     assert.equal(XA.holdAskAllowed({...base, ...k}), false, JSON.stringify(k));
   const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, {phase: 'thinking', model: {question: 'q'}, progress: 'Following the ducts…', steps: []});
   assert.ok(ctx.calls.includes('Following the ducts…'));
+});
+
+test('access code (API 3): code= from the URL, X-Ask-Code on ask/transcribe/speak, friendly 401/429', () => {
+  assert.equal(XA.API, 3);
+  assert.equal(XA.parseParams('?ask=1&server=https://192.168.1.20:8765&code=ab23cd').code, 'AB23CD');
+  assert.equal(XA.parseParams('?ask=1').code, '');
+  assert.equal(XA.accessCode('?code=k7-px 3m'), 'K7PX3M');
+  assert.deepEqual(XA.askHeaders('AB23CD', {'Content-Type': 'application/json'}), {'Content-Type': 'application/json', 'X-Ask-Code': 'AB23CD'});
+  assert.deepEqual(XA.askHeaders('', {a: 1}), {a: 1});
+  assert.match(XA.refusalText(401, {reason: 'code_required'}), /Access code needed/);
+  assert.match(XA.refusalText(401, {reason: 'code_wrong'}), /Wrong access code/);
+  assert.match(XA.refusalText(429, {error: 'Easy there: at most 10 questions per minute. Try again in 40 s.'}), /40 s/);
+  assert.equal(XA.refusalText(404, {}), null);
+  assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null,code:XAP\.code\|\|''/);
+  for (const name of ['ask', 'speak', 'transcribe']) assert.match(page, new RegExp(`fetch\\(askApi\\('${name}'\\),\\{method:'POST',headers:XA\\.askHeaders\\(ASK\\.code`), name);
+  assert.match(page, /askRefusal\(res\)/);
 });

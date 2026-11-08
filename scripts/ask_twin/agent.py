@@ -24,6 +24,7 @@ NOT_RUN_RX = re.compile(r'hanger|support|clearance zone|anno', re.I)
 CITE_RX = re.compile(r'\[\[([A-Za-z0-9_.:-]{1,40})\]\]')
 DEFAULT_MODEL = 'claude-sonnet-5-5'
 MAX_ROUNDS = 8
+DEFAULT_MAX_TOKENS = 4000   # per model round; answers are ~170 words, the rest is room for adaptive thinking + tool calls
 
 SYSTEM_PROMPT = """You are the diagnostic assistant inside the Grimes Engineering Center (UC Berkeley) digital twin.
 A facilities user has clicked a BIM element (and a point on it) in the 3D viewer and asks a question about it.
@@ -126,10 +127,36 @@ def _sdk_errors():
         import types
         return types.SimpleNamespace(AuthenticationError=_Never, RateLimitError=_Never, APIStatusError=_Never, APIConnectionError=_Never)
 
+def _cache_last_tool(tools):
+    """Prompt caching: a breakpoint on the last tool definition caches the whole tool list (render order tools -> system ->
+    messages); the system prompt carries the second breakpoint. Both are byte-stable across questions."""
+    tools = [dict(t) for t in tools]
+    if tools:
+        tools[-1]['cache_control'] = {'type': 'ephemeral'}
+    return tools
+
+
+def _mark_cache_tail(messages, prev):
+    """Move the rolling cache breakpoint to the last block of the newest user turn, so the next model round of this answer
+    reads the earlier rounds from the cache. At most one such breakpoint at a time (the API allows four in total)."""
+    if prev is not None:
+        prev.pop('cache_control', None)
+    last = messages[-1]
+    if isinstance(last['content'], str):
+        last['content'] = [{'type': 'text', 'text': last['content']}]
+    block = last['content'][-1]
+    block['cache_control'] = {'type': 'ephemeral'}
+    return block
+
+
 class LiveAgent:
-    def __init__(self, twin: Twin, client, model=DEFAULT_MODEL, effort='medium', max_tokens=8000, fallbacks=True):
+    def __init__(self, twin: Twin, client, model=DEFAULT_MODEL, effort='medium', max_tokens=DEFAULT_MAX_TOKENS, fallbacks=True,
+                 on_usage=None, budget_left=None):
         self.twin, self.client, self.model, self.effort, self.max_tokens, self.fallbacks = twin, client, model, effort, max_tokens, fallbacks
-        self.tools = [dict(t, eager_input_streaming=True) for t in TOOL_SCHEMAS]
+        self.tools = _cache_last_tool(dict(t, eager_input_streaming=True) for t in TOOL_SCHEMAS)
+        # on_usage(dict): called after every model round with that response's usage (the server's daily token budget);
+        # budget_left() -> int: checked before every round after the first, so a long answer stops once the budget is spent.
+        self.on_usage, self.budget_left = on_usage, budget_left
 
     def ask(self, question: str, element_id=None, point=None, history=None):
         anthropic = _sdk_errors()
@@ -140,10 +167,14 @@ class LiveAgent:
                 messages += [{'role': 'user', 'content': str(h['q'])[:2000]}, {'role': 'assistant', 'content': str(h['a'])[:4000]}]
         messages.append({'role': 'user', 'content': f'{ctx}\n\nQuestion: {question}'})
         system = [{'type': 'text', 'text': SYSTEM_PROMPT, 'cache_control': {'type': 'ephemeral'}}]
-        answer, used, usage = '', [], {'input_tokens': 0, 'output_tokens': 0, 'cache_read_input_tokens': 0}
+        answer, used, usage = '', [], {'input_tokens': 0, 'output_tokens': 0, 'cache_read_input_tokens': 0, 'cache_creation_input_tokens': 0}
         t0 = time.time()
-        downgraded = False
+        downgraded, tail = False, None
         for _round in range(MAX_ROUNDS):
+            if _round and self.budget_left is not None and self.budget_left() <= 0:
+                yield {'type': 'error', 'message': 'Daily budget reached for the AI answers; this answer was stopped. It resets at midnight.'}
+                return
+            tail = _mark_cache_tail(messages, tail)
             kwargs = dict(model=self.model, max_tokens=self.max_tokens, system=system, tools=self.tools, messages=messages,
                           output_config={'effort': self.effort})
             if self.fallbacks:
@@ -168,7 +199,7 @@ class LiveAgent:
                 if e.status_code == 400 and (self.fallbacks or self.tools[0].get('eager_input_streaming')) and not downgraded:
                     # Optional request features (refusal fallback beta, eager tool streaming) rejected: retry once without them.
                     downgraded, self.fallbacks = True, False
-                    self.tools = [dict(t) for t in TOOL_SCHEMAS]
+                    self.tools = _cache_last_tool(TOOL_SCHEMAS)
                     yield {'type': 'status', 'text': 'retrying without optional API features'}
                     continue
                 yield {'type': 'error', 'message': f'Anthropic API error {e.status_code}: {getattr(e, "message", "")}'[:300]}
@@ -179,8 +210,11 @@ class LiveAgent:
             except ValueError as e:   # unparseable eager tool input: re-issue once per round
                 yield {'type': 'status', 'text': f'retrying after malformed tool input ({e})'[:120]}
                 continue
+            round_usage = {k: getattr(msg.usage, k, 0) or 0 for k in usage}
             for k in usage:
-                usage[k] += getattr(msg.usage, k, 0) or 0
+                usage[k] += round_usage[k]
+            if self.on_usage:
+                self.on_usage(round_usage)
             answer += round_text
             if msg.stop_reason == 'refusal':
                 yield {'type': 'error', 'message': 'The model declined this request.'}
