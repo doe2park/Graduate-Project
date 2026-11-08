@@ -1216,7 +1216,7 @@ function askHighlight(final){const cites=(final.citations||[]).filter(c=>c.verif
  if(meshes.length)ASK.run={meshes,t0:performance.now(),ids};}
 /* Per frame (XR and desktop): glow pulse, run lighting, throttled card redraw. Returns true while something animates (desktop keeps drawing). */
 function askTick(){if(!ASK?.on)return false;const now=performance.now();let anim=false;
- askRing.visible=ASK.voice==='recording'&&!!ASK.el;
+ askRing.visible=ASK.voice==='recording'&&!!ASK.el&&!ASK.hideRing;
  if(askRing.visible){askRing.position.copy(ASK.el.world);camera.getWorldPosition(_head);askRing.lookAt(_head);const d=_head.distanceTo(ASK.el.world),k=clamp(d*.35,.25,3)*(1+.18*Math.sin(now/140));askRing.scale.setScalar(k);anim=true;}
  if(ASK.dirty&&now-ASK.lastDraw>120)askDraw();
  if(ASK.glow.children.length){const red=askReduced(),ph=red?0:Math.sin(now/260)*.5+.5;
@@ -1439,6 +1439,11 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
   // lens: the Lens cone follows this ray (as the flashlight hand does in XR). trigger: then act as the trigger would (pick the element
   // along the ray / press the button). press: 'down' / 'up' dispatches the controller's own selectstart / selectend (a held trigger,
   // e.g. on "Hold to speak": the real record -> /api/transcribe -> ask path). null hides it.
+  // slide/recording mode (desktop debug only, default off): ring:false hides the pulsing "Listening…" ring (the bar's
+  // "Listening… release" button still shows it); residual:false drops the registration residual number from the alignment text
+  // ("registered (internal residual ≈… m, not surveyed)" -> "registered, not surveyed") on the info card and menus.
+  slideMode:({ring=true,residual=true}={})=>{ASK.hideRing=!ring;if(!residual&&capture){capture={...capture,alignmentText:capture.alignmentText.replace(/\s*\(internal residual[^)]*\)/,', not surveyed')};updateAlign();}
+   invalidate();return {hideRing:!!ASK.hideRing,alignmentText:capture?.alignmentText||null};},
   simController:async(target,{hand=[.16,-.22,-.3],lens=true,trigger=false,press=null}={})=>{if(renderer.xr.isPresenting)return null;const c=controllers[1],u=c.userData,ray=u.ray,ret=u.reticle;
    if(!target){c.visible=false;ray.visible=false;ret.visible=false;setHover(c,null);invalidate();return {hidden:true};}
    camera.updateMatrixWorld(true);bimRoot.updateMatrixWorld(true);rig.updateMatrixWorld(true);let w=null;const o=new THREE.Vector3().fromArray(hand).applyMatrix4(camera.matrixWorld);
