@@ -262,6 +262,23 @@ function cardHtml(s, el, style, feed) {
   return html;
 }
 
+/* Compact card for a temporary test device (?sensors=live): name, value + one state chip, the BIM element, one note.
+   The state chip follows SensorFeed.assess: LIVE only while values arrive; STALE / NO DATA otherwise (never a green LIVE on old data). */
+function testCardHtml(s, el, style, obs, a, fm) {
+  const color = /^#[0-9a-fA-F]{6}$/.test(s.color || '') ? s.color : '#22d3ee', st = a ? a.state : 'missing';
+  const kind = (TYPES[s.type] || 'Sensor').replace(/ node$/, '');
+  const val = st === 'missing' || !obs ? '—' : fm.formatValue(obs.value, s.unit);
+  const chip = st === 'ok' ? '<span class="sdt-chip ok">● LIVE</span><span class="sdt-age">' + esc(fm.ageText(a.ageS)) + '</span>'
+    : st === 'stale' ? '<span class="sdt-chip off">STALE</span><span class="sdt-age">' + esc(fm.ageText(a.ageS)) + '</span>'
+    : st === 'missing' ? '<span class="sdt-chip off">NO DATA</span>' : '<span class="sdt-chip warn">' + esc(a.label || 'Check') + '</span>';
+  const lvl = el && el.level ? String(el.level).replace(/^LEVEL\s*0?(\d+)$/i, 'Level $1') : '';
+  const elLine = [(el && el.type ? el.type : s.anchor.layer) + ' ' + s.anchor.id, lvl].filter(Boolean).join(' · ');
+  const note = (s.test_device && s.test_device.card_note) || 'Test device · not calibrated';
+  return '<div class="sdt"><div class="sdt-top"><i class="sd-dot" style="background:' + color + '">' + (style ? iconSvg(style.icon, 12) : '') + '</i>' + esc(kind) + ' · test device</div>'
+    + '<div class="sdt-val sdt-' + st + '"><b>' + esc(val) + '</b>' + chip + '</div>'
+    + '<div class="sdt-el">' + esc(elLine) + '</div><div class="sdt-note">' + esc(note) + '</div></div>';
+}
+
 /* ═══════════════ BIM pane runtime ═══════════════ */
 function mountBim(ctx) {
   const THREE = ctx.THREE, post = ctx.post || (() => {}), sensors = [], resolved = new Map(), states = {};
@@ -418,6 +435,7 @@ const PARENT_CSS = `
 #sdCard .gz-badge{flex:none;font:700 9.5px/1 monospace;letter-spacing:.3px;padding:3px 6px;border-radius:4px}
 #sdCard .gz-badge.sd-demo{background:rgba(253,181,21,.18);color:#fbbf24}
 #sdCard .gz-badge.sd-test{background:rgba(52,211,153,.2);color:#34d399}
+#sdCard .sdt-top{font:700 14px/1.3 Arial,sans-serif;color:#f1f5f9;display:flex;align-items:center;gap:6px}#sdCard .sdt-val{display:flex;align-items:baseline;gap:8px;margin:8px 0 4px}#sdCard .sdt-val b{font:700 24px/1 Arial,sans-serif;color:#f8fafc;white-space:nowrap}#sdCard .sdt-chip,#sdCard .sdt-age{white-space:nowrap}#sdCard .sdt-val.sdt-stale b,#sdCard .sdt-val.sdt-missing b{color:#64748b}#sdCard .sdt-chip{font:700 11px/1 Arial,sans-serif;padding:3px 6px;border-radius:4px}#sdCard .sdt-chip.ok{background:rgba(52,211,153,.2);color:#34d399}#sdCard .sdt-chip.off{background:rgba(148,163,184,.2);color:#94a3b8}#sdCard .sdt-chip.warn{background:rgba(251,191,36,.2);color:#fbbf24}#sdCard .sdt-age{font:12px Arial,sans-serif;color:#94a3b8}#sdCard .sdt-el{font:12px/1.4 Arial,sans-serif;color:#cbd5e1}#sdCard .sdt-note{font:11px/1.4 Arial,sans-serif;color:#fbbf24;margin-top:4px}
 #sdCard .gz-sub{margin-top:2px;font-size:12px;color:#94a3b8}
 #sdCard .gz-val{margin-top:6px;font-size:14px;font-weight:600;color:#f1f5f9}
 #sdCard .gz-det{margin-top:2px;font-size:12px;line-height:1.35;color:#94a3b8}
@@ -576,7 +594,7 @@ function mountParent(ctx) {
     else if (lens && lensLocked) { lens.release(); lensLocked = false; }
     if (lensBtn) { lensBtn.hidden = !primaryId || embedded; lensBtn.textContent = auto ? 'Lens: on sensor' : 'Lens: mouse'; lensBtn.setAttribute('aria-pressed', String(auto)); }
     if (!s || !b || b.hidden) { card.classList.remove('show'); doc.body.classList.remove('sd-card-on'); return; }
-    if (card.dataset.sensor !== id) { card.innerHTML = cardHtml(s, elements[id], styleOf(s), feedBlock(s)); card.dataset.sensor = id; cardSize = null; }
+    if (card.dataset.sensor !== id) { card.innerHTML = s.install_status === 'test' && feed && ctx.feedModule ? testCardHtml(s, elements[id], styleOf(s), obs[s.id], ctx.feedModule.assess(obs[s.id], s, Date.now(), feed.staleAfter), ctx.feedModule) : cardHtml(s, elements[id], styleOf(s), feedBlock(s)); card.dataset.sensor = id; cardSize = null; }
     const R = RR, x = +b.dataset.x || 0, y = +b.dataset.y || 0;
     if (!cardSize) cardSize = [card.offsetWidth || 270, card.offsetHeight || 160];   // measured once per card content
     const [cw, ch] = cardSize;

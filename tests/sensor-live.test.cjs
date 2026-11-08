@@ -119,11 +119,11 @@ test('XR page: ?sensors=live = the live-test scene with LIVE / STALE / NO DATA l
   assert.equal(SX.mrDefaults('?sensors=live&feed=x.json'), '?mode=ar&place=demo&sensors=live&feed=x.json');
   const s = LIVE.sensors[0], obs = {sensor_id: s.id, ts: iso(T - 3000), value: 0.42, unit: 'm/s2', quality: 'good', source: 'gateway'};
   const a = F.assess(obs, s, T), L = SX.liveCardLines({sensor: s, element: {name: 'Straight Rect_ duct'}, typeName: SD.TYPES[s.type], obs, a, valueText: F.formatValue(0.42, s.unit), age: F.ageText(a.ageS), series: [0.1, 0.4], alignText: 'DEMO placement'});
-  assert.equal(L.badge, 'LIVE'); assert.equal(L.cls, 'live'); assert.equal(L.rows[0], 'Live value: 0.42 m/s² · 3 s ago'); assert.match(L.rows[1], /quality good · source gateway · temporary test device/);
+  assert.equal(L.badge, 'LIVE'); assert.equal(L.cls, 'live'); assert.equal(L.rows[0], '0.42 m/s² · LIVE · 3 s ago'); assert.equal(L.title, 'Vibration · test device'); assert.equal(L.rows[2], 'Phone test device · not calibrated');
   assert.match(L.footer[0], /Temporary test device/); assert.ok(!JSON.stringify(L).includes('Simulated'));
   const st = F.assess(obs, s, T + 60000), Ls = SX.liveCardLines({sensor: s, obs, a: st, valueText: '0.42 m/s²', age: F.ageText(st.ageS)});
-  assert.equal(Ls.badge, 'STALE'); assert.equal(Ls.rows[0], 'Stale: last 0.42 m/s² · 1 min ago');
-  const ms = F.assess(null, s, T); assert.equal(SX.liveCardLines({sensor: s, obs: null, a: ms, valueText: '—'}).rows[0], 'No data: no observation');
+  assert.equal(Ls.badge, 'STALE'); assert.equal(Ls.rows[0], 'STALE · last 0.42 m/s² · 1 min ago');
+  const ms = F.assess(null, s, T); assert.equal(SX.liveCardLines({sensor: s, obs: null, a: ms, valueText: '—'}).rows[0], 'NO DATA');
   assert.equal(SX.liveTag(F.assess({...obs, source: 'demo-sim', simulated: true}, s, T)), 'SIM', 'a simulated value is never tagged LIVE');
   assert.equal(SX.chipText('Vibration', '0.42 m/s²', 'LIVE'), 'Vibration · 0.42 m/s² · LIVE'); assert.equal(SX.chipText('Leak', 'Dry'), 'Leak · Dry · SIM');
   const html = read('scan-xr.html');

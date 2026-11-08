@@ -94,13 +94,13 @@ function liveTag(a) { return !a ? 'NO DATA' : a.badge === 'Simulated' ? 'SIM' : 
 /* Headset card for a live test device: the value with its age, quality and source from the gateway observation (assess a). */
 function liveCardLines({sensor, element, typeName, obs, a, valueText, age, series, alignText}) {
   const clip = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
-  const where = sensor.anchor.layer + ':' + sensor.anchor.id, el = element ? clip(element.name || element.type || 'Element', 40) : clip(sensor.anchor.name || where, 40);
   const tag = liveTag(a), st = a ? a.state : 'missing';
-  const first = st === 'ok' ? 'Live value: ' + valueText + (age ? ' · ' + age : '') : st === 'stale' ? 'Stale: last ' + valueText + (age ? ' · ' + age : '') : st === 'missing' ? 'No data: ' + ((a && a.reason) || 'no observation') : (a.label || 'Suspect') + ': ' + valueText;
-  const rows = [first, clip(['quality ' + (obs && obs.quality || 'missing'), 'source ' + (obs && obs.source || sensor.data_source), sensor.test_device ? 'temporary test device' : null].filter(Boolean).join(' · '), 80),
-    'Anchored to BIM element ' + el + ' · ' + where];
-  return {title: clip((sensor.k ? sensor.k + ' · ' : '') + sensor.label, 44), sub: clip([typeName, 'Live test'].filter(Boolean).join(' · '), 70),
-    badge: tag, tier: tag, cls: tag === 'LIVE' ? 'live' : tag === 'STALE' || tag === 'SUSPECT' ? 'mod' : 'none', rows, footer: [LIVE_CAPTION, clip(alignText || '', 140)],
+  const first = st === 'ok' ? valueText + ' · LIVE' + (age ? ' · ' + age : '') : st === 'stale' ? 'STALE · last ' + valueText + (age ? ' · ' + age : '') : st === 'missing' ? 'NO DATA' : (a.label || 'Check') + ' · ' + valueText;
+  const lvl = element && element.level ? String(element.level).replace(/^LEVEL\s*0?(\d+)$/i, 'Level $1') : '';
+  const elLine = clip([(element && element.type ? element.type : sensor.anchor.layer) + ' ' + sensor.anchor.id, lvl].filter(Boolean).join(' · '), 60);
+  const note = (sensor.test_device && sensor.test_device.card_note) || (sensor.test_device ? 'Test device · not calibrated' : '');
+  return {title: clip(String(typeName || 'Sensor').replace(/ node$/, '') + (sensor.test_device ? ' · test device' : ''), 44), sub: '',
+    badge: tag, tier: tag, cls: tag === 'LIVE' ? 'live' : tag === 'STALE' || tag === 'SUSPECT' ? 'mod' : 'none', rows: [first, elLine, note].filter(Boolean), footer: [LIVE_CAPTION, clip(alignText || '', 140)],
     spark: Array.isArray(series) && series.length > 1 && series.every(finite) ? series.slice() : null, sparkColor: sensor.color || '#22d3ee'};
 }
 
