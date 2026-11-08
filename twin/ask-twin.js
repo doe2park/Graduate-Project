@@ -1,4 +1,4 @@
-/* Ask the twin — local demo panel for grimes-bim-viewer.html?ask=1 (served by scripts/ask_twin_server.py).
+/* Ask the twin — local demo panel for grimes-bim-viewer.html?ask=1 and scan-compare.html?view=overlay&ask=1 (served by scripts/ask_twin_server.py).
    Click an element, ask a question (typed or push-to-talk); the local server answers with Claude + read-only tools
    (or scripted mock answers). Live answers are one plain paragraph plus an Evidence line; cited elements ([[id]]) become chips: verified ones are highlighted in the model and
    fly the camera on click. Nothing here writes model data; highlights are render-time colours only. */
@@ -132,7 +132,7 @@ panel.innerHTML = `
  <div class="at-head"><div class="at-logo">?</div><div class="at-title">Ask the twin</div>
   <span class="at-mode off" id="atMode">connecting…</span><button class="at-x" id="atMin" title="Minimise">–</button></div>
  <div class="at-body">
-  <div class="at-ctx" id="atCtx"><span class="at-dot"></span><span>Click an element in the model, then ask about it.</span></div>
+  <div class="at-ctx" id="atCtx"><span class="at-dot"></span><span>${esc(api.pickHint || 'Click an element in the model, then ask about it.')}</span></div>
   <div class="at-ex" id="atEx">${EXAMPLES.map(([l, q], i) => `<button data-i="${i}" title="${esc(q)}">${esc(l)}</button>`).join('')}</div>
   <div class="at-in"><textarea id="atQ" rows="2" placeholder="Ask about the selected element…  (Enter to ask)"></textarea>
    <button class="at-btn at-mic" id="atMic" title="Hold to talk">🎙</button><button class="at-btn at-ask" id="atAsk">Ask</button></div>
@@ -265,6 +265,11 @@ function addBox(b, color, pad) {
   const {THREE} = api, box = new THREE.Box3(new THREE.Vector3(b[0] - pad, b[1] - pad, b[2] - pad), new THREE.Vector3(b[3] + pad, b[4] + pad, b[5] + pad));
   const h = new THREE.Box3Helper(box, color); h.material.depthTest = false; h.material.transparent = true; h.material.opacity = .95; h.renderOrder = 999;
   boxGroup.add(h);
+  if (api.boxFill) {   // over a photo (scan-compare Overlay) thin outlines get lost: add a see-through filled box
+    const s = box.getSize(new THREE.Vector3()), f = new THREE.Mesh(new THREE.BoxGeometry(s.x, s.y, s.z),
+      new THREE.MeshBasicMaterial({color, transparent: true, opacity: pad > .05 ? .45 : .25, depthTest: false, depthWrite: false}));
+    box.getCenter(f.position); f.renderOrder = 998; boxGroup.add(f);
+  }
 }
 async function showCitations(cites, answer) {
   api.clearHighlights(); clearBoxes();
@@ -279,8 +284,8 @@ async function showCitations(cites, answer) {
   for (const c of ok) api.highlight([c.id], c.id === primary ? PRIMARY : OTHER);
   for (const c of cites) if (c.verified && c.bbox_m) addBox(c.bbox_m, c.id === primary ? PRIMARY : OTHER, c.id === primary ? 0.08 : 0.04);
   const pc = primary && cites.find(c => c.id === primary && c.verified);
-  state.markerAt = pc ? [(pc.bbox_m[0] + pc.bbox_m[3]) / 2, pc.bbox_m[4], (pc.bbox_m[2] + pc.bbox_m[5]) / 2] : null;
-  if (pc) flyTo(pc.bbox_m);
+  state.markerAt = pc && !api.focus ? [(pc.bbox_m[0] + pc.bbox_m[3]) / 2, pc.bbox_m[4], (pc.bbox_m[2] + pc.bbox_m[5]) / 2] : null;
+  if (pc) (api.focus || flyTo)(pc.bbox_m);   // api.focus: a host whose camera is not ours (scan-compare Overlay moves its Lens instead)
 }
 
 $('#atCard').addEventListener('click', async e => {
@@ -288,8 +293,8 @@ $('#atCard').addEventListener('click', async e => {
   const id = b.dataset.id, c = state.lastCites.find(x => x.id === id);
   if (c && c.in_viewer && !api.isLoaded(c.layer)) { b.textContent = `loading ${c.layer}…`; await api.loadLayer(c.layer); }
   if (c && c.in_viewer) { api.highlight([id], OTHER); api.select(id); }
-  flyTo(boxOf(id));
-  if (c) state.markerAt = [(c.bbox_m[0] + c.bbox_m[3]) / 2, c.bbox_m[4], (c.bbox_m[2] + c.bbox_m[5]) / 2];
+  (api.focus || flyTo)(boxOf(id));
+  if (c && !api.focus) state.markerAt = [(c.bbox_m[0] + c.bbox_m[3]) / 2, c.bbox_m[4], (c.bbox_m[2] + c.bbox_m[5]) / 2];
   setTimeout(() => { if (b.isConnected && !b.querySelector('i')) b.innerHTML = `${esc(c?.label || c?.type || 'element')} <i>#${esc(id)}</i>`; }, 50);
 });
 

@@ -352,6 +352,23 @@ presses button 3 through the same panel hit test a controller ray uses, asks lev
 run, verified citations, speech plan and *Close*. The immersive emulator smoke (`tests/scan-xr-immersive-smoke.cjs`,
 IWER) was not run for this feature.
 
+## On the real photo (scan-compare Overlay, Nov 8 2026)
+
+`scan-compare.html?view=overlay&style=lens&ask=1&code=<CODE>` opens the same panel over the 360° photo with the BIM services
+overlaid (served by the ask server, e.g. `http://127.0.0.1:8765/scan-compare.html?view=overlay&style=lens&capture=2026-05-06&ask=1&code=<CODE>`).
+
+- Point the Lens (it follows the mouse) at an element in the photo: the element under the Lens centre is the one asked about
+  (same lens probe as the info cards, so Info cards must be on; Lens style only). Moving the mouse onto the panel to type keeps
+  the Lens and the selection where they were.
+- When the answer arrives, the cited elements are coloured in the BIM layer with a see-through filled box (magenta = main
+  answer, cyan = other evidence), and the Lens moves onto the main one. If no part of it is in view (or only under the panel),
+  the photo turns toward it at the same station first; for elements above eye level it looks a little higher so the room
+  below stays out of frame. The Lens holds the answer until the mouse moves.
+- No camera fly and no pin marker here (the camera follows the photo); `select()` is a no-op.
+- Without `?ask=1` the page and its BIM pane are unchanged. On the public site the panel has no server and says "server offline".
+- Code: `scan-compare.html` (`ASK OVERLAY LOGIC` pure helpers + the `?ask=1` block), `scan-bim.html` (`twinViewerApi` in the BIM
+  pane, only with `&ask=1`), `twin/ask-twin.js` (`api.focus`, `api.boxFill`, `api.pickHint`). Tests: `tests/ask-twin-overlay.test.cjs`.
+
 ## Tests
 
 ```bash
@@ -360,6 +377,7 @@ node --test tests/xr-ask.test.cjs                                       # headse
 # Method A, desktop Chrome against the running --lan server (public origin served from this checkout by Playwright):
 PLAYWRIGHT_MODULE=/path/to/playwright-core FAKE_AUDIO=/abs/question.wav node tests/xr-ask-methoda-smoke.cjs https://<lan-ip>:8765
 node --test tests/ask-twin.test.cjs                                     # laptop panel: code= from the URL, X-Ask-Code header, 401/429 text
+node --test tests/ask-twin-overlay.test.cjs                             # scan-compare Overlay: ?ask=1 gate, lens target, box samples, turn pitch, hold
 python3 scripts/ask_twin_server.py --mock --no-code &                   # then the headless browser check (or keep the code and pass ASK_CODE=<code>):
 PLAYWRIGHT_MODULE=/path/to/playwright-core CHROME_EXECUTABLE=/path/to/chrome-headless-shell \
   [FAKE_AUDIO=/abs/question.wav] node tests/ask-twin-smoke.cjs          # screenshots -> work/ask-twin/shots/

@@ -3117,6 +3117,24 @@ window.addEventListener('message',e=>{
  const p=d.pose;if(!p||!Array.isArray(p.position)||p.position.length!==3||!Array.isArray(p.quaternion)||p.quaternion.length!==4||![...p.position,...p.quaternion,p.fov,p.zoom].every(Number.isFinite)||p.fov<=0||p.fov>=180||p.zoom<=0)return;
  applyLinkedPose(p);
 });
+/* Ask the twin in scan-compare Overlay (opt-in: scan-compare.html?ask=1 adds &ask=1 to this BIM pane only). The parent page's
+   panel (twin/ask-twin.js) uses the same small API as grimes-bim-viewer.html's askViewerApi; the camera stays linked to the
+   photo, so select() is a no-op and the parent moves its Lens instead of flying the camera. Render-time colours only. */
+if(splitPane==='bim'&&new URLSearchParams(location.search).get('ask')==='1'){
+ const askHighlights=new Map();
+ window.twinViewerApi={THREE,scene,camera,controls,LAYERS,
+  meta:id=>equipMeta[id]||null,
+  selected:()=>null,
+  isLoaded:key=>!!layerState[key]?.group,
+  loadLayer:key=>LAYERS[key]?(layerState[key]?.group?(layerState[key].group.visible||toggleLayer(key),Promise.resolve(true)):toggleLayer(key,{bulk:true})):Promise.resolve(false),
+  select:()=>{},
+  highlight(ids,color=0x38bdf8){
+   for(const id of ids){askHighlights.set(id,color);for(const mesh of equipMeshes)highlightElementRender(mesh,id,true,color);}
+   _kick();return ids.filter(id=>equipMeshes.some(m=>m.userData.ids?.includes(id)||m.userData.ranges?.some(r=>r.id===id)));
+  },
+  clearHighlights(){for(const id of askHighlights.keys())for(const mesh of equipMeshes)highlightElementRender(mesh,id,false);askHighlights.clear();_kick();},
+ };
+}
 window.parent.postMessage({type:'grimes-camera-ready'},location.origin);
 
 // Lightweight, source-ID-based alternative to selecting small targets on a phone.

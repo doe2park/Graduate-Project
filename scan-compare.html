@@ -98,6 +98,25 @@ function lensDragCenter(drag,w,h,top,bottom){
 }
 function effectiveStyle(style,env){return style==='ghost'?'plain':style;}
 /* END OVERLAY LOGIC */
+/* ASK OVERLAY LOGIC (pure; tests/ask-twin-overlay.test.cjs). ?ask=1 only: Ask the twin over the real photo (docs/ASK_TWIN.md). */
+function askEnabled(search){return new URLSearchParams(search).get('ask')==='1';}
+/* projected NDC of the answer's element (BIM pane camera = this page's main rect) -> normalised lens target, or null when it
+   is behind the camera or too close to the edge to be read */
+function askLensPoint(v,margin){const m=Number.isFinite(margin)?margin:.08;if(!v||![v.x,v.y,v.z].every(Number.isFinite)||v.z>=1||v.z<=-1)return null;
+ const x=(v.x+1)/2,y=(1-v.y)/2;return x<m||x>1-m||y<m||y>1-m?null:{x,y};}
+/* the Lens stays on the answer until the mouse really moves (more than tol, normalised) from where it was when the answer came */
+/* points of an answer box worth centring the Lens on: the centre plus samples along its longest axis (a long pipe or duct
+   is often only partly in view) */
+function askBoxSamples(b,n){const k=Number.isInteger(n)&&n>1?n:9,c=[0,1,2].map(i=>(b[i]+b[i+3])/2),ext=[0,1,2].map(i=>b[i+3]-b[i]),ax=ext.indexOf(Math.max(...ext)),out=[c];
+ for(let i=0;i<k;i++){const p=c.slice();p[ax]=b[ax]+ext[ax]*(i+.5)/k;out.push(p);}return out;}
+/* the on-screen sample nearest the current Lens, never one hidden under the ask panel (block, normalised rect) */
+function askPickPoint(pts,cur,block){let best=null,bd=Infinity;for(const p of pts||[]){if(!p)continue;if(block&&p.x>=block.x0-.02&&p.x<=block.x1+.02&&p.y>=block.y0-.02&&p.y<=block.y1+.02)continue;
+ const d=Math.hypot(p.x-(cur?cur.x:.5),p.y-(cur?cur.y:.5));if(d<bd){bd=d;best=p;}}return best;}
+/* turning toward an element above eye level (ceiling services): look higher than straight at it, so it sits in the lower part of
+   the view and the room below stays out of frame (radians; fov in degrees) */
+function askTurnPitch(pitch,fov){if(!Number.isFinite(pitch)||pitch<=0)return pitch;const f=(Number.isFinite(fov)?fov:60)*Math.PI/180;return Math.min(pitch+.4*f,85*Math.PI/180);}
+function askHoldKeeps(from,d,tol){const t=Number.isFinite(tol)?tol:.04;if(!d||!Number.isFinite(d.x)||!Number.isFinite(d.y))return true;if(!from)return false;return Math.hypot(d.x-from.x,d.y-from.y)<=t;}
+/* END ASK OVERLAY LOGIC */
 /* REGISTRATION OVERRIDE: ?registration=<same-origin candidate JSON> previews a workbench/ICP candidate (never the default) */
 function registrationOverride(search){const raw=new URLSearchParams(search).get('registration');if(raw===null)return null;return RegistrationCore.safeRegistrationPath(raw)||'invalid';}
 function previewLabel(reg){return 'PREVIEW candidate \u00b7 '+reg.status+' \u00b7 not the accepted registration';}
@@ -279,10 +298,10 @@ let lensSent='';
 function sendLensState(on,x,y,r){const k=on?[x,y,r].map(v=>Math.round(v)).join(','):'off';if(k===lensSent)return;lensSent=k;send('bim',on?{type:'grimes-overlay-lens',on:true,x,y,r}:{type:'grimes-overlay-lens',on:false});}
 /* scan panes report the mouse position (normalised); touch devices keep the lens centred */
 function edgeFromScan(d){
- if(d?.type==='grimes-pointer'){if(window.sdLensLock&&!(window.sdPointerMoved&&window.sdPointerMoved()))return;/* ?sensors=demo: a locked sensor holds the Lens */lensTarget=Number.isFinite(d.x)&&Number.isFinite(d.y)&&!touchMq.matches?{x:d.x,y:d.y}:null;layoutLens(false);return;}
+ if(d?.type==='grimes-pointer'){if(window.askLensHeld&&window.askLensHeld(d))return;/* ?ask=1: the Lens stays on the answer until the mouse moves */if(window.sdLensLock&&!(window.sdPointerMoved&&window.sdPointerMoved()))return;/* ?sensors=demo: a locked sensor holds the Lens */lensTarget=Number.isFinite(d.x)&&Number.isFinite(d.y)&&!touchMq.matches?{x:d.x,y:d.y}:null;layoutLens(false);return;}
  if(d?.type==='grimes-photo-station'&&Number.isInteger(d.index)){lastStation=d.index;}
 }
-frames[1].src='scan-bim.html?pane=bim&revision=overlay2'+(view==='overlay'?'&overlay=1':'')+(new URLSearchParams(location.search).get('sensors')==='demo'?'&sensors=demo'+(/^[a-z0-9-]{1,30}$/.test(new URLSearchParams(location.search).get('scene')||'')?'&scene='+new URLSearchParams(location.search).get('scene'):''):new URLSearchParams(location.search).get('sensors')==='live'?'&sensors=live':'');
+frames[1].src='scan-bim.html?pane=bim&revision=overlay2'+(view==='overlay'?'&overlay=1':'')+(new URLSearchParams(location.search).get('ask')==='1'?'&ask=1':'')+(new URLSearchParams(location.search).get('sensors')==='demo'?'&sensors=demo'+(/^[a-z0-9-]{1,30}$/.test(new URLSearchParams(location.search).get('scene')||'')?'&scene='+new URLSearchParams(location.search).get('scene'):''):new URLSearchParams(location.search).get('sensors')==='live'?'&sensors=live':'');
 let registration=null,registrationPreview=false,driver='scan',epoch=0;const poses={};
 const index=p=>p==='scan'?0:1,other=p=>p==='scan'?'bim':'scan';
 const send=(pane,data)=>{frames[index(pane)].contentWindow.postMessage(data,location.origin);};
@@ -674,6 +693,51 @@ window.addEventListener('message',e=>{
 });
 if(registration&&!alBase){alignOnRegistration(registration,registrationPreview);epoch++;roles();}
 alRender();
+</script>
+<script>
+/* ASK THE TWIN OVER THE PHOTO (opt-in ?ask=1; served by scripts/ask_twin_server.py, which answers /api/ask). The panel is
+   twin/ask-twin.js, driven through the BIM pane's twinViewerApi (scan-bim.html, same origin). The element under the Lens
+   centre is the one asked about (pointing = the mouse, the Lens follows it); when an answer arrives the cited elements are
+   coloured in the BIM pane and the Lens moves onto the main one, so it is seen over the real photo at its place. Nothing
+   else changes without ?ask=1. */
+if(askEnabled(location.search)){
+ let askHold=null,askPtr=null,askSel=null,askLoaded=false;
+ const bimAskApi=()=>{try{return frames[1].contentWindow.twinViewerApi||null;}catch(e){return null;}};
+ /* the pointer leaving the photo (to type a question) keeps the Lens, and so the selection, where it pointed */
+ window.askLensHeld=d=>{if(!Number.isFinite(d?.x)||!Number.isFinite(d?.y))return true;askPtr={x:d.x,y:d.y};if(!askHold)return false;if(askHoldKeeps(askHold.ptr,d))return true;askHold=null;return false;};
+ /* the answer's main element: move the Lens onto it; when no part of it is in view (or only under the panel), turn the photo
+    toward it first (same station), then place the Lens */
+ function askFocus(b,turned){
+  const api=bimAskApi();if(!api||!Array.isArray(b)||b.length!==6||!b.every(Number.isFinite)||document.body.dataset.focus!=='overlay')return;
+  const {THREE,camera}=api;camera.updateMatrixWorld();
+  const m=mainEl.getBoundingClientRect(),pr=document.getElementById('askTwin')?.getBoundingClientRect();
+  const block=pr&&pr.width&&!document.getElementById('askTwin').classList.contains('min')?{x0:(pr.left-m.left)/m.width,x1:(pr.right-m.left)/m.width,y0:(pr.top-m.top)/m.height,y1:(pr.bottom-m.top)/m.height}:null;
+  const pts=askBoxSamples(b).map(p=>askLensPoint(new THREE.Vector3(...p).project(camera)));
+  const q=askPickPoint(pts,lensNow&&m.width?{x:lensNow.x/m.width,y:lensNow.y/m.height}:null,block);
+  if(q){askHold={at:q,ptr:askPtr};if(touchMq.matches)lensDrag={x:q.x*m.width,y:q.y*m.height};else lensTarget=q;layoutLens(false);return;}
+  if(turned||!photoMode||!registration)return;
+  askHold={at:null,ptr:askPtr};   // the selection stays the asked element while the photo turns
+  const eye=camera.position.clone(),c=new THREE.Vector3((b[0]+b[3])/2,(b[1]+b[4])/2,(b[2]+b[5])/2);
+  const e=new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(eye,c,new THREE.Vector3(0,1,0))),'YXZ');
+  e.x=askTurnPitch(e.x,camera.fov);const look=new THREE.Quaternion().setFromEuler(e);
+  send('scan',{type:'grimes-photo-goto',pose:convert({position:eye.toArray(),quaternion:look.toArray(),fov:camera.fov,zoom:1},'bim')});
+  setTimeout(()=>askFocus(b,true),700);
+ }
+ function askStart(){
+  if(askLoaded)return true;const api=bimAskApi();if(!api)return false;askLoaded=true;
+  window.twinViewerApi=Object.assign(Object.create(api),{focus:askFocus,boxFill:true,pickHint:'Point the Lens at an element in the photo, then ask about it.'});
+  const s=document.createElement('script');s.src='twin/ask-twin.js';document.head.appendChild(s);return true;
+ }
+ const askT=setInterval(()=>{if(askStart())clearInterval(askT);},300);
+ /* the lens probe (info cards) names the element under the Lens centre: that becomes the selection, unless the Lens is
+    holding an answer */
+ window.addEventListener('message',e=>{
+  if(e.origin!==location.origin||e.source!==frames[1].contentWindow||e.data?.type!==ElementCards.LENS_PICK)return;
+  const pick=ElementCards.parseLensPick(e.data);if(!pick?.hit||askHold||!window.__askTwin||pick.hit.id===askSel)return;
+  askSel=pick.hit.id;const info=bimAskApi()?.meta(pick.hit.id)||{type:pick.hit.meta?.type,layer:pick.hit.layer};
+  try{window.__askTwin.onPick(pick.hit.id,info,pick.hit.point||null);}catch(err){console.warn('[ask-twin]',err);}
+ });
+}
 </script>
 <script>
 /* SENSOR DEMO (opt-in ?sensors=demo; twin/sensor-demo.js + twin/sensors/registry.json). Illustrative sensors anchored to real
