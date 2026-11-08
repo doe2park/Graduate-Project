@@ -1437,8 +1437,9 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
   // ({id}: its centroid, else the first of its vertices (pulled 15% toward the centroid) that the ray reaches before any other element),
   // an ask-bar button ({button}) or a world point ({world}); the bar button under the ray highlights as in the headset.
   // lens: the Lens cone follows this ray (as the flashlight hand does in XR). trigger: then act as the trigger would (pick the element
-  // along the ray / press the button). null hides it.
-  simController:async(target,{hand=[.16,-.22,-.3],lens=true,trigger=false}={})=>{if(renderer.xr.isPresenting)return null;const c=controllers[1],u=c.userData,ray=u.ray,ret=u.reticle;
+  // along the ray / press the button). press: 'down' / 'up' dispatches the controller's own selectstart / selectend (a held trigger,
+  // e.g. on "Hold to speak": the real record -> /api/transcribe -> ask path). null hides it.
+  simController:async(target,{hand=[.16,-.22,-.3],lens=true,trigger=false,press=null}={})=>{if(renderer.xr.isPresenting)return null;const c=controllers[1],u=c.userData,ray=u.ray,ret=u.reticle;
    if(!target){c.visible=false;ray.visible=false;ret.visible=false;setHover(c,null);invalidate();return {hidden:true};}
    camera.updateMatrixWorld(true);bimRoot.updateMatrixWorld(true);rig.updateMatrixWorld(true);let w=null;const o=new THREE.Vector3().fromArray(hand).applyMatrix4(camera.matrixWorld);
    const firstId=(from,to)=>{raycaster.set(from,to.clone().sub(from).normalize());raycaster.far=P.radius+6;const h=raycaster.intersectObjects(pickables(),false)[0];return h?{id:resolveHit(h.object,h.instanceId,h.faceIndex,h.index),h}:null;};
@@ -1459,6 +1460,7 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
    ret.position.copy(point);camera.getWorldPosition(_head);ret.lookAt(_head);ret.scale.setScalar(clamp(dist*.012,.006,.1));ret.userData.mat.color.set(col);ret.visible=true;
    if(lens&&kind!=='button'&&kind!=='panel'){U.coneOrigin.value.copy(o);U.coneDir.value.copy(d);}
    invalidate();const out={kind,distance:+dist.toFixed(3),button:hit?.button??null,hitId,origin:o.toArray(),point:point.toArray()};
+   if(press==='down'||press==='up'){c.dispatchEvent({type:press==='down'?'selectstart':'selectend'});out.press=press;}
    if(trigger){if(kind==='button')out.pressed=askButton(hit.button,c);else if(kind==='element'){const r=await pickAlong(o,d);out.picked=r&&{id:r.id,layer:r.layer};}}
    return out;}},
  // cost of one element-hover raycast along the centre ray (what the flashlight hand pays per throttled cast), median of n

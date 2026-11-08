@@ -96,6 +96,16 @@ const URL_ = BASE + '/scan-xr.html?mode=ar&place=demo&sensors=demo&scene=air&lay
     assert.equal(st.phase, null, 'hover alone asks nothing');
     await page.waitForTimeout(200);
     await shot('05-sim-controller-on-button.png', 'stand-in controller ray + reticle on button 1 (desktop preview only)');
+    // a held trigger on "Hold to speak" (controller selectstart / selectend): records, release stops (fake microphone)
+    if ((await page.evaluate(() => xrInspection().ask.voice)) === 'ready') {
+      await page.evaluate(() => xrDebug.ask.simController({button: 4}, {press: 'down'}));
+      await page.waitForFunction(() => xrInspection().ask.voice === 'recording', null, {timeout: 10000});
+      await page.waitForTimeout(1200);
+      await page.evaluate(() => xrDebug.ask.simController({button: 4}, {press: 'up'}));
+      await page.waitForFunction(() => xrInspection().ask.voice !== 'recording', null, {timeout: 10000});
+      report.simHold = 'recorded and released';
+    } else report.simHold = 'skipped: voice not ready (server without speech-to-text)';
+    await page.waitForFunction(() => !['transcribing'].includes(xrInspection().ask.voice) && !xrInspection().ask.busy, null, {timeout: 60000});
     assert.deepEqual(await page.evaluate(() => xrDebug.ask.simController(null)), {hidden: true});
     report.simController = {element: {hitId: sim.hitId, distance: sim.distance}, button: simBtn.button};
     await page.evaluate(() => xrDebug.ask.button(5));
