@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=3"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=4"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -129,11 +129,11 @@ function fakeCtx() {
     get: (o, k) => k in o ? o[k] : (k === 'roundRect' ? () => {} : typeof k === 'string' && /^[a-z]/.test(k) && !['font', 'fillStyle', 'strokeStyle', 'lineWidth', 'textAlign', 'lineCap', 'lineJoin'].includes(k) ? () => {} : o[k]),
     set: (o, k, v) => { o[k] = v; return true; }});
 }
-test('canvas drawing: answer card (thinking / answer / error) and bar draw without throwing; badge + cited ids + footer', () => {
+test('canvas drawing: answer card (thinking / answer / error) and bar draw without throwing; small AI mark (no chat header) + cited ids + footer', () => {
   const m = XA.cardModel({question: 'Which VAV box feeds this?', answer: ANSWER, final: FINAL, level: 3});
   for (const view of [{phase: 'thinking', model: {question: 'q', level: 3}, steps: ['connected_run · 250 touching elements']}, {phase: 'answer', model: m, speech: 'speaking', runNote: 'Lit run: 11 pieces'}, {phase: 'error', model: {}, error: 'server 404'}]) {
     const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, view);
-    assert.ok(ctx.calls.includes('Claude'), view.phase);
+    assert.ok(ctx.calls.includes('AI answer'), view.phase); assert.ok(!ctx.calls.includes('Claude'), view.phase);
     if (view.phase === 'answer') { assert.ok(ctx.calls.some(t => t.startsWith('#400766'))); assert.ok(ctx.calls.includes('READ ALOUD')); assert.ok(ctx.calls.some(t => /SIMULATED/.test(t))); }
     if (view.phase === 'thinking') assert.ok(ctx.calls.some(t => /connected_run/.test(t)));
     if (view.phase === 'error') assert.ok(ctx.calls.includes('Could not answer'));
@@ -216,4 +216,88 @@ test('plain live answers: the paragraph is the lead, the first Evidence id is th
   assert.equal(m.confidence, null);
   assert.doesNotMatch(m.lead, /Evidence|\[\[/);
   assert.equal(XA.sections('Let me check.\n**Answer:** [[1]] x').lead, '[[1]] x');   // a header lead replaces a preamble line
+});
+
+/* Nov 9 visual card: structured tool visuals (scripts/ask_twin/agent.py tool_visual) -> headline + picture, no prose parsing for the graphics */
+const Q1 = 'This is a supply air vent (a square perforated ceiling diffuser, about 0.6 m across) that blows air into the room from the ceiling on Level 1. You are probably in the Exhibit/Open Work Space 100-1. The twin has no room outlines, and the closest labelled item is in Storage B114A, about 5 m away, so check the room sign.\nEvidence: [[388189]] [[160879]]';
+const Q1C = [{id: '388189', known: true, verified: true, layer: 'duct', type: 'M-HVAC-CDFF', label: 'diffuser', size_m: [0.6, 0.05, 0.6], level: 'L1'}, {id: '160879', known: true, verified: true, layer: 'equipment', type: 'Panel', label: 'panel'}];
+const Q2 = 'Directly above this light, the closest thing is a fire sprinkler main (a 3-inch pipe) about 0.16 m up. A concrete beam on the level above is next, about 0.42 m up. This comes from the model geometry only, so check on site.\nEvidence: [[278081]] [[131161]] [[411938]]';
+const NEAR = {kind: 'near', above_only: true, radius_m: 2, total: 147, counts_by_layer: {duct: 100, hydronic: 22, fire: 13, structural: 11},
+  items: [{id: '278081', label: 'sprinkler pipe', layer: 'fire', type: 'Pipe', vertical: 'above', vertical_gap_m: 0.16, horizontal_gap_m: 0},
+    {id: '131161', label: 'beam', layer: 'structural', type: 'Structural Framing', vertical: 'above', vertical_gap_m: 0.42, horizontal_gap_m: 0},
+    {id: '411938', label: 'pipe', layer: 'hydronic', type: 'Pipe', vertical: 'above', vertical_gap_m: 0.05, horizontal_gap_m: 0.62},
+    {id: '500001', label: 'duct', layer: 'duct', type: 'Duct', vertical: 'above', vertical_gap_m: 0.9, horizontal_gap_m: 1.1}]};
+test('pictograms and plain names from element type / layer / server label', () => {
+  const P = XA.pictogram;
+  assert.equal(P({label: 'diffuser', type: 'M-HVAC-CDFF', layer: 'duct'}), 'vent');
+  assert.equal(P({label: 'VAV box', type: 'Terminal unit', layer: 'duct'}), 'vav');
+  assert.equal(P({label: 'duct', layer: 'duct'}), 'duct');
+  assert.equal(P({label: 'sprinkler pipe', layer: 'fire'}), 'sprinkler');
+  assert.equal(P({label: 'pipe', layer: 'hydronic'}), 'pipe');
+  assert.equal(P({label: 'light', layer: 'lighting'}), 'light');
+  assert.equal(P({type: 'Structural Framing', layer: 'structural'}), 'beam');
+  assert.equal(P({label: 'valve', layer: 'plumbing'}), 'valve');
+  assert.equal(P({layer: 'ceilings-l1', label: 'ceiling'}), 'ceiling');
+  assert.equal(P(null), 'box');
+  assert.equal(XA.niceName({label: 'diffuser'}), 'Air vent (diffuser)');
+  assert.equal(XA.niceName({label: 'element', type: 'M-HVAC-CDFF'}), 'Element');   // CAD codes never shown as a name
+  assert.equal(XA.sizeText({size_m: [0.6, 0.05, 0.6]}), '0.6 × 0.6 m');
+  assert.equal(XA.sizeText({size: '3"', size_m: [5, .1, .1]}), '3"');
+  assert.equal(XA.sizeText({size_m: [6.2, .3, .3]}), '6.2 m long');
+  assert.deepEqual(XA.roomChip({room: 'EXHIBIT/ OPEN WORK SPACE 100-1', confidence: 'low'}), {name: 'Exhibit / Open Work Space 100-1', dots: 1, word: 'Best guess', basis: 'guessed from nearby labels'});
+  assert.equal(XA.roomChip({room: 'B114A', confidence: 'medium'}).word, 'Probably');
+  assert.equal(XA.roomChip({room: 'B114A', confidence: 'recorded'}).dots, 3);
+  assert.equal(XA.roomChip({room: null}), null);
+});
+test('caption = first sentences without ids; check chip from the answer, else a per-kind default', () => {
+  assert.equal(XA.captionText(Q2, 1), 'Directly above this light, the closest thing is a fire sprinkler main (a 3-inch pipe) about 0.16 m up.');
+  assert.doesNotMatch(XA.captionText(Q1, 3), /Evidence|\[\[/);
+  assert.equal(XA.checkText(Q1, 'lookup'), 'Check the room sign');
+  assert.equal(XA.checkText(Q2, 'near'), 'Check on site');
+  assert.equal(XA.checkText('The duct link comes from touching shapes, so check the duct drawings or the BAS (building automation system) points on site.', 'trace'), 'Check the duct drawings or the BAS points on site');
+  assert.equal(XA.checkText('No hint here.', 'near'), 'Look above the ceiling tile on site');
+});
+test('visual: look up -> element pictogram, size, level, room chip with how sure', () => {
+  const v = XA.answerVisual({visuals: [{kind: 'room', room: 'EXHIBIT/ OPEN WORK SPACE 100-1', level: 'L1', confidence: 'low', basis: 'nearby labels'}], citations: Q1C, primary: '388189',
+    selected: {id: '388189', layer: 'duct', type: 'M-HVAC-CDFF'}, answer: Q1});
+  assert.equal(v.kind, 'lookup'); assert.equal(v.headline, 'Air vent (diffuser)'); assert.equal(v.element.picto, 'vent');
+  assert.equal(v.size, '0.6 × 0.6 m'); assert.equal(v.level, 'Level 1'); assert.equal(v.room.word, 'Best guess'); assert.equal(v.check, 'Check the room sign');
+  assert.ok(v.caption.startsWith('This is a supply air vent'));
+});
+test('visual: nearby -> height markers (cited first, at their gaps), counts by system, headline from the closest item above', () => {
+  const cites = ['278081', '131161', '411938'].map(id => ({id, known: true, verified: true}));
+  const v = XA.answerVisual({visuals: [NEAR], citations: cites, primary: '278081', selected: {id: '23006', layer: 'lighting'}, answer: Q2});
+  assert.equal(v.kind, 'near'); assert.equal(v.self.picto, 'light');
+  assert.deepEqual(v.marks.map(m => [m.id, m.picto, m.dy, m.cited]), [['278081', 'sprinkler', .16, true], ['131161', 'beam', .42, true], ['411938', 'pipe', .05, true], ['500001', 'duct', .9, false]]);
+  assert.equal(v.headline, 'Sprinkler pipe 0.16 m above');   // closest directly above (the copper pipe is 0.62 m aside)
+  assert.deepEqual(v.counts.map(c => [c.layer, c.n, c.picto]), [['duct', 100, 'duct'], ['hydronic', 22, 'pipe'], ['fire', 13, 'sprinkler'], ['structural', 11, 'beam']]);
+});
+test('visual: trace -> this element, pieces along the run, the cited source with its distance', () => {
+  const run = {kind: 'run', layer: 'duct', reached: 150, start: {id: '388219', label: 'diffuser', layer: 'duct'},
+    notable: [{id: '400766', label: 'VAV box', type: 'Terminal unit', layer: 'duct', hops: 12, horizontal_gap_m: 3.4, vertical: 'above'}]};
+  const v = XA.answerVisual({visuals: [run], citations: [{id: '400766', known: true, verified: true}, {id: '388219', known: true, verified: true}], primary: '400766',
+    selected: {id: '388219', layer: 'duct'}, answer: 'The air probably comes from a VAV box. Check the duct drawings.'});
+  assert.equal(v.kind, 'trace'); assert.equal(v.headline, 'Probably fed by a VAV box');
+  assert.deepEqual([v.from.picto, v.to.picto, v.hops, v.away, v.where, v.pieceWord], ['vent', 'vav', 12, 3.4, 'above the ceiling', 'duct pieces']);
+});
+test('visual: other questions -> first sentence headline + cited element tiles; no visuals -> text card as before', () => {
+  const v = XA.answerVisual({visuals: [], citations: [{id: '9', known: true, verified: true, label: 'pipe', layer: 'plumbing'}], answer: 'A simulated demo sensor reads warm. Check the valve.'});
+  assert.equal(v.kind, 'text'); assert.equal(v.headline, 'A simulated demo sensor reads warm.'); assert.equal(v.items[0].picto, 'pipe');
+  assert.equal(XA.cardModel({answer: ANSWER, final: FINAL}).visual, null);
+});
+test('visual cards draw without throwing for every kind, with headline, check chip, ids and the honesty footer', () => {
+  const cites = ['278081', '131161', '411938'].map(id => ({id, known: true, verified: true, label: 'x'}));
+  const cases = [
+    XA.cardModel({question: 'q', answer: Q1, final: {mode: 'live', model: 'm', citations: Q1C, tools_used: [{}]}, visuals: [{kind: 'room', room: 'B114A', level: 'L1', confidence: 'low'}], selected: {id: '388189', layer: 'duct'}}),
+    XA.cardModel({question: 'q', answer: Q2, final: {mode: 'live', model: 'm', citations: cites, tools_used: [{}]}, visuals: [NEAR], selected: {id: '23006', layer: 'lighting'}}),
+    XA.cardModel({question: 'q', answer: ANSWER, final: FINAL, visuals: [{kind: 'run', layer: 'duct', start: {id: '388279', label: 'diffuser'}, notable: [{id: '400766', label: 'VAV box', hops: 11, horizontal_gap_m: 3.1, vertical: 'above'}]}], selected: {id: '388279', layer: 'duct'}}),
+    XA.cardModel({question: 'q', answer: 'Short. Check the valve.\nEvidence: [[9]]', final: {mode: 'mock', citations: [{id: '9', known: true, verified: true, label: 'pipe', layer: 'plumbing'}], tools_used: []}, visuals: []})];
+  for (const m of cases) {
+    const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, {phase: 'answer', model: m, speech: 'text only'});
+    assert.ok(ctx.calls.includes(m.visual.headline), m.visual.kind); assert.ok(ctx.calls.some(t => t.includes(m.visual.check)), m.visual.kind);
+    assert.ok(ctx.calls.some(t => /^#\d/.test(t)), m.visual.kind); assert.ok(ctx.calls.some(t => /SIMULATED/.test(t)), m.visual.kind);
+    assert.ok(!ctx.calls.some(t => /Claude/.test(t)) || m.mode === 'live', m.visual.kind);
+  }
+  assert.ok(page.includes('if(ev.visual&&typeof ev.visual===\'object\')ASK.vis.push(ev.visual);'));
+  assert.ok(page.includes('visuals:ASK.vis,selected:'));
 });

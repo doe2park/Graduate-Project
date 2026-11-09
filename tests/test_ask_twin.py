@@ -189,6 +189,29 @@ class MockAgentTests(unittest.TestCase):
         self.assertIn('simulated', f['answer'])
         self.assertTrue(all(c['verified'] for c in f['citations']))
 
+    def test_tool_event_visual_is_copied_from_the_tool_result(self):
+        """Headset answer card graphics (twin/xr-ask.js answerVisual): structured data from the tool result, nothing added."""
+        near = {'query': {'radius_m': 2.0, 'above_only': True}, 'total_found': 3, 'counts_by_layer': {'fire': 2, 'structural': 1},
+                'elements': [{'id': 'p1', 'layer': 'fire', 'type': 'Pipe', 'name': 'Pipe', 'size': '3"', 'size_m': [4, .1, .1],
+                              'vertical': 'above', 'vertical_gap_m': .16, 'horizontal_gap_m': 0.0, 'center_offset_m': [0, .2, 0]}]}
+        v = A.tool_event('elements_near', {}, near)['visual']
+        self.assertEqual((v['kind'], v['above_only'], v['total'], v['counts_by_layer']), ('near', True, 3, {'fire': 2, 'structural': 1}))
+        self.assertEqual(v['items'][0], {'id': 'p1', 'label': 'sprinkler pipe', 'type': 'Pipe', 'layer': 'fire', 'size': '3"', 'size_m': [4, .1, .1],
+                                         'vertical': 'above', 'vertical_gap_m': .16, 'horizontal_gap_m': 0.0})
+        r = A.tool_event('room_of', {}, {'level': 'L1', 'room': 'B114A', 'confidence': 'low'})['visual']
+        self.assertEqual(r, {'kind': 'room', 'room': 'B114A', 'level': 'L1', 'confidence': 'low', 'basis': 'nearby labels'})
+        r2 = A.tool_event('room_of', {}, {'level': 'L1', 'room': '100', 'confidence': 'recorded on the element (design BIM)'})['visual']
+        self.assertEqual((r2['confidence'], r2['basis']), ('recorded', 'element'))
+        run = {'start': {'id': 'd', 'layer': 'duct', 'type': 'M-HVAC-CDFF'}, 'layer': 'duct', 'elements_reached': 150, 'types_in_run': {'Duct': 120},
+               'notable_on_run': [{'id': 'v', 'layer': 'duct', 'type': 'Terminal unit', 'hops': 12, 'horizontal_gap_m': 3.4, 'vertical': 'above',
+                                   'vertical_gap_m': .3, 'path_ids': ['d', 'x', 'v']}]}
+        rv = A.tool_event('connected_run', {}, run)['visual']
+        self.assertEqual((rv['kind'], rv['reached'], rv['start']['label']), ('run', 150, 'diffuser'))
+        self.assertEqual({k: rv['notable'][0][k] for k in ('id', 'label', 'hops', 'horizontal_gap_m')}, {'id': 'v', 'label': 'VAV box', 'hops': 12, 'horizontal_gap_m': 3.4})
+        self.assertEqual(A.tool_event('get_element', {}, {'element': {'id': 'e', 'layer': 'lighting', 'type': 'Light', 'level': 'L2'}})['visual']['element']['label'], 'light')
+        for name, res in (('list_sensors', {'sensors': []}), ('elements_near', {'error': 'x'}), ('connected_run', {'error': 'x'})):
+            self.assertNotIn('visual', A.tool_event(name, {}, res))
+
     def test_tool_event_paths_only_for_connected_run(self):
         self.assertNotIn('paths', A.tool_event('get_element', {}, {'element': {}}))
         ev = A.tool_event('connected_run', {}, {'start': {'id': 'a'}, 'notable_on_run': [{'id': 'c', 'path_ids': ['a', 'b', 'c']}]})

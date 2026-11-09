@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=3"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=4"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -1152,13 +1152,13 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
 /* ══ Ask the twin in the headset (opt-in ?ask=1; docs/ASK_TWIN.md "Headset") ══ Needs the local server (scripts/ask_twin_server.py [--mock] --lan),
    which serves this page and answers /api/ask with read-only tools over the twin (Claude, or scripted mock answers). Nothing here exists without ?ask=1.
    Trigger on a service element (or a demo-sensor pin) -> the info card plus an ask bar: the four question levels, hold-to-speak, close.
-   The answer comes back as a world-locked card under the element (Claude badge, short text, cited ids), verified citations glow in the model
+   The answer comes back as a world-locked card under the element (small AI mark, one headline, a picture built from the tool results, a short caption, check-on-site chip, cited ids), verified citations glow in the model
    (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
    and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
 var ASK=null;
 const XA=globalThis.XRAsk,XAOK=XA?.API===3,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
 ASK={on:!!XAP.enabled,base:XAP.server||null,code:XAP.code||'',prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
- paths:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
+ paths:[],vis:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
  hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0};
 ASK.glow.name='ask: cited elements (render-only glow)';bimRoot.add(ASK.glow);
 if(q.get('ask')==='1'&&!XAOK)console.warn('scan-xr: twin/xr-ask.js missing or out of date · Ask the twin is off');
@@ -1198,7 +1198,7 @@ function askDraw(){ASK.dirty=false;ASK.lastDraw=performance.now();
 /* Remove the answer (glow, run, speech) but keep the pick. */
 function askResetAnswer(){ASK.epoch++;try{ASK.abort?.abort();}catch(e){}ASK.abort=null;ASK.busy=false;askStopSpeech();clearTimeout(ASK.filler);ASK.progress='';
  for(const o of [...ASK.glow.children]){ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();}ASK.run=null;
- ASK.phase=null;ASK.model=null;ASK.final=null;ASK.text='';ASK.steps=[];ASK.paths=[];ASK.error=null;askCard.mesh.visible=false;askLine.visible=false;}
+ ASK.phase=null;ASK.model=null;ASK.final=null;ASK.text='';ASK.steps=[];ASK.paths=[];ASK.vis=[];ASK.error=null;askCard.mesh.visible=false;askLine.visible=false;}
 function askClear(){if(!ASK?.on)return;askResetAnswer();if(ASK.voice==='recording')askRecStop(true);askRing.visible=false;ASK.el=null;ASK.anchor=null;askBar.mesh.visible=false;ASK.hover.clear();invalidate();}
 /* Glow: a render-only copy of the element's own batch vertices (never modifies the batches), additive, always on top. Element not drawn
    (layer not loaded, other level, not a drawn layer): a box outline from the server's bbox (viewer frame = bimRoot-local). */
@@ -1239,7 +1239,7 @@ async function askQuestion(level,text){if(!ASK.on)return null;if(!ASK.el){status
   if(!res.ok||!res.body)throw new Error('ask server '+res.status+(res.status===404||res.status===501?' · open this page from scripts/ask_twin_server.py':''));
   let fail=null;const sp=XA.createStream(ev=>{if(epoch!==ASK.epoch)return;
    const pr=XA.progressText(ev,ASK.el);if(pr&&ASK.phase==='thinking'&&pr!==ASK.progress){ASK.progress=pr;ASK.dirty=true;}
-   if(ev.type==='tool'){ASK.steps.push(ev.name+' · '+(ev.summary||''));if(Array.isArray(ev.paths))ASK.paths.push(...ev.paths);ASK.dirty=true;}
+   if(ev.type==='tool'){ASK.steps.push(ev.name+' · '+(ev.summary||''));if(Array.isArray(ev.paths))ASK.paths.push(...ev.paths);if(ev.visual&&typeof ev.visual==='object')ASK.vis.push(ev.visual);ASK.dirty=true;}
    else if(ev.type==='status'){if(ev.phase!=='thinking'){ASK.steps.push(ev.text);ASK.dirty=true;}}
    else if(ev.type==='speak'){spoke=true;askSay(ev.text,epoch);}
    else if(ev.type==='text')ASK.text+=ev.text;else if(ev.type==='final')ASK.final=ev;else if(ev.type==='error')fail=ev.message||'server error';});
@@ -1247,7 +1247,7 @@ async function askQuestion(level,text){if(!ASK.on)return null;if(!ASK.el){status
   for(;;){const {value,done}=await reader.read();if(done)break;sp.push(dec.decode(value,{stream:true}));if(fail||epoch!==ASK.epoch)break;}
   sp.end();if(epoch!==ASK.epoch)return null;if(fail)throw new Error(fail);if(!ASK.final)throw new Error('the answer stream ended early');
   clearTimeout(ASK.filler);
-  const f=ASK.final,answer=f.answer||ASK.text;ASK.text=answer;ASK.model=XA.cardModel({question,answer,final:f,level:ASK.level});if(ASK.health?.note&&f.mode==='mock')ASK.model.footer[0]=ASK.model.footer[0].replace(/^MOCK · scripted from real tool results/,'MOCK · '+ASK.health.note);ASK.phase='answer';ASK.tAnswer=Math.round(performance.now()-t0);
+  const f=ASK.final,answer=f.answer||ASK.text;ASK.text=answer;const se=ASK.el||{},selMeta=layerState[se.layer]?.meta?.[se.id]||{};ASK.model=XA.cardModel({question,answer,final:f,level:ASK.level,visuals:ASK.vis,selected:se.id?{id:se.id,layer:se.layer,type:selMeta.type,name:selMeta.name,sensor:se.sensor}:null});if(ASK.health?.note&&f.mode==='mock')ASK.model.footer[0]=ASK.model.footer[0].replace(/^MOCK · scripted from real tool results/,'MOCK · '+ASK.health.note);ASK.phase='answer';ASK.tAnswer=Math.round(performance.now()-t0);
   askHighlight(f);askDraw();ASK.busy=false;askDrawBar();if(!ASK.saidAny)askEarcon('done');
   if(!spoke)askSay(f.spoken||XA.speakable(answer,f.citations),epoch);   // older server: no 'speak' events
   return {ms:ASK.tAnswer,final:f};
@@ -1354,7 +1354,7 @@ async function askHealth(){const sameOrigin=!ASK.base;$('askRetryBtn').style.dis
 function askInspection(){if(!ASK?.on)return {on:false,available:XAOK};const w=new THREE.Vector3();
  return {on:true,health:ASK.health?{mode:ASK.health.mode,model:ASK.health.model,stt:!!ASK.health.stt?.available,tts:!!ASK.health.tts?.available}:null,healthError:ASK.healthError,
   el:ASK.el&&{id:ASK.el.id,layer:ASK.el.layer,bim:ASK.el.bim,sensor:ASK.el.sensor},phase:ASK.phase,busy:ASK.busy,question:ASK.question,level:ASK.level,steps:ASK.steps.slice(),error:ASK.error,answerMs:ASK.tAnswer,
-  lead:ASK.model?.lead||null,primary:ASK.model?.primary||null,chips:ASK.model?.chips||[],citations:(ASK.final?.citations||[]).map(c=>({id:c.id,verified:c.verified,layer:c.layer})),
+  lead:ASK.model?.lead||null,primary:ASK.model?.primary||null,chips:ASK.model?.chips||[],visual:ASK.model?.visual||null,citations:(ASK.final?.citations||[]).map(c=>({id:c.id,verified:c.verified,layer:c.layer})),
   glow:ASK.glow.children.map(o=>({id:o.userData.id,kind:o.userData.kind})),run:ASK.run?{pieces:ASK.run.meshes.length,ids:ASK.run.ids.length}:null,speech:ASK.speech,speechPlan:ASK.speechPlan||null,speechEngine:ASK.speechEngine||null,
   base:ASK.base,prefer:ASK.prefer,progress:ASK.progress,note:ASK.health?.note||null,ring:askRing.visible,
   voice:ASK.voice,voicePlan:ASK.voicePlan||null,voiceNote:ASK.voiceNote,bar:askBar.mesh.visible?askButtons().map(b=>b.id):null,cardVisible:askCard.mesh.visible,infoCardVisible:card.mesh.visible,

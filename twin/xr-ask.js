@@ -3,7 +3,7 @@
    puts on planes in the scene. This file holds the logic and the drawing only (no three.js, no DOM queries):
      - the preset questions of the four levels (look up · nearby in 3D · trace a system · reason across sources),
      - the answer stream parser (Server-Sent Events from /api/ask),
-     - the short in-view answer card (lead, 2-3 bullets, cited ids, provenance footer) and its canvas drawing with the Claude badge,
+     - the in-view answer card (headline + a picture built from the tool results + caption, check chip, cited ids, provenance),
      - the spoken text, the run lighting timing for connected_run, the ask-bar layout and hit test, and the voice/TTS plans.
    Unit-tested in tests/xr-ask.test.cjs. The page is unchanged unless it is opened with ?ask=1. NOT verified on a headset. */
 (function (root, factory) {
@@ -22,7 +22,6 @@ const LEVELS = [
   {level: 4, id: 'q4', label: 'Why is it warm?', hint: 'reason across sources', question: 'This room is warm from 9 to 5 every weekday. What is the likely cause, and where do I check first?'},
 ];
 const COLORS = {primary: 0xff3df0, other: 0x22d3ee, run: 0x22d3ee};   // same magenta / cyan as the laptop panel (twin/ask-twin.js)
-const CLAUDE = {orange: '#D97757', cream: '#F4EFE6'};
 
 /* ?ask=1 turns the feature on. Anything else (absent, 0, off) leaves the page exactly as it was.
    &server=https://<laptop LAN IP>:<port> ("Method A"): the page itself comes from anywhere (e.g. GitHub Pages) and only the
@@ -131,7 +130,7 @@ function sections(answer) {
 
 /* The short in-view card: lead + at most 2 evidence bullets + the first "check first" line, cited ids, provenance.
    final = the server's 'final' event (citations verified server-side; only verified ids are highlighted). */
-function cardModel({question = '', answer = '', final = null, level = null, toolCount = null} = {}) {
+function cardModel({question = '', answer = '', final = null, level = null, toolCount = null, visuals = null, selected = null} = {}) {
   const S = sections(answer), cites = (final && final.citations) || [], byId = new Map(cites.map(c => [c.id, c]));
   const label = id => { const c = byId.get(id); return c && c.type ? c.type : null; };
   const primary = leadId(answer);
@@ -141,9 +140,12 @@ function cardModel({question = '', answer = '', final = null, level = null, tool
   const check = (S.sections['Check first'] || [])[0];
   const bullets = [...evidence.slice(0, 2).map(t => ({kind: 'why', text: plainLine(t)})), ...(check ? [{kind: 'check', text: plainLine(check)}] : [])];
   const chips = cites.filter(c => c.known !== false).map(c => ({id: c.id, label: c.label || c.type || c.layer || 'element', verified: !!c.verified, primary: c.id === primary}))
-    .sort((a, b) => (b.primary - a.primary) || (b.verified - a.verified)).slice(0, 4);
+    .sort((a, b) => (b.primary - a.primary) || (b.verified - a.verified)).slice(0, 5);
   const nv = cites.filter(c => c.verified).length, mode = final ? final.mode : null;
-  return {question: plainLine(question), level, lead, leadKind: S.leadKind, confidence: conf, bullets, chips, primary: primary && byId.get(primary)?.verified ? primary : null,
+  const prim = primary && byId.get(primary)?.verified ? primary : null;
+  const visual = visuals ? answerVisual({visuals, citations: cites, primary: prim, selected, answer}) : null;
+  if (visual && S.leadKind && visual.kind !== 'text') visual.caption = plainLine(S.lead.replace(/\s*·\s*confidence:\s*(low|medium|high)/i, ''), id => 'the ' + (byId.get(id)?.label || 'element'));   // older card format: the lead line
+  return {question: plainLine(question), level, lead, leadKind: S.leadKind, confidence: conf, bullets, chips, primary: prim, visual,
     limits: plainLine(S.limits), mode, model: final ? final.model : null, label,
     footer: [
       (mode === 'live' ? 'LIVE · ' + (final.model || 'Claude') : mode === 'mock' ? 'MOCK · scripted from real tool results' : '') +
@@ -281,21 +283,6 @@ function fit(ctx, text, x, y, width, size, weight = '', family = 'Arial') {
   ctx.fillText(text, x, y);
 }
 function rr(ctx, x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
-/* Claude badge: orange disc with a cream sparkle (tapered rays), drawn so no image asset is needed in the headset. */
-function drawBadge(ctx, cx, cy, r) {
-  ctx.save();
-  ctx.fillStyle = CLAUDE.orange; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-  ctx.translate(cx, cy); ctx.fillStyle = CLAUDE.cream;
-  const n = 12;
-  for (let k = 0; k < n; k++) {
-    ctx.save(); ctx.rotate(k * Math.PI * 2 / n + (k % 3) * .05);
-    const L = r * (k % 2 ? .52 : .7), w = r * (k % 2 ? .1 : .13);
-    ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.quadraticCurveTo(-w * .35, -L * .6, 0, -L); ctx.quadraticCurveTo(w * .35, -L * .6, w / 2, 0); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-  ctx.beginPath(); ctx.arc(0, 0, r * .17, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-}
 function drawSpeaker(ctx, x, y, s, color) {
   ctx.save(); ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineWidth = s * .12; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x, y - s * .2); ctx.lineTo(x + s * .22, y - s * .2); ctx.lineTo(x + s * .5, y - s * .45); ctx.lineTo(x + s * .5, y + s * .45); ctx.lineTo(x + s * .22, y + s * .2); ctx.lineTo(x, y + s * .2); ctx.closePath(); ctx.fill();
@@ -303,61 +290,312 @@ function drawSpeaker(ctx, x, y, s, color) {
   ctx.restore();
 }
 const hex = c => '#' + c.toString(16).padStart(6, '0');
-/* The answer card. view: {phase: 'thinking'|'answer'|'error', model (cardModel), steps: [text], error, speech: 'speaking'|'done'|'text only'|...} */
-function drawAnswer(ctx, W, H, view) {
-  const m = view.model || {}, pad = 40;
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = 'rgb(8,16,28)'; rr(ctx, 4, 4, W - 8, H - 8, 30); ctx.fill();
-  ctx.strokeStyle = view.phase === 'error' ? '#e2725b' : CLAUDE.orange; ctx.lineWidth = 4; ctx.stroke();
-  // header: badge, name, mode pill, read-aloud state
-  drawBadge(ctx, pad + 30, 62, 30);
-  ctx.fillStyle = '#fff'; ctx.font = '700 44px Arial'; ctx.fillText('Claude', pad + 74, 78);
-  const mode = view.modeLabel || (m.mode === 'live' ? 'LIVE' : m.mode === 'mock' ? 'MOCK' : '');
-  let hx = pad + 74 + ctx.measureText('Claude').width + 18;
-  if (mode) { ctx.font = '700 26px Arial'; const w = ctx.measureText(mode).width + 28; ctx.fillStyle = mode === 'LIVE' ? '#14532d' : '#6a4a10'; rr(ctx, hx, 42, w, 42, 21); ctx.fill(); ctx.fillStyle = mode === 'LIVE' ? '#86efac' : '#fcd34d'; ctx.fillText(mode, hx + 14, 72); hx += w + 12; }
-  if (m.level) { ctx.font = '600 26px Arial'; ctx.fillStyle = '#9fb6cb'; ctx.fillText('Level ' + m.level, hx + 4, 72); }
-  if (view.speech) { const sp = view.speech, col = sp === 'speaking' ? '#ffd9a0' : '#8aa2b8'; ctx.textAlign = 'right'; ctx.font = '700 24px Arial'; ctx.fillStyle = col; ctx.fillText(sp === 'speaking' ? 'READ ALOUD' : sp.toUpperCase(), W - pad, 72); const tw = ctx.measureText(sp === 'speaking' ? 'READ ALOUD' : sp.toUpperCase()).width; ctx.textAlign = 'left'; drawSpeaker(ctx, W - pad - tw - 46, 63, 36, col); }
-  let y = 128;
-  if (m.question) { ctx.font = 'italic 28px Arial'; ctx.fillStyle = '#a9c1d6'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y); y += 36; } y += 8; }
-  if (view.phase === 'thinking') {
-    ctx.font = '600 34px Arial'; ctx.fillStyle = '#e8f1f8'; fit(ctx, view.progress || 'Thinking…', pad, y + 12, W - 2 * pad, 34, '600'); y += 60;
-    ctx.font = '28px Arial';
-    for (const s of (view.steps || []).slice(-6)) { ctx.fillStyle = '#34d399'; ctx.fillText('✓', pad, y); ctx.fillStyle = '#cfe3f5'; fit(ctx, s, pad + 34, y, W - 2 * pad - 34, 28); y += 40; }
-  } else if (view.phase === 'error') {
-    ctx.font = '700 36px Arial'; ctx.fillStyle = '#ffb4a8'; ctx.fillText('Could not answer', pad, y + 12); y += 58;
-    ctx.font = '30px Arial'; ctx.fillStyle = '#e8f1f8'; for (const t of wrap(ctx, view.error || '', W - 2 * pad, 4)) { ctx.fillText(t, pad, y); y += 40; }
-  } else {
-    ctx.font = '700 36px Arial'; ctx.fillStyle = '#ffffff';
-    for (const t of wrap(ctx, m.lead || '', W - 2 * pad, (m.bullets || []).length ? 3 : 6)) { ctx.fillText(t, pad, y + 10); y += 46; }
-    if (m.confidence) { ctx.font = '700 24px Arial'; const t = 'confidence: ' + m.confidence, w = ctx.measureText(t).width + 26; ctx.fillStyle = m.confidence === 'high' ? '#14532d' : m.confidence === 'medium' ? '#6a4a10' : '#3b2a4a'; rr(ctx, pad, y - 10, w, 36, 18); ctx.fill(); ctx.fillStyle = '#f1f5f9'; ctx.fillText(t, pad + 13, y + 16); y += 40; }
-    y += 10;
-    for (const b of m.bullets || []) {
-      ctx.font = b.kind === 'check' ? '600 28px Arial' : '28px Arial'; ctx.fillStyle = b.kind === 'check' ? '#ffd479' : '#cfe3f5';
-      const lines = wrap(ctx, (b.kind === 'check' ? 'Check first: ' : '') + b.text, W - 2 * pad - 30, 2);
-      ctx.fillText(b.kind === 'check' ? '▸' : '•', pad, y + 6);
-      for (const t of lines) { ctx.fillText(t, pad + 30, y + 6); y += 36; }
-      y += 6;
-      if (y > H - 190) break;
-    }
-    // cited ids (verified ones are highlighted in the model)
-    let cx = pad; const cy = H - 150;
-    ctx.font = '600 24px Arial';
-    for (const c of m.chips || []) {
-      const t = '#' + c.id + ' ' + c.label, w = Math.min(ctx.measureText(t).width + 30, W - pad - cx);
-      if (w < 120) break;
-      const col = !c.verified ? '#ef4444' : c.primary ? hex(COLORS.primary) : hex(COLORS.other);
-      ctx.fillStyle = 'rgba(255,255,255,.06)'; rr(ctx, cx, cy - 30, w, 42, 12); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = c.primary ? 4 : 2.5; ctx.stroke();
-      ctx.fillStyle = c.verified ? '#f1f5f9' : '#fca5a5'; ctx.save(); ctx.beginPath(); ctx.rect(cx, cy - 34, w - 12, 50); ctx.clip(); ctx.fillText(t, cx + 15, cy); ctx.restore();
-      if (!c.verified) { ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 12, cy - 9); ctx.lineTo(cx + w - 12, cy - 9); ctx.stroke(); }
-      cx += w + 12;
-    }
+/* ---------------------------------------------------------------- visual answer card (Nov 9 redesign)
+   Feedback after the first recordings: a text-only card is hard to read in a headset. The card now leads with one short
+   headline and a picture chosen by the tool that answered, built from the structured tool results the server sends with
+   each 'tool' event (ev.visual, scripts/ask_twin/agent.py tool_visual) and the verified citations, never by parsing prose:
+     look up  (room_of / get_element) -> element pictogram, size, level, room chip with how sure the room is
+     nearby   (elements_near)          -> "what's above" height graph with pictogram markers + counts by system
+     trace    (connected_run)          -> mini path diagram: this element -> n pieces along the run -> source
+   The full sentence answer stays as a 1-2 line caption; a "check on site" chip and the evidence ids sit at the bottom.
+   A small neutral spark mark + "AI answer" replaces the chat-style header (no logo, no bubble). */
+const SYS = {duct: '#7dd3fc', fire: '#f87171', hydronic: '#fb923c', plumbing: '#60a5fa', structural: '#cbd5e1', lighting: '#fde68a',
+  equipment: '#86efac', conduit: '#c4b5fd', lifesafety: '#fca5a5', fixtures: '#e2e8f0', ceiling: '#94a3b8'};
+const SYS_WORD = {duct: 'ducts', fire: 'sprinkler pipes', hydronic: 'heating/cooling pipes', plumbing: 'plumbing', structural: 'structure',
+  lighting: 'lights', equipment: 'equipment', conduit: 'conduit', lifesafety: 'life safety', fixtures: 'fixtures'};
+const PICTO_FOR_LAYER = {duct: 'duct', fire: 'sprinkler', hydronic: 'pipe', plumbing: 'pipe', structural: 'beam', lighting: 'light',
+  equipment: 'equipment', conduit: 'conduit', lifesafety: 'sensor', fixtures: 'equipment'};
+/* element -> pictogram key: vent, vav, duct, damper, sprinkler, pipe, valve, light, beam, ceiling, conduit, sensor, equipment, box */
+function pictogram(el) {
+  if (!el) return 'box';
+  const label = String(el.label || '').toLowerCase(), t = `${el.type || ''} ${el.name || ''}`.toLowerCase(), layer = String(el.layer || '');
+  if (el.sensor || /sensor/.test(label)) return 'sensor';
+  if (label === 'vav box' || /terminal unit|\bvav\b|\bsdv\b/.test(t)) return 'vav';
+  if (label === 'diffuser' || /cdff|diffuser|grille|register|air outlet/.test(t)) return 'vent';
+  if (label === 'damper' || /damper/.test(t)) return 'damper';
+  if (label === 'valve' || /valve/.test(t)) return 'valve';
+  if (/sprinkler/.test(label) || layer === 'fire') return 'sprinkler';
+  if (label === 'light' || layer === 'lighting') return 'light';
+  if (label === 'ceiling' || layer.startsWith('ceilings')) return 'ceiling';
+  if (layer === 'structural' || /beam|framing|joist|girder|column|slab/.test(t)) return 'beam';
+  return PICTO_FOR_LAYER[layer] || (/pipe/.test(label) ? 'pipe' : /duct/.test(label) ? 'duct' : 'box');
+}
+const NICE = {diffuser: 'Air vent (diffuser)', 'VAV box': 'VAV box', light: 'Ceiling light', duct: 'Duct', 'sprinkler pipe': 'Sprinkler pipe',
+  'sprinkler drop': 'Sprinkler drop', 'sprinkler head': 'Sprinkler head', 'sprinkler fitting': 'Sprinkler fitting', pipe: 'Pipe', 'pipe fitting': 'Pipe fitting',
+  valve: 'Valve', damper: 'Damper', ceiling: 'Ceiling', 'coil connection kit': 'Coil connection kit'};
+/* plain display name: the server's spoken label, else the BIM type unless it is a CAD code */
+function niceName(el) {
+  if (!el) return 'Element';
+  const l = el.label && el.label !== 'element' ? el.label : (el.type && !/[A-Z]-[A-Z]{2,}/.test(el.type) ? el.type : '');
+  if (!l) return pictogram(el) === 'beam' ? 'Beam' : 'Element';
+  if (NICE[l]) return NICE[l];
+  if (/structural framing|beam/i.test(l)) return 'Beam';
+  return l.charAt(0).toUpperCase() + l.slice(1);
+}
+const shortName = el => niceName(el).replace(/\s*\(.*\)$/, '');
+const mFmt = v => (Math.round(v * 100) / 100).toFixed(v < 1 ? 2 : 1).replace(/\.?0+$/, '') + ' m';
+/* recorded size string, else the plan size of the model box ("0.6 × 0.6 m"), else null */
+function sizeText(el) {
+  if (!el) return null;
+  if (el.size) return String(el.size).replace(/\s+/g, ' ').trim().slice(0, 20);
+  const s = Array.isArray(el.size_m) && el.size_m.length === 3 ? el.size_m.map(Number) : null;
+  if (!s || !s.every(Number.isFinite)) return null;
+  const plan = [s[0], s[2]].sort((a, b) => b - a), r = v => (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, '');
+  if (plan[1] < .05) return null;
+  return plan[0] > 3 ? r(plan[0]) + ' m long' : r(plan[0]) + ' × ' + r(plan[1]) + ' m';
+}
+const LEVEL_WORD = l => { const m = /^L?(\d+)$/i.exec(String(l || '')); return m ? 'Level ' + m[1] : (l ? String(l) : ''); };
+/* room_of confidence -> chip: dots (1-3), word, basis */
+function roomChip(room) {
+  if (!room || !room.room) return null;
+  const c = room.confidence, recorded = c === 'recorded';
+  const name = String(room.room).replace(/\s*\/\s*/g, ' / ').replace(/\s+/g, ' ').trim().toLowerCase().replace(/(^|[\s/(-])([a-z])/g, (_, a, b) => a + b.toUpperCase()).slice(0, 40);
+  return {name, dots: recorded ? 3 : c === 'medium' ? 2 : 1, word: recorded ? 'Recorded' : c === 'medium' ? 'Probably' : 'Best guess',
+    basis: recorded ? 'on the element record' : 'guessed from nearby labels'};
+}
+/* answer prose -> caption (first sentences) and the "check …" phrase for the on-site chip. Display only; the graphics never
+   depend on these. */
+function answerBody(answer) {
+  return String(answer || '').replace(MOCK_TAG, '').split('\n').filter(l => !/^\s*(?:\*\*)?Evidence:/i.test(l)).join(' ')
+    .replace(CITE_RX, 'it').replace(/\*\*(.+?)\*\*:?/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/^\s*(?:Answer|Most likely source):\s*/i, '').replace(/\s+/g, ' ').trim();
+}
+function captionText(answer, n = 2) {
+  const body = answerBody(answer), parts = body ? body.split(/(?<=[.!?])\s+(?=[A-Z"“(])/) : [];
+  return parts.slice(0, n).map(t => t.trim()).join(' ').trim();
+}
+const CHECK_DEFAULT = {lookup: 'Check the room sign on site', near: 'Look above the ceiling tile on site', trace: 'Check the duct drawings or BAS points',
+  text: 'Check on site'};
+function checkText(answer, kind = 'text') {
+  const body = answerBody(answer).replace(/\s*\([^()]*\)/g, '');
+  const m = /\bcheck(?:ing)?\s+((?:the|a|an|on|with|its|for)\b[^.;:!?]{0,60})/i.exec(body);
+  let t = m ? 'Check ' + m[1].trim().replace(/[,\s]+$/, '') : '';
+  if (t.length > 52) t = t.slice(0, 52).replace(/\s+\S*$/, '') + '…';
+  return t || CHECK_DEFAULT[kind] || CHECK_DEFAULT.text;
+}
+/* visuals (ev.visual of every tool event) + verified citations + primary/selected -> what the card draws */
+function answerVisual({visuals = [], citations = [], primary = null, selected = null, answer = ''} = {}) {
+  const vis = (visuals || []).filter(v => v && typeof v === 'object'), of = k => vis.filter(v => v.kind === k);
+  const cites = (citations || []).filter(c => c && c.known !== false), ok = new Set(cites.filter(c => c.verified).map(c => c.id));
+  const byId = new Map(cites.map(c => [c.id, c])), citedOrder = cites.map(c => c.id);
+  const selId = selected && selected.id != null ? String(selected.id) : null;
+  const selEl = Object.assign({}, selected || {}, byId.get(selId) || {});
+  const run = of('run').find(v => (v.notable || []).length), near = of('near').find(v => v.above_only && (v.items || []).length) || of('near').find(v => (v.items || []).length);
+  const room = of('room').filter(v => v.room).pop() || null, elv = of('element').map(v => v.element).find(e => e && String(e.id) === selId) || of('element')[0]?.element || null;
+  const out = {kind: 'text', headline: '', check: '', caption: captionText(answer)};
+  if (run) {
+    const src = run.notable.find(n => n.id === primary && ok.has(n.id)) || run.notable.find(n => ok.has(n.id)) || run.notable[0];
+    const from = selId && run.start && String(run.start.id) !== selId ? selEl : (run.start && run.start.id ? Object.assign({}, run.start, byId.get(run.start.id) || {}) : selEl);
+    Object.assign(out, {kind: 'trace', from: {label: shortName(from), picto: pictogram(from)}, to: {id: src.id, label: shortName(src), picto: pictogram(src)},
+      hops: Number.isFinite(src.hops) ? src.hops : null, away: Number.isFinite(src.horizontal_gap_m) ? src.horizontal_gap_m : null,
+      where: src.vertical === 'above' ? 'above the ceiling' : src.vertical === 'below' ? 'below' : '', pieceWord: run.layer === 'duct' ? 'duct pieces' : 'pieces',
+      runPicto: PICTO_FOR_LAYER[run.layer] || 'duct', reached: run.reached || null, verified: ok.has(src.id)});
+    out.headline = 'Probably fed by ' + (/^[aeiou]/i.test(out.to.label) && !/^VAV/.test(out.to.label) ? 'an ' : 'a ') + out.to.label.replace(/^(?!VAV)\w/, c => c.toLowerCase());
+  } else if (near) {
+    const items = (near.items || []).filter(it => !String(it.layer || '').startsWith('ceilings')), rank = it => { const i = citedOrder.indexOf(it.id); return i < 0 ? 99 : i; };
+    const pickFrom = items.filter(it => ok.has(it.id)).sort((a, b) => rank(a) - rank(b));
+    const seen = new Set(pickFrom.map(it => it.label)), fill = items.filter(it => !ok.has(it.id) && it.vertical === 'above' && !seen.has(it.label) && seen.add(it.label));
+    const marks = [...pickFrom, ...fill].slice(0, 5).map(it => ({id: it.id, label: shortName(it), picto: pictogram(it), layer: it.layer, cited: ok.has(it.id),
+      above: it.vertical === 'above', dy: Number(it.vertical_gap_m) || 0, dh: Number(it.horizontal_gap_m) || 0}));
+    const counts = Object.entries(near.counts_by_layer || {}).filter(([layer]) => !layer.startsWith('ceilings')).slice(0, 5).map(([layer, n]) => ({layer, n, word: SYS_WORD[layer] || layer, picto: PICTO_FOR_LAYER[layer] || 'box'}));
+    const up = marks.filter(m => m.above && m.dy >= .03).sort((a, b) => a.dy - b.dy), top = up.find(m => m.dh < .3) || up[0];   // touching neighbours (0 m) do not make a headline
+    Object.assign(out, {kind: 'near', self: {label: shortName(selEl), picto: pictogram(selEl)}, marks, counts, total: near.total || 0, radius: near.radius_m || null, aboveOnly: !!near.above_only});
+    out.headline = top ? `${top.label} ${mFmt(top.dy)} above` : `${out.total} things within ${near.radius_m || 2} m`;
+  } else if (room || elv || selId || primary) {
+    const el = Object.assign({}, selEl, elv || {}, (!selId && byId.get(primary)) || {});
+    Object.assign(out, {kind: 'lookup', element: {label: niceName(el), picto: pictogram(el), layer: el.layer || null}, size: sizeText(el),
+      level: LEVEL_WORD((room && room.level) || el.level), room: roomChip(room)});
+    out.headline = niceName(el);
   }
-  ctx.fillStyle = '#8aa2b8';
+  if (out.kind === 'text') {
+    out.items = cites.filter(c => ok.has(c.id)).slice(0, 4).map(c => ({id: c.id, label: shortName(c), picto: pictogram(c), layer: c.layer}));
+    const first = captionText(answer, 1);
+    out.headline = first.length > 46 ? first.slice(0, 46).replace(/\s+\S*$/, '') + '…' : first;
+    out.caption = captionText(answer, 3).slice(first.length).trim() || '';
+  }
+  out.check = checkText(answer, out.kind);
+  return out;
+}
+
+/* small neutral mark (four-point spark) drawn here, no logo file */
+function drawMark(ctx, cx, cy, r, color = '#e2e8f0') {
+  ctx.save(); ctx.fillStyle = color; ctx.translate(cx, cy); ctx.beginPath();
+  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); ctx.quadraticCurveTo(0, 0, Math.cos(a + Math.PI / 4) * r * .22, Math.sin(a + Math.PI / 4) * r * .22); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+/* pictograms: line drawings in a square of side s centred on (cx, cy) */
+function drawPicto(ctx, key, cx, cy, s, color = '#e2e8f0') {
+  const h = s / 2, L = (x1, y1, x2, y2) => { ctx.beginPath(); ctx.moveTo(cx + x1 * h, cy + y1 * h); ctx.lineTo(cx + x2 * h, cy + y2 * h); ctx.stroke(); };
+  const R = (x, y, w, hh, fill) => { ctx.beginPath(); ctx.rect(cx + x * h, cy + y * h, w * h, hh * h); fill ? ctx.fill() : ctx.stroke(); };
+  const C = (x, y, r, fill) => { ctx.beginPath(); ctx.arc(cx + x * h, cy + y * h, r * h, 0, Math.PI * 2); fill ? ctx.fill() : ctx.stroke(); };
+  ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = Math.max(2, s * .07); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  switch (key) {
+    case 'vent': R(-.8, -.8, 1.6, 1.6); R(-.45, -.45, .9, .9); L(-.8, -.8, -.45, -.45); L(.8, -.8, .45, -.45); L(-.8, .8, -.45, .45); L(.8, .8, .45, .45); break;
+    case 'light': R(-.85, -.55, 1.7, .4, true); for (const x of [-.6, 0, .6]) L(x, -.02, x * 1.35, .75); break;
+    case 'duct': R(-.85, -.35, 1.25, .8); L(-.85, -.35, -.45, -.7); L(.4, -.35, .8, -.7); L(-.45, -.7, .8, -.7); L(.8, -.7, .8, .1); L(.4, .45, .8, .1); break;
+    case 'damper': R(-.8, -.6, 1.6, 1.2); for (const y of [-.3, 0, .3]) L(-.55, y + .12, .55, y - .12); break;
+    case 'pipe': L(-.85, -.28, .6, -.28); L(-.85, .28, .6, .28); ctx.beginPath(); ctx.ellipse(cx + .6 * h, cy, .14 * h, .28 * h, 0, 0, Math.PI * 2); ctx.stroke(); break;
+    case 'conduit': L(-.85, -.12, .85, -.12); L(-.85, .12, .85, .12); break;
+    case 'sprinkler': L(-.9, -.55, .9, -.55); L(-.9, -.3, .9, -.3); L(0, -.3, 0, .1); L(-.3, .12, .3, .12); for (const [x, y] of [[-.45, .5], [0, .65], [.45, .5]]) C(x, y, .09, true); break;
+    case 'valve': ctx.beginPath(); ctx.moveTo(cx - .8 * h, cy - .45 * h); ctx.lineTo(cx + .8 * h, cy + .45 * h); ctx.lineTo(cx + .8 * h, cy - .45 * h); ctx.lineTo(cx - .8 * h, cy + .45 * h); ctx.closePath(); ctx.stroke(); L(0, 0, 0, -.7); L(-.3, -.7, .3, -.7); break;
+    case 'beam': R(-.8, -.7, 1.6, .25, true); R(-.8, .45, 1.6, .25, true); R(-.12, -.45, .24, .9, true); break;
+    case 'vav': R(-.85, -.5, 1.7, 1); C(-.2, 0, .3); L(-.2, -.3, -.2, .3); L(.25, 0, .65, 0); L(.5, -.13, .65, 0); L(.5, .13, .65, 0); break;
+    case 'ceiling': L(-.9, -.2, .9, -.2); for (const x of [-.6, -.2, .2, .6]) L(x, -.2, x, .2); L(-.9, .2, .9, .2); break;
+    case 'sensor': C(0, .1, .22, true); ctx.beginPath(); ctx.arc(cx, cy + .1 * h, .5 * h, -2.4, -.75); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy + .1 * h, .8 * h, -2.4, -.75); ctx.stroke(); break;
+    case 'equipment': R(-.75, -.6, 1.5, 1.2); C(0, 0, .3); L(-.75, -.3, -.95, -.3); L(.75, .3, .95, .3); break;
+    case 'check': C(0, 0, .8); L(-.35, 0, -.08, .3); L(-.08, .3, .4, -.3); break;
+    default: R(-.6, -.45, 1, .9); L(-.6, -.45, -.25, -.75); L(.4, -.45, .75, -.75); L(-.25, -.75, .75, -.75); L(.75, -.75, .75, .15); L(.4, .45, .75, .15);
+  }
+  ctx.restore();
+}
+const sysColor = layer => SYS[layer] || (String(layer || '').startsWith('ceilings') ? SYS.ceiling : '#e2e8f0');
+function pill(ctx, x, y, text, {h = 40, size = 24, fill = 'rgba(255,255,255,.08)', stroke = null, color = '#f1f5f9', weight = '600', maxW = 600} = {}) {
+  ctx.font = `${weight} ${size}px Arial`; let t = text;
+  while (ctx.measureText(t).width + h * .7 > maxW && t.length > 4) t = t.slice(0, -2) + '…';
+  const w = ctx.measureText(t).width + h * .7;
+  ctx.fillStyle = fill; rr(ctx, x, y, w, h, h / 2); ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2.5; ctx.stroke(); }
+  ctx.fillStyle = color; ctx.fillText(t, x + h * .35, y + h / 2 + size * .36); return w;
+}
+function tile(ctx, x, y, w, h, color) { ctx.fillStyle = 'rgba(255,255,255,.05)'; rr(ctx, x, y, w, h, 22); ctx.fill(); ctx.strokeStyle = color; ctx.globalAlpha = .55; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 1; }
+function drawLookup(ctx, v, x, y, w, h) {
+  const col = sysColor(v.element.layer);
+  tile(ctx, x, y, 290, h, col); drawPicto(ctx, v.element.picto, x + 145, y + h * .44, 150, col);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#e2e8f0'; fit(ctx, shortName(v.element), x + 145, y + h - 26, 260, 28, '600'); ctx.textAlign = 'left';
+  let ry = y + 10; const rx = x + 330, rw = w - 330;
+  const row = (k, val) => { ctx.font = '600 22px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(k.toUpperCase(), rx, ry + 22); ctx.fillStyle = '#fff'; fit(ctx, val, rx, ry + 70, rw, 44, '700'); ry += 96; };
+  if (v.size) row('Size', v.size);
+  if (v.level) row('Level', v.level);
+  if (v.room) {
+    ctx.font = '600 22px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText('ROOM', rx, ry + 22);
+    ctx.fillStyle = '#fff'; fit(ctx, v.room.name, rx, ry + 64, rw, 38, '700');
+    let dx = rx; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(dx + 10, ry + 94, 9, 0, Math.PI * 2); ctx.fillStyle = i < v.room.dots ? '#fbbf24' : 'rgba(255,255,255,.18)'; ctx.fill(); dx += 26; }
+    ctx.font = '600 24px Arial'; ctx.fillStyle = '#fde68a'; ctx.fillText(v.room.word, dx + 8, ry + 102); const ww = ctx.measureText(v.room.word).width;
+    ctx.font = '22px Arial'; ctx.fillStyle = '#a9c1d6'; fit(ctx, '· ' + v.room.basis, dx + 18 + ww, ry + 102, rw - (dx + 18 + ww - rx), 22);
+  } else if (!v.size && !v.level) { ctx.font = '26px Arial'; ctx.fillStyle = '#a9c1d6'; ctx.fillText('No size or room in the model record', rx, ry + 40); }
+}
+function drawNear(ctx, v, x, y, w, h) {
+  const gw = Math.round(w * .6), axX = x + 92, base = y + h - 54, top = y + 26;
+  tile(ctx, x, y, gw, h, '#64748b');
+  const above = v.marks.filter(m => m.above), maxDy = Math.max(.5, ...above.map(m => m.dy)), span = Math.min(4, Math.ceil(maxDy * 1.25 / .5) * .5);
+  const Y = d => base - (Math.min(d, span) / span) * (base - top);
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(axX, base); ctx.lineTo(axX, top - 6); ctx.stroke();
+  ctx.font = '600 20px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.textAlign = 'right';
+  for (const d of [0, span / 2, span]) { const yy = Y(d); ctx.fillText(d ? '+' + mFmt(d) : '0', axX - 12, yy + 7); ctx.beginPath(); ctx.moveTo(axX - 6, yy); ctx.lineTo(axX + 6, yy); ctx.stroke(); }
+  ctx.textAlign = 'left';
+  // the selected element at height 0
+  drawPicto(ctx, v.self.picto, axX + 46, base + 22, 40, '#ffffff'); ctx.font = '600 22px Arial'; ctx.fillStyle = '#fff'; fit(ctx, 'this ' + v.self.label.toLowerCase(), axX + 78, base + 30, gw - 190, 22, '600');
+  // markers, labels pushed apart (min 48 px) with a leader to the true height
+  const ms = above.slice().sort((a, b) => a.dy - b.dy); let last = base - 10; const lab = [];
+  for (const m of ms) { let ly = Math.min(Y(m.dy), last - 48); ly = Math.max(ly, top + 8); lab.push([m, ly]); last = ly; }
+  for (const [m, ly] of lab) {
+    const col = sysColor(m.layer), yy = Y(m.dy);
+    ctx.strokeStyle = col; ctx.lineWidth = m.cited ? 4 : 2; ctx.beginPath(); ctx.moveTo(axX - 8, yy); ctx.lineTo(axX + 24, yy); ctx.lineTo(axX + 40, ly); ctx.stroke();
+    drawPicto(ctx, m.picto, axX + 70, ly, 40, col);
+    ctx.font = '700 26px Arial'; ctx.fillStyle = '#fff'; const t = '+' + mFmt(m.dy); ctx.fillText(t, axX + 100, ly + 9); const tw = ctx.measureText(t).width;
+    ctx.fillStyle = m.cited ? '#e2e8f0' : '#a9c1d6'; fit(ctx, m.label.toLowerCase() + (m.dh >= .3 ? ' · ' + mFmt(m.dh) + ' aside' : ''), axX + 110 + tw, ly + 9, gw - (axX - x) - 130 - tw, 24, m.cited ? '600' : '');
+  }
+  const beside = v.marks.filter(m => !m.above).slice(0, 2);
+  if (beside.length) { ctx.font = '22px Arial'; ctx.fillStyle = '#a9c1d6'; fit(ctx, 'beside: ' + beside.map(m => m.label.toLowerCase() + ' ' + mFmt(m.dh)).join(', '), x + 20, y + h - 12, gw - 40, 22); }
+  // counts by system
+  const cx = x + gw + 24, cw = w - gw - 24; tile(ctx, cx, y, cw, h, '#64748b');
+  ctx.font = '600 22px Arial'; ctx.fillStyle = '#8aa2b8'; fit(ctx, `${v.total} ITEMS WITHIN ${v.radius || 2} M` + (v.aboveOnly ? ' ABOVE' : ''), cx + 18, y + 38, cw - 36, 22, '600');
+  const maxN = Math.max(1, ...v.counts.map(c => c.n)); let yy = y + 66;
+  for (const c of v.counts) {
+    const col = sysColor(c.layer); drawPicto(ctx, c.picto, cx + 38, yy + 22, 34, col);
+    ctx.font = '600 22px Arial'; ctx.fillStyle = '#e2e8f0'; fit(ctx, c.word, cx + 66, yy + 16, cw - 140, 22, '600');
+    ctx.textAlign = 'right'; ctx.font = '700 24px Arial'; ctx.fillStyle = '#fff'; ctx.fillText(String(c.n), cx + cw - 16, yy + 18); ctx.textAlign = 'left';
+    ctx.fillStyle = col; ctx.globalAlpha = .75; rr(ctx, cx + 66, yy + 26, Math.max(6, (cw - 90) * c.n / maxN), 10, 5); ctx.fill(); ctx.globalAlpha = 1;
+    yy += 58; if (yy > y + h - 40) break;
+  }
+}
+function drawTrace(ctx, v, x, y, w, h) {
+  const midY = y + h * .42, ax = x + 130, bx = x + w - 130, col = SYS.duct;
+  for (const [cx, el, sub] of [[ax, v.from, 'this ' + v.from.label.toLowerCase()], [bx, v.to, (v.away != null ? mFmt(v.away) + ' away' : '') + (v.where ? (v.away != null ? ' · ' : '') + v.where : '')]]) {
+    tile(ctx, cx - 115, midY - 105, 230, 210, el === v.to ? hex(COLORS.primary) : '#94a3b8'); drawPicto(ctx, el.picto, cx, midY - 18, 110, el === v.to ? '#ffd1fb' : '#e2e8f0');
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; fit(ctx, el.label, cx, midY + 78, 210, 28, '700');
+    ctx.fillStyle = '#a9c1d6'; fit(ctx, sub, cx, midY + 140, 260, 24, ''); ctx.textAlign = 'left';
+  }
+  // the run between them: a chain of short duct pieces
+  const x0 = ax + 125, x1 = bx - 125, n = 7, seg = (x1 - x0) / n;
+  ctx.fillStyle = col;
+  for (let i = 0; i < n; i++) { ctx.globalAlpha = .35 + .55 * (i / (n - 1)); rr(ctx, x0 + i * seg + 4, midY - 12, seg - 8, 24, 6); ctx.fill(); }
+  ctx.globalAlpha = 1; ctx.textAlign = 'center';
+  ctx.font = '700 40px Arial'; ctx.fillStyle = '#fff'; ctx.fillText(v.hops != null ? String(v.hops) : '?', (x0 + x1) / 2, midY - 34);
+  ctx.font = '600 24px Arial'; ctx.fillStyle = '#bae6fd'; ctx.fillText(v.pieceWord + ' along the run', (x0 + x1) / 2, midY + 50);
+  ctx.textAlign = 'left';
+  ctx.font = '22px Arial'; ctx.fillStyle = '#a9c1d6';
+  const note = 'Lit up in the room · found from touching pieces, no flow direction in the model';
+  ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x + 20, y + h - 18); ctx.lineTo(x + 60, y + h - 18); ctx.stroke();
+  fit(ctx, note, x + 74, y + h - 10, w - 90, 22);
+}
+function drawItems(ctx, v, x, y, w, h) {
+  const items = v.items || []; if (!items.length) return false;
+  const tw = Math.min(220, (w - 20 * (items.length - 1)) / items.length);
+  items.forEach((it, i) => { const tx = x + i * (tw + 20), col = sysColor(it.layer); tile(ctx, tx, y, tw, h, col); drawPicto(ctx, it.picto, tx + tw / 2, y + h * .42, Math.min(110, tw * .55), col);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; fit(ctx, it.label, tx + tw / 2, y + h - 52, tw - 20, 26, '600'); ctx.fillStyle = '#8aa2b8'; fit(ctx, '#' + it.id, tx + tw / 2, y + h - 18, tw - 20, 20, ''); ctx.textAlign = 'left'; });
+  return true;
+}
+/* The answer card. view: {phase: 'thinking'|'answer'|'error', model (cardModel; model.visual from answerVisual), steps: [text],
+   error, speech: 'speaking'|'done'|'text only'|..., progress, modeLabel, footer} */
+function drawAnswer(ctx, W, H, view) {
+  const m = view.model || {}, pad = 40, v = m.visual || null;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(10,16,24,.94)'; rr(ctx, 4, 4, W - 8, H - 8, 28); ctx.fill();
+  ctx.strokeStyle = view.phase === 'error' ? '#e2725b' : 'rgba(226,232,240,.35)'; ctx.lineWidth = 3; ctx.stroke();
+  // header: small mark + "AI answer", mode, read-aloud state
+  drawMark(ctx, pad + 14, 46, 15, '#e2e8f0');
+  ctx.font = '600 24px Arial'; ctx.fillStyle = '#a9c1d6'; ctx.fillText('AI answer', pad + 38, 55);
+  let hx = pad + 38 + ctx.measureText('AI answer').width + 16;
+  const mode = view.modeLabel || (m.mode === 'live' ? 'LIVE' : m.mode === 'mock' ? 'MOCK' : '');
+  if (mode) hx += pill(ctx, hx, 32, mode, {h: 32, size: 19, weight: '700', fill: mode === 'LIVE' ? '#14532d' : '#6a4a10', color: mode === 'LIVE' ? '#86efac' : '#fcd34d'}) + 12;
+  if (view.speech) { const sp = view.speech, t = sp === 'speaking' ? 'READ ALOUD' : sp.toUpperCase(), col = sp === 'speaking' ? '#fde68a' : '#8aa2b8'; ctx.textAlign = 'right'; ctx.font = '700 20px Arial'; ctx.fillStyle = col; ctx.fillText(t, W - pad, 55); const tw = ctx.measureText(t).width; ctx.textAlign = 'left'; drawSpeaker(ctx, W - pad - tw - 38, 48, 28, col); }
+  let y = 92;
+  if (view.phase === 'thinking' || view.phase === 'error' || !v) {
+    if (m.question) { ctx.font = 'italic 28px Arial'; ctx.fillStyle = '#a9c1d6'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y + 20); y += 36; } y += 14; }
+  }
+  if (view.phase === 'thinking') {
+    ctx.fillStyle = '#e8f1f8'; fit(ctx, view.progress || 'Thinking…', pad, y + 30, W - 2 * pad, 40, '700'); y += 80;
+    ctx.font = '26px Arial';
+    for (const s of (view.steps || []).slice(-6)) { drawPicto(ctx, 'check', pad + 14, y - 9, 26, '#34d399'); ctx.fillStyle = '#cfe3f5'; fit(ctx, s, pad + 40, y, W - 2 * pad - 40, 26); y += 40; }
+  } else if (view.phase === 'error') {
+    ctx.font = '700 38px Arial'; ctx.fillStyle = '#ffb4a8'; ctx.fillText('Could not answer', pad, y + 20); y += 66;
+    ctx.font = '30px Arial'; ctx.fillStyle = '#e8f1f8'; for (const t of wrap(ctx, view.error || '', W - 2 * pad, 4)) { ctx.fillText(t, pad, y); y += 40; }
+  } else if (v) {
+    // headline
+    ctx.fillStyle = '#ffffff'; fit(ctx, v.headline || m.lead || '', pad, y + 50, W - 2 * pad, 56, '700'); y += 78;
+    // the picture
+    const bh = 330, by = y;
+    const drawn = v.kind === 'lookup' ? (drawLookup(ctx, v, pad, by, W - 2 * pad, bh), true) : v.kind === 'near' ? (drawNear(ctx, v, pad, by, W - 2 * pad, bh), true)
+      : v.kind === 'trace' ? (drawTrace(ctx, v, pad, by, W - 2 * pad, bh), true) : drawItems(ctx, v, pad, by, W - 2 * pad, 250);
+    y = drawn ? by + (v.kind === 'text' ? 250 : bh) + 14 : y;
+    // caption (the sentence answer, 1-2 lines)
+    ctx.font = '25px Arial'; ctx.fillStyle = '#b8c9d9';
+    for (const t of wrap(ctx, v.caption || '', W - 2 * pad, drawn ? 2 : 6)) { ctx.fillText(t, pad, y + 22); y += 32; }
+    // bottom rows: check on site, then the evidence ids
+    const ry = H - 200;
+    const cw = pill(ctx, pad, ry, '      ' + v.check, {h: 46, size: 24, fill: 'rgba(251,191,36,.16)', stroke: '#fbbf24', color: '#fde68a', weight: '700', maxW: W - 2 * pad});
+    drawPicto(ctx, 'check', pad + 27, ry + 23, 26, '#fbbf24');
+    let cx = pad; const ey = H - 140;
+    ctx.font = '600 19px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText('EVIDENCE', cx, ey + 23); cx += ctx.measureText('EVIDENCE').width + 14;
+    for (const c of m.chips || []) {
+      const col = !c.verified ? '#ef4444' : c.primary ? hex(COLORS.primary) : hex(COLORS.other);
+      ctx.font = '600 20px Arial'; const t = '#' + c.id + ' ' + shortName(c).toLowerCase(), wNeed = Math.min(ctx.measureText(t).width + 24, 260); if (cx + wNeed > W - pad) break;
+      const w = pill(ctx, cx, ey, t, {h: 34, size: 20, fill: 'rgba(255,255,255,.06)', stroke: col, color: c.verified ? '#f1f5f9' : '#fca5a5', maxW: 260});
+      if (!c.verified) { ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 8, ey + 17); ctx.lineTo(cx + w - 8, ey + 17); ctx.stroke(); }
+      cx += w + 8;
+    }
+  } else {
+    // no visual model (older page): the text card as before
+    ctx.font = '700 36px Arial'; ctx.fillStyle = '#ffffff';
+    for (const t of wrap(ctx, m.lead || '', W - 2 * pad, 6)) { ctx.fillText(t, pad, y + 10); y += 46; }
+    let cx = pad;
+    for (const c of m.chips || []) { const w = pill(ctx, cx, H - 170, '#' + c.id + ' ' + c.label, {h: 40, size: 22, stroke: c.primary ? hex(COLORS.primary) : hex(COLORS.other), maxW: W - pad - cx}); cx += w + 10; if (cx > W - 200) break; }
+  }
   const f = (m.footer && m.footer.length ? m.footer : view.footer) || [];
-  if (view.runNote) { ctx.fillStyle = '#9fe7f5'; fit(ctx, view.runNote, pad, H - 92, W - 2 * pad, 24); }
-  ctx.fillStyle = '#8aa2b8';
-  if (f[0]) fit(ctx, f[0], pad, H - 58, W - 2 * pad, 24);
-  if (f[1]) fit(ctx, f[1], pad, H - 26, W - 2 * pad, 22);
+  if (view.runNote && !(v && v.kind === 'trace') && view.phase === 'answer') { ctx.fillStyle = '#9fe7f5'; fit(ctx, view.runNote, pad, H - 70, W - 2 * pad, 20); }
+  ctx.fillStyle = '#7f94a8';
+  if (f[0]) fit(ctx, f[0], pad, H - 44, W - 2 * pad, 20);
+  ctx.fillStyle = '#7f94a8';
+  if (f[1]) fit(ctx, f[1], pad, H - 18, W - 2 * pad, 20);
 }
 /* The ask bar (buttons). hover: Set of button indices under a ray. */
 function drawBar(ctx, W, H, buttons, hover = new Set()) {
@@ -368,7 +606,7 @@ function drawBar(ctx, W, H, buttons, hover = new Set()) {
     const r = rects[i]; if (!r) return;
     const hov = hover.has(i) && !b.disabled, x = r.x * W, y = r.y * H, w = r.w * W, h = r.h * H;
     ctx.fillStyle = hov ? '#FDB515' : b.tone === 'rec' ? '#7a2633' : b.tone === 'exit' ? '#3a2633' : b.disabled ? '#1b2a3a' : '#123a5c';
-    rr(ctx, x, y, w, h, 16); ctx.fill(); ctx.strokeStyle = hov ? '#fff' : b.id === 'mic' && b.tone !== 'off' ? CLAUDE.orange : '#5d82a3'; ctx.lineWidth = hov ? 6 : 3; ctx.stroke();
+    rr(ctx, x, y, w, h, 16); ctx.fill(); ctx.strokeStyle = hov ? '#fff' : b.id === 'mic' && b.tone !== 'off' ? '#fbbf24' : '#5d82a3'; ctx.lineWidth = hov ? 6 : 3; ctx.stroke();
     ctx.textAlign = 'center'; ctx.fillStyle = hov ? '#0b1020' : b.disabled ? '#7b8da0' : '#fff';
     fit(ctx, b.label, x + w / 2, y + h * .48, w - 20, 34, '700');
     ctx.fillStyle = hov ? '#0b1020' : '#9fb6cb'; fit(ctx, b.sub || '', x + w / 2, y + h * .8, w - 20, 22, '500');
@@ -376,7 +614,8 @@ function drawBar(ctx, W, H, buttons, hover = new Set()) {
   });
 }
 
-return {API, LEVELS, COLORS, CLAUDE, BAR, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
-  barRects, barHit, barButtons, micPlan, ttsPlan, wrap, drawBadge, drawAnswer, drawBar,
+return {API, LEVELS, COLORS, BAR, SYS, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
+  barRects, barHit, barButtons, micPlan, ttsPlan, wrap, drawMark, drawPicto, drawAnswer, drawBar,
+  pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
   serverOrigin, privateIPv4, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

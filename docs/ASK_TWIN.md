@@ -285,9 +285,19 @@ MR/VR page (`scan-xr.html`, the page behind `/mr`) in mock mode; nothing below i
    **ask bar** under it: `1 · What is this?` (look up), `2 · What's above?` (nearby in 3D), `3 · What feeds it?`
    (trace a system), `4 · Why is it warm?` (reason across sources), **Hold to speak**, **Close**.
 2. Trigger on a level button, or hold the trigger on *Hold to speak*, say the question, release.
-3. The answer comes back as a world-locked card just under the element: Claude badge, LIVE/MOCK, the short lead,
-   two evidence lines, the first *check first* line, the cited ids (verified ones bordered; unverified struck through) and
-   the provenance footer (*design BIM · inferred geometry and rooms · demo sensors SIMULATED · not headset-verified*).
+3. The answer comes back as a world-locked card just under the element (visual card since Nov 9, 2026; not
+   headset-verified): a small neutral spark mark + *AI answer* and LIVE/MOCK, one large headline, then a picture chosen
+   by the tool that answered, built from the structured tool results (`visual` on each server `tool` event,
+   `scripts/ask_twin/agent.py` `tool_visual`), never by parsing the prose:
+   - look up (`room_of` / `get_element`): element pictogram, size, level and a room chip with how sure the room is
+     (*Recorded* / *Probably* / *Best guess · guessed from nearby labels*);
+   - nearby (`elements_near`): a *what's above* height graph, pictogram markers at their vertical gaps (+ how far aside),
+     and counts by system;
+   - trace (`connected_run`): this element → n pieces along the run → the cited source (distance, above the ceiling),
+     next to the lit run in the room.
+   Below it the sentence answer as a 1-2 line caption, a *check on site* chip, the evidence ids (verified ones bordered;
+   unverified struck through) and the provenance footer (*design BIM · inferred geometry and rooms · demo sensors
+   SIMULATED · not headset-verified*). Other questions show the first sentence as headline and tiles of the cited elements.
 4. Verified cited elements glow (most likely source magenta, others cyan): render-only copies of the element's own
    batch vertices, drawn on top; a box outline when the element is not drawn (layer not loaded, other level). When the
    answer used `connected_run` (levels 3 and 4), the run lights up piece by piece from the cited terminal unit to the
@@ -393,7 +403,7 @@ The headless check loads three element layers under software WebGL and takes abo
 - `scripts/ask_twin/limits.py` — access code, rate limits, daily token budget (usage JSON outside the repo)
 - `scripts/ask_twin/index.py` — element box index; `tools.py` — read-only tools + schemas; `agent.py` — live and mock loops (+ `mock_route`); `speech.py` — short spoken version and `speak` events
 - `twin/ask-twin.js` — panel, citation chips, highlights, fly-to, push-to-talk, spoken reply
-- `twin/xr-ask.js` — headset helpers and canvas drawing (ask bar, answer card, Claude badge); `scan-xr.html` `?ask=1` block wires it into the XR page
+- `twin/xr-ask.js` — headset helpers and canvas drawing (ask bar, visual answer card, pictograms); `scan-xr.html` `?ask=1` block wires it into the XR page
 - `tests/xr-ask.test.cjs`, `tests/xr-ask-smoke.cjs` — headset helper tests and the desktop-simulation smoke
 - `grimes-bim-viewer.html` — small `?ask=1` hook (`window.twinViewerApi`, pick context); inert without `?ask=1`
 - `tests/test_ask_twin.py`, `tests/ask-twin-smoke.cjs`

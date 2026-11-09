@@ -94,7 +94,7 @@ def verify_citations(twin: Twin, text: str, grounded: set) -> list:
         if known:
             s = twin.summary(cid)
             from .speech import spoken_name
-            row.update({'layer': s['layer'], 'type': s.get('type'), 'label': spoken_name(s), 'name': s.get('name'), 'level': s.get('level'),
+            row.update({'layer': s['layer'], 'type': s.get('type'), 'label': spoken_name(s), 'name': s.get('name'), 'level': s.get('level'), 'size': s.get('size'), 'size_m': s.get('size_m'),
                         'bbox_m': twin.box[cid], 'in_viewer': s['layer'] in ix.VIEWER_LAYERS})
         out.append(row)
     return out
@@ -159,7 +159,54 @@ def tool_event(name, args, result) -> dict:
     if name == 'connected_run' and 'error' not in result:
         ev['paths'] = [{'to': n['id'], 'ids': list(n.get('path_ids') or [])} for n in result.get('notable_on_run', [])[:6]]
         ev['start'] = (result.get('start') or {}).get('id')
+    vis = tool_visual(name, result)
+    if vis:
+        ev['visual'] = vis
     return ev
+
+
+def _vis_el(s: dict) -> dict:
+    """One element for the headset answer card's pictograms: id, plain name, type, layer (+ size string when recorded)."""
+    from .speech import spoken_name
+    out = {'id': s.get('id'), 'label': spoken_name(s), 'type': s.get('type'), 'layer': s.get('layer')}
+    if s.get('size'):
+        out['size'] = str(s['size'])[:24]
+    if s.get('size_m'):
+        out['size_m'] = s['size_m']
+    return out
+
+
+def tool_visual(name, result) -> dict | None:
+    """Compact structured data from a tool result for the headset answer card's graphics (pictograms, height graph, run
+    diagram). Copied from the tool result only (no prose parsing, nothing added); None for tools the card does not draw."""
+    if not isinstance(result, dict) or 'error' in result:
+        return None
+    if name == 'get_element' and result.get('element'):
+        e = result['element']
+        return {'kind': 'element', 'element': _vis_el(e), 'level': e.get('level')}
+    if name == 'room_of':
+        conf = result.get('confidence')
+        return {'kind': 'room', 'room': result.get('room'), 'level': result.get('level'),
+                'confidence': 'recorded' if conf and conf.startswith('recorded') else conf,
+                'basis': 'element' if conf and conf.startswith('recorded') else 'nearby labels'}
+    if name == 'elements_near':
+        items = []
+        for s in result.get('elements', [])[:16]:
+            it = _vis_el(s)
+            it.update({'vertical': s.get('vertical'), 'vertical_gap_m': s.get('vertical_gap_m'), 'horizontal_gap_m': s.get('horizontal_gap_m')})
+            items.append(it)
+        q = result.get('query') or {}
+        return {'kind': 'near', 'above_only': bool(q.get('above_only')), 'radius_m': q.get('radius_m'), 'total': result.get('total_found', 0),
+                'counts_by_layer': dict(list((result.get('counts_by_layer') or {}).items())[:6]), 'items': items}
+    if name == 'connected_run':
+        notable = []
+        for s in result.get('notable_on_run', [])[:4]:
+            it = _vis_el(s)
+            it.update({'hops': s.get('hops'), 'horizontal_gap_m': s.get('horizontal_gap_m'), 'vertical': s.get('vertical'), 'vertical_gap_m': s.get('vertical_gap_m')})
+            notable.append(it)
+        return {'kind': 'run', 'start': _vis_el(result.get('start') or {}), 'layer': result.get('layer'), 'reached': result.get('elements_reached'),
+                'types_in_run': dict(list((result.get('types_in_run') or {}).items())[:4]), 'notable': notable}
+    return None
 
 
 def tool_summary(name, args, result) -> str:
