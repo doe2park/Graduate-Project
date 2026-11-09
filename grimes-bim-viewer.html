@@ -2691,7 +2691,7 @@ document.getElementById('mobileBrowse').onclick=async()=>{
 let mobileSearchTimer;document.getElementById('mobileElementSearch').oninput=()=>{clearTimeout(mobileSearchTimer);mobileSearchTimer=setTimeout(renderMobileElements,100);};
 document.getElementById('mobileElementClose').onclick=()=>{document.getElementById('mobileElementBrowser').hidden=true;};
 document.getElementById('mobileFit').onclick=()=>{if(walkMode)exitWalk();clearPick();const bb=bimBbox();if(bb.isEmpty())return;const c=bb.getCenter(new THREE.Vector3()),r=bb.getSize(new THREE.Vector3()).length()/2;const angle=Math.min(camera.fov*Math.PI/180,2*Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect));controls.target.copy(c);camera.position.copy(c).addScaledVector(new THREE.Vector3(1,.7,1).normalize(),r/Math.sin(angle/2)*1.05);controls.update();};
-if (new URLSearchParams(location.search).has('ask')) {   // local Ask-the-twin demo (scripts/ask_twin_server.py)
+if (new URLSearchParams(location.search).get('ask') === '1') {   // local Ask-the-twin demo (scripts/ask_twin_server.py)
   window.twinViewerApi = askViewerApi();
   const sc = document.createElement('script'); sc.src = 'twin/ask-twin.js'; document.head.appendChild(sc);
 }
