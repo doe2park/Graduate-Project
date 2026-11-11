@@ -1,6 +1,10 @@
 # Viewer validation
 
-The static site has no build step. Tests use Node's test runner and Python unittest. Three.js is pinned to the same 0.169.0 as the viewer.
+The static site has no build step. Tests use Node's test runner and Python unittest.
+
+One command runs every unit test (no browsers, GPU or network) and prints a summary: `python3 scripts/run_all_tests.py`. It does not run the headless-browser smokes (`tests/*-smoke.cjs`) or the two suites under `scripts/` (last command below).
+
+The pages load Three.js 0.169.0. The render-tier tests need a local copy: `tools/package.json` pins 0.170.0, which the runner picks up from `tools/node_modules/three` when it is installed; without it those `.mjs` tests fail on the missing module, not on the code. The Python suite needs numpy, requests, Pillow and scipy; the `~/.venvs/ask-twin` environment has only what `tests/test_ask_twin.py` needs.
 
 ```sh
 node --test tests/viewer.test.cjs

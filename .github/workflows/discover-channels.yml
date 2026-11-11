@@ -13,6 +13,7 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: bmo-discovery
     steps:
@@ -31,7 +32,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests==2.34.2
 
       - name: Probe devices
         env:
@@ -47,7 +48,9 @@ jobs:
           git config user.email "bmo@github-actions.bot"
           git add data/bmo_channels_report.json
           git diff --staged --quiet || git commit -m "🔎 BMO channel inventory"
+          ok=0
           for i in 1 2 3; do
-            git pull --rebase origin data && git push origin data && break
+            if git pull --rebase origin data && git push origin data; then ok=1; break; fi
             sleep $((i * 5))
           done
+          if [ "$ok" != 1 ]; then echo "::error::push to data branch failed after 3 attempts"; exit 1; fi

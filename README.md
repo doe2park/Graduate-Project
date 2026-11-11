@@ -2,7 +2,7 @@
 
 **Yoonsung Chung · UC Berkeley Civil & Environmental Engineering**
 
-Advisor: Prof. Kenichi Soga · Research status updated October 14, 2026
+Advisor: Prof. Kenichi Soga · Research status updated November 10, 2026
 
 A research prototype linking **captured site appearance, BIM objects and operational data**, with explicit labels for measured, modelled and inferred information.
 
@@ -35,8 +35,8 @@ No installation is required. Open a live page, rather than its HTML source on Gi
 |---|---|---|
 | Element BIM | Ten layers, 66,620 identities with geometry; filtering, picking and runtime batching | Design properties do not prove installed condition or sensor coverage |
 | Operating data | Scheduled BMO collection and archived observations | Not a direct BAS/BACnet connection or continuous verified meter history |
-| Public scan comparison | September 17 capture is the default; May 6 baseline remains selectable | September alignment is provisional; photo transitions are not measured parallax |
-| Gaussian reconstruction | Two distinct local research tracks: exported poses and independent raw-video SfM | Trained scenes remain local; public links open photo/mesh modes |
+| Public scan comparison | October 18 capture is the default (Level 1, plus Level 2 and Level 3 photo packages); September 17 and the May 6 baseline remain selectable | September and October alignments are provisional; photo transitions are not measured parallax |
+| Gaussian reconstruction | Two distinct research tracks: exported poses and independent raw-video SfM. Published scenes: May 6, and October 18 Level 1 zones A, C and D | Experimental appearance, not surveyed geometry; October 18 zone B and all other trained scenes remain local |
 | Research evaluation | Task-based comparison proposed | No completed user study or demonstrated improvement in decision accuracy yet |
 
 ## Architecture and data honesty
@@ -57,7 +57,7 @@ The collection workflow is scheduled every 15 minutes, but GitHub runs scheduled
 
 ## Scan registration and reconstruction
 
-The public comparison contains separate May 6 and September 17 packages, each with 100 recovered panoramas. The May source inventory lists 217 positions; that is not 217 recovered images. The September package is not claimed to cover the entire building or all server imagery.
+The public comparison contains separate May 6, September 17 and October 18 Level 1 packages, each with 100 recovered panoramas, plus October 18 Level 2 and Level 3 photo packages. The May source inventory lists 217 positions; that is not 217 recovered images. The September package is not claimed to cover the entire building or all server imagery.
 
 The May registration uses axis conversion, pose search and trimmed point-to-point ICP constrained to yaw and translation, with metric scale fixed. Its approximately 0.13 m internal median nearest-point residual is **not surveyed accuracy**. September uses a separately labelled provisional project-frame alignment; May's validation status must not be transferred to it.
 
@@ -98,7 +98,7 @@ To train a Gaussian scene for a capture yourself (Mac or Windows with a GPU), fo
 
 ### Ask the twin (local AI demo)
 
-Click a BIM element in the viewer and ask a question; a small server on your laptop answers with Claude and read-only tools over the twin data, and highlights the elements the answer cites. Local only: nothing is deployed.
+Click a BIM element in the viewer and ask a question; a small server on your laptop answers with Claude and read-only tools over the twin data, and highlights the elements the answer cites. The pages carry the Ask panel behind `?ask=1`, but answers need the server running on your own laptop: no AI service is deployed.
 
 ```bash
 python3 scripts/ask_twin_server.py          # live: needs ANTHROPIC_API_KEY (env or ~/.config/ask-twin/env)

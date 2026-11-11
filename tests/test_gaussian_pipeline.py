@@ -39,6 +39,8 @@ class PresetTests(unittest.TestCase):
     def test_shipped_presets_point_at_existing_inputs(self):
         for preset in pipe.load_presets()['captures'].values():
             for rel in [preset['manifest'], preset['registration'], *preset['seedGlbs']]:
+                if rel.startswith('capture-local/') and not (ROOT / 'capture-local').is_dir():
+                    continue   # private captures are git-ignored: absent in a fresh clone or another worktree
                 self.assertTrue((ROOT / rel).is_file(), rel)
 
     def test_validation_rejects_bad_presets(self):

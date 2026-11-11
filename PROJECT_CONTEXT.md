@@ -1,7 +1,9 @@
 # Project Context — UC Berkeley Campus Digital Twin
 
+> **Historical (last updated 2026-07-30).** Kept for background only. The current entry points are [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md) and [README.md](README.md). The "Pushing changes" recipe below is superseded: work happens in local git worktrees, and files are moved, never deleted with `rm`.
+
 > Paste this whole file into a fresh Cowork session. Gives a new Claude full context to continue without redoing work.
-> User: Yoonsung (yschung1105@gmail.com) · Graduate student, UC Berkeley.
+> User: Yoonsung · Graduate student, UC Berkeley.
 
 ---
 
@@ -203,7 +205,7 @@ cd /tmp && rm -rf graduate_fresh
 git clone https://doe2park:<TOKEN>@github.com/doe2park/Graduate-Project.git graduate_fresh
 cp "/sessions/<sandbox-id>/mnt/Graduate-Project/<file>" /tmp/graduate_fresh/
 cd /tmp/graduate_fresh
-git config user.name "Yoonsung" && git config user.email "yschung1105@gmail.com"
+git config user.name "Yoonsung"
 git add <files>
 git commit -m "..."
 git push origin main

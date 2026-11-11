@@ -262,10 +262,13 @@ def merge_history(existing, new_rows, now_pt, run_t):
     return [e for t, e in sorted(((t, e) for t, e in keep if t and t >= cutoff), key=lambda x: x[0])]
 
 
-def write_json_atomic(path, obj):
-    """Write via a temp file + rename so an interrupted run never leaves truncated JSON."""
+def write_json_atomic(path, obj, **dump_kw):
+    """Write via a temp file + rename so an interrupted run never leaves truncated JSON.
+
+    dump_kw overrides the compact default (e.g. indent=2) so a file keeps its existing layout."""
+    path = Path(path)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, separators=(",", ":")))
+    tmp.write_text(json.dumps(obj, **(dump_kw or {"separators": (",", ":")})))
     os.replace(tmp, path)
 
 
@@ -609,10 +612,9 @@ def run():
     }
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, "w") as f:
-        json.dump(output, f, indent=2)
-    with open(HISTORY_FILE, "w") as f:
-        json.dump(history, f)
+    # Atomic writes: a cancelled run (the workflow cancels in-progress runs) must never commit truncated JSON.
+    write_json_atomic(OUTPUT_FILE, output, indent=2)
+    write_json_atomic(HISTORY_FILE, history, separators=(", ", ": "))
     save_pacific_days(history, OUTPUT_DIR, now_str, now_pt)
 
     # ── Save daily snapshot (append to today's file) ──
@@ -632,14 +634,12 @@ def run():
         "online": online,
         "buildings": {bid: r["kw"] for bid, r in results.items() if r["kw"] is not None}
     })
-    with open(daily_file, "w") as f:
-        json.dump(daily, f)
+    write_json_atomic(daily_file, daily, separators=(", ", ": "))
 
     # ── Update daily index ──
     daily_files = sorted(daily_dir.glob("*.json"))
     index = [f.stem for f in daily_files if f.stem != "index"]
-    with open(daily_dir / "index.json", "w") as f:
-        json.dump({"days": index, "updated": now_str}, f)
+    write_json_atomic(daily_dir / "index.json", {"days": index, "updated": now_str}, separators=(", ", ": "))
 
     print(f"\n  ✓ {online}/{len(results)} online | {total_kw} kW")
     print(f"  ✓ ~${output['total_daily_cost']}/day | ~{output['total_daily_co2_kg']} kg CO2/day")

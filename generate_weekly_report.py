@@ -66,7 +66,7 @@ def run():
         day_min = round(min(kws), 1) if kws else 0
         peak_time = ""
         for r in readings:
-            if r.get("total_kw") == max(kws):
+            if kws and r.get("total_kw") == max(kws):   # a day whose readings all lack total_kw has no peak
                 peak_time = r.get("time", "")
                 break
 
@@ -152,8 +152,9 @@ def run():
         "building_rankings": dict(sorted(building_weekly.items(), key=lambda x: -x[1]["avg_kw"])),
     }
 
-    with open(OUTPUT, "w") as f:
-        json.dump(report, f, indent=2)
+    tmp = Path(str(OUTPUT) + ".tmp")   # temp file + rename: an interrupted run never leaves truncated JSON
+    tmp.write_text(json.dumps(report, indent=2))
+    os.replace(tmp, OUTPUT)
 
     print(f"\n  ✓ Saved → {OUTPUT}")
     print(f"  ✓ Period: {report['period']['start']} to {report['period']['end']} ({len(days)} days)")
