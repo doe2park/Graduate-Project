@@ -423,6 +423,7 @@ body[data-pane="bim"] #twinPanel{top:calc(8px + var(--tb-h) + 6px)}
 </div>
 
 <div id="scanQuickActions"><button id="scanObjects" type="button">Objects</button><button type="button" onclick="document.getElementById('layersBtn').click()">Layers</button><button id="showAllLayersQuick">Show all layers</button><button id="fitBimQuick" hidden>Fit BIM</button><button id="bimNavigate" aria-label="Walk or look around the BIM" title="Walk or look around the BIM">Walk</button><button id="bimFollow">Follow scan</button><label><input id="scanVisibleToggle" type="checkbox" checked>3D scan</label></div><details id="interiorTools" aria-label="View settings"><summary>View settings</summary><div class="interior-modes"><button id="interiorRoom" aria-pressed="true">Room view</button><button id="interiorServices" aria-pressed="false">Reveal MEP</button><button id="electricalFocus">Show electrical</button><details><summary>Interior ▾</summary><div class="interior-options"><label><input type="checkbox" data-interior="furniture" checked>Furniture &amp; casework</label><label><input type="checkbox" data-interior="enclosure" checked>Walls &amp; doors</label><label><input type="checkbox" data-interior="floors" checked>Floors &amp; stairs</label><label><input type="checkbox" data-interior="ceilings" checked>Ceilings</label><small>All requested source interior categories recovered. Original design layout; installed furniture and finishes may differ. Source design geometry, not surveyed as-built; the interior follows the element floor (Levels 1–3, one floor at a time).</small></div></details></div><div id="interiorStatus" role="status">Loading Level 1 interior…</div></details><section id="scanTools"><b>Level 1 · Scan + BIM</b><div id="scanStatus">Loading 3D scan…</div><button id="scanWalkStart">First-person in scan</button><button id="scanShow">Hide scan</button><button id="scanFit">Fit scan</button><button id="scanOnly">Scan only</button><label>Scan opacity <input id="scanAlpha" type="range" min="0" max="1" step="0.05" value="0.65"></label><div>Click a BIM device to inspect its element information. Location correspondence is not verified.</div><details><summary>Alignment · not registered</summary><div>Current inherited transform fails wall alignment. Landmark registration is required.</div><label>X <input id="scanX" type="number" step="0.1" value="16.9"></label><label>Height <input id="scanY" type="number" step="0.1" value="1.524"></label><label>Z <input id="scanZ" type="number" step="0.1" value="10.8"></label><label>Yaw <input id="scanYaw" type="number" step="0.5" value="-135"></label><div>Pick matching fixed landmarks on scan and BIM (at least 3 pairs).</div><button id="scanPoint">Pick scan point</button><button id="bimPoint">Pick BIM point</button><button id="solveScan">Align pairs</button><button id="clearScanPairs">Clear pairs</button><div id="pairStatus">0 pairs</div><button id="scanReset">Reset alignment</button><button id="scanSave">Export alignment</button></details></section><script src="twin/twin-resolver.js"></script><script src="twin/element-cards.js"></script><script src="twin/as-built.js"></script><script src="twin/overlay-visibility.js"></script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -527,6 +528,7 @@ const NAME_TO_SYS_N = Object.fromEntries(SYSTEMS.map((s, i) => [NORM(s.name), i]
 const draco = new DRACOLoader();
 draco.setWorkerLimit(mobileQuality ? 1 : 4);
 draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+draco.preload();   // fetch and compile the decoder now, not when the first compressed mesh arrives
 const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
 
 const allMeshes = [];
@@ -1219,15 +1221,19 @@ async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey) {
       const ranges = [];let vertexOffset=0,indexOffset=0;
       for (const {part,indices:localIndices,sourceVertices} of chunk) {
         normalMatrix.getNormalMatrix(part.matrix);
-        for (let i=0;i<sourceVertices.length;i++) {
-          const sourceIndex=sourceVertices[i], dest=vertexOffset+i;
-          for (const [name,attribute] of Object.entries(part.geometry.attributes)) {
-            const size=attribute.itemSize, array=arrays[name], at=dest*size;
-            for (let k=0;k<size;k++) array[at+k]=(name==='color'&&!part.material.vertexColors)?1:attribute.getComponent(sourceIndex,k);
-            if (name==='position') { vector.fromArray(array,at).applyMatrix4(part.matrix);vector.toArray(array,at); }
-            else if(name==='normal') { vector.fromArray(array,at).applyMatrix3(normalMatrix).normalize();vector.toArray(array,at); }
-            else if(name==='tangent') { vector.fromArray(array,at).transformDirection(part.matrix);vector.toArray(array,at);if(size===4 && part.matrix.determinant()<0)array[at+3]*=-1; }
-          }
+        /* One pass per attribute (not per vertex): the attribute list, the plain-array fast path and the determinant are
+           resolved once per fragment. Output arrays are bit-identical to the per-vertex getComponent() loop. */
+        const count=sourceVertices.length, flip=part.matrix.determinant()<0;
+        for (const [name,attribute] of Object.entries(part.geometry.attributes)) {
+          const size=attribute.itemSize, array=arrays[name], base=vertexOffset*size;
+          if (name==='color'&&!part.material.vertexColors) array.fill(1,base,base+count*size);
+          else if (attribute.isBufferAttribute&&!attribute.isInterleavedBufferAttribute&&!attribute.normalized&&attribute.array instanceof Float32Array) {
+            const source=attribute.array;
+            for (let i=0;i<count;i++) { const from=sourceVertices[i]*size, at=base+i*size; for (let k=0;k<size;k++) array[at+k]=source[from+k]; }
+          } else for (let i=0;i<count;i++) { const sourceIndex=sourceVertices[i], at=base+i*size; for (let k=0;k<size;k++) array[at+k]=attribute.getComponent(sourceIndex,k); }
+          if (name==='position') for (let i=0,at=base;i<count;i++,at+=size) { vector.fromArray(array,at).applyMatrix4(part.matrix);vector.toArray(array,at); }
+          else if (name==='normal') for (let i=0,at=base;i<count;i++,at+=size) { vector.fromArray(array,at).applyMatrix3(normalMatrix).normalize();vector.toArray(array,at); }
+          else if (name==='tangent') for (let i=0,at=base;i<count;i++,at+=size) { vector.fromArray(array,at).transformDirection(part.matrix);vector.toArray(array,at);if(size===4&&flip)array[at+3]*=-1; }
         }
         for(let i=0;i<localIndices.length;i++) indices[indexOffset+i]=vertexOffset+localIndices[i];
         if(!part.isLine && part.matrix.determinant()<0)for(let i=0;i<localIndices.length;i+=3){const at=indexOffset+i+1,tmp=indices[at];indices[at]=indices[at+1];indices[at+1]=tmp;}
@@ -1388,7 +1394,10 @@ async function assembleElementParts(paths, loadPart, buildPart, releasePart) {
 
 /* END ELEMENT DATA HELPERS */
 
-const fetchJson = u => fetch(u, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
+/* Static model files (element sidecars, manifests) revalidate with the HTTP cache (304 when unchanged) instead of being
+   downloaded again on every visit; live data stays no-store. */
+const STATIC_JSON = /^(?:buildings|interior|bim-explorer-assets)\//;
+const fetchJson = u => fetch(u, { cache: STATIC_JSON.test(u) ? 'no-cache' : 'no-store' }).then(r => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); });
 const _jsonCache = {};
 const cachedJson = u => {
   const c = _jsonCache[u];

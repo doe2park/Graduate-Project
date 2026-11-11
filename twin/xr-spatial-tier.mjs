@@ -23,6 +23,57 @@ export function bindElementSourceIds(gltf) {
   return {boundNodes};
 }
 
+/* Level pruning before decode (load time): returns a copy of the GLB whose scene graph references only the nodes
+   buildSpatialTier would keep for `levels`, so GLTFLoader never Draco-decodes the other floors. Only the in-memory JSON
+   chunk is rewritten (scenes[].nodes, children, and `mesh` on a kept parent whose own mesh is on another floor); node,
+   mesh, accessor and bufferView indices and the whole BIN chunk are unchanged, and the file on the server is never
+   touched. Identity follows buildSpatialTier: the nearest ancestor-or-self node whose name is a sidecar key. A mesh node
+   with no such name is kept (the tier counts it as unidentified, as before). Anything unexpected returns the input as is. */
+export function pruneGlbToLevels(buffer, meta, levels) {
+  const same = why => ({buffer, pruned: false, keptMeshNodes: null, droppedMeshNodes: 0, why});
+  try {
+    if (!(buffer instanceof ArrayBuffer) || !levels || !meta || buffer.byteLength < 20) return same('no levels or not a buffer');
+    const view = new DataView(buffer);
+    if (view.getUint32(0, true) !== 0x46546C67 || view.getUint32(4, true) !== 2 || view.getUint32(16, true) !== 0x4E4F534A) return same('not a GLB 2 file');
+    const jsonLength = view.getUint32(12, true), jsonEnd = 20 + jsonLength;
+    if (jsonEnd > buffer.byteLength) return same('bad JSON chunk length');
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, jsonLength)));
+    const nodes = json.nodes, scenes = json.scenes, meshes = json.meshes || [];
+    if (!Array.isArray(nodes) || !Array.isArray(scenes) || json.skins || (json.animations && json.animations.length)) return same('unsupported structure');
+    const has = id => typeof id === 'string' && id !== '' && Object.prototype.hasOwnProperty.call(meta, id);
+    let kept = 0, dropped = 0;
+    const visited = new Uint8Array(nodes.length);
+    const keep = (index, inherited) => {   // recursion depth = scene depth (element GLBs are a few levels deep)
+      const node = nodes[index];
+      if (!node || visited[index]) throw new Error('node graph is not a tree');
+      visited[index] = 1;
+      const id = has(node.name) ? node.name : inherited;
+      let keepSelf = false;
+      if (Number.isInteger(node.mesh)) {
+        const otherLevel = id !== null && !levels.has(meta[id].levelKey) && !has(meshes[node.mesh]?.name);
+        if (otherLevel) dropped++; else { keepSelf = true; kept++; }
+      }
+      let children = null;
+      if (Array.isArray(node.children)) { children = node.children.filter(child => keep(child, id)); }
+      const keepChildren = !!children && children.length > 0;
+      if (!keepSelf && !keepChildren) return Number.isInteger(node.camera) || !!node.extensions;   // never drop what we do not understand
+      if (children) { if (children.length) node.children = children; else delete node.children; }
+      if (!keepSelf && Number.isInteger(node.mesh)) delete node.mesh;
+      return true;
+    };
+    for (const scene of scenes) if (Array.isArray(scene.nodes)) scene.nodes = scene.nodes.filter(root => keep(root, null));
+    if (!dropped) return same('nothing on other levels');
+    let text = JSON.stringify(json);
+    const encoded = new TextEncoder().encode(text), padded = (encoded.length + 3) & ~3, rest = buffer.byteLength - jsonEnd;
+    const out = new Uint8Array(20 + padded + rest), outView = new DataView(out.buffer);
+    out.set(new Uint8Array(buffer, 0, 12)); outView.setUint32(8, out.length, true);
+    outView.setUint32(12, padded, true); outView.setUint32(16, 0x4E4F534A, true);
+    out.set(encoded, 20); out.fill(0x20, 20 + encoded.length, 20 + padded);
+    out.set(new Uint8Array(buffer, jsonEnd, rest), 20 + padded);
+    return {buffer: out.buffer, pruned: true, keptMeshNodes: kept, droppedMeshNodes: dropped, why: ''};
+  } catch (error) { return same(String(error?.message || error)); }
+}
+
 /* Release parser caches after building (scan-bim releaseElementSource). Instanced batches keep sharing source geometry. */
 export function releaseSource(gltf) {
   if (!gltf) return;

@@ -36,6 +36,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
 <script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=6"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=5"></script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -77,7 +78,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
-import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight,applyRadius} from './twin/xr-spatial-tier.mjs';
+import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight,applyRadius,pruneGlbToLevels} from './twin/xr-spatial-tier.mjs?v=2';   // ?v: a cached older copy lacks pruneGlbToLevels and the import would fail
 const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
 /* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
    inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
@@ -191,7 +192,7 @@ function applyShaderState(){
  if(state.menu)drawMenu();if(MODE_AR&&mr?.panel)mrDrawPanel();invalidate();
 }
 /* ── Loaders ── DRACOLoader decodes in Web Workers (WorkerPool); same pinned decoder as scan-bim. */
-const draco=new DRACOLoader();draco.setWorkerLimit(2);draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+const draco=new DRACOLoader();draco.setWorkerLimit(2);draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');draco.preload();   /* decoder ready before the first layer arrives */
 const gltfLoader=new GLTFLoader();gltfLoader.setDRACOLoader(draco);
 const texLoader=new THREE.TextureLoader();
 const fetchJson=u=>fetch(u,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(u+' '+r.status);return r.json();});
@@ -261,21 +262,39 @@ function stepFade(now){if(!fadeAnim)return false;const a=fadeAnim,f=a.ms?Math.mi
 /* ── Service layers ── sequential, smallest first; Level-1 fragments only; radius visibility per station. */
 const layerState={};
 function elementLevel(info){if(info.levelKey&&info.levelKey!=='UNKNOWN')return info.levelKey;const n=String(info.level||'').toUpperCase();if(/MEZZ/.test(n))return'MEZZ';if(/LOWER|B1/.test(n))return'LOWER';if(/ROOF/.test(n))return'ROOF';const m=n.match(/^LEVEL 0?([1-4])$/);return m?'L'+m[1]:null;}
-async function loadLayer(key){
+/* Load-time plumbing (2026-11-10). Bytes are fetched apart from parsing so that (1) the next file downloads while the
+   current one decodes, (2) every sidecar is requested up front, and (3) other floors are pruned from the scene graph
+   before GLTFLoader Draco-decodes them (pruneGlbToLevels). The files on the server are never changed. */
+const glbAhead=new Map(),sidecarAhead=new Map();
+async function fetchGlb(path,onProgress){
+ const res=await fetch(path);if(!res.ok)throw new Error(path+' '+res.status);
+ if(!res.body||!onProgress)return res.arrayBuffer();
+ const reader=res.body.getReader(),chunks=[];let loaded=0;
+ for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);loaded+=value.byteLength;onProgress(loaded);}
+ const out=new Uint8Array(loaded);let at=0;for(const c of chunks){out.set(c,at);at+=c.byteLength;}return out.buffer;
+}
+function glbPrefetch(path){if(!path||glbAhead.has(path)||glbAhead.size>=2)return;const p=fetchGlb(path);p.catch(()=>{});glbAhead.set(path,p);}   // at most two files held ahead
+function glbTake(path,onProgress){const p=glbAhead.get(path);glbAhead.delete(path);return p?p.catch(()=>fetchGlb(path,onProgress)):fetchGlb(path,onProgress);}
+function sidecar(key){if(!sidecarAhead.has(key)){const p=fetchJson(LAYERS[key].json);p.catch(()=>sidecarAhead.delete(key));sidecarAhead.set(key,p);}return sidecarAhead.get(key);}
+async function loadLayer(key,{onBytes}={}){
  const L=LAYERS[key],old=layerState[key];if(old&&!old.error)return old.pending;
  if(old){for(const m of old.meshes)m.geometry?.dispose();old.group.removeFromParent();}   // a failed load is retried from scratch
  const st=layerState[key]={key,loading:true,loaded:false,meshes:[],meta:null,stats:{},bytes:0,group:new THREE.Group()};
  st.group.name='xr-layer:'+key;st.group.visible=true;bimRoot.add(st.group);
  st.pending=(async()=>{const t0=performance.now();
   try{
-   const metaJson=await fetchJson(L.json),meta=metaJson.elements||{};
+   const metaJson=await sidecar(key),meta=metaJson.elements||{};
    for(const [id,info] of Object.entries(meta)){info.layer=key;info.levelKey=elementLevel(info)||'UNKNOWN';}
    st.meta=meta;
    let paths=[L.glb],expect=[L.mb*1e6];   // expect = known raw (uncompressed) size: the progress event's total is the gzip Content-Length, never trusted
    if(L.partsManifest){const man=await fetchJson(L.partsManifest);const parts=man.chunks.filter(c=>P.levels.has(c.levelKey));paths=parts.map(c=>'buildings/grimes/'+c.file);expect=parts.map(c=>c.bytes);st.bytes=parts.reduce((a,c)=>a+c.bytes,0);}
    for(const [pi,path] of paths.entries()){
     status(L.label+' · loading…',true);
-    const gltf=await gltfLoader.loadAsync(path,p=>status(X.loadProgressText(L.label+(paths.length>1?' '+(pi+1)+'/'+paths.length:''),p.loaded,expect[pi]),true));
+    const bytes=await glbTake(path,n=>status(X.loadProgressText(L.label+(paths.length>1?' '+(pi+1)+'/'+paths.length:''),n,expect[pi]),true));
+    if(pi+1<paths.length)glbPrefetch(paths[pi+1]);else if(onBytes)onBytes();   // the next download overlaps this decode
+    const cut=pruneGlbToLevels(bytes,meta,P.levels);st.stats.prunedMeshNodes=(st.stats.prunedMeshNodes||0)+cut.droppedMeshNodes;
+    status(L.label+' · decoding…',true);
+    const gltf=await gltfLoader.parseAsync(cut.buffer,'');
     try{
      const root=gltf.scene;root.rotation.y=Math.PI;root.position.set(EQUIP_OFFSET.x,EQUIP_OFFSET.y,EQUIP_OFFSET.z);root.updateMatrixWorld(true);
      const bind=bindElementSourceIds(gltf);status(L.label+' · building Level '+[...P.levels].join('+')+' batches…',true);
@@ -291,7 +310,8 @@ async function loadLayer(key){
  })();
  return st.pending;
 }
-async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);for(const k of order)await loadLayer(k);timing.layersDoneMs=Math.round(performance.now()-T0);const failed=order.filter(k=>layerState[k]?.error).map(k=>LAYERS[k].label);
+async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);for(const k of order)if(!layerState[k])sidecar(k).catch(()=>{});
+ for(const [i,k] of order.entries()){const next=LAYERS[order[i+1]];await loadLayer(k,{onBytes:()=>{if(next&&!next.partsManifest&&!layerState[order[i+1]])glbPrefetch(next.glb);}});}timing.layersDoneMs=Math.round(performance.now()-T0);const failed=order.filter(k=>layerState[k]?.error).map(k=>LAYERS[k].label);
  status(failed.length?(failed.length<order.length?'Services ready except ':'')+failed.join(', ')+' failed to load · turn the layer on again to retry':'Services ready · Level '+[...P.levels].join('+')+' within '+P.radius+' m',!!failed.length);updateStats();}
 const layerMissing=k=>!layerState[k]||!!layerState[k].error;
 function updateRadius(){let n=0;const r=MODE_AR?mrCullRadius():P.radius;for(const st of Object.values(layerState))n+=applyRadius(st.meshes,stationBim,r);invalidate();return n;}

@@ -159,22 +159,32 @@ async function buildElementRenderTier(THREE2, sceneGroup, meta, layerKey, option
       let vertexOffset = 0, indexOffset = 0;
       for (const { part, indices: localIndices, sourceVertices } of chunk) {
         normalMatrix.getNormalMatrix(part.matrix);
-        for (let i = 0; i < sourceVertices.length; i++) {
-          const sourceIndex = sourceVertices[i], dest = vertexOffset + i;
-          for (const [name, attribute] of Object.entries(part.geometry.attributes)) {
-            const size = attribute.itemSize, array = arrays[name], at = dest * size;
-            for (let k = 0; k < size; k++) array[at + k] = name === "color" && !part.material.vertexColors ? 1 : attribute.getComponent(sourceIndex, k);
-            if (name === "position") {
-              vector.fromArray(array, at).applyMatrix4(part.matrix);
-              vector.toArray(array, at);
-            } else if (name === "normal") {
-              vector.fromArray(array, at).applyMatrix3(normalMatrix).normalize();
-              vector.toArray(array, at);
-            } else if (name === "tangent") {
-              vector.fromArray(array, at).transformDirection(part.matrix);
-              vector.toArray(array, at);
-              if (size === 4 && part.matrix.determinant() < 0) array[at + 3] *= -1;
+        const count = sourceVertices.length, flip = part.matrix.determinant() < 0;
+        for (const [name, attribute] of Object.entries(part.geometry.attributes)) {
+          const size = attribute.itemSize, array = arrays[name], base = vertexOffset * size;
+          if (name === "color" && !part.material.vertexColors) array.fill(1, base, base + count * size);
+          else if (attribute.isBufferAttribute && !attribute.isInterleavedBufferAttribute && !attribute.normalized && attribute.array instanceof Float32Array) {
+            const source = attribute.array;
+            for (let i = 0; i < count; i++) {
+              const from = sourceVertices[i] * size, at = base + i * size;
+              for (let k = 0; k < size; k++) array[at + k] = source[from + k];
             }
+          } else for (let i = 0; i < count; i++) {
+            const sourceIndex = sourceVertices[i], at = base + i * size;
+            for (let k = 0; k < size; k++) array[at + k] = attribute.getComponent(sourceIndex, k);
+          }
+          if (name === "position") for (let i = 0, at = base; i < count; i++, at += size) {
+            vector.fromArray(array, at).applyMatrix4(part.matrix);
+            vector.toArray(array, at);
+          }
+          else if (name === "normal") for (let i = 0, at = base; i < count; i++, at += size) {
+            vector.fromArray(array, at).applyMatrix3(normalMatrix).normalize();
+            vector.toArray(array, at);
+          }
+          else if (name === "tangent") for (let i = 0, at = base; i < count; i++, at += size) {
+            vector.fromArray(array, at).transformDirection(part.matrix);
+            vector.toArray(array, at);
+            if (size === 4 && flip) array[at + 3] *= -1;
           }
         }
         for (let i = 0; i < localIndices.length; i++) indices[indexOffset + i] = vertexOffset + localIndices[i];
@@ -820,9 +830,21 @@ var vp = $("viewport");
 var scene = new THREE.Scene();
 scene.background = new THREE.Color("#eef3f6");
 var camera = new THREE.PerspectiveCamera(42, 1, 1e-3, 1e5);
-var renderer = new THREE.WebGLRenderer({ antialias: true });
+var renderer;
+var contextLost = false;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+} catch (error) {
+  status("This browser could not start WebGL, so the 3D model cannot be shown. Try another browser or device.", true);
+  throw error;
+}
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 vp.append(renderer.domElement);
+renderer.domElement.addEventListener("webglcontextlost", (event2) => {
+  event2.preventDefault();
+  contextLost = true;
+  status("The 3D view ran out of graphics memory. Reload the page" + (new URLSearchParams(location.search).get("model") === "regional" ? "." : ", or open the smaller regional example (?model=regional)."), true);
+});
 scene.add(new THREE.HemisphereLight(16777215, 6320256, 1.8));
 var light = new THREE.DirectionalLight(16777215, 1.5);
 light.position.set(8, 15, 12);
@@ -831,8 +853,10 @@ var controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 var ray = new THREE.Raycaster();
 ray.params.Line.threshold = 0.025;
+var dracoWorkers = matchMedia("(max-width: 768px), (pointer: coarse)").matches ? 2 : Math.min(6, Math.max(2, (navigator.hardwareConcurrency || 4) - 2));
 var draco = new DRACOLoader().setDecoderPath(deployment.asset("draco/"));
-draco.setWorkerLimit(2);
+draco.setWorkerLimit(dracoWorkers);
+draco.preload();
 var loader = new GLTFLoader().setDRACOLoader(draco);
 var root = null;
 var records = {};
@@ -921,6 +945,7 @@ function event(message) {
   }));
 }
 function status(message, error = false) {
+  if (contextLost && !error) return;
   $("status").textContent = message;
   $("status").className = error ? "error" : "";
 }

@@ -104,15 +104,19 @@ async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey, options
       const ranges = [];let vertexOffset=0,indexOffset=0;
       for (const {part,indices:localIndices,sourceVertices} of chunk) {
         normalMatrix.getNormalMatrix(part.matrix);
-        for (let i=0;i<sourceVertices.length;i++) {
-          const sourceIndex=sourceVertices[i], dest=vertexOffset+i;
-          for (const [name,attribute] of Object.entries(part.geometry.attributes)) {
-            const size=attribute.itemSize, array=arrays[name], at=dest*size;
-            for (let k=0;k<size;k++) array[at+k]=(name==='color'&&!part.material.vertexColors)?1:attribute.getComponent(sourceIndex,k);
-            if (name==='position') { vector.fromArray(array,at).applyMatrix4(part.matrix);vector.toArray(array,at); }
-            else if(name==='normal') { vector.fromArray(array,at).applyMatrix3(normalMatrix).normalize();vector.toArray(array,at); }
-            else if(name==='tangent') { vector.fromArray(array,at).transformDirection(part.matrix);vector.toArray(array,at);if(size===4 && part.matrix.determinant()<0)array[at+3]*=-1; }
-          }
+        /* One pass per attribute (not per vertex): the attribute list, the plain-array fast path and the determinant are
+           resolved once per fragment. Output arrays are bit-identical to the per-vertex getComponent() loop. */
+        const count=sourceVertices.length, flip=part.matrix.determinant()<0;
+        for (const [name,attribute] of Object.entries(part.geometry.attributes)) {
+          const size=attribute.itemSize, array=arrays[name], base=vertexOffset*size;
+          if (name==='color'&&!part.material.vertexColors) array.fill(1,base,base+count*size);
+          else if (attribute.isBufferAttribute&&!attribute.isInterleavedBufferAttribute&&!attribute.normalized&&attribute.array instanceof Float32Array) {
+            const source=attribute.array;
+            for (let i=0;i<count;i++) { const from=sourceVertices[i]*size, at=base+i*size; for (let k=0;k<size;k++) array[at+k]=source[from+k]; }
+          } else for (let i=0;i<count;i++) { const sourceIndex=sourceVertices[i], at=base+i*size; for (let k=0;k<size;k++) array[at+k]=attribute.getComponent(sourceIndex,k); }
+          if (name==='position') for (let i=0,at=base;i<count;i++,at+=size) { vector.fromArray(array,at).applyMatrix4(part.matrix);vector.toArray(array,at); }
+          else if (name==='normal') for (let i=0,at=base;i<count;i++,at+=size) { vector.fromArray(array,at).applyMatrix3(normalMatrix).normalize();vector.toArray(array,at); }
+          else if (name==='tangent') for (let i=0,at=base;i<count;i++,at+=size) { vector.fromArray(array,at).transformDirection(part.matrix);vector.toArray(array,at);if(size===4&&flip)array[at+3]*=-1; }
         }
         for(let i=0;i<localIndices.length;i++) indices[indexOffset+i]=vertexOffset+localIndices[i];
         if(!part.isLine && part.matrix.determinant()<0)for(let i=0;i<localIndices.length;i+=3){const at=indexOffset+i+1,tmp=indices[at];indices[at]=indices[at+1];indices[at+1]=tmp;}

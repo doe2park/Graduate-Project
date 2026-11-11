@@ -57,3 +57,57 @@ test('bindElementSourceIds prefers the exact source name over uniquified runtime
   const gltf = {scene, parser: {associations: new Map([[o, {nodes: 0}]]), json: {nodes: [{name: '370418'}]}}};
   assert.equal(bindElementSourceIds(gltf).boundNodes, 1); assert.equal(o.userData.elementId, '370418');
 });
+
+/* ── pruneGlbToLevels: load-time pruning of other floors before Draco decode ── */
+const {pruneGlbToLevels} = await import('../twin/xr-spatial-tier.mjs');
+function glb(json, bin = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])) {
+  const j = new TextEncoder().encode(JSON.stringify(json)), jp = (j.length + 3) & ~3, out = new Uint8Array(12 + 8 + jp + 8 + bin.length), v = new DataView(out.buffer);
+  v.setUint32(0, 0x46546C67, true); v.setUint32(4, 2, true); v.setUint32(8, out.length, true); v.setUint32(12, jp, true); v.setUint32(16, 0x4E4F534A, true);
+  out.set(j, 20); out.fill(0x20, 20 + j.length, 20 + jp); v.setUint32(20 + jp, bin.length, true); v.setUint32(24 + jp, 0x004E4942, true); out.set(bin, 28 + jp); return out.buffer;
+}
+function readGlb(buffer) { const v = new DataView(buffer), n = v.getUint32(12, true); return {json: JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, n))), rest: new Uint8Array(buffer, 20 + n), total: v.getUint32(8, true)}; }
+function reachableMeshNodes(json) { const out = [], walk = i => { const n = json.nodes[i]; if (Number.isInteger(n.mesh)) out.push(i); (n.children || []).forEach(walk); }; json.scenes.forEach(s => s.nodes.forEach(walk)); return out.sort((a, b) => a - b); }
+test('pruneGlbToLevels keeps only the requested floors, leaves indices and the BIN chunk alone', () => {
+  const json = {asset: {version: '2.0'}, scene: 0, scenes: [{nodes: [0, 5, 6, 8]}], meshes: [{name: 'm0'}, {name: 'm1'}, {name: 'm2'}, {name: 'm3'}, {name: 'm4'}, {name: 'm5'}], nodes: [
+    {name: 'root', children: [1, 2, 3]},
+    {name: 'A', mesh: 0},                       // L1 -> kept
+    {name: 'B', mesh: 1},                       // L2 -> dropped
+    {name: 'C', children: [4]},                 // L2 group: its unnamed child inherits C -> dropped with the group
+    {mesh: 2},
+    {name: 'D', mesh: 3, children: [7]},        // L2 parent with an L1 child: parent stays as a transform, loses its mesh
+    {name: 'nobody', mesh: 4},                  // not in the sidecar -> kept (the tier reports it as unidentified)
+    {name: 'A2', mesh: 5},                      // L1 child of D
+    {name: 'E'},                                // empty leaf -> dropped
+  ]};
+  const meta = {A: {levelKey: 'L1'}, B: {levelKey: 'L2'}, C: {levelKey: 'L2'}, D: {levelKey: 'L2'}, A2: {levelKey: 'L1'}, E: {levelKey: 'L1'}};
+  const source = glb(json), before = new Uint8Array(source).slice();
+  const r = pruneGlbToLevels(source, meta, new Set(['L1']));
+  assert.equal(r.pruned, true); assert.deepEqual([r.keptMeshNodes, r.droppedMeshNodes], [3, 3]);
+  assert.deepEqual([...new Uint8Array(source)], [...before], 'the input buffer is never modified');
+  const out = readGlb(r.buffer), src = readGlb(source);
+  assert.equal(out.total, r.buffer.byteLength); assert.equal(r.buffer.byteLength % 4, 0);
+  assert.deepEqual([...out.rest], [...src.rest], 'BIN chunk (header + bytes) identical');
+  assert.equal(out.json.nodes.length, json.nodes.length, 'no node is re-indexed'); assert.deepEqual(out.json.meshes, json.meshes);
+  assert.deepEqual(out.json.scenes[0].nodes, [0, 5, 6]); assert.deepEqual(out.json.nodes[0].children, [1]);
+  assert.deepEqual(reachableMeshNodes(out.json), [1, 6, 7]); assert.equal(out.json.nodes[5].mesh, undefined); assert.deepEqual(out.json.nodes[5].children, [7]);
+  // nothing to drop, no level filter, or not a GLB: the same buffer comes back
+  assert.equal(pruneGlbToLevels(source, meta, new Set(['L1', 'L2'])).buffer, source);
+  assert.equal(pruneGlbToLevels(source, meta, null).buffer, source);
+  const junk = new Uint8Array(64).buffer; assert.equal(pruneGlbToLevels(junk, meta, new Set(['L1'])).buffer, junk);
+  const cyc = glb({scenes: [{nodes: [0]}], nodes: [{name: 'B', mesh: 0, children: [0]}], meshes: [{}]}); assert.equal(pruneGlbToLevels(cyc, meta, new Set(['L1'])).buffer, cyc);
+});
+test('pruneGlbToLevels on the published duct layer keeps exactly the Level 1 mesh nodes the tier would keep', {skip: !fs.existsSync(new URL('../buildings/grimes/grimes-duct.glb', import.meta.url))}, () => {
+  const file = fs.readFileSync(new URL('../buildings/grimes/grimes-duct.glb', import.meta.url)), source = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength);
+  const meta = JSON.parse(fs.readFileSync(new URL('../buildings/grimes/duct.elements.json', import.meta.url), 'utf8')).elements;
+  const levelOf = info => { if (info.levelKey && info.levelKey !== 'UNKNOWN') return info.levelKey; const n = String(info.level || '').toUpperCase(); if (/MEZZ/.test(n)) return 'MEZZ'; if (/LOWER|B1/.test(n)) return 'LOWER'; if (/ROOF/.test(n)) return 'ROOF'; const m = n.match(/^LEVEL 0?([1-4])$/); return m ? 'L' + m[1] : 'UNKNOWN'; };
+  for (const info of Object.values(meta)) info.levelKey = levelOf(info);   // as scan-xr.html does before loading the GLB
+  const levels = new Set(['L1']), src = readGlb(source), r = pruneGlbToLevels(source, meta, levels), out = readGlb(r.buffer);
+  const expected = [], walk = (i, inherited) => { const n = src.json.nodes[i], id = Object.hasOwn(meta, n.name || '') ? n.name : inherited; if (Number.isInteger(n.mesh) && (id === null || levels.has(meta[id].levelKey))) expected.push(i); (n.children || []).forEach(c => walk(c, id)); };
+  src.json.scenes.forEach(s => s.nodes.forEach(root => walk(root, null)));
+  expected.sort((a, b) => a - b);
+  assert.equal(r.pruned, true); assert.deepEqual(reachableMeshNodes(out.json), expected);
+  assert.equal(r.keptMeshNodes, expected.length); assert.ok(r.droppedMeshNodes > 0 && expected.length > 0);
+  assert.equal(Buffer.compare(Buffer.from(out.rest), Buffer.from(src.rest)), 0, 'Draco bytes untouched');
+  assert.equal(out.json.nodes.length, src.json.nodes.length); assert.equal(out.json.meshes.length, src.json.meshes.length);
+  console.log(`      duct: ${r.keptMeshNodes} mesh nodes kept, ${r.droppedMeshNodes} skipped before decode (${Math.round(100 * r.droppedMeshNodes / (r.keptMeshNodes + r.droppedMeshNodes))}%)`);
+});

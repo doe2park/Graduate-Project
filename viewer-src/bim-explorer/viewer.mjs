@@ -14,10 +14,18 @@ import {verifiedAsset} from './asset-cache.mjs';
 import {deploymentPaths} from './deployment.mjs';
 const deployment=deploymentPaths(document.baseURI);
 const $=id=>document.getElementById(id),vp=$('viewport'),scene=new THREE.Scene();scene.background=new THREE.Color('#eef3f6');
-const camera=new THREE.PerspectiveCamera(42,1,.001,100000),renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));vp.append(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(42,1,.001,100000);
+/* No WebGL (blocked, software-only, or out of contexts): say so instead of leaving "Loading…" up for ever. */
+let renderer,contextLost=false;try{renderer=new THREE.WebGLRenderer({antialias:true});}catch(error){status('This browser could not start WebGL, so the 3D model cannot be shown. Try another browser or device.',true);throw error;}
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));vp.append(renderer.domElement);
+/* A lost context (usually a phone running out of graphics memory on the full model) leaves a blank canvas: tell the visitor what to do. */
+renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;
+ status('The 3D view ran out of graphics memory. Reload the page'+(new URLSearchParams(location.search).get('model')==='regional'?'.':', or open the smaller regional example (?model=regional).'),true);});
 scene.add(new THREE.HemisphereLight(0xffffff,0x607080,1.8));const light=new THREE.DirectionalLight(0xffffff,1.5);light.position.set(8,15,12);scene.add(light);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;const ray=new THREE.Raycaster();ray.params.Line.threshold=.025;
-const draco=new DRACOLoader().setDecoderPath(deployment.asset('draco/'));draco.setWorkerLimit(2);const loader=new GLTFLoader().setDRACOLoader(draco);
+/* The full model is ~110,000 separately compressed primitives: desktops get more decode workers, phones and tablets stay at 2 (memory). */
+const dracoWorkers=matchMedia('(max-width: 768px), (pointer: coarse)').matches?2:Math.min(6,Math.max(2,(navigator.hardwareConcurrency||4)-2));
+const draco=new DRACOLoader().setDecoderPath(deployment.asset('draco/'));draco.setWorkerLimit(dracoWorkers);draco.preload();const loader=new GLTFLoader().setDRACOLoader(draco);
 let root=null,records={},report=null,selected=null,mode=null,layers=[],events=[],objectView=null,recordIndex=createRecordIndex({}),hiddenKeys=new Set(),isolatedKey=null,cacheReads=[];
 const gate=createLoadGate();let floor='',buildingSource=false,previewShown=false,previewGroup=null,subsetShown=false;const phoneMedia=matchMedia('(max-width: 768px), (pointer: coarse)'),wantAllLayers=()=>new URLSearchParams(location.search).get('layers')==='all';let forceAll=wantAllLayers();const query=new URLSearchParams(location.search);if(!query.has('model')&&matchMedia('(max-width: 600px)').matches)$('dataset').value='regional';if(['regional','conduit','full'].includes(query.get('model')))$('dataset').value=query.get('model');
 const draw=createDemandRenderer({renderer,scene,camera,controls,blocked:()=>buildingSource&&!previewShown,onFrame:stats=>{
@@ -37,7 +45,8 @@ function fit(top=false){if(previewShown&&previewGroup){const pb=new THREE.Box3()
 function fitBox(box,top,suffix){const c=box.getCenter(new THREE.Vector3()),s=box.getSize(new THREE.Vector3()),radius=s.length()/2;controls.target.copy(c);const direction=(top?new THREE.Vector3(0,1,.0001):new THREE.Vector3(.9,.65,1)).normalize(),right=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),direction).normalize(),up=new THREE.Vector3().crossVectors(direction,right),tan=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));let distance=0;for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z]){const v=new THREE.Vector3(x,y,z).sub(c);distance=Math.max(distance,v.dot(direction)+Math.abs(v.dot(right))/(tan*camera.aspect),v.dot(direction)+Math.abs(v.dot(up))/tan);}camera.position.copy(c).addScaledVector(direction,distance*1.09);camera.near=Math.max(radius/10000,.001);camera.far=Math.max(radius*50,100);camera.updateProjectionMatrix();controls.update();$('view-label').textContent=(top?'Top view':'Model overview')+suffix;invalidate();}
 $('fit').onclick=()=>fit();$('top').onclick=()=>fit(true);
 function event(message){events.push({at:new Date().toISOString(),message});events=events.slice(-40);$('activity').replaceChildren(...events.slice(-6).reverse().map(e=>{const li=document.createElement('li'),time=document.createElement('time');li.textContent=e.message;time.dateTime=e.at;time.textContent=new Date(e.at).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});li.append(time);return li;}));}
-function status(message,error=false){$('status').textContent=message;$('status').className=error?'error':'';}
+function status(message,error=false){if(contextLost&&!error)return;   /* keep the reload advice on screen */
+ $('status').textContent=message;$('status').className=error?'error':'';}
 function dispose(object){const geometries=new Set(),materials=new Set(),textures=new Set();object?.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:[o.material])if(m){materials.add(m);for(const v of Object.values(m))if(v?.isTexture)textures.add(v);}});for(const t of textures)t.dispose();for(const m of materials)m.dispose();for(const g of geometries)g.dispose();object?.clear();}
 function applyVisibility(){
  if(!root)return;
