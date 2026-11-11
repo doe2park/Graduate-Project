@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=4"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=5"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -358,7 +358,7 @@ async function pickAlong(origin,dir){
 const sensorsActive=()=>SENS.on&&SENS.ready;
 const sdl=src=>new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>no(new Error(src.split('?')[0]+' failed to load'));document.head.appendChild(e);});
 function sensorLibs(){if(!SXOK)return Promise.reject(new Error('twin/sensor-xr.js is out of date · reload the page'));
- return SENS.libs=SENS.libs||(async()=>{await sdl('twin/sensors/feed.js?v=2');await sdl('twin/sensor-demo.js?v=2');
+ return SENS.libs=SENS.libs||(async()=>{await sdl('twin/sensors/feed.js?v=2');await sdl('twin/sensor-demo.js?v=3');
   const reg=await fetchJson(SENS.live?globalThis.SensorDemo.LIVE_CONFIG_URL:'twin/sensors/registry.json'),v=globalThis.SensorDemo.validateConfig(reg);if(!v.sensors.length)throw new Error('sensor registry has no valid sensors');
   if(SENS.live)SENS.gw=globalThis.SensorFeed.liveFeedUrl(location.search,location.href);   // only this computer or a private-LAN address
   if(!v.ok)console.warn('[sensors] entries skipped:',v.errors);SENS.cfg=reg;SENS.all=v.sensors;SENS.feed=globalThis.SensorFeed.create(SENS.live?{registry:{...reg,sensors:v.sensors},gateway:SENS.gw}:{registry:{...reg,sensors:v.sensors}});})().catch(e=>{SENS.libs=null;throw e;});}

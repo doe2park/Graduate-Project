@@ -102,13 +102,15 @@ def verify_citations(twin: Twin, text: str, grounded: set) -> list:
 
 LEGACY_LEAD_RX = re.compile(r'^\s*\*\*(?:Most likely source|Answer):\*\*', re.M)
 EVIDENCE_RX = re.compile(r'^[ \t]*(?:\*\*)?Evidence:(?:\*\*)?[ \t]*(.*)$', re.M | re.I)
+# "…on site. Evidence: [[id]]" on one line: the Evidence line starts after the sentence, so it is never shown or spoken
+INLINE_EVIDENCE_RX = re.compile(r'([.!?)])[ \t]+((?:\*\*)?Evidence:(?:\*\*)?[ \t]*\[\[)')
 CAD_CODE_RX = re.compile(r'\b[A-Z]-[A-Z]{2,}(?:-[A-Z0-9]+)+\b')
 MAX_EVIDENCE = 6
 
 
 def split_answer(text: str) -> tuple[str, list]:
     """Plain answer format -> (visible body, evidence ids in order). Ids written in the body are moved to the evidence list."""
-    text = str(text or '')
+    text = INLINE_EVIDENCE_RX.sub(r'\1\n\2', str(text or ''))
     ev = []
     for m in EVIDENCE_RX.finditer(text):
         ev += CITE_RX.findall(m.group(1))
@@ -127,6 +129,7 @@ def tidy_answer(twin: Twin, text: str, selected=None) -> str:
     this only repairs slips (markdown, an 'Answer:' label, ids or CAD codes in the sentence). Answers in the older card
     format (**Answer:** / **Most likely source:** lead and no Evidence line) are returned unchanged."""
     text = str(text or '').strip()
+    text = INLINE_EVIDENCE_RX.sub(r'\1\n\2', text)
     if not text or (LEGACY_LEAD_RX.search(text) and not EVIDENCE_RX.search(text)):
         return text
     from .speech import spoken_name   # local import: speech imports nothing from here, but keep agent importable alone
@@ -279,21 +282,23 @@ class LiveAgent:
         ctx, grounded = context_block(self.twin, element_id, point)
         messages = []
         for h in (history or [])[-3:]:
-            if h.get('q') and h.get('a'):
+            if isinstance(h, dict) and h.get('q') and h.get('a'):
                 messages += [{'role': 'user', 'content': str(h['q'])[:2000]}, {'role': 'assistant', 'content': str(h['a'])[:4000]}]
         messages.append({'role': 'user', 'content': f'{ctx}\n\nQuestion: {question}'})
         system = [{'type': 'text', 'text': SYSTEM_PROMPT, 'cache_control': {'type': 'ephemeral'}}]
         answer, used, usage = '', [], {'input_tokens': 0, 'output_tokens': 0, 'cache_read_input_tokens': 0, 'cache_creation_input_tokens': 0}
         t0 = time.time()
-        downgraded, tail = False, None
+        downgraded, tail, stop = False, None, None
+        # Optional request features are dropped per question; the shared agent only changes once a retry without them worked.
+        fallbacks, tools = self.fallbacks, self.tools
         for _round in range(MAX_ROUNDS):
             if _round and self.budget_left is not None and self.budget_left() <= 0:
                 yield {'type': 'error', 'message': 'Daily budget reached for the AI answers; this answer was stopped. It resets at midnight.'}
                 return
             tail = _mark_cache_tail(messages, tail)
-            kwargs = dict(model=self.model, max_tokens=self.max_tokens, system=system, tools=self.tools, messages=messages,
+            kwargs = dict(model=self.model, max_tokens=self.max_tokens, system=system, tools=tools, messages=messages,
                           output_config={'effort': self.effort})
-            if self.fallbacks:
+            if fallbacks:
                 kwargs.update(betas=['server-side-fallback-2026-07-01'], fallbacks='default')
             round_text = ''
             # visible "Thinking…" while the model reasons before its first tool call or text (adaptive thinking)
@@ -312,10 +317,10 @@ class LiveAgent:
                 yield {'type': 'error', 'message': 'Rate limited by the Anthropic API (429). Wait a moment and ask again.'}
                 return
             except anthropic.APIStatusError as e:
-                if e.status_code == 400 and (self.fallbacks or self.tools[0].get('eager_input_streaming')) and not downgraded:
+                if e.status_code == 400 and (fallbacks or tools[0].get('eager_input_streaming')) and not downgraded:
                     # Optional request features (refusal fallback beta, eager tool streaming) rejected: retry once without them.
-                    downgraded, self.fallbacks = True, False
-                    self.tools = _cache_last_tool(TOOL_SCHEMAS)
+                    downgraded, fallbacks = True, False
+                    tools = _cache_last_tool(TOOL_SCHEMAS)
                     yield {'type': 'status', 'text': 'retrying without optional API features'}
                     continue
                 yield {'type': 'error', 'message': f'Anthropic API error {e.status_code}: {getattr(e, "message", "")}'[:300]}
@@ -326,6 +331,8 @@ class LiveAgent:
             except ValueError as e:   # unparseable eager tool input: re-issue once per round
                 yield {'type': 'status', 'text': f'retrying after malformed tool input ({e})'[:120]}
                 continue
+            if downgraded and (self.fallbacks or self.tools is not tools):   # the retry worked: later questions skip the features
+                self.fallbacks, self.tools = False, tools
             round_usage = {k: getattr(msg.usage, k, 0) or 0 for k in usage}
             for k in usage:
                 usage[k] += round_usage[k]
@@ -341,6 +348,7 @@ class LiveAgent:
                 yield {'type': 'error', 'message': 'Answer was cut off (max_tokens) mid tool call.'}
                 return
             if msg.stop_reason != 'tool_use' or not calls:
+                stop = msg.stop_reason or 'end_turn'
                 break
             if round_text:
                 answer += '\n\n'
@@ -354,8 +362,19 @@ class LiveAgent:
                 results.append({'type': 'tool_result', 'tool_use_id': b.id, 'content': json.dumps(res, separators=(',', ':')),
                                 **({'is_error': True} if 'error' in res else {})})
             messages.append({'role': 'user', 'content': results})   # all results in one user turn
+        if stop is None:   # every round asked for more lookups: there is no answer to show
+            yield {'type': 'error', 'message': 'The lookups did not settle on an answer. Ask again, or ask a narrower question.'}
+            return
         # The card shows the last round's text only: anything written before a tool call was a preamble, not the answer.
-        answer = tidy_answer(self.twin, round_text if round_text.strip() else answer, element_id)
+        raw = round_text if round_text.strip() else answer
+        if stop == 'max_tokens' and not EVIDENCE_RX.search(INLINE_EVIDENCE_RX.sub(r'\1\n\2', raw)):
+            # the Evidence line closes every answer, so without it the text stopped mid-way: never show half a sentence as the answer
+            yield {'type': 'error', 'message': 'The answer was cut off before it finished. Ask again.'}
+            return
+        answer = tidy_answer(self.twin, raw, element_id)
+        if not split_answer(answer)[0]:
+            yield {'type': 'error', 'message': 'The model returned no answer. Ask again.'}
+            return
         yield {'type': 'final', 'answer': answer.strip(), 'citations': verify_citations(self.twin, answer, grounded),
                'tools_used': used, 'mode': 'live', 'model': self.model, 'effort': self.effort, 'usage': usage,
                'seconds': round(time.time() - t0, 1)}

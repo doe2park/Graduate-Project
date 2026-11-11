@@ -22,7 +22,7 @@ const H = {
   isCard(text) { const t = String(text || ''); return /^\s*\*\*(?:Most likely source|Answer):\*\*/m.test(t) && !/^\s*(?:\*\*)?Evidence:/im.test(t); },
   /* plain answer -> {body, evidence: [ids]}; ids written in the body (should not be there) join the evidence list */
   splitAnswer(text) {
-    const ev = [], lines = String(text || '').split('\n'), body = [];
+    const ev = [], lines = String(text || '').replace(/([.!?)])[ \t]+((?:\*\*)?Evidence:(?:\*\*)?[ \t]*\[\[)/g, '$1\n$2').split('\n'), body = [];   // "…on site. Evidence: [[id]]" on one line
     for (const l of lines) {
       const m = /^\s*(?:\*\*)?Evidence:(?:\*\*)?\s*(.*)$/i.exec(l);
       if (m) { for (const x of m[1].matchAll(/\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g)) ev.push(x[1]); } else body.push(l);
@@ -304,7 +304,7 @@ async function ask(question) {
   if (!question || state.busy) return;
   state.lastQuestion = question;
   state.busy = true; $('#atAsk').disabled = true; $('#atAsk').textContent = '…';
-  speechSynthesis?.cancel?.();
+  window.speechSynthesis?.cancel?.();
   const steps = $('#atSteps'), card = $('#atCard'), foot = $('#atFoot');
   steps.innerHTML = ''; steps.classList.add('on'); card.className = 'at-card on'; foot.textContent = '';
   card.innerHTML = '<p class="at-cursor" style="color:#5b6b85">Looking it up in the twin…</p>';
@@ -373,7 +373,7 @@ let rec = null, chunks = [], stream = null, recog = null, recogText = '', holdin
 async function startTalk() {
   if (state.busy || rec || recog) return;
   holding = true;
-  speechSynthesis?.cancel?.();
+  window.speechSynthesis?.cancel?.();
   mic.classList.add('rec'); $('#atQ').placeholder = 'Starting microphone…';
   if (state.stt && navigator.mediaDevices?.getUserMedia && window.MediaRecorder) {
     try {

@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=4"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=5"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -279,6 +279,28 @@ test('visual: trace -> this element, pieces along the run, the cited source with
     selected: {id: '388219', layer: 'duct'}, answer: 'The air probably comes from a VAV box. Check the duct drawings.'});
   assert.equal(v.kind, 'trace'); assert.equal(v.headline, 'Probably fed by a VAV box');
   assert.deepEqual([v.from.picto, v.to.picto, v.hops, v.away, v.where, v.pieceWord], ['vent', 'vav', 12, 3.4, 'above the ceiling', 'duct pieces']);
+});
+test('visual: the headline never names something the answer did not cite', () => {
+  const run = {kind: 'run', layer: 'duct', reached: 40, start: {id: '388219', label: 'diffuser', layer: 'duct'},
+    notable: [{id: '400766', label: 'VAV box', type: 'Terminal unit', layer: 'duct', hops: 12, horizontal_gap_m: 3.4, vertical: 'above'}]};
+  // "What is this?" answered from the element alone: an uncited run visual does not turn it into "Probably fed by ..."
+  const what = XA.answerVisual({visuals: [run], citations: [{id: '388219', known: true, verified: true, label: 'diffuser', layer: 'duct'}], primary: '388219',
+    selected: {id: '388219', layer: 'duct'}, answer: 'This is a ceiling diffuser. Check on site.'});
+  assert.notEqual(what.kind, 'trace'); assert.doesNotMatch(what.headline, /fed by/i);
+  // a cited-but-unverified id does not count either
+  assert.notEqual(XA.answerVisual({visuals: [run], citations: [{id: '400766', known: true, verified: false}], primary: '400766', selected: {id: '388219', layer: 'duct'}, answer: 'x.'}).kind, 'trace');
+  // a pipe run is not "fed by"
+  const pipe = XA.answerVisual({visuals: [{kind: 'run', layer: 'plumbing', reached: 9, start: {id: '5', label: 'pipe', layer: 'plumbing'}, notable: [{id: '6', label: 'valve', layer: 'plumbing', hops: 3}]}],
+    citations: [{id: '6', known: true, verified: true}], primary: '6', selected: {id: '5', layer: 'plumbing'}, answer: 'The nearest shut-off is a valve. Check on site.'});
+  assert.equal(pipe.kind, 'trace'); assert.equal(pipe.headline, 'Connected to a valve');
+  // near: the closest thing above is an uncited sprinkler pipe, but the answer cited the duct
+  const near = {kind: 'near', above_only: true, total: 2, radius_m: 2, counts_by_layer: {duct: 1, fire: 1}, items: [
+    {id: 'p1', label: 'sprinkler pipe', layer: 'fire', vertical: 'above', vertical_gap_m: .2, horizontal_gap_m: 0},
+    {id: 'd1', label: 'duct', layer: 'duct', vertical: 'above', vertical_gap_m: .9, horizontal_gap_m: .1}]};
+  const cited = XA.answerVisual({visuals: [near], citations: [{id: 'd1', known: true, verified: true}], primary: 'd1', selected: {id: 't1', layer: 'ceilings'}, answer: 'A duct runs about 0.9 m above.'});
+  assert.match(cited.headline, /^Duct 0\.9\d* m above$/);
+  const none = XA.answerVisual({visuals: [near], citations: [], selected: {id: 't1', layer: 'ceilings'}, answer: 'Several things are above.'});
+  assert.match(none.headline, /^Sprinkler pipe 0\.2\d* m above$/);   // nothing cited above: the closest neighbour, as before
 });
 test('visual: other questions -> first sentence headline + cited element tiles; no visuals -> text card as before', () => {
   const v = XA.answerVisual({visuals: [], citations: [{id: '9', known: true, verified: true, label: 'pipe', layer: 'plumbing'}], answer: 'A simulated demo sensor reads warm. Check the valve.'});

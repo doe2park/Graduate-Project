@@ -288,6 +288,58 @@ class LiveAgentTests(unittest.TestCase):
         evs = list(A.LiveAgent(twin(), FakeClient([('', [], 'refusal')])).ask('x', LIGHT))
         self.assertEqual(evs[-1]['type'], 'error')
 
+    def test_empty_cut_off_or_unsettled_answers_are_errors_not_finals(self):
+        call = lambda i: _block(type='tool_use', id=f't{i}', name='get_element', input={'element_id': LIGHT})
+        for script, word in (([('', [], 'max_tokens')], 'cut off'),
+                             ([('This is a ceiling light. It is on', [], 'max_tokens')], 'cut off'),
+                             ([('', [], 'end_turn')], 'no answer'),
+                             ([('', [call(i)], 'tool_use') for i in range(A.MAX_ROUNDS)], 'did not settle')):
+            evs = list(A.LiveAgent(twin(), FakeClient(script)).ask('x', LIGHT))
+            self.assertEqual(evs[-1]['type'], 'error', word)
+            self.assertIn(word, evs[-1]['message'])
+            self.assertFalse([e for e in evs if e['type'] == 'final'])
+        # max_tokens after a complete answer (the Evidence line is there) is still a normal final
+        evs = list(A.LiveAgent(twin(), FakeClient([(f'This is a ceiling light.\nEvidence: [[{LIGHT}]]', [], 'max_tokens')])).ask('x', LIGHT))
+        self.assertEqual(evs[-1]['type'], 'final')
+
+    def test_evidence_on_the_answer_line_is_split_off(self):
+        body, ids = A.split_answer(f'This is a ceiling light. Check on site. Evidence: [[{LIGHT}]]')
+        self.assertEqual((body, ids), ('This is a ceiling light. Check on site.', [LIGHT]))
+        tidy = A.tidy_answer(twin(), f'This is a ceiling light. Check on site. Evidence: [[{LIGHT}]]', LIGHT)
+        self.assertEqual(tidy.count('Evidence:'), 1)
+        self.assertTrue(tidy.splitlines()[-1].startswith('Evidence: [['))
+        self.assertNotIn('Evidence', tidy.splitlines()[0])
+        self.assertEqual(A.split_answer('There is evidence: none in the model.')[0], 'There is evidence: none in the model.')
+
+    def test_wrong_typed_input_is_an_error_result_not_a_crash(self):
+        from ask_twin.tools import run_tool
+        for name, args in (('find_elements', {'text': 5}), ('elements_near', {'element_id': LIGHT, 'type_contains': 5})):
+            self.assertIn('error', run_tool(twin(), name, args), name)
+        client = FakeClient([(f'This is a ceiling light.\nEvidence: [[{LIGHT}]]', [], 'end_turn')])
+        evs = list(A.LiveAgent(twin(), client).ask('x', LIGHT, history=['hello', {'q': 'a', 'a': 'b'}, 7]))
+        self.assertEqual(evs[-1]['type'], 'final')
+        self.assertEqual(len(client.calls[0]['messages']), 3)
+
+    def test_a_400_on_the_retry_does_not_downgrade_the_shared_agent(self):
+        class Always400:
+            def __init__(self):
+                self.beta = _block(messages=_block(stream=self._stream))
+
+            def _stream(self, **kw):
+                raise Rejecting400()
+        import ask_twin.agent as mod
+        real = mod._sdk_errors
+        mod._sdk_errors = lambda: _block(AuthenticationError=KeyError, RateLimitError=IndexError, APIStatusError=Rejecting400, APIConnectionError=OSError)
+        try:
+            agent = A.LiveAgent(twin(), Always400())
+            tools = agent.tools
+            evs = list(agent.ask('x', LIGHT))
+        finally:
+            mod._sdk_errors = real
+        self.assertEqual(evs[-1]['type'], 'error')
+        self.assertTrue(agent.fallbacks)
+        self.assertIs(agent.tools, tools)
+
 
 class Rejecting400(Exception):
     status_code, message = 400, 'unknown field'
@@ -385,8 +437,25 @@ class ServerTests(unittest.TestCase):
 
     def test_static_is_read_only_and_restricted(self):
         self.assertEqual(self.get('/twin/ask-twin.js')[0], 200)
-        for p in ('/.git/config', '/work/ask-twin/element-index.json', '/scripts/../.git/HEAD', '/.gitignore'):
+        for p in ('/.git/config', '/work/ask-twin/element-index.json', '/scripts/../.git/HEAD', '/.gitignore',
+                  '/Work/ask-twin/element-index.json', '/WORK/', '/Capture-Local/x.json', '/TWIN/ask-twin.js',
+                  '/docs/', '/scripts/ask_twin/', '/twin', '/thesis/draft.pdf', '/scripts/ask_twin/__pycache__/'):
             self.assertEqual(self.get(p)[0], 403, p)
+        self.assertEqual(self.get('/mr/')[0], 200)   # a folder with a tracked index.html still opens
+
+    def test_static_rule_serves_only_what_git_does_not_ignore(self):
+        import ask_twin_server as S
+        served = frozenset({'twin/ask-twin.js', 'mr/index.html', 'notes/new.md'})
+        for p, blocked in (('/twin/ask-twin.js', False), ('/twin/ask-twin.js?v=4', False), ('/mr/', False), ('/mr', False),
+                           ('/notes/new.md', False), ('/Twin/ask-twin.js', True), ('/twin/', True), ('/thesis/a.pdf', True),
+                           ('/twin/%2e%2e/thesis/a.pdf', True), ('/twin/.hidden', True), ('/', True)):
+            self.assertEqual(S.static_blocked(p, served), blocked, p)
+        # git unavailable: the old deny-list, now case-insensitive
+        for p, blocked in (('/Work/x.json', True), ('/capture-local/x', True), ('/twin/ask-twin.js', False), ('/.env', True)):
+            self.assertEqual(S.static_blocked(p, None), blocked, p)
+        tracked = S.served_files()
+        self.assertIn('twin/ask-twin.js', tracked)
+        self.assertFalse([f for f in tracked if f.startswith(('work/', 'capture-local/', 'thesis/'))])
 
 
 class AudioDecodeTests(unittest.TestCase):

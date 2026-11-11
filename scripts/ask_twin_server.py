@@ -5,7 +5,8 @@
     python3 scripts/ask_twin_server.py --mock     # no key: scripted answers built from the same read-only tools
     open http://127.0.0.1:8765/                   # -> grimes-bim-viewer.html?ask=1
 
-Serves this checkout read-only (GET/HEAD; dot-files, work/, capture-local/ and node_modules refused) plus:
+Serves this checkout read-only (GET/HEAD): only files git does not ignore, matched by exact case, so ignored local folders
+(work/, capture-local/, thesis/, unpublished captures, node_modules) and dot-files are refused; no directory listings. Plus:
     GET  /api/health      mode, model, index, speech-to-text status, limits and today's usage (numbers only; open)
     GET  /trust           a tiny page to open once in the headset so it accepts the self-signed certificate (Method A)
     POST /api/ask         {question, element_id?, point?, history?} -> text/event-stream of agent events
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import shutil
@@ -54,6 +56,37 @@ STT_HOTWORDS = 'Grimes duct diffuser VAV box damper airflow sprinkler pipe valve
 XR_ENTRY = '/mr/?ask=1'   # the headset page: /mr -> scan-xr.html?mode=ar&place=demo&sensors=demo&ask=1
 CODE_HEADER = 'X-Ask-Code'
 PUBLIC_MR = 'https://doe2park.github.io/Graduate-Project/mr/?ask=1'
+
+
+_SERVED = {}
+
+
+def served_files(root: Path = ROOT):
+    """Relative paths this server may hand out: tracked files plus untracked ones git does not ignore.
+
+    Anything git ignores is local-only by this repo's convention (private captures, thesis drafts, work/), so it is never
+    served, whatever its name or letter case. Returns None when git cannot answer; the caller then falls back to DENY_TOP.
+    Read once per root: restart the server after adding a new file."""
+    key = str(root)
+    if key not in _SERVED:
+        try:
+            out = subprocess.run(['git', '-C', key, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+                                 capture_output=True, timeout=30, check=True).stdout
+            _SERVED[key] = frozenset(f for f in out.decode('utf-8', 'surrogateescape').split('\0') if f)
+        except (OSError, subprocess.SubprocessError):
+            _SERVED[key] = None
+    return _SERVED[key]
+
+
+def static_blocked(url_path: str, served) -> bool:
+    """True when a GET/HEAD path must be refused. `served` is served_files() (None = git unavailable)."""
+    parts = [p for p in unquote(urlparse(url_path).path).split('/') if p]
+    if not parts or any(p.startswith('.') for p in parts):   # '..' and dot-files; '/' itself is redirected before this
+        return True
+    if served is None:
+        return parts[0].lower() in DENY_TOP
+    rel = '/'.join(parts)
+    return rel not in served and rel + '/index.html' not in served   # exact case: /Work/… is not work/… to git
 
 
 def maybe_reexec_in_venv():
@@ -333,8 +366,11 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ----- static, read-only
     def _blocked(self) -> bool:
-        parts = [p for p in unquote(urlparse(self.path).path).split('/') if p]
-        return any(p.startswith('.') for p in parts) or (parts and parts[0] in DENY_TOP) or '..' in parts
+        return static_blocked(self.path, served_files())
+
+    def list_directory(self, path):   # never list a folder, even one with no index.html
+        self.send_error(HTTPStatus.FORBIDDEN, 'not served')
+        return None
 
     def do_GET(self):
         path = urlparse(self.path).path
@@ -368,10 +404,17 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ----- API
     def _body(self) -> bytes:
-        n = int(self.headers.get('Content-Length') or 0)
+        n = self._length()
         if n > MAX_BODY:
             raise ValueError('request body too large')
         return self.rfile.read(n) if n else b''
+
+    def _length(self) -> int:
+        """Content-Length as a non-negative int; ValueError for anything else (read(-1) would block the thread)."""
+        raw = (self.headers.get('Content-Length') or '0').strip()
+        if not raw.isascii() or not raw.isdigit():
+            raise ValueError('bad Content-Length')
+        return int(raw)
 
     def _json(self, code, obj, retry_after=None):
         data = json.dumps(obj).encode()
@@ -394,7 +437,10 @@ class Handler(SimpleHTTPRequestHandler):
                 status, body, wait = refused
                 if body.get('reason') in ('budget', 'rate_day'):
                     sys.stderr.write(f'[ask-twin] refused: {body["reason"]}\n')
-                self.rfile.read(min(int(self.headers.get('Content-Length') or 0), MAX_BODY))   # drain so the client sees the reply
+                try:
+                    self.rfile.read(min(self._length(), MAX_BODY))   # drain so the client sees the reply
+                except ValueError:
+                    self.close_connection = True
                 return self._json(status, body, wait)
         try:
             if path == '/api/ask':
@@ -414,9 +460,9 @@ class Handler(SimpleHTTPRequestHandler):
         eid = req.get('element_id')
         eid = str(eid)[:40] if eid not in (None, '') else None
         pt = req.get('point')
-        if pt is not None and not (isinstance(pt, list) and len(pt) == 3 and all(isinstance(v, (int, float)) for v in pt)):
+        if pt is not None and not (isinstance(pt, list) and len(pt) == 3 and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in pt)):
             pt = None
-        hist = req.get('history') if isinstance(req.get('history'), list) else []
+        hist = [h for h in req.get('history') if isinstance(h, dict)] if isinstance(req.get('history'), list) else []
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
         self.send_header('X-Accel-Buffering', 'no')

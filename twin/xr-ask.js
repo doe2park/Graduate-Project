@@ -379,17 +379,17 @@ function answerVisual({visuals = [], citations = [], primary = null, selected = 
   const byId = new Map(cites.map(c => [c.id, c])), citedOrder = cites.map(c => c.id);
   const selId = selected && selected.id != null ? String(selected.id) : null;
   const selEl = Object.assign({}, selected || {}, byId.get(selId) || {});
-  const run = of('run').find(v => (v.notable || []).length), near = of('near').find(v => v.above_only && (v.items || []).length) || of('near').find(v => (v.items || []).length);
+  const run = of('run').find(v => (v.notable || []).some(n => ok.has(n.id))), near   /* a trace card only for a run the answer verifiably cites */ = of('near').find(v => v.above_only && (v.items || []).length) || of('near').find(v => (v.items || []).length);
   const room = of('room').filter(v => v.room).pop() || null, elv = of('element').map(v => v.element).find(e => e && String(e.id) === selId) || of('element')[0]?.element || null;
   const out = {kind: 'text', headline: '', check: '', caption: captionText(answer)};
   if (run) {
-    const src = run.notable.find(n => n.id === primary && ok.has(n.id)) || run.notable.find(n => ok.has(n.id)) || run.notable[0];
+    const src = run.notable.find(n => n.id === primary && ok.has(n.id)) || run.notable.find(n => ok.has(n.id));
     const from = selId && run.start && String(run.start.id) !== selId ? selEl : (run.start && run.start.id ? Object.assign({}, run.start, byId.get(run.start.id) || {}) : selEl);
     Object.assign(out, {kind: 'trace', from: {label: shortName(from), picto: pictogram(from)}, to: {id: src.id, label: shortName(src), picto: pictogram(src)},
       hops: Number.isFinite(src.hops) ? src.hops : null, away: Number.isFinite(src.horizontal_gap_m) ? src.horizontal_gap_m : null,
       where: src.vertical === 'above' ? 'above the ceiling' : src.vertical === 'below' ? 'below' : '', pieceWord: run.layer === 'duct' ? 'duct pieces' : 'pieces',
       runPicto: PICTO_FOR_LAYER[run.layer] || 'duct', reached: run.reached || null, verified: ok.has(src.id)});
-    out.headline = 'Probably fed by ' + (/^[aeiou]/i.test(out.to.label) && !/^VAV/.test(out.to.label) ? 'an ' : 'a ') + out.to.label.replace(/^(?!VAV)\w/, c => c.toLowerCase());
+    out.headline = (run.layer === 'duct' ? 'Probably fed by ' : 'Connected to ') + (/^[aeiou]/i.test(out.to.label) && !/^VAV/.test(out.to.label) ? 'an ' : 'a ') + out.to.label.replace(/^(?!VAV)\w/, c => c.toLowerCase());
   } else if (near) {
     const items = (near.items || []).filter(it => !String(it.layer || '').startsWith('ceilings')), rank = it => { const i = citedOrder.indexOf(it.id); return i < 0 ? 99 : i; };
     const pickFrom = items.filter(it => ok.has(it.id)).sort((a, b) => rank(a) - rank(b));
@@ -397,7 +397,7 @@ function answerVisual({visuals = [], citations = [], primary = null, selected = 
     const marks = [...pickFrom, ...fill].slice(0, 5).map(it => ({id: it.id, label: shortName(it), picto: pictogram(it), layer: it.layer, cited: ok.has(it.id),
       above: it.vertical === 'above', dy: Number(it.vertical_gap_m) || 0, dh: Number(it.horizontal_gap_m) || 0}));
     const counts = Object.entries(near.counts_by_layer || {}).filter(([layer]) => !layer.startsWith('ceilings')).slice(0, 5).map(([layer, n]) => ({layer, n, word: SYS_WORD[layer] || layer, picto: PICTO_FOR_LAYER[layer] || 'box'}));
-    const up = marks.filter(m => m.above && m.dy >= .03).sort((a, b) => a.dy - b.dy), top = up.find(m => m.dh < .3) || up[0];   // touching neighbours (0 m) do not make a headline
+    const upAll = marks.filter(m => m.above && m.dy >= .03).sort((a, b) => a.dy - b.dy), up = upAll.some(m => m.cited) ? upAll.filter(m => m.cited) : upAll, top = up.find(m => m.dh < .3) || up[0];   // the headline names what the answer cited; an uncited neighbour only when nothing cited is above;   // touching neighbours (0 m) do not make a headline
     Object.assign(out, {kind: 'near', self: {label: shortName(selEl), picto: pictogram(selEl)}, marks, counts, total: near.total || 0, radius: near.radius_m || null, aboveOnly: !!near.above_only});
     out.headline = top ? `${top.label} ${mFmt(top.dy)} above` : `${out.total} things within ${near.radius_m || 2} m`;
   } else if (room || elv || selId || primary) {

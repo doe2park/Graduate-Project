@@ -3179,7 +3179,7 @@ let sensorDemo=null;
 if(splitPane==='bim'&&['demo','live'].includes(new URLSearchParams(location.search).get('sensors'))){
  const sdLive=new URLSearchParams(location.search).get('sensors')==='live';
  const sdRay=new THREE.Ray(),sdEye=new THREE.Vector3(),sdP=new THREE.Vector3();
- const sdScript=document.createElement('script');sdScript.src='twin/sensor-demo.js?v=2';
+ const sdScript=document.createElement('script');sdScript.src='twin/sensor-demo.js?v=3';
  /* layers the Overlay skips on this device (same rule as setOverlay: fire on phones / coarse-pointer browsers incl. Quest)
     get only their anchored elements, from the chunk named by the sensor config, as a render-only group outside layerState */
  const sdSkipped=key=>key==='fire'&&mobileQuality;

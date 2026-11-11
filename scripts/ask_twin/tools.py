@@ -449,6 +449,8 @@ def run_tool(twin: Twin, name: str, args) -> dict:
         return getattr(twin, name)(**args)
     except (KeyError, ValueError, TypeError) as e:
         return {'error': str(e).strip("'\"")}
+    except Exception as e:   # wrong-typed model input (e.g. a number where text is expected): an error result, never a crash
+        return {'error': f'bad arguments: {type(e).__name__}'}
 
 
 ID_RX = re.compile(r'"(?:id|element_id|anchor_element_id)": "([^"]+)"|"path_ids": \[([^\]]*)\]')

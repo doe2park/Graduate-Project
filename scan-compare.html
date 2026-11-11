@@ -748,7 +748,7 @@ if(askEnabled(location.search)){
    (the owner's phone via tools/sensor_gateway.py) as Live; the feed URL must be this computer or a private-LAN address. */
 if(['demo','live'].includes(new URLSearchParams(location.search).get('sensors'))){
  const sdLive=new URLSearchParams(location.search).get('sensors')==='live';
- const s=document.createElement('script');s.src='twin/sensor-demo.js?v=2';
+ const s=document.createElement('script');s.src='twin/sensor-demo.js?v=3';
  s.onload=()=>{const sd=SensorDemo.mountParent({main:mainEl,frame:frames[1],sceneFilter:sdLive?null:SensorDemo.parseSceneParam(location.search),
   mode:sdLive?'live':'demo',configUrl:sdLive?SensorDemo.LIVE_CONFIG_URL:undefined,
   gateway:sdLive?(window.SensorFeed?SensorFeed.liveFeedUrl(location.search,location.href):{url:null,error:'twin/sensors/feed.js did not load'}):undefined,

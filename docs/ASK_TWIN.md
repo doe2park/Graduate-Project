@@ -45,7 +45,7 @@ chmod 600 ~/.config/ask-twin/env
 The server refuses an env file inside the repository, never prints the key, and exits with a clear message (and the
 `--mock` hint) when no key is set. `.gitignore` also lists `ask-twin.env` / `.env.ask-twin` in case a copy is made.
 
-Options: `--model claude-opus-5-5` (default `claude-sonnet-5-5`), `--effort low|medium|high` (default `medium`),
+Options: `--model claude-opus-5-5` (default `claude-sonnet-5-5`), `--effort low|medium|high|xhigh|max` (default `medium`),
 `--port`, `--no-stt`, `--stt-model small.en`, `--stt-beam 1` (default 5), `--no-tts` (no laptop voice for `/api/speak`),
 `--voice "Zoe (Premium)"` (default: best installed English voice), `--no-fallbacks`, `--lan` (private-LAN HTTPS, see Headset
 below), `--auto` (live Claude when a key is found, else scripted answers with the note *Live AI needs a key on the laptop;
@@ -64,7 +64,10 @@ step after ~1-3 s, the spoken lead ~4-10 s after the question (2-4 tool rounds),
 spoken when nothing has been said 1.5 s after the question. Speech-to-text adds ~0.4 s (base.en, beam 5, measured on
 this Mac with synthetic speech).
 If the API rejects an optional request feature (the refusal-fallback beta or eager tool streaming) with a 400, the
-server retries that question once without them.
+server retries that question once without them. If the retry works, later questions skip those features; if it also
+fails, the error is shown and nothing changes for the next question.
+An answer that comes back empty, stops mid-sentence at the token limit, or never settles after the allowed lookup rounds
+is shown as an error ("Ask again"), never as a finished answer.
 
 ## Limits and access code
 
@@ -399,7 +402,7 @@ The headless check loads three element layers under software WebGL and takes abo
 
 ## Files
 
-- `scripts/ask_twin_server.py` — server (static read-only + `/api/health`, `/api/ask` SSE, `/api/transcribe`, `/api/speak`)
+- `scripts/ask_twin_server.py` — server (static read-only: only files git does not ignore, exact case, no folder listings; restart after adding a file; + `/api/health`, `/api/ask` SSE, `/api/transcribe`, `/api/speak`)
 - `scripts/ask_twin/limits.py` — access code, rate limits, daily token budget (usage JSON outside the repo)
 - `scripts/ask_twin/index.py` — element box index; `tools.py` — read-only tools + schemas; `agent.py` — live and mock loops (+ `mock_route`); `speech.py` — short spoken version and `speak` events
 - `twin/ask-twin.js` — panel, citation chips, highlights, fly-to, push-to-talk, spoken reply
