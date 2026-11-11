@@ -262,7 +262,8 @@ function stepFade(now){if(!fadeAnim)return false;const a=fadeAnim,f=a.ms?Math.mi
 const layerState={};
 function elementLevel(info){if(info.levelKey&&info.levelKey!=='UNKNOWN')return info.levelKey;const n=String(info.level||'').toUpperCase();if(/MEZZ/.test(n))return'MEZZ';if(/LOWER|B1/.test(n))return'LOWER';if(/ROOF/.test(n))return'ROOF';const m=n.match(/^LEVEL 0?([1-4])$/);return m?'L'+m[1]:null;}
 async function loadLayer(key){
- const L=LAYERS[key];if(layerState[key])return layerState[key].pending;
+ const L=LAYERS[key],old=layerState[key];if(old&&!old.error)return old.pending;
+ if(old){for(const m of old.meshes)m.geometry?.dispose();old.group.removeFromParent();}   // a failed load is retried from scratch
  const st=layerState[key]={key,loading:true,loaded:false,meshes:[],meta:null,stats:{},bytes:0,group:new THREE.Group()};
  st.group.name='xr-layer:'+key;st.group.visible=true;bimRoot.add(st.group);
  st.pending=(async()=>{const t0=performance.now();
@@ -290,7 +291,9 @@ async function loadLayer(key){
  })();
  return st.pending;
 }
-async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);for(const k of order)await loadLayer(k);timing.layersDoneMs=Math.round(performance.now()-T0);status('Services ready · Level '+[...P.levels].join('+')+' within '+P.radius+' m');updateStats();}
+async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);for(const k of order)await loadLayer(k);timing.layersDoneMs=Math.round(performance.now()-T0);const failed=order.filter(k=>layerState[k]?.error).map(k=>LAYERS[k].label);
+ status(failed.length?(failed.length<order.length?'Services ready except ':'')+failed.join(', ')+' failed to load · turn the layer on again to retry':'Services ready · Level '+[...P.levels].join('+')+' within '+P.radius+' m',!!failed.length);updateStats();}
+const layerMissing=k=>!layerState[k]||!!layerState[k].error;
 function updateRadius(){let n=0;const r=MODE_AR?mrCullRadius():P.radius;for(const st of Object.values(layerState))n+=applyRadius(st.meshes,stationBim,r);invalidate();return n;}
 function setFire(on){setLayer('fire',on);}
 const fireOn=()=>!!layerState.fire&&layerState.fire.group.visible;
@@ -399,7 +402,7 @@ async function sensorsSetScene(scene){
   await sensorLibs();if(epoch!==SENS.epoch)return;
   const SD=globalThis.SensorDemo,list=SD.filterScene(SENS.all,scene),need=[...new Set(list.map(s=>s.anchor.layer))].filter(k=>LAYERS[k]);
   status((SENS.live?'Live test · ':'Demo sensors · ')+SXN[scene]+' · loading '+need.map(k=>LAYERS[k].label).join(', ')+'…',true);
-  for(const k of need){if(!layerState[k])setLayer(k,true);else{layerState[k].group.visible=true;if(k==='fire')$('fire').setAttribute('aria-pressed','true');}await layerState[k].pending;if(epoch!==SENS.epoch)return;}
+  for(const k of need){if(layerMissing(k))setLayer(k,true);else{layerState[k].group.visible=true;if(k==='fire')$('fire').setAttribute('aria-pressed','true');}await layerState[k].pending;if(epoch!==SENS.epoch)return;}
   const pts=[];
   for(const s of list){const st=layerState[s.anchor.layer],info=st?.meta?.[s.anchor.id],bad=m=>{SENS.states[s.id]={status:'refused',reason:m};};
    if(!st||st.error||!st.loaded)bad('layer '+s.anchor.layer+' not loaded');else if(!info)bad('element '+s.anchor.id+' not in the sidecar');
@@ -495,7 +498,7 @@ function placeTag(){const {ctx,canvas}=tag,W=canvas.width,H=canvas.height,g=gaus
  if(g){ctx.fillStyle='#ffd9a0';const zn=gauss.zones&&gauss.manifest?.zone?(gauss.manifest.zone.name||gauss.manifest.zone.id)+' · ':'';fitText(ctx,gauss.fallback?X.gaussianOutsideNote():'Gaussian · '+zn+'experimental appearance, not surveyed geometry',W/2,108,W-60,34,'Arial');}
  ctx.fillStyle='#9fb6cb';fitText(ctx,'Left stick ↑ hold: aim, release: go · ←→ turn · Right trigger: info',W/2,g?160:140,W-60,32,'Arial');
  ctx.textAlign='left';tag.texture.needsUpdate=true;placeInFront(tag.mesh,1.3,.75);tag.mesh.visible=true;}
-function setLayer(k,on){if(!LAYERS[k])return;const st=layerState[k];if(on&&!st){loadLayer(k);status(LAYERS[k].label+' loading'+(xrSession?' · frames may stutter':''));}else if(st)st.group.visible=on;
+function setLayer(k,on){if(!LAYERS[k])return;const st=layerState[k];if(on&&layerMissing(k)){loadLayer(k);status(LAYERS[k].label+' loading'+(xrSession?' · frames may stutter':''));}else if(st)st.group.visible=on;
  if(k==='fire')$('fire').setAttribute('aria-pressed',String(on));if(state.menu)drawMenu();invalidate();}
 function setHands(h){state.hands=h==='both'?'both':'right';if(state.hands==='right')U.cone2On.value=0;status('Flashlight: '+(state.hands==='both'?'both hands':'right hand'));if(state.menu)drawMenu();invalidate();}
 /* id ('capture', 'style', …) or a button index on the current page; returns the id that acted. */
@@ -892,7 +895,7 @@ function mrCheck(point,method){if(mrDemoOn())return;const c=mr.area.checks[mr.ch
  const row={area:mr.area.id,check:c.id,element:c.source?.element||null,label:c.label,at:new Date().toISOString(),method,...o,alignment:{rmsCm:mr.fit?.ok?MR.cm(mr.fit.rmsM):null,points:mr.fit?.n??null,nudged:mr.nudged,source:mr.source},note:'design (BIM) vs installed; manual alignment, not surveyed'};
  mr.lastCheck=row;MR.appendCheck(localStorage,row);mrLog('check '+c.id);mr.note=`${c.id}: real is ${o.horizontalCm.toFixed(1)} cm from BIM (BIM x ${o.dxBimCm.toFixed(1)}, z ${o.dzBimCm.toFixed(1)} cm) · logged`;mrRefresh();}
 function mrLayerOn(k){return !!layerState[k]&&layerState[k].group.visible;}
-function mrToggleLayer(k){if(!layerState[k]){loadLayer(k).then(()=>{status(LAYERS[k].label+' ready');mrUpdateCull(true);mrRefresh();});mr.note=LAYERS[k].label+' loading'+(xrSession?' · frames may stutter':'');}else layerState[k].group.visible=!layerState[k].group.visible;if(k==='fire')$('fire').setAttribute('aria-pressed',String(mrLayerOn('fire')));mrUpdateCull(true);mrRefresh();}
+function mrToggleLayer(k){if(layerMissing(k)){loadLayer(k).then(()=>{status(LAYERS[k].label+' ready');mrUpdateCull(true);mrRefresh();});mr.note=LAYERS[k].label+' loading'+(xrSession?' · frames may stutter':'');}else layerState[k].group.visible=!layerState[k].group.visible;if(k==='fire')$('fire').setAttribute('aria-pressed',String(mrLayerOn('fire')));mrUpdateCull(true);mrRefresh();}
 /* ── Demo here ── Grimes services at real scale in the room you stand in (twin/mr-align.js demoTransform). Aim at the floor, trigger.
    Floor point: grip + hit-test point; else the controller ray on the floor (y = 0); else the tip ball projected to the floor; else the head. */
 function mrDemoFloorPoint(c,o,d,useHit){
@@ -1483,7 +1486,7 @@ setInterval(updateStats,1000);
  const supported=await detectXR();
  askBoot();
  if(MODE_AR){await bootMR();return;}
- $('enterMR').onclick=()=>{location.search='?mode=ar';};   // the photo VR page offers MR only where immersive-ar exists
+ $('enterMR').onclick=()=>{const u=new URLSearchParams(location.search);u.set('mode','ar');location.search='?'+u;};   // keeps capture, ask, code and the rest of the link   // the photo VR page offers MR only where immersive-ar exists
  state.hiRes=q.get('hires')==='1'?true:q.get('hires')==='0'?false:!supported;$('hires').setAttribute('aria-pressed',String(state.hiRes));
  gauss.override=await readOverride();if(gauss.overrideNote)$('xrNote').textContent=($('xrNote').textContent?$('xrNote').textContent+' · ':'')+gauss.overrideNote;
  // ?scene=gaussian with a local override and no ?capture opens the override's capture (e.g. the Oct 18 zone package).
@@ -1497,5 +1500,5 @@ setInterval(updateStats,1000);
  await loadLayers(P.layers);
  if(SENS.on)await sensorsSetScene(SENS.scene);
 })();
-</script><script>/* /mr: open photo VR inside Grimes with the same demo-sensor scene (no typing on the headset) */(function(){const a=document.getElementById('chVR');if(!a)return;a.addEventListener('click',()=>{const q=new URLSearchParams(location.search),o=new URLSearchParams();if(q.get('sensors')!=='off')o.set('sensors','demo');const sc=q.get('scene');if(sc&&/^[a-z0-9-]{1,30}$/.test(sc))o.set('scene',sc);a.href='scan-xr.html'+(o.toString()?'?'+o:'');});})();</script>
+</script><script>/* /mr: open photo VR inside Grimes with the same demo-sensor scene (no typing on the headset) */(function(){const a=document.getElementById('chVR');if(!a)return;a.addEventListener('click',()=>{const q=new URLSearchParams(location.search),o=new URLSearchParams(q);for(const k of ['mode','place','area','scene'])o.delete(k);   /* MR-only keys go; ask, code, capture and the rest stay */if(q.get('sensors')!=='off')o.set('sensors','demo');const sc=q.get('scene');if(sc&&/^[a-z0-9-]{1,30}$/.test(sc))o.set('scene',sc);a.href='scan-xr.html'+(o.toString()?'?'+o:'');});})();</script>
 </body></html>

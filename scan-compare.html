@@ -160,6 +160,8 @@ const FLOORS_MANIFEST='capture-local/grimes-oct18-floors/panoramas/manifest.json
 const FLOOR_MANIFESTS={L2:'scan-assets/captures/2026-10-18/floors/L2/panoramas/manifest.json',L3:'scan-assets/captures/2026-10-18/floors/L3/panoramas/manifest.json'};
 const FLOOR_NAMES={L1:'Level 1',L2:'Level 2',L3:'Level 3'};
 function multiFloorSelection(search,host,c){const f=new URLSearchParams(search).get('floors');if(!(c&&c.date==='2026-10-18'))return null;if(f==='all')return ['localhost','127.0.0.1'].includes(host)?{photo:FLOORS_MANIFEST,floors:'all',local:true}:null;return Object.hasOwn(FLOOR_MANIFESTS,f)?{photo:FLOOR_MANIFESTS[f],floors:f,published:true}:null;}
+/* The Oct 18 Gaussian zones cover Level 1 only: an upper-floor page never offers them (it would show Level 1 under a Level 2/3 label). */
+function captureForFloors(c,fl){if(!fl||!c.gaussian||!['L2','L3'].includes(fl.floors))return c;return {...c,gaussian:null,display:'photo',splatRefused:c.display==='splat'||c.splatRefused,gaussianLevel1Only:true};}
 function floorForHeight(y){return !Number.isFinite(y)?null:y>=14.3+.5?'L3':y>=9.4+.5?'L2':'L1';}
 /* 2026-10-27: Cupix-free raw INSV captures (scripts/raw360_bim.py package). ?capture=<unpublished date>&floors=L1|L2|L3 on localhost
    opens capture-local/grimes-<floor>-<date>/: stations already in the BIM viewer frame, identity registration.json. */
@@ -168,7 +170,7 @@ function localFloorSelection(search,host,published){const q=new URLSearchParams(
 const capture=captureForHost(captureSelection(location.search),location.hostname),capturePicker=document.getElementById('captureDate');capturePicker.value=capture.date;
 const localCapture=localFloorSelection(location.search,location.hostname,Object.keys(CAPTURE_SHORT));
 if(localCapture){Object.assign(capture,{date:localCapture.date,provisional:true,gaussian:null,display:'photo',splatRefused:false,registration:localCapture.registration});capturePicker.add(new Option(localCapture.date+' (local)',localCapture.date));capturePicker.value=localCapture.date;}
-const floorsPreview=multiFloorSelection(location.search,location.hostname,capture)||(localCapture&&{photo:localCapture.photo,floors:localCapture.floors,local:true});if(floorsPreview)capture.photo=floorsPreview.photo;
+const floorsPreview=multiFloorSelection(location.search,location.hostname,capture)||(localCapture&&{photo:localCapture.photo,floors:localCapture.floors,local:true});if(floorsPreview)Object.assign(capture,captureForFloors(capture,floorsPreview),{photo:floorsPreview.photo});
 let bimFloor=null;
 function followFloor(y){const f=floorForHeight(y);if(!f||f===bimFloor)return;bimFloor=f;send('bim',{type:'grimes-floor',level:f});const sp=document.querySelector('section[aria-label="BIM model"] h2 span');if(sp){sp.textContent=({L1:'Level 1',L2:'Level 2',L3:'Level 3'})[f]+' · elements + interior follow the photo floor';sp.title='BIM interior (walls, floors, furniture, ceilings) of this floor: source design geometry, not surveyed as-built; one floor loaded at a time';}}
 /* Floor picker for the Oct 18 capture (every host, 2026-10-28): Level 1 = the Level 1 export; Level 2 / Level 3 = the published
@@ -334,10 +336,10 @@ let gaussianSource=capture.gaussian,gaussianPreview=false,gaussianNote='',gaussi
 // A local run can be previewed with ?manifest=work/gaussian/...; the override is honoured on localhost only and labelled.
 {const o=['localhost','127.0.0.1'].includes(location.hostname)?new URLSearchParams(location.search).get('manifest'):null;if(o&&/^[\w.\/-]+\.json$/.test(o)&&!o.includes('..')){gaussianSource={kind:'manifest',path:o};gaussianPreview=true;}}
 const splatOption=mode.querySelector('[value=splat]');splatOption.textContent=gaussianOptionLabel({...capture,gaussian:gaussianSource});
-if(!gaussianSource)splatOption.title=capture.gaussianLocalOnly?'No Gaussian published for this capture':'No Gaussian for this capture';
+if(!gaussianSource)splatOption.title=capture.gaussianLevel1Only?'The Gaussian covers Level 1 only':capture.gaussianLocalOnly?'No Gaussian published for this capture':'No Gaussian for this capture';
 function scanNoteText(){
  if(gaussianFailed)return 'Gaussian unavailable \u00b7 showing 360\u00b0 photos';
- if(capture.splatRefused)return 'No Gaussian for '+CAPTURE_SHORT[capture.date]+' \u00b7 showing 360\u00b0 photos';
+ if(capture.splatRefused)return (capture.gaussianLevel1Only?'The Gaussian covers Level 1 only':'No Gaussian for '+CAPTURE_SHORT[capture.date])+' \u00b7 showing 360\u00b0 photos';
  if(photoMode)return '';
  return [view==='overlay'?'Gaussian \u00b7 experimental appearance, not surveyed':'',gaussianPreview?'local preview manifest':'',gaussianNote?CAPTURE_SHORT[capture.date]+' '+gaussianNote:''].filter(Boolean).join(' \u00b7 ');
 }
