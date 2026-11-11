@@ -142,3 +142,8 @@ test('clickable chips and cards are keyboard-operable',()=>{assert.doesNotMatch(
 test('map polls the feed at most every 5 minutes',()=>{assert.match(source,/setInterval\(fetchLiveData,\s*300000\)/);assert.doesNotMatch(source,/setInterval\(fetchLiveData,\s*60000\)/)});
 test('fetchLiveData resets per-building live fields every fetch',()=>{const a=source.indexOf('async function fetchLiveData');const body=source.slice(a,source.indexOf('// Update stats',a));assert.match(body,/b\.kw\s*=\s*null/);assert.match(body,/b\.sparkline\s*=\s*\[\]/)});
 test('static roster carries no kW values',()=>{const a=source.indexOf('const D=[');const roster=source.slice(a,source.indexOf('];',a));assert.doesNotMatch(roster,/[,{ ]kw:\s*\d/)});
+test('"typical" comes from the current Pacific hour-of-week baseline, not the retired April snapshot file',()=>{assert.doesNotMatch(source,/fetch\([^)]*baselines\.json/);assert.doesNotMatch(source,/window\.baselines\b/);
+ const a=source.indexOf('window.getBaseline = function'),fn=source.slice(a,source.indexOf('\n  };',a)+5),w={energyBaseline:null},ctx={window:w,baselineKey:()=>({wdayMon0:2,hr:5}),isFinite,Array,Date};
+ require('node:vm').runInNewContext(fn,ctx);assert.equal(w.getBaseline('grimes',Date.now()),null);
+ const b168=Array.from({length:168},(_,i)=>i);w.energyBaseline={buildings:{grimes:{baseline168:b168,sigma:13.4,n_hours:778},thin:{baseline168:b168,sigma:2,n_hours:30},bad:{baseline168:[1,2]}}};
+ assert.deepEqual({...w.getBaseline('grimes',Date.now())},{mean:53,std:13.4,n:778,tier:1});assert.equal(w.getBaseline('thin',Date.now()).tier,3);assert.equal(w.getBaseline('bad',Date.now()),null);assert.equal(w.getBaseline('nope',Date.now()),null);assert.equal(w.getBaseline('grimes',NaN),null)});

@@ -1000,12 +1000,10 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   window.render3DFn=renderMarkers;
   window.currentEnergyData=null;
 
-  // ── Baseline lookup — loaded once. Fed into forecast + Public "vs typical" line ──
-  // 4-tier fallback: (wday,hr) → (weekday|weekend,hr) → hr → building overall.
-  // Built by build_baselines.py from data/archive/*.json sparklines.
-  window.baselines=null;
-  fetch('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/baselines.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.baselines=d;}).catch(function(){});
-
+  // ── "Typical" lookup for the forecast ghost line + the Public "vs typical" sentence ──
+  // Source: energy_baseline.json (hour-of-week median, Pacific, rebuilt on every data run; loaded just below).
+  // The older data/baselines.json (build_baselines.py) is no longer read: it was last built in May 2026 from April
+  // snapshots, and bucketed by UTC hour while this page looks up Pacific hours.
   // Statistical baseline/anomaly layer (hour-of-week median + MAD z-scores) —
   // built by scripts/build_baseline.py. Feeds the σ-banner in popups.
   window.energyBaseline=null;
@@ -1030,23 +1028,16 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
   fetch('data/bechtel_lca.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(d){window.lcaData=d;}).catch(function(){});
 
   window.getBaseline = function(buildingId, dateObj){
-    var b = window.baselines && window.baselines.buildings && window.baselines.buildings[buildingId];
-    if(!b) return null;
-    // Pacific weekday/hour (baselines are built in America/Los_Angeles), never browser-local.
+    var eb = window.energyBaseline, b = eb && eb.buildings && eb.buildings[buildingId];
+    if(!b || !Array.isArray(b.baseline168) || b.baseline168.length!==168) return null;
     var ms = (dateObj instanceof Date) ? dateObj.getTime() : +dateObj;
     if(!isFinite(ms)) return null;
-    var bk = baselineKey(ms);
-    var wdayMon0 = bk.wdayMon0;            // 0=Mon..6=Sun (matches Python weekday())
-    var hr = bk.hr;
-    var wclass = wdayMon0>=5 ? 'weekend' : 'weekday';
-    var key1 = wdayMon0+','+hr;
-    var key2 = wclass+','+hr;
-    var key3 = String(hr);
-    var t = (b.tier1 && b.tier1[key1])
-         || (b.tier2 && b.tier2[key2])
-         || (b.tier3 && b.tier3[key3])
-         || b.tier4;
-    return t ? {mean:t.mean, std:t.std, n:t.n, tier: (b.tier1&&b.tier1[key1])?1: (b.tier2&&b.tier2[key2])?2: (b.tier3&&b.tier3[key3])?3:4} : null;
+    var bk = baselineKey(ms);              // Pacific weekday (0=Mon..6=Sun) and hour, never browser-local
+    var mean = b.baseline168[bk.wdayMon0*24 + bk.hr];
+    if(typeof mean!=='number' || !isFinite(mean)) return null;
+    // tier: 1 = at least four weeks of hourly history behind the median, 2 = one to four weeks, 3 = less than a week
+    var n = +b.n_hours || 0;
+    return {mean:mean, std:(typeof b.sigma==='number'&&isFinite(b.sigma))?b.sigma:null, n:n, tier:n>=672?1:n>=168?2:3};
   };
 
   // ── Sonar tick — expanding ripple rings on top consumers (~16 Hz) ──
@@ -1333,7 +1324,7 @@ function(EMap,MapView,Graphic,GraphicsLayer,Locate,BasemapToggle,Point){
 
     // Build baseline series spanning past sparkline + future horizon (for chart ghost line)
     var baselinePast=[], baselineFuture=[];
-    if(window.baselines){
+    if(window.energyBaseline){
       var nPast = sparkData ? sparkData.length : 0;
       for(var pi=0; pi<nPast; pi++){
         baselinePast.push(baseAt(tpts[pi].x));

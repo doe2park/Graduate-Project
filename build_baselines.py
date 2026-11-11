@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """
+RETIRED (2026-11-10): the campus map no longer reads data/baselines.json. It was never scheduled, buckets by UTC hour
+while the map looks up Pacific hours, and its archive glob stops at 2026. The map uses data/energy_baseline.json
+(scripts/build_baseline.py, Pacific, rebuilt every data run). Kept for reference only.
+
 Build per-building energy baselines for the campus map's forecast layer.
 
 Walks `data/archive/2026-*.json` snapshots, expands each building's sparkline
