@@ -4,7 +4,7 @@
 <script>if(!["scan","bim"].includes(new URLSearchParams(location.search).get("pane")))location.replace("scan-compare.html");</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scan + UC Berkeley · Grimes BIM (Three.js)</title>
+<meta name="description" content="Grimes Engineering Center BIM view used by the scan comparison: interior, service layers and element properties."><title>Scan + UC Berkeley · Grimes BIM (Three.js)</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -353,8 +353,8 @@ body[data-pane="bim"] #twinPanel{top:calc(8px + var(--tb-h) + 6px)}
 
 <div id="welcome">
   <div class="card">
-    <h2>🏛️ Grimes Engineering Center — Live Digital Twin</h2>
-    This is a live digital twin of an operating campus building.<br><br>
+    <h2>🏛️ Grimes Engineering Center — Digital Twin</h2>
+    This is a digital twin of an operating campus building: the design model, with building meter readings collected on a schedule.<br><br>
     <span class="em">Colored pipes &amp; ducts</span> show modelled building systems — <b>click one</b> for design information and building meter context.<br><br>
     <span class="em">🚶 Walk</span> explores the building like a game · <span class="em">🪞 Compare</span> walks the real 360° site photos side-by-side.
     <button onclick="dismissWelcome()">Got it — let me explore</button>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Campus Digital Twin · Grimes Engineering Center</title>
+<meta name="description" content="A research prototype linking captured site appearance, BIM objects and operational data for the Grimes Engineering Center, with explicit labels for measured, modelled and inferred information.">
+<link rel="icon" href="data:,">
+<style>
+:root{--bg:#0b1522;--panel:#111f31;--line:#22364d;--text:#eaf2fa;--soft:#a9bccf;--link:#91d9ff;--live:#7fe0b0;--warn:#ffd18a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--link)}
+a:focus-visible,summary:focus-visible{outline:3px solid var(--link);outline-offset:3px;border-radius:6px}
+main{max-width:1080px;margin:auto;padding:40px 20px 56px}
+header p.kicker{margin:0 0 10px;color:var(--soft);font-size:14px;letter-spacing:.06em;text-transform:uppercase}
+h1{margin:0;font-size:clamp(28px,5vw,44px);line-height:1.15;text-wrap:balance}
+.lede{max-width:64ch;margin:16px 0 0;font-size:18px;color:var(--soft)}
+.lede strong{color:var(--text);font-weight:600}
+blockquote{max-width:64ch;margin:22px 0 0;padding:2px 0 2px 16px;border-left:3px solid var(--link);color:var(--text)}
+h2{margin:44px 0 6px;font-size:22px}
+h2+p{margin:0 0 18px;color:var(--soft);max-width:70ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:0;margin:0;list-style:none}
+.card{display:flex;flex-direction:column;height:100%;padding:18px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.card h3{margin:0 0 6px;font-size:18px}
+.card h3 a{color:var(--text);text-decoration:none}
+.card h3 a:hover{color:var(--link);text-decoration:underline}
+.card p{margin:0;color:var(--soft);font-size:15px}
+.card .note{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:14px;color:var(--warn)}
+.card .more{margin-top:auto;padding-top:12px;font-size:14px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{width:100%;min-width:640px;border-collapse:collapse;font-size:15px}
+th,td{padding:12px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th{background:var(--panel);color:var(--soft);font-weight:600}
+td:first-child{font-weight:600;white-space:nowrap}
+td:last-child{color:var(--warn)}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--soft);font-size:14px}
+footer a{margin-right:14px;white-space:nowrap}
+@media (max-width:480px){main{padding:28px 16px 44px}.lede{font-size:17px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<p class="kicker">UC Berkeley · Civil &amp; Environmental Engineering · research prototype</p>
+<h1>Campus Digital Twin: Grimes Engineering Center</h1>
+<p class="lede">Captured <strong>site appearance</strong>, <strong>BIM objects</strong> and <strong>operational data</strong> for one building, linked in the browser, with explicit labels for what is measured, modelled or inferred.</p>
+<blockquote>In existing buildings with incomplete drawings and sensor coverage, does connecting these sources and showing their evidence help people understand building conditions faster and more accurately?</blockquote>
+</header>
+
+<section aria-labelledby="demos">
+<h2 id="demos">Open a demonstration</h2>
+<p>Everything runs in the browser. A desktop is recommended for the full BIM model; large-model loading on phones depends on device memory and WebGL support.</p>
+<ul class="grid">
+<li class="card"><h3><a href="grimes-campus-map-arcgis.html">Campus map</a></h3><p>Geographic context and the utility observations available for 61 buildings.</p><p class="note">Scheduled collection from the campus metering portal, not a direct BAS connection.</p></li>
+<li class="card"><h3><a href="campus-energy-dashboard.html">Energy dashboard</a></h3><p>Compare demand, building categories and which buildings are reporting.</p><p class="more"><a href="weekly-report.html">Weekly history</a></p></li>
+<li class="card"><h3><a href="grimes-bim-explorer.html?model=full">BIM explorer</a></h3><p>The whole Grimes model: original materials, object search, isolate and hide, section cuts.</p><p class="note">Ten source layers, 66,620 object identities. Source BIM properties only.</p><p class="more"><a href="grimes-bim-explorer.html?model=regional">Smaller regional example</a></p></li>
+<li class="card"><h3><a href="grimes-bim-viewer.html">Element BIM viewer</a></h3><p>Pick floors, service layers and single elements; read properties with their data provenance.</p><p class="note">Design properties do not prove installed condition or sensor coverage.</p></li>
+<li class="card"><h3><a href="scan-compare.html">Scan and BIM, side by side</a></h3><p>Walk captured 360° photos next to the linked BIM view, or overlay the services on the photo.</p><p class="note">October 18 capture by default. The September and October alignments are provisional, not surveyed.</p></li>
+<li class="card"><h3><a href="vr/">Headset view</a></h3><p>Stand inside a captured 360° photo with the Level 1 building services overlaid. Opens as a desktop preview in any browser.</p><p class="more"><a href="mr/">Mixed-reality mode</a> · <a href="https://github.com/doe2park/Graduate-Project/blob/main/docs/QUEST_XR_OVERLAY.md">Guide and what has been run on a headset</a></p></li>
+<li class="card"><h3><a href="grimes-performance.html">Design intent and operation</a></h3><p>LEED design context for Grimes set against the operating evidence that is available.</p></li>
+<li class="card"><h3><a href="talks/sensor-deck/">Talk: building data and sensing</a></h3><p>Slides on what the building reports today and what a sensing layer would add.</p><p class="note">Sensors shown in the twin are simulated unless a page says otherwise.</p></li>
+</ul>
+</section>
+
+<section aria-labelledby="status">
+<h2 id="status">What is implemented, and what is still experimental</h2>
+<p>Each row states the current result and the limit of the evidence behind it.</p>
+<div class="tablewrap" tabindex="0" role="region" aria-labelledby="status">
+<table>
+<thead><tr><th scope="col">Area</th><th scope="col">Current status</th><th scope="col">Evidence boundary</th></tr></thead>
+<tbody>
+<tr><td>Element BIM</td><td>Ten layers, 66,620 identities with geometry; filtering, picking and runtime batching.</td><td>Design properties do not prove installed condition or sensor coverage.</td></tr>
+<tr><td>Operating data</td><td>Scheduled collection and archived observations.</td><td>Not a direct BAS/BACnet connection or a continuous verified meter history.</td></tr>
+<tr><td>Scan comparison</td><td>Three captures: May 6, September 17 and October 18 (Level 1, plus Level 2 and Level 3 photo packages).</td><td>September and October alignments are provisional; photo transitions are not measured parallax.</td></tr>
+<tr><td>Gaussian scenes</td><td>Published: May 6, and October 18 Level 1 zones A, C and D.</td><td>Experimental appearance, not surveyed geometry.</td></tr>
+<tr><td>Ask the twin</td><td>Questions about a selected element, answered from read-only tools over the twin data.</td><td>Needs a server on the researcher's own laptop; no AI service is deployed with this site.</td></tr>
+<tr><td>Evaluation</td><td>A task-based comparison is proposed.</td><td>No completed user study or demonstrated improvement in decision accuracy yet.</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<footer>
+<a href="https://github.com/doe2park/Graduate-Project">Source on GitHub</a>
+<a href="https://github.com/doe2park/Graduate-Project/blob/main/docs/RESEARCH_COLLABORATION.md">For research collaborators</a>
+<a href="https://github.com/doe2park/Graduate-Project/blob/main/docs/DATA_SHARING.md">Data guide</a>
+<a href="rights.html">Copyright and permitted use</a>
+<p>Yoonsung · status as of November 10, 2026</p>
+</footer>
+</main>
+</body>
+</html>

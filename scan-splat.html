@@ -76,8 +76,10 @@ try{
  }
  /* Optional zone index: ?zones=<path>, else scan-assets/gaussian/<?capture or 2026-05-06>/zones/index.json unless ?manifest overrides.
     Without an index the single-scene behaviour below is unchanged. */
+ const ZONED_CAPTURES=['2026-10-18'];
  async function loadZoneIndex(){
   const explicit=params.get('zones');if(!explicit&&params.get('manifest'))return null;
+  if(!explicit&&!ZONED_CAPTURES.includes(captureParam))return null;   /* only zoned captures have an index: no 404 probe for the single-scene May 6 capture */
   const url=new URL(explicit||`scan-assets/gaussian/${captureParam||'2026-05-06'}/zones/index.json`,location.href);
   if(url.origin!==location.origin)throw Error('Use a same-origin zones index');
   let json=null;try{const r=await fetch(url);if(r.ok)json=await r.json();}catch(e){if(explicit)throw Error('Zones index unavailable');}
