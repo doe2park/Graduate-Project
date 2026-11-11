@@ -1,6 +1,6 @@
 # Claude handoff — Campus and Interior Digital Twin
 
-**Updated October 14, 2026. Public, sanitized continuation guide.**
+**Updated November 10, 2026. Public, sanitized continuation guide.**
 
 Read [AGENTS.md](../AGENTS.md) first, then this document, [README.md](../README.md), and the instructions for the component you will change. This is project context, not authorization for a deployment or an unrelated rewrite.
 
@@ -35,12 +35,14 @@ Reconstruction and rendering are parts of the system, not the research contribut
 |---|---|---|
 | Full BIM explorer | `grimes-bim-explorer.html` and maintained source in `viewer-src/bim-explorer/` | Source for the richer desktop workshop |
 | Element/data viewer | `grimes-bim-viewer.html` | Related properties/data inspection in WebXR prototypes |
-| Scan comparison | Public photo/mesh comparison with stored registrations | Additional recorded-viewpoint inspection experiments |
-| Gaussian pipeline | Methods and processing scripts are documented | Trained raw-video scenes, evaluation renders and teaching notebooks remain separate |
-| Quest optimization | The local Quest runtime is not shipped by this documentation update | Latest storage/visibility/material experiments are summarized below |
-| New memory benchmark | Summary only in this handoff | Full raw reports, runtime packages and source snapshots are not included here |
+| Scan comparison | `scan-compare.html`: 360° photo comparison with stored registrations for May 6, September 17 and October 18 (default). October 18 also has Level 2 and Level 3 photo packages (`?floors=L2`, `?floors=L3`). The 3D mesh view is retired; old `?mode=mesh` links open the photos | A combined multi-floor station graph (`?floors=all`) and Cupix-free raw-video captures open on localhost only, from ignored `capture-local/` |
+| Gaussian scenes | Published as an experimental appearance layer: May 6, and October 18 Level 1 zones A, C and D. Methods and processing scripts are documented | October 18 zone B is not published. Other trained scenes, raw-video runs, evaluation renders and teaching notebooks remain separate |
+| Headset pages (WebXR) | `scan-xr.html` (photo VR overlay), `mr/` (passthrough entry) and `vr/`, with `twin/xr-core.js`, `twin/mr-align.js` and `twin/xr-spatial-tier.mjs` | No `immersive-ar` session is recorded as run on a headset; see section 9 and [the Quest guide](QUEST_XR_OVERLAY.md) |
+| Sensors | `twin/sensors/` (registry, feed contract, schemas, `feed.js`), `twin/sensor-demo.js`, `twin/sensor-xr.js`; `tools/sensor_gateway.py` and `tools/sensor-phone.html` for a phone-as-temporary-sensor live test | **No sensor is installed: all 17 registry entries are simulated demo rows** |
+| Ask the twin | `twin/ask-twin.js` (PC panel) and `twin/xr-ask.js` (headset card), off unless the page is opened with `?ask=1`; `scripts/ask_twin/` and `scripts/ask_twin_server.py` | The server runs on the owner's laptop only. No AI service is deployed, and the public pages cannot answer without it. See [Ask the twin](ASK_TWIN.md) |
+| October 14 storage benchmark | Summary only in this handoff (section 5) | Full raw reports, runtime packages and source snapshots are not included here |
 
-**A fresh clone does not contain the latest local Quest runtime or its 54-package benchmark.** Do not invent files from the local implementation or attribute its measurements to the deployed explorer. Public explorer code baseline at this handoff: commit `35d1586d`.
+**A fresh clone does not contain the October 14 local storage experiment or its 54-package benchmark.** Do not invent files from that local implementation or attribute its measurements to the deployed pages. The public explorer source was last changed in commit `7b6ee5b54` (progressive full-model load).
 
 ## 2. Open the demonstrations
 
@@ -52,11 +54,13 @@ Reconstruction and rendering are parts of the system, not the research contribut
 | Energy dashboard | [Open dashboard](https://doe2park.github.io/Graduate-Project/campus-energy-dashboard.html) | [HTML](../campus-energy-dashboard.html) |
 | Weekly history | [Open report](https://doe2park.github.io/Graduate-Project/weekly-report.html) | [HTML](../weekly-report.html) |
 | Scan/BIM | [Open comparison](https://doe2park.github.io/Graduate-Project/scan-compare.html) | [HTML](../scan-compare.html) |
+| Headset photo VR overlay | [Open scan-xr](https://doe2park.github.io/Graduate-Project/scan-xr.html) | [HTML](../scan-xr.html), [guide](QUEST_XR_OVERLAY.md) |
+| Headset passthrough entry | [Open /mr](https://doe2park.github.io/Graduate-Project/mr/) | [Redirect page](../mr/index.html) to `scan-xr.html?mode=ar` with demo placement and simulated demo sensors |
 | Design versus actual | [Open performance page](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | [HTML](../grimes-performance.html) |
 
 The richer public BIM Explorer supports source-property inspection, search, isolation/hiding, floors/systems and sectioning. The element viewer supplies the established operating-data context. They serve different inspection tasks; do not replace either with an old small teaching sample.
 
-Desktop Explorer defaults to all ten BIM layers. Narrow screens use a smaller regional default unless `model=full` is requested. The regional package contains 492 objects in a partial Level 1 area; it is not the whole building.
+Desktop Explorer defaults to all ten BIM layers, and the full model draws progressively as each file arrives (structure first). Narrow screens default to the regional example unless a mode is requested; the regional package is a partial Level 1 area, not the whole building. When a phone opens the full model it starts with eight of the ten disciplines (fire protection and receptacles/data are skipped at first and the label says so); *Load all 10 disciplines* or `?layers=all` loads everything. Do not present a partial load as the whole building.
 
 ## 3. Files Claude can actually edit in a fresh clone
 
@@ -76,12 +80,23 @@ Desktop Explorer defaults to all ten BIM layers. Narrow screens use a smaller re
 | `tests/bim-explorer-deployment.test.mjs` | Deployment/source contract tests |
 | `bim-explorer-assets/` | Catalog, small examples, vendor decoders and build manifest |
 | `buildings/grimes/` | Canonical GLBs and identity sidecars |
-| `scan-assets/` | Published capture packages, meshes and panoramas |
+| `scan-assets/` | Published capture packages, panoramas, earlier meshes and published Gaussian scenes |
+| `scan-compare.html`, `scan-photo.html`, `scan-bim.html`, `scan-splat.html` | Scan/BIM comparison and its panes (single-HTML pages) |
+| `scan-xr.html`, `mr/`, `vr/` | Headset pages and their short entry addresses |
+| `twin/xr-core.js`, `twin/mr-align.js`, `twin/xr-spatial-tier.mjs`, `twin/overlay-visibility.js` | Headset logic kept testable outside the page: stations, alignment, spatial batching, visibility |
+| `twin/element-cards.js`, `twin/as-built.js`, `twin/twin-resolver.js` | Shared element cards and data tiers, as-built adjustments, twin lookups |
+| `twin/sensors/`, `twin/sensor-demo.js`, `twin/sensor-xr.js` | Sensor registry, feed contract and schemas; the simulated demo layer |
+| `tools/sensor_gateway.py`, `tools/sensor_sim.py`, `tools/sensor-phone.html` | Local gateway and snapshot generator for the sensor feed |
+| `twin/ask-twin.js`, `twin/xr-ask.js` | Ask the twin panel and headset card (behind `?ask=1`) |
+| `scripts/ask_twin/`, `scripts/ask_twin_server.py` | Ask the twin laptop server and its read-only tools |
+| `tests/`, `scripts/run_all_tests.py` | Unit tests and the one-command runner |
 | `docs/` | Methods and provenance |
 
 Read the [Explorer guide](BIM_EXPLORER.md) and [source README](../viewer-src/bim-explorer/README.md). Edit maintained modules, then rebuild the root HTML; do not hand-edit the generated explorer. The established element viewer and other canonical pages have their own single-HTML architecture.
 
-The local Quest experiment has additional concepts named spatial visibility, material interning, adaptive detail, exact array storage, sensor adapters and runtime benchmarking. Those local modules are **not public import paths in this clone**. Porting any of them requires a separate reviewed implementation and verification.
+Several `twin/` modules are loaded with a `?v=<number>` query that the page checks against the module's `API` constant, so a stale cached copy is detected. When such a module changes, bump both together and keep the tests that pin them passing.
+
+The October 14 local experiment (section 5) has additional concepts named material interning, adaptive detail, exact array storage and runtime benchmarking. Those local modules are **not public import paths in this clone**. Porting any of them requires a separate reviewed implementation and verification.
 
 ## 4. Source identity, model scope and hard invariants
 
@@ -159,7 +174,8 @@ The local snapshot recorded 206 passing checks: 181 JavaScript, 21 HTTP/receiver
 Keep separate:
 
 - **Published panoramas:** actual photographs at recorded stations. Crossfades do not establish measured intermediate parallax.
-- **Published scan mesh:** exported geometry used by the registered comparison. The vendor's reconstruction internals cannot be established from an export alone.
+- **Published scan mesh:** exported geometry for May 6 and September 17. The comparison's mesh view is retired; the files remain as registration evidence. The vendor's reconstruction internals cannot be established from an export alone.
+- **Published Gaussian scenes:** May 6, and October 18 Level 1 zones A, C and D, shown as experimental appearance, not surveyed geometry. October 18 zone B is not published.
 - **Earlier posed-image Gaussian pilot:** uses existing capture poses and its documented transform chain.
 - **Independent raw-video SfM/Gaussian experiment:** estimates cameras from imagery; metric scale and BIM alignment remain unvalidated.
 
@@ -167,7 +183,7 @@ The raw-video workflow is imagery preparation/FFmpeg → COLMAP/PyCOLMAP SfM →
 
 Sparse points are triangulated feature tracks. Camera markers show estimated viewpoints, not BIM objects. Overlapping imagery is required; not every pixel becomes a 3D point, and registration can split into multiple components with arbitrary scale.
 
-### Saved training evidence used in the latest presentation
+### Saved training evidence recorded on October 14
 
 No new training was launched for the October 14 presentation update. Existing saved outputs were evaluated:
 
@@ -181,19 +197,19 @@ A/B also differ in population growth settings. The comparison shows combined con
 
 Brush repeatedly renders a known view, compares it with the source photograph, propagates the image objective and updates Gaussian parameters. A controlled learning study should keep settings/split fixed, save genuine checkpoints and logs, and evaluate separate spatial areas.
 
-Read [raw-video reconstruction](RAW_VIDEO_RECONSTRUCTION.md), [earlier Gaussian methodology](GAUSSIAN_RECONSTRUCTION_METHODS.md), and [new capture onboarding](CAPTURE_ONBOARDING.md). The private/local training package and notebooks are not shipped with this handoff.
+Read [raw-video reconstruction](RAW_VIDEO_RECONSTRUCTION.md), [earlier Gaussian methodology](GAUSSIAN_RECONSTRUCTION_METHODS.md), [the training guide](GAUSSIAN_TRAINING_GUIDE.md), [the raw 360 pipeline](RAW360_PIPELINE.md) and [new capture onboarding](CAPTURE_ONBOARDING.md). The private/local training package and notebooks are not shipped with this handoff.
 
 ## 7. Registration and new floors/buildings
 
-Read [the actual registration method](SCAN_BIM_REGISTRATION.md), [accepted registration](../alignment-analysis/accepted-registration.json), [captured panoramas](CAPTURED_PANORAMA_VIEWER.md), and [September capture update](CAPTURE_UPDATE_20260917.md).
+Read [the actual registration method](SCAN_BIM_REGISTRATION.md), [accepted registration](../alignment-analysis/accepted-registration.json), [captured panoramas](CAPTURED_PANORAMA_VIEWER.md), the [September](CAPTURE_UPDATE_20260917.md) and [October](CAPTURE_UPDATE_20261018.md) capture updates, and [the October upper floors](MULTIFLOOR_OCT18.md).
 
 May's documented fit converts coordinate axes, searches coarse poses and refines trimmed point-to-point ICP constrained to **yaw + XYZ translation, with scale fixed at one**. Its approximately 0.13 m internal median nearest-reference residual is not surveyed accuracy. Candidate selection/internal checks are not independent physical control.
 
-The September 17 capture has a separately labelled provisional alignment. The raw-video Gaussian experiment has a different, unvalidated scale/alignment status. Do not reuse an old Cupix-frame angle, add floor elevation twice, or assign Grimes registration to a new building by changing a manifest URL.
+The September 17 and October 18 captures each have a separately labelled provisional alignment (`project-frame-provisional`: the May transform used as a visualization candidate, with no survey validation). The October 18 Level 2 and Level 3 packages reuse the October 18 registration and are likewise provisional. The raw-video Gaussian experiment has a different, unvalidated scale/alignment status. Do not reuse an old Cupix-frame angle, add floor elevation twice, or assign Grimes registration to a new building by changing a manifest URL.
 
 Apply accepted transforms consistently to camera position and orientation, with the inverse for reverse navigation. Shared viewpoint means position, direction and field of view agree. A projected BIM point in a photo is a candidate geometric correspondence, not proof of physical device identity.
 
-New data needs a building/capture namespace, units/up-axis confirmation, overlap, camera/geometry checks, a separately fitted transform and independent check points. Sparse monocular SfM needs scale established before fixed-scale ICP. A complete connected Level 1/Level 2 result is not claimed by this update.
+New data needs a building/capture namespace, units/up-axis confirmation, overlap, camera/geometry checks, a separately fitted transform and independent check points. Sparse monocular SfM needs scale established before fixed-scale ICP. The published Level 2 and Level 3 packages open one floor at a time; a surveyed, connected multi-floor result is not claimed.
 
 ## 8. Operating data and evidence honesty
 
@@ -207,13 +223,17 @@ Meter 77 design-VA allocation and meter 3 design-CFM allocation are uncalibrated
 
 A meter total on a component card is meter/system context, not that component's consumption. Missing/stale data must never become live zero. Do not fabricate direct readings for a more impressive selection demo. Verified device/asset identifiers, panel schedules, point lists, units, timestamps and documentary relationships are needed for direct bindings.
 
-The public Explorer currently focuses on source BIM properties; use the established element viewer for operating-data context. The newer local adapter design validates exact stable IDs and provenance and avoids fetching/decoding operational data every XR frame. It is not a deployed public BAS integration.
+The public Explorer currently focuses on source BIM properties; use the established element viewer for operating-data context. Element cards name their data tier (live/latest, modelled, context) through the shared `twin/element-cards.js`; see [element feeds](ELEMENT_FEEDS.md).
+
+The sensor layer in `twin/sensors/` is a registry and feed contract with a simulated demo: **no sensor is installed, and every demo value is simulated and labelled so**. The opt-in live test uses a phone as a temporary test device through `tools/sensor_gateway.py`. None of this is a deployed BAS integration.
+
+Ask the twin answers from read-only tools over the twin's own data and marks which cited elements were verified against tool results. It runs only while the owner's laptop server is running; mock mode gives scripted answers and is labelled MOCK.
 
 Weekly history records collector observations, not guaranteed continuous histories. Sample-mean × 24-hour extrapolation is not a measured meter-counter delta. See [data sharing](DATA_SHARING.md) and preserve uncertainty and freshness labels.
 
 ## 9. Quest and AR status
 
-The owner has used a Quest 2 to inspect earlier versions and reported qualitative issues with exit controls, pointers, readability, materials and model completeness. The latest source-fidelity/storage work still needs physical hardware measurement.
+The owner has used a Quest 2 to inspect earlier versions and reported qualitative issues with exit controls, pointers, readability, materials and model completeness. The photo VR overlay (`scan-xr.html`) had a first headset test by the owner, after which its controls were redesigned on October 22. Everything added since is recorded in [the Quest guide](QUEST_XR_OVERLAY.md) as **unverified on a headset**: the passthrough mode (`?mode=ar`, `/mr`), landmark alignment and automatic restore, the simulated demo sensors in the headset, and Ask the twin in the headset. They were built and checked on a desktop only. The latest source-fidelity/storage work also still needs physical hardware measurement.
 
 - Tabletop passthrough places a scaled model in a tracked room; it does not establish building registration.
 - VR uses a virtual reference frame.
@@ -223,9 +243,9 @@ The calibration design uses separated matching landmarks, a constrained transfor
 
 ## 10. Presentation and documentation status
 
-An editable 22-slide presentation was updated separately for October 15. Private cloud document identifiers, media links and unpublished captures are deliberately omitted from this public handoff.
+Presentations are maintained separately from this repository. Two web decks are tracked under `talks/` (`talks/sensor-deck/` and `talks/lab-2026-11-05/`). Private cloud document identifiers, media links and unpublished captures are deliberately omitted from this public handoff.
 
-The narrative now covers capture/BIM streams, actual reconstruction, a render/compare/update training diagram, identical source/A/B detail crops, varied real BIM selections, storage diagrams, the implemented workflow, headset methodology and a future evaluation flowchart. Full-model context is shown before and after component inspection. Captured-location comparison uses “Same viewpoint” and explicitly labels revealed concealed services; physical device identity remains unverified.
+The October 15 presentation narrative covered capture/BIM streams, actual reconstruction, a render/compare/update training diagram, identical source/A/B detail crops, varied real BIM selections, storage diagrams, the implemented workflow, headset methodology and a future evaluation flowchart. Full-model context is shown before and after component inspection. Captured-location comparison uses “Same viewpoint” and explicitly labels revealed concealed services; physical device identity remains unverified.
 
 Presentation conventions: Calibri, navy/gold, consistent title/subtitle/content/footer positions, at most three main content regions, editable text/diagrams, equal image frames and preserved aspect ratios. Use real evidence and readable captions. The existing public element viewer remains a presentation entry point; the deployed richer Explorer is also available.
 
@@ -251,11 +271,29 @@ node scripts/build_bim_explorer.mjs --check
 node --test tests/bim-explorer-deployment.test.mjs
 ```
 
-The first build may fetch the pinned esbuild package from npm. Read the source README before running it. Generated HTML and the build manifest must match the maintained modules. Read component-specific instructions for other tests.
+The first build may fetch the pinned esbuild package from npm. Read the source README before running it. Generated HTML and the build manifest must match the maintained modules.
+
+One command runs every unit test (no browsers, GPU or network):
+
+```sh
+python3 scripts/run_all_tests.py
+```
+
+It does not run the headless-browser smoke tests (`tests/*-smoke.cjs`). [tests/README.md](../tests/README.md) lists what the runner needs (a local Three.js copy for the render-tier tests, and the Python packages) and the remaining commands.
 
 Do not run local-only workshop commands against guessed paths in this clone. Do not overwrite historical evidence during a new experiment. Save a new dated output, input/source hashes, scope, settings, environment, raw results and limitations. Isolate one policy at a time; keep camera route, eye resolution, model scope and LOD fixed. Measure without video capture and record presentation footage separately.
 
 ## 12. Useful next tasks for Claude
+
+Open items as of November 10, 2026:
+
+- **First headset test of Ask the twin** (immersive session, trigger hold, microphone permission, certificate accept). Not done.
+- **First `immersive-ar` session on a headset** for the passthrough mode and landmark alignment. Not done.
+- **Sensor gateway walkthrough** with a phone as the temporary test device, then a first real registry row. No sensor is installed.
+- **Campus map forecast baseline (changed November 10).** `grimes-campus-map-arcgis.html` now takes "typical" from `data/energy_baseline.json` (Pacific hour-of-week median, rebuilt on every data run) instead of the retired `data/baselines.json`. The change is covered by a unit test but has not been checked on the live map.
+- **BIM Explorer without WebGL.** `viewer-src/bim-explorer/viewer.mjs` has no WebGL-failure or context-lost state; the page stays on its loading message.
+
+Standing guidance:
 
 1. Inspect the public source and confirm current behavior before changing it. Keep the rich full-model Explorer and element/data viewer roles clear.
 2. Add bounded, measurable optimizations to the public code only after preserving exact source identity, properties, geometry and materials. Separate transfer, decode peak, retained arrays, GPU buffers, draw/state changes and frame intervals.
