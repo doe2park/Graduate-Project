@@ -242,6 +242,28 @@ def combine_meters(per_meter):
     return out, sorted(live)
 
 
+PARTIAL_GRACE_RUNS = 4   # runs a silent meter is waited for before the remaining meters are accepted as the building
+
+
+def partial_state(prev_entry, meters_used_ids):
+    """Is this run's sum missing a meter that the last complete run had? -> (partial, expected, streak).
+
+    A transient single-meter failure (one timeout) must not be stored as the building total: it would enter the
+    history as a fraction of the real load, raise a false 'low' anomaly and bias the baselines. The expected set is
+    the meters of the last complete run (carried in the output file). After PARTIAL_GRACE_RUNS consecutive partial
+    runs the silent meter is treated as gone and the responding meters become the new complete set, so a retired
+    meter cannot stop a building's history for good."""
+    prev = prev_entry if isinstance(prev_entry, dict) else {}
+    expected = set(prev.get("meters_last_complete") or [m for m in str(prev.get("meter") or "").split("+") if m])
+    used = set(meters_used_ids or [])
+    if not used or not (expected - used):
+        return False, sorted(used), 0
+    streak = int(prev.get("partial_runs") or 0) + 1
+    if streak > PARTIAL_GRACE_RUNS:
+        return False, sorted(used), 0
+    return True, sorted(expected), streak
+
+
 def window_start(history_rows, now_pt):
     """Request start: last stored BMO timestamp, bounded to MAX_WINDOW_H; 2 h when nothing stored."""
     stamps = [parse_pt(e.get("ts")) for e in history_rows or []]
@@ -548,15 +570,17 @@ def run():
         rows, meters_used_ids = combine_meters(per_meter)
         kw, ts = (rows[-1][1], rows[-1][0]) if rows else (None, None)
         meter_used = "+".join(meters_used_ids) if meters_used_ids else None
+        partial, meters_complete, partial_runs = partial_state((prev_out.get("buildings") or {}).get(bid), meters_used_ids)
 
         if bid not in results or (kw is not None and (results.get(bid, {}).get("kw") is None)):
             if kw is not None:
                 online += 1
-                history[bid] = merge_history(history.get(bid), rows, now_pt, run_t)
+                # a sum that lacks a meter is shown (flagged) but never stored: history keeps complete totals only
+                history[bid] = merge_history(history.get(bid), [] if partial else rows, now_pt, run_t)
             elif bid in history:
                 history[bid] = merge_history(history[bid], [], now_pt, run_t)
 
-            anomaly = detect_anomaly(history, bid, kw)
+            anomaly = detect_anomaly(history, bid, None if partial else kw)
             prediction = predict_next(history, bid)
             sparkline = [p["kw"] for p in history.get(bid, [])[-24:]]
 
@@ -568,6 +592,9 @@ def run():
                 "mac": b["mac"],
                 "meter": meter_used,
                 "meters_configured": b["meters"],
+                "meters_last_complete": meters_complete if kw is not None else (prev_out.get("buildings") or {}).get(bid, {}).get("meters_last_complete"),
+                "partial": partial,
+                "partial_runs": partial_runs,
                 "predicted_kw": prediction,
                 "anomaly": anomaly,
                 "sparkline": sparkline,

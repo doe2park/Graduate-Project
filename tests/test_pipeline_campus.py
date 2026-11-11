@@ -147,6 +147,28 @@ class BackfillTests(CampusBase):
         self.assertEqual([e["ts"] for e in h], ["2026-10-14 02:45:00"])
         self.assertEqual(h[0]["kw"], 15.0)
 
+    def test_a_run_missing_one_meter_is_flagged_and_not_stored(self):
+        self.assertEqual(self.run_with(FakeSession(two_meter_rows(["2026-10-14 02:45:00"]))), 0)
+        self.assertEqual(self.run_with(FakeSession({"AAA_3": [("2026-10-14 03:00:00", 10.0)]})), 0)   # meter 76 silent
+        self.assertEqual([(e["ts"], e["kw"]) for e in self.hist()["grimes"]], [("2026-10-14 02:45:00", 15.0)])
+        g = json.loads((self.d / "campus_energy.json").read_text())["buildings"]["grimes"]
+        self.assertEqual((g["partial"], g["partial_runs"], g["meters_last_complete"], g["kw"], g["anomaly"]), (True, 1, ["3", "76"], 10.0, None))
+        self.assertEqual(self.run_with(FakeSession(two_meter_rows(["2026-10-14 03:00:00"]))), 0)       # both back
+        self.assertEqual([e["kw"] for e in self.hist()["grimes"]], [15.0, 15.0])
+        self.assertFalse(json.loads((self.d / "campus_energy.json").read_text())["buildings"]["grimes"]["partial"])
+
+    def test_partial_state_waits_for_a_silent_meter_then_accepts_the_rest(self):
+        self.assertEqual(m.partial_state(None, ["3", "76"]), (False, ["3", "76"], 0))                      # first run ever
+        self.assertEqual(m.partial_state({"meter": "3+76"}, ["3", "76"]), (False, ["3", "76"], 0))          # complete
+        self.assertEqual(m.partial_state({"meter": "3+76"}, ["3"]), (True, ["3", "76"], 1))                 # meter 76 timed out
+        prev = {"meter": "3", "meters_last_complete": ["3", "76"], "partial_runs": 1}
+        self.assertEqual(m.partial_state(prev, ["3"]), (True, ["3", "76"], 2))                              # still waiting
+        self.assertEqual(m.partial_state(prev, ["3", "76"]), (False, ["3", "76"], 0))                       # it came back
+        gone = {"meter": "3", "meters_last_complete": ["3", "76"], "partial_runs": m.PARTIAL_GRACE_RUNS}
+        self.assertEqual(m.partial_state(gone, ["3"]), (False, ["3"], 0))                                   # retired meter: move on
+        self.assertEqual(m.partial_state({"meter": "3"}, ["3", "76"]), (False, ["3", "76"], 0))             # a meter was added
+        self.assertEqual(m.partial_state({"meter": "3+76"}, []), (False, [], 0))                            # offline is not partial
+
     def test_dst_ambiguous_rows_are_unknown_not_stored(self):
         now = datetime(2026, 11, 1, 10, 30, tzinfo=timezone.utc)  # 02:30 PST
         rows = two_meter_rows(["2026-11-01 00:45:00", "2026-11-01 01:15:00", "2026-11-01 02:00:00"])
