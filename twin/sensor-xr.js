@@ -11,7 +11,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 2;
+const API = 3;   // 3: cache refresh only (the file changed after v2 shipped without a bump)
 const SCENES = ['leak', 'air', 'water', 'elec', 'rotating'];
 const LIVE_SCENE = 'live-test';   // ?sensors=live only; never part of the demo scene cycle
 const SCENE_NAMES = {leak: 'Leak', air: 'Air', water: 'Water', elec: 'Power', rotating: 'Rotating', 'live-test': 'Live test'};

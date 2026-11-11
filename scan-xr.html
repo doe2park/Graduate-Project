@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=5"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=2"></script><script src="twin/xr-ask.js?v=5"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=6"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=5"></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <div id="bar" role="toolbar" aria-label="XR overlay controls">
@@ -81,7 +81,7 @@ import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight
 const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
 /* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
    inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
-const XR_CORE_API=5,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
+const XR_CORE_API=6,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
 const T0=performance.now(),q=new URLSearchParams(location.search);
 const MODE_AR=q.get('mode')==='ar';   // mixed-reality passthrough mode (immersive-ar, manual alignment); default = the 360° photo VR overlay
 const MR_DEFAULT_LAYERS=['fire','duct','plumbing'];   // Quest 2 budget: fire piping, ducts, plumbing on; the rest toggle from the MR panel
@@ -301,7 +301,7 @@ const fireOn=()=>!!layerState.fire&&layerState.fire.group.visible;
 const raycaster=new THREE.Raycaster();raycaster.params.Line.threshold=.04;
 /* ── Simulated sensors state (opt-in &sensors=demo; functions further down) ── pins/chips/DTS colouring live in a group under bimRoot,
    so VR photo registration, MR alignment and the Demo-here placement move them with the services. Illustrative: nothing is installed. */
-const SX=globalThis.SensorXR,SXOK=SX?.API===2,SXP=SXOK?SX.parseParams(location.search):{enabled:false,scene:'leak',live:false},SXN=SXOK?SX.SCENE_NAMES:{};
+const SX=globalThis.SensorXR,SXOK=SX?.API===3,SXP=SXOK?SX.parseParams(location.search):{enabled:false,scene:'leak',live:false},SXN=SXOK?SX.SCENE_NAMES:{};
 /* live test (?sensors=live&feed=<private-LAN or localhost URL>): temporary test devices with real gateway observations, labelled LIVE / STALE / NO DATA */
 const SENS={on:SXP.enabled,live:!!SXP.live,gw:null,hist:{},scene:SXP.scene,libs:null,cfg:null,all:[],feed:null,recs:new Map(),states:{},obs:{},center:null,ready:false,loading:false,epoch:0,picked:null,error:null,lastFeed:0,feeding:false,lastInv:0,pinTex:new Map(),ringTex:null,group:new THREE.Group()};
 SENS.group.name='sensors (simulated, illustrative)';SENS.group.visible=false;bimRoot.add(SENS.group);
