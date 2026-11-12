@@ -593,6 +593,27 @@ class CorsTests(ServerTests):
 
 
 class CorsUnitTests(unittest.TestCase):
+    def test_rooms_electrical_and_meter_tools_on_real_index(self):
+        tw = self._real_twin() if hasattr(self, '_real_twin') else T.Twin()
+        rooms = T.run_tool(tw, 'find_rooms', {'text': 'restroom'})
+        self.assertGreaterEqual(rooms['total_found'], 3)
+        self.assertTrue(all(len(r['centre_point']) == 3 and r['examples'][0]['id'] in tw.box for r in rooms['rooms']))
+        near = T.run_tool(tw, 'find_rooms', {'point': rooms['rooms'][0]['centre_point'], 'limit': 3})
+        self.assertEqual(near['rooms'][0]['horizontal_distance_m'], min(r['horizontal_distance_m'] for r in near['rooms']))
+        el = T.run_tool(tw, 'electrical_summary', {'element_id': '160879'})
+        self.assertGreater(el['boxes_with_family_default_excluded'], 0)          # 3600 VA family defaults are not a load
+        self.assertNotIn('Device box (prefab)', el['design_load_va_by_type'])
+        self.assertIn('not measurements', el['evidence'])
+        feed = {'generated_at': 'now', 'meters': {'76': {'name': 'A', 'status': 'online', 'latest': {'timestamp': 't', 'kw': 82.0}, 'stats_today': {'kw': {'min': 1, 'max': 9, 'avg': 5}}}}}
+        tw.fetch_json = lambda url: feed
+        tw._meters = None
+        m = T.run_tool(tw, 'building_meters', {})
+        self.assertEqual([x['kw_now'] for x in m['meters'] if x['meter'] == '76'], [82.0])
+        self.assertIn('MEASURED', m['evidence'])
+        tw._meters = None
+        tw.fetch_json = lambda url: (_ for _ in ()).throw(OSError('down'))
+        self.assertIn('error', T.run_tool(tw, 'building_meters', {}))
+
     def test_public_origin_is_one_exact_extra_origin(self):
         from scripts.ask_twin_server import App
         app = App(None, 'mock', 'm', None, None, 8765, public_origin='https://abc-def.trycloudflare.com')

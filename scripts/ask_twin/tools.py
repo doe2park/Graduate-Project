@@ -10,6 +10,7 @@ Nothing here writes files or calls the network. Each result says what kind of ev
 from __future__ import annotations
 
 import json
+import time
 import math
 import re
 import sys
@@ -77,6 +78,15 @@ def level_of_y(y: float) -> str:
     return key
 
 
+def _fetch_json(url: str, timeout: float = 8.0):
+    """Read-only GET of the campus meter feed named in buildings/grimes/sources.json."""
+    from urllib.request import Request, urlopen
+    if not str(url).startswith('https://'):
+        raise ValueError('feed url must be https')
+    with urlopen(Request(url, headers={'User-Agent': 'ask-twin'}), timeout=timeout) as r:
+        return json.loads(r.read().decode('utf-8'))
+
+
 class Twin:
     """Loaded twin data + spatial grid. Construct once per server."""
 
@@ -118,6 +128,7 @@ class Twin:
             for c in cells:
                 self._grid.setdefault(c, []).append(eid)
         self._located = [(eid, m['location']) for eid, m in self.meta.items() if m.get('location')]
+        self._root, self._rooms, self._meters, self.fetch_json = root, None, None, _fetch_json
 
     @staticmethod
     def _quality(root: Path) -> dict:
@@ -291,6 +302,121 @@ class Twin:
                 'ceilings_at_this_xz': ceilings[:3],
                 'evidence': 'inferred'}
 
+    def _room_index(self):
+        """Named places the model can point at. Grimes has no room outlines: a place is the cluster of elements that carry
+        the same room label, or a cluster of restroom accessories. Positions are therefore approximate."""
+        if self._rooms is not None:
+            return self._rooms
+        groups = {}
+        for eid, loc in self._located:
+            groups.setdefault((str(loc).strip(), self.meta[eid].get('levelKey')), []).append(eid)
+        places = [(label, lvl, ids, 'room label on equipment') for (label, lvl), ids in groups.items()]
+        wc = [eid for eid, m in self.meta.items() if 'restroom' in str(m.get('type', '')).lower()]
+        seen = set()
+        for start in wc:   # single-link clusters, 6 m, same level
+            if start in seen:
+                continue
+            seen.add(start)
+            cluster, todo = [], [start]
+            while todo:
+                a = todo.pop()
+                cluster.append(a)
+                ca = ix.box_center(self.box[a])
+                for b in wc:
+                    if b in seen or self.meta[b].get('levelKey') != self.meta[a].get('levelKey'):
+                        continue
+                    cb = ix.box_center(self.box[b])
+                    if math.hypot(ca[0] - cb[0], ca[2] - cb[2]) <= 6:
+                        seen.add(b)
+                        todo.append(b)
+            places.append(('Restroom (from restroom accessories)', self.meta[start].get('levelKey'), cluster, 'restroom accessories'))
+        out = []
+        for label, lvl, ids, source in places:
+            cs = [ix.box_center(self.box[i]) for i in ids]
+            c = [sum(v[k] for v in cs) / len(cs) for k in range(3)]
+            out.append({'room': label, 'level': lvl, 'centre_point': [round(v, 2) for v in c],
+                        'spread_m': round(max(math.hypot(v[0] - c[0], v[2] - c[2]) for v in cs), 1),
+                        'labelled_elements': len(ids), 'source': source,
+                        'examples': [{'id': i, 'type': self.meta[i].get('type')} for i in ids[:2]]})
+        self._rooms = out
+        return out
+
+    def find_rooms(self, text=None, level=None, element_id=None, point=None, limit=12):
+        words = [w for w in str(text or '').lower().split() if w]
+        rooms = [r for r in self._room_index() if all(w in r['room'].lower() for w in words) and (not level or r['level'] == str(level).upper())]
+        ref = None
+        if element_id or point:
+            ref, _ = self.ref_box(element_id, point)
+            c = ix.box_center(ref)
+            rooms = sorted(({**r, 'horizontal_distance_m': round(math.hypot(r['centre_point'][0] - c[0], r['centre_point'][2] - c[2]), 1)} for r in rooms),
+                           key=lambda r: (r['horizontal_distance_m'], r['room']))
+        else:
+            rooms = sorted(rooms, key=lambda r: (str(r['level']), r['room']))
+        limit = max(1, min(int(limit), 40))
+        return {'total_found': len(rooms), 'rooms': rooms[:limit],
+                'evidence': 'room names come from labels on equipment and from restroom accessories; there are no room outlines, so '
+                            'centre_point is the middle of the labelled elements (approximate) and a room may be missing'}
+
+    def electrical_summary(self, element_id=None, point=None, radius_m=10.0):
+        ref, self_id = self.ref_box(element_id, point)
+        radius_m = max(0.5, min(float(radius_m), 30.0))
+        total, with_load, without, placeholders, by_type, gear = 0.0, 0, 0, 0, Counter(), []
+        for eid in self._candidates(ref, radius_m):
+            m = self.meta[eid]
+            if ix.box_gap(ref, self.box[eid]) > radius_m:
+                continue
+            kind = str(m.get('kind') or m.get('type') or '').lower()
+            if any(k in kind for k in ('panelboard', 'transformer', 'disconnect', 'switchboard')):
+                gear.append((ix.box_gap(ref, self.box[eid]), eid))
+            if str(m.get('system', '')).lower() not in ('electrical', 'lighting'):
+                continue
+            try:
+                va = float(m.get('design_va') or 0)
+            except (TypeError, ValueError):
+                va = 0.0
+            if va > 0 and 'box' in str(m.get('type', '')).lower():   # prefab boxes carry a family default (e.g. 3600 VA), not a load
+                placeholders += 1
+            elif va > 0:
+                total += va
+                with_load += 1
+                by_type[m.get('type')] += va
+            else:
+                without += 1
+        gear.sort()
+        return {'reference': {'element_id': self_id, 'point': point}, 'radius_m': radius_m,
+                'design_connected_load_va': round(total), 'devices_with_design_load': with_load, 'devices_without_design_load': without, 'boxes_with_family_default_excluded': placeholders,
+                'design_load_va_by_type': {k: round(v) for k, v in by_type.most_common(8)},
+                'distribution_equipment': [{**self.summary(e, ref), 'mains': self.meta[e].get('mains'), 'rating': self.meta[e].get('electrical_data'),
+                                            'tag': self.meta[e].get('element_tag'), 'room_label': self.meta[e].get('location')} for _, e in gear[:6]],
+                'evidence': 'DESIGN values from the BIM (nameplate volt-amperes per device), not measurements. The model has no circuit or '
+                            'panel schedule, so it cannot say which panel or breaker feeds a device. Measured power exists only per '
+                            'building service: see building_meters.'}
+
+    def building_meters(self):
+        """Measured electrical power of the building services (campus metering feed). Real values, building level only."""
+        now = time.time()
+        if self._meters and now - self._meters[0] < 300:
+            return self._meters[1]
+        src = json.loads((self._root / 'buildings' / 'grimes' / 'sources.json').read_text())
+        names = json.loads((self._root / 'buildings' / 'grimes' / 'equipment.json').read_text()).get('meters', {})
+        try:
+            data = self.fetch_json(src['adapters']['bmo']['url'])
+        except Exception as e:
+            return {'error': f'campus meter feed not reachable ({type(e).__name__})'}
+        meters = []
+        for mid in sorted({str(p['meter']) for p in src.get('points', {}).values() if p.get('adapter') == 'bmo'}, key=int):
+            m = (data.get('meters') or {}).get(mid) or {}
+            latest, today = m.get('latest') or {}, (m.get('stats_today') or {}).get('kw') or {}
+            meters.append({'meter': mid, 'name': m.get('name') or names.get(mid, {}).get('name'), 'serves': names.get(mid, {}).get('serves'),
+                           'status': m.get('status'), 'reading_time': latest.get('timestamp'), 'kw_now': latest.get('kw'),
+                           'kw_today_min': today.get('min'), 'kw_today_max': today.get('max'), 'kw_today_avg': today.get('avg'),
+                           'peak_demand_kw': latest.get('peak_demand_kw')})
+        out = {'meters': meters, 'feed_generated_at': data.get('generated_at'),
+               'evidence': 'MEASURED by the campus metering system, collected on a schedule (not a live BAS link). One value per building '
+                           'electrical service; nothing is metered per room, circuit, panel or device.'}
+        self._meters = (now, out)
+        return out
+
     def find_elements(self, text=None, layer=None, level=None, element_id=None, point=None, radius_m=None, limit=MAX_LIST):
         words = [w for w in re.split(r'\s+', (text or '').lower()) if w]
         ref = None
@@ -457,6 +583,12 @@ TOOL_SCHEMAS = [
      'input_schema': {'type': 'object', 'properties': {
          'text': {'type': 'string'}, 'layer': {'type': 'string', 'enum': LAYER_ENUM}, 'level': {'type': 'string'},
          'element_id': _ID, 'point': _PT, 'radius_m': {'type': 'number'}, 'limit': {'type': 'integer'}}, 'additionalProperties': False}},
+    {'name': 'find_rooms', 'description': 'Named rooms and places (from room labels on equipment, plus restrooms found from restroom accessories) with level and an approximate centre point; filter by words (e.g. "restroom", "electrical room", "B124") and level, and sort by distance from an element or point. Use the centre_point with find_elements / elements_near for "closest X to room Y". There are no room outlines: positions are approximate.',
+     'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}, 'level': {'type': 'string'}, 'element_id': _ID, 'point': _PT, 'limit': {'type': 'integer'}}, 'additionalProperties': False}},
+    {'name': 'electrical_summary', 'description': 'Design electrical load around an element or point (default 10 m, max 30): total design volt-amperes of receptacles, lighting and equipment, split by type, plus nearby panelboards, transformers and disconnects with their ratings and room labels. Design values only; no circuits or panel schedules.',
+     'input_schema': {'type': 'object', 'properties': {'element_id': _ID, 'point': _PT, 'radius_m': {'type': 'number'}}, 'additionalProperties': False}},
+    {'name': 'building_meters', 'description': 'MEASURED electrical power of the building\'s services from the campus metering feed: kW now, today\'s min/max/average and reading time for each service (480/277 V, 208/120 V, roof). Building level only: use it for "how much power is being used", and say that nothing is metered per device or circuit.',
+     'input_schema': {'type': 'object', 'properties': {}, 'additionalProperties': False}},
     {'name': 'connected_run', 'description': 'Follow geometrically touching elements of the same layer from a start element (breadth-first, hangers skipped) and report valves, terminal units, AHUs, heaters or drain pans found along the run with hop counts. Heuristic adjacency, NOT verified connectivity and no flow direction.',
      'input_schema': {'type': 'object', 'properties': {'element_id': _ID, 'max_elements': {'type': 'integer', 'description': 'Default 150, max 400.'}},
                       'required': ['element_id'], 'additionalProperties': False}},

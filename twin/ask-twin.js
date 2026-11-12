@@ -337,9 +337,12 @@ async function ask(question) {
     text = final.answer || text; state.lastCites = final.citations || [];
     paint();
     const nv = state.lastCites.filter(c => c.verified).length, nb = state.lastCites.length - nv;
-    foot.innerHTML = `<span><b>${final.mode === 'live' ? 'Claude' : 'Mock'}</b> · ${esc(final.model)}</span><span>${final.tools_used.length} read-only lookups</span>`
-      + `<span>${nv} cited element${nv === 1 ? '' : 's'} verified${nb ? ` · <b style="color:#fca5a5">${nb} unverified</b>` : ''}</span><span>${final.seconds}s</span>`
-      + `<span>Sources: design BIM · geometry · <b>simulated</b> demo sensors</span>`;
+    // One quiet line; the counts live in its tooltip. Two things are never hidden: a citation that could not be verified, and simulated sensor values.
+    const used = (final.tools_used || []).map(u => String(u && u.name || u)), sim = used.some(n => /sensor/.test(n));
+    foot.title = `${final.model} · ${used.length} read-only lookup${used.length === 1 ? '' : 's'} · ${nv} cited element${nv === 1 ? '' : 's'} verified`;
+    foot.innerHTML = `<span>${final.mode === 'live' ? 'Live answer' : 'Scripted demo answer'} · ${final.seconds} s</span>`
+      + (nb ? `<span><b style="color:#fca5a5">${nb} cited element${nb === 1 ? '' : 's'} not verified</b></span>` : '')
+      + (sim ? `<span>uses <b>simulated</b> demo sensors</span>` : '');
     state.history.push({q: question, a: text}); state.history = state.history.slice(-3);
     await showCitations(state.lastCites, text);
     if ($('#atSpeak').checked) speak(final.spoken || text, !!final.spoken);   // server's short spoken version (lead + one check)

@@ -120,6 +120,22 @@ The start banner looks like this (example addresses):
 
 There is no terminal QR code (that would need a new dependency).
 
+## Rooms, design electrical load and measured building power (added 2026-11-12)
+
+Three more read-only tools, all built from data the twin already had:
+
+- `find_rooms`: 129 named places with a level and an approximate centre point. A place is the cluster of elements that carry the same
+  room label (120 labels on equipment) or a cluster of restroom accessories (five restrooms). There are no room outlines.
+- `electrical_summary`: design load (nameplate volt-amperes) of receptacles, lighting and equipment around an element or point, and
+  the nearby panelboards, transformers and disconnects with their ratings. Prefab device boxes carry a family default (3,600 VA) and
+  are left out of the total. The model has no circuits or panel schedules.
+- `building_meters`: measured kW of the three building electrical services from the campus metering feed named in
+  `buildings/grimes/sources.json` (scheduled collection, not a live BAS link; cached for five minutes). Building level only.
+
+Still missing, and not in the project files: room outlines, panel schedules and circuit assignments, equipment schedules, BAS points
+and maintenance documents. The only BIM source on hand is the combined Navisworks file; the full property export has to be
+regenerated with `convert_nwd_local.py`, which needs the Autodesk credentials.
+
 ## Demo from outside the Wi-Fi (temporary public address)
 
 `scripts/ask_twin_public.sh` keeps the laptop as the server (the API key stays in `~/.config/ask-twin/env`) and puts a Cloudflare
