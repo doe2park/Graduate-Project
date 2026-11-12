@@ -213,13 +213,13 @@ function runPath(paths, primary, citations = []) {
 }
 /* Opacity of element i of n on the lit run at time t (ms since the answer): pieces light one after another, then a soft
    pulse travels along the run. reduced = prefers-reduced-motion: everything lit, no motion. */
-function runGlow(i, n, t, {stepMs = 90, fadeMs = 220, pulseMs = 1600, base = .3, reduced = false} = {}) {
+function runGlow(i, n, t, {stepMs = 90, fadeMs = 220, pulseMs = 1600, base = .5, reduced = false} = {}) {   // base: a lit piece stays this solid; the pulse only adds to it
   if (reduced) return .5;
   const on = t - i * stepMs;
   if (on <= 0) return 0;
   let a = base * Math.min(1, on / fadeMs);
   const after = t - n * stepMs;
-  if (after > 0 && n > 1) { const p = ((after % pulseMs) / pulseMs) * (n + 4) - 2, d = i - p; a += .45 * Math.exp(-(d * d) / 3); }
+  if (after > 0 && n > 1) { const p = ((after % pulseMs) / pulseMs) * (n + 4) - 2, d = i - p; a += .3 * Math.exp(-(d * d) / 3); }
   return Math.min(.8, a);
 }
 

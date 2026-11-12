@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=5"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=6"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -92,6 +92,7 @@ test('run glow: dark before its turn, lit in order, a pulse afterwards; reduced 
   const after = Array.from({length: 10}, (_, i) => XA.runGlow(i, 10, 10 * 90 + 600));
   assert.ok(Math.max(...after) > Math.min(...after) + 0.1, 'a pulse travels along the run');
   assert.ok(after.every(a => a <= 0.8));
+  assert.ok(after.every(a => a >= 0.5), 'a lit piece stays solid between pulses');
   assert.equal(XA.runGlow(5, 10, 0, {reduced: true}), 0.5);
 });
 
