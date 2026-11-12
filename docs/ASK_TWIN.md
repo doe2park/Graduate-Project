@@ -120,6 +120,18 @@ The start banner looks like this (example addresses):
 
 There is no terminal QR code (that would need a new dependency).
 
+## Demo from outside the Wi-Fi (temporary public address)
+
+`scripts/ask_twin_public.sh` keeps the laptop as the server (the API key stays in `~/.config/ask-twin/env`) and puts a Cloudflare
+quick tunnel in front of it. It prints three links (PC overlay, `/vr/`, `/mr/`) on one temporary `https://….trycloudflare.com`
+address with a fresh access code; pages and API share that address, so a headset needs no certificate step.
+
+- The address changes on every start and works only while the laptop is awake and the script runs (Ctrl+C stops both).
+- The server answers that one origin only (`--public-origin`, exact match) and always requires the access code.
+- All visitors arrive through the tunnel, so the per-minute limit counts them as one client; the daily question and token limits apply as usual.
+- The 3D model files are sent from the laptop: the first load is slower than on the public site.
+- Checked from a desktop browser through the tunnel (page load and one live answer); not yet tried on a Quest.
+
 ## How an answer is made
 
 1. The browser sends the question, the selected element id and the clicked 3D point (viewer frame).

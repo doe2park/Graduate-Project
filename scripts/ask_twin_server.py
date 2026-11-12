@@ -518,15 +518,16 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 class App:
-    def __init__(self, agent, mode, model, twin, stt, port, verbose=False, lan=False, tts=None, limits=None):
+    def __init__(self, agent, mode, model, twin, stt, port, verbose=False, lan=False, tts=None, limits=None, public_origin=None):
         self.agent, self.mode, self.model, self.twin, self.stt, self.port, self.verbose, self.lan = agent, mode, model, twin, stt, port, verbose, lan
+        self.public_origin = public_origin   # one extra exact origin: the https address of a tunnel in front of this server
         self.tts, self.note, self.limits = tts, None, limits
 
     def cors_ok(self, origin, host):
         """Exact allow-list: this server's own origin, localhost/127.0.0.1 on this port, or a PUBLIC_ORIGINS entry."""
         if not origin or origin == 'null':
             return False
-        if origin in PUBLIC_ORIGINS:
+        if origin in PUBLIC_ORIGINS or (self.public_origin and origin == self.public_origin):
             return True
         o = urlparse(origin)
         if o.path or o.query or o.username:
@@ -594,7 +595,13 @@ def build_app(args, log=print):
     else:
         agent = MockAgent(twin)
     stt = None if args.no_stt else STT(args.stt_model, beam_size=args.stt_beam)
-    app = App(agent, mode, model, twin, stt, args.port, args.verbose, args.lan, tts=TTS(not args.no_tts, voice=args.voice), limits=limits)
+    if args.public_origin is not None:
+        po = urlparse(args.public_origin)
+        if po.scheme != 'https' or not po.hostname or po.path or po.query or po.fragment or po.username:
+            ap.error('--public-origin must be https://host with nothing after the host')
+        if args.no_code:
+            ap.error('--public-origin needs an access code (remove --no-code)')
+    app = App(agent, mode, model, twin, stt, args.port, args.verbose, args.lan, tts=TTS(not args.no_tts, voice=args.voice), limits=limits, public_origin=args.public_origin)
     app.note = note
     return app
 
@@ -614,6 +621,7 @@ def parse_args(argv=None):
     ap.add_argument('--voice', default=None, help='macOS voice for /api/speak, e.g. "Zoe (Premium)" or Ava (default: best installed English voice)')
     ap.add_argument('--no-fallbacks', action='store_true', help='do not send the server-side refusal fallback beta')
     ap.add_argument('--lan', action='store_true', help='HTTPS on the private LAN address (Quest on the same Wi-Fi), self-signed dev certificate from scripts/serve_quest_https.py')
+    ap.add_argument('--public-origin', default=None, metavar='https://HOST', help='also answer pages served through this one https origin (a tunnel in front of this server, see scripts/ask_twin_public.sh); needs an access code')
     lim = ap.add_argument_group('limits and access (docs/ASK_TWIN.md "Limits and access code")')
     lim.add_argument('--code', default=None, help='access code to require (4-32 letters/digits; default: a random 6-character code each start)')
     lim.add_argument('--no-code', action='store_true', help='no access code (localhost only; refused with --lan)')

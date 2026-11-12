@@ -593,6 +593,14 @@ class CorsTests(ServerTests):
 
 
 class CorsUnitTests(unittest.TestCase):
+    def test_public_origin_is_one_exact_extra_origin(self):
+        from scripts.ask_twin_server import App
+        app = App(None, 'mock', 'm', None, None, 8765, public_origin='https://abc-def.trycloudflare.com')
+        self.assertTrue(app.cors_ok('https://abc-def.trycloudflare.com', '127.0.0.1:8765'))
+        self.assertFalse(app.cors_ok('https://other.trycloudflare.com', '127.0.0.1:8765'))
+        self.assertFalse(app.cors_ok('http://abc-def.trycloudflare.com', '127.0.0.1:8765'))
+        self.assertFalse(App(None, 'mock', 'm', None, None, 8765).cors_ok('https://abc-def.trycloudflare.com', '127.0.0.1:8765'))
+
     def test_cors_ok_rules(self):
         import ask_twin_server as S
         app = S.App(None, 'mock', 'm', types.SimpleNamespace(box={}, index={'layers': []}, sensors=[]), None, 8765, lan=True)
