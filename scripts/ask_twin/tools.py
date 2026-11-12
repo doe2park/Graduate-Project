@@ -20,7 +20,13 @@ from pathlib import Path
 from . import index as ix
 
 ROOT = ix.ROOT
-LEVELS = [('LOWER', 1.524), ('MEZZ', 2.286), ('L1', 6.096), ('L2', 10.363), ('L3', 15.24), ('ROOF', 19.812)]  # manifest.json viewerY
+# Slab tops in the element (viewer) frame, metres: measured from the floor slabs and from Revit "elevation from level"
+# (scripts/build_element_quality.py FLOORS). manifest.json lists the Revit elevations, which sit 0.83 m higher.
+LEVELS = [('LOWER', 0.69), ('MEZZ', 1.46), ('L1', 5.26), ('L2', 9.53), ('L3', 14.41), ('ROOF', 18.98)]
+QUALITY_PATH = 'buildings/grimes/element-quality.json'
+QUALITY_NOTES = {'noGeometry': 'has an identity but no drawable geometry in the model',
+                 'aggregate': 'one source object that covers most of a floor; its parts cannot be told apart',
+                 'storey': 'level label disagrees with the geometry; filed under the storey that contains it'}
 CELL = 2.0
 MAX_LIST = 25
 
@@ -80,10 +86,26 @@ class Twin:
         self.meta: dict = {}
         self.box: dict = {}
         self.layer: dict = {}
+        quality = self._quality(root)
+        self.hidden: dict = {}   # id -> reason: source objects that are not building parts (never offered to the model)
         for key, L in self.index['layers'].items():
             side = json.loads((root / L['sidecar']).read_text())['elements']
+            q = quality.get(key, {})
+            skip = {eid: reason for reason, ids in q.get('hidden', {}).items() for eid in ids}
+            self.hidden.update(skip)
             for eid, b in L['boxes'].items():
-                self.box[eid], self.layer[eid], self.meta[eid] = b, key, side.get(eid, {})
+                if eid not in skip:
+                    self.box[eid], self.layer[eid], self.meta[eid] = b, key, side.get(eid, {})
+            for reason in ('noGeometry', 'aggregate'):
+                for eid in q.get(reason, ()):
+                    if eid in self.meta:
+                        self.meta[eid].setdefault('quality', []).append(reason)
+            for storey, ids in q.get('storey', {}).items():
+                for eid in ids:
+                    m = self.meta.get(eid)
+                    if m is not None and m.get('levelKey') != storey:
+                        m['sourceLevelKey'], m['levelKey'] = m.get('levelKey'), storey
+                        m.setdefault('quality', []).append('storey')
         self.registry = registry or json.loads((root / 'twin' / 'sensors' / 'registry.json').read_text())
         self.sensors = {s['id']: s for s in self.registry['sensors'] if s.get('install_status') != 'retired'}
         self._grid: dict = {}
@@ -96,6 +118,16 @@ class Twin:
             for c in cells:
                 self._grid.setdefault(c, []).append(eid)
         self._located = [(eid, m['location']) for eid, m in self.meta.items() if m.get('location')]
+
+    @staticmethod
+    def _quality(root: Path) -> dict:
+        """Per-layer defect overlay (same file the viewers apply). Missing or unknown: the model as exported."""
+        try:
+            data = json.loads((root / QUALITY_PATH).read_text())
+        except (OSError, ValueError):
+            return {}
+        layers = data.get('layers') if isinstance(data, dict) and data.get('_schema') == 'twin-element-quality/1' else None
+        return layers if isinstance(layers, dict) else {}
 
     # ---------- geometry helpers ----------
     @staticmethod
@@ -157,6 +189,10 @@ class Twin:
                'size_m': [_r(b[3] - b[0]), _r(b[4] - b[1]), _r(b[5] - b[2])]}
         if m.get('system') in SYSTEM_CODES or (m.get('system') or '')[:11] in SYSTEM_CODES:
             out['system_meaning'] = SYSTEM_CODES.get(m.get('system')) or SYSTEM_CODES.get(m['system'][:11])
+        if m.get('sourceLevelKey'):
+            out['level_label_in_source'] = m['sourceLevelKey']
+        if m.get('quality'):
+            out['model_note'] = '; '.join(QUALITY_NOTES[q] for q in m['quality'] if q in QUALITY_NOTES)
         for k in ('mark', 'location', 'size', 'flow', 'element_tag'):
             if m.get(k):
                 out[k] = m[k]

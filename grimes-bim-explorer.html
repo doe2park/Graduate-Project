@@ -823,6 +823,69 @@ function deploymentPaths(documentURL) {
   };
 }
 
+// twin/element-quality.mjs
+var ELEMENT_QUALITY_PATH = "buildings/grimes/element-quality.json";
+var SCHEMA = "twin-element-quality/1";
+var HIDDEN_REASONS = ["annotation", "reference", "duplicate"];
+var QUALITY_NOTES = {
+  annotation: "Drawing linework that repeats a modelled part (CAD annotation layer)",
+  reference: "Layout point, sleeve point or clearance zone: a construction aid, not a part",
+  duplicate: "Exported twice at the same place; the other copy is shown",
+  noGeometry: "Has an identity but no drawable geometry in the model",
+  aggregate: "One source object that covers most of a floor; its parts cannot be picked one by one",
+  storey: "Level label disagrees with the geometry; filed under the storey that contains it"
+};
+function showFlagged(search) {
+  try {
+    return new URLSearchParams(search || "").get("flagged") === "1";
+  } catch {
+    return false;
+  }
+}
+var list = (value) => Array.isArray(value) ? value.filter((id) => typeof id === "string" && id !== "") : [];
+var own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+var done = /* @__PURE__ */ new WeakMap();
+function applyElementQuality(meta, overlay, layer, { keepHidden = false } = {}) {
+  const counts = { annotation: 0, reference: 0, duplicate: 0, noGeometry: 0, aggregate: 0, storey: 0 };
+  const result = { applied: false, hidden: /* @__PURE__ */ new Map(), counts };
+  const entry = overlay && overlay._schema === SCHEMA && overlay.layers && typeof overlay.layers === "object" ? overlay.layers[layer] : null;
+  if (!meta || typeof meta !== "object" || !entry || typeof entry !== "object") return result;
+  if (done.has(meta)) return done.get(meta);
+  done.set(meta, result);
+  result.applied = true;
+  const flag = (id, reason) => {
+    const info = meta[id];
+    (info.quality || (info.quality = [])).push(reason);
+    counts[reason]++;
+    return info;
+  };
+  for (const reason of ["noGeometry", "aggregate"]) for (const id of list(entry[reason])) if (own(meta, id)) flag(id, reason);
+  const storey = entry.storey && typeof entry.storey === "object" ? entry.storey : {};
+  for (const [key, ids] of Object.entries(storey)) for (const id of list(ids)) {
+    if (!own(meta, id) || meta[id].levelKey === key) continue;
+    const info = flag(id, "storey");
+    info.sourceLevelKey = info.levelKey || "UNKNOWN";
+    info.levelKey = key;
+  }
+  const hiddenLists = entry.hidden && typeof entry.hidden === "object" ? entry.hidden : {};
+  for (const reason of HIDDEN_REASONS) for (const id of list(hiddenLists[reason])) {
+    if (!own(meta, id) || result.hidden.has(id)) continue;
+    const info = flag(id, reason);
+    if (keepHidden) continue;
+    info.hidden = reason;
+    result.hidden.set(id, info);
+    delete meta[id];
+  }
+  return result;
+}
+function isNonPart(info) {
+  return Array.isArray(info?.quality) && info.quality.some((reason) => HIDDEN_REASONS.includes(reason));
+}
+function qualityText(info) {
+  const reasons = Array.isArray(info?.quality) ? info.quality : [];
+  return reasons.map((reason) => QUALITY_NOTES[reason]).filter(Boolean).join(" · ");
+}
+
 // viewer-src/bim-explorer/viewer.mjs
 var deployment = deploymentPaths(document.baseURI);
 var $ = (id) => document.getElementById(id);
@@ -870,6 +933,10 @@ var recordIndex = createRecordIndex({});
 var hiddenKeys = /* @__PURE__ */ new Set();
 var isolatedKey = null;
 var cacheReads = [];
+var flaggedKeys = /* @__PURE__ */ new Set();
+var SHOW_FLAGGED = showFlagged(location.search);
+var qualityAhead = null;
+var elementQuality = () => qualityAhead || (qualityAhead = checked(deployment.source(ELEMENT_QUALITY_PATH)).catch(() => null));
 var gate = createLoadGate();
 var floor = "";
 var buildingSource = false;
@@ -968,7 +1035,12 @@ function applyVisibility() {
   const visible = enabledLayers();
   for (const m of root.children) m.visible = visible.has(m.userData.layer) && (!floor || (m.userData.levelKey || "UNKNOWN") === floor) && m.userData.objectFilterVisible !== false;
   $("metric-visible").textContent = recordIndex.count({ layers: visible, floor, hiddenKeys, isolatedKey }).toLocaleString();
-  $("object-filter-state").textContent = isolatedKey ? "One object isolated" : hiddenKeys.size ? `${hiddenKeys.size} objects hidden` : "";
+  {
+    let own2 = 0;
+    for (const k of hiddenKeys) if (!flaggedKeys.has(k)) own2++;
+    const flagged = hiddenKeys.size - own2;
+    $("object-filter-state").textContent = isolatedKey ? "One object isolated" : [own2 ? `${own2} objects hidden` : "", flagged ? `${flagged.toLocaleString()} non-part source objects not drawn` : ""].filter(Boolean).join(" · ");
+  }
   invalidate();
 }
 function highlight(key, enabled) {
@@ -1027,12 +1099,13 @@ $("hide-object").onclick = () => {
   }
 };
 function restoreView() {
-  hiddenKeys.clear();
+  hiddenKeys = new Set(flaggedKeys);
   isolatedKey = null;
   floor = "";
   $("floor").value = "";
   highlight(selected, false);
-  objectView?.restore();
+  if (flaggedKeys.size) objectView?.setObjectFilter({ isolatedKey, hiddenKeys });
+  else objectView?.restore();
   highlight(selected, true);
   setAllLayers(true);
   resetSection();
@@ -1076,7 +1149,7 @@ function applyColours() {
 }
 $("colours").onchange = applyColours;
 $("all").onclick = () => {
-  hiddenKeys.clear();
+  hiddenKeys = new Set(flaggedKeys);
   isolatedKey = null;
   applyObjectFilter();
   setAllLayers(true);
@@ -1138,7 +1211,7 @@ function select(key) {
   $("system-name").textContent = systems[e.layer]?.label || e.layer;
   $("key").textContent = `${e.buildingId} / ${e.layer} / ${e.sourceId}`;
   $("props").replaceChildren();
-  for (const [label, value] of [["Tag", e.element_tag || e.mark || "Not supplied"], ["System", e.system || e.layer], ["Level", e.level || "Not supplied"], ["Source ID", e.sourceId], ["Location", e.location || "Not supplied"]]) {
+  for (const [label, value] of [["Tag", e.element_tag || e.mark || "Not supplied"], ["System", e.system || e.layer], ["Level", (e.level || "Not supplied") + (e.sourceLevelKey ? ` (geometry is on ${levelName(e.levelKey)})` : "")], ...qualityText(e) ? [["Model note", qualityText(e)]] : [], ["Source ID", e.sourceId], ["Location", e.location || "Not supplied"]]) {
     const dt = document.createElement("dt"), dd = document.createElement("dd");
     dt.textContent = label;
     dd.textContent = String(value);
@@ -1246,7 +1319,9 @@ async function loadExample() {
     const manifest = await checked(deployment.asset("regional/manifest.json")), all = await checked(deployment.asset("regional/" + manifest.elements)), parts = [];
     for (const l of manifest.layers) {
       $("loading").textContent = `Loading ${systems[l.layer]?.label || l.layer}…`;
-      const part = await decode(await checked(deployment.asset("regional/" + l.file), "buffer"), layerMetadata(all, l.layer), manifest.sourceTransform);
+      const md = layerMetadata(all, l.layer);
+      applyElementQuality(md.elements, await elementQuality(), l.layer, { keepHidden: true });
+      const part = await decode(await checked(deployment.asset("regional/" + l.file), "buffer"), md, manifest.sourceTransform);
       next.add(...part.meshes);
       parts.push(part);
       if (part.validation.matched !== l.objects) throw Error(`Object count mismatch in ${l.layer}`);
@@ -1306,7 +1381,9 @@ async function loadFull(next) {
     if (!metaBy.has(layer.key)) {
       $("loading").textContent = `Restoring ${label} · ${completed}/${total} files`;
       const raw = await sourceFile(layer.metadata, layer.metadataSHA256);
-      metaBy.set(layer.key, sourceMetadata(JSON.parse(new TextDecoder().decode(raw)), layer.key));
+      const md = sourceMetadata(JSON.parse(new TextDecoder().decode(raw)), layer.key);
+      applyElementQuality(md.elements, await elementQuality(), layer.key, { keepHidden: true });
+      metaBy.set(layer.key, md);
     }
     $("loading").textContent = `Loading ${label} · ${completed + 1}/${total} files`;
     await new Promise((r) => setTimeout(r, 0));
@@ -1356,9 +1433,11 @@ async function requestLoad(build) {
       records = newRecords;
       recordIndex = createRecordIndex(records);
       selected = null;
-      hiddenKeys = /* @__PURE__ */ new Set();
+      flaggedKeys = new Set(SHOW_FLAGGED ? [] : Object.keys(records).filter((k) => isNonPart(records[k])));
+      hiddenKeys = new Set(flaggedKeys);
       isolatedKey = null;
       objectView = createObjectView(THREE, root.children, (m, id) => identityKey(m.userData.buildingId, m.userData.layer, id));
+      if (flaggedKeys.size) objectView.setObjectFilter({ isolatedKey, hiddenKeys });
       mode = result.choice;
       layers = result.parts.map((p) => ({ key: p.layer, count: p.validation.matched, visible: true }));
       setupFloors();

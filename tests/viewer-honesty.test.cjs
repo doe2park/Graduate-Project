@@ -128,7 +128,7 @@ function elementFixture(meters, info, extra = {}) {
   const s = sandbox({
     equipMeta: {'123': {name: 'x', type: 'Receptacle', layer: 'fixtures', ...info}}, equipMeshes: [], LAYERS: {fixtures: {json: 'f.json'}},
     cachedJson: async () => ({meters}), highlight() {}, unhighlightEquip() {}, drawSpark() {}, highlightElementRender() {},
-    EQUIP_LABELS: {}, revitRows: () => '', carbonRows: () => '', loadMeterHistory() {}, ...extra,
+    EQUIP_LABELS: {}, revitRows: () => '', qualityText: i => (i && i.quality || []).join(' '), carbonRows: () => '', loadMeterHistory() {}, ...extra,
   });
   s.run('const esc = x => String(x).replace(/[&<>"\']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",\'"\':"&quot;","\'":"&#39;"}[c]));const dsec = t => t;const drow = (k, v) => k + ":" + v;');
   s.run(HELPERS());

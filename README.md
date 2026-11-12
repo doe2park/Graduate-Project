@@ -33,7 +33,7 @@ No installation is required. Open a live page, rather than its HTML source on Gi
 
 | Area | Current status | Evidence boundary |
 |---|---|---|
-| Element BIM | Ten layers, 66,620 identities with geometry; filtering, picking and runtime batching | Design properties do not prove installed condition or sensor coverage |
+| Element BIM | Ten layers, 66,620 source identities; 62,870 drawn by default after known non-part objects are hidden ([quality overlay](docs/ELEMENT_QUALITY.md)); filtering, picking and runtime batching | Design properties do not prove installed condition or sensor coverage |
 | Operating data | Scheduled BMO collection and archived observations | Not a direct BAS/BACnet connection or continuous verified meter history |
 | Public scan comparison | October 18 capture is the default (Level 1, plus Level 2 and Level 3 photo packages); September 17 and the May 6 baseline remain selectable | September and October alignments are provisional; photo transitions are not measured parallax |
 | Gaussian reconstruction | Two distinct research tracks: exported poses and independent raw-video SfM. Published scenes: May 6, and October 18 Level 1 zones A, C and D | Experimental appearance, not surveyed geometry; October 18 zone B and all other trained scenes remain local |

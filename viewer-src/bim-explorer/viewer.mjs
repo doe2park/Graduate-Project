@@ -12,6 +12,7 @@ import {createRecordIndex} from './record-index.mjs';
 import {createDemandRenderer} from './demand-renderer.mjs';
 import {verifiedAsset} from './asset-cache.mjs';
 import {deploymentPaths} from './deployment.mjs';
+import {applyElementQuality,isNonPart,qualityText,showFlagged,ELEMENT_QUALITY_PATH} from '../../twin/element-quality.mjs';
 const deployment=deploymentPaths(document.baseURI);
 const $=id=>document.getElementById(id),vp=$('viewport'),scene=new THREE.Scene();scene.background=new THREE.Color('#eef3f6');
 const camera=new THREE.PerspectiveCamera(42,1,.001,100000);
@@ -27,6 +28,10 @@ const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamp
 const dracoWorkers=matchMedia('(max-width: 768px), (pointer: coarse)').matches?2:Math.min(6,Math.max(2,(navigator.hardwareConcurrency||4)-2));
 const draco=new DRACOLoader().setDecoderPath(deployment.asset('draco/'));draco.setWorkerLimit(dracoWorkers);draco.preload();const loader=new GLTFLoader().setDRACOLoader(draco);
 let root=null,records={},report=null,selected=null,mode=null,layers=[],events=[],objectView=null,recordIndex=createRecordIndex({}),hiddenKeys=new Set(),isolatedKey=null,cacheReads=[];
+/* Source objects that are not building parts (annotation copies, layout points, double exports: buildings/grimes/element-quality.json).
+   Every identity is still loaded and verified; these start hidden and Focus or ?flagged=1 shows them. */
+let flaggedKeys=new Set();const SHOW_FLAGGED=showFlagged(location.search);
+let qualityAhead=null;const elementQuality=()=>qualityAhead||(qualityAhead=checked(deployment.source(ELEMENT_QUALITY_PATH)).catch(()=>null));
 const gate=createLoadGate();let floor='',buildingSource=false,previewShown=false,previewGroup=null,subsetShown=false;const phoneMedia=matchMedia('(max-width: 768px), (pointer: coarse)'),wantAllLayers=()=>new URLSearchParams(location.search).get('layers')==='all';let forceAll=wantAllLayers();const query=new URLSearchParams(location.search);if(!query.has('model')&&matchMedia('(max-width: 600px)').matches)$('dataset').value='regional';if(['regional','conduit','full'].includes(query.get('model')))$('dataset').value=query.get('model');
 const draw=createDemandRenderer({renderer,scene,camera,controls,blocked:()=>buildingSource&&!previewShown,onFrame:stats=>{
  $('render-stats').textContent=`${stats.calls.toLocaleString()} draw calls${stats.moving?' · navigating':''}`;
@@ -53,7 +58,8 @@ function applyVisibility(){
  const visible=enabledLayers();
  for(const m of root.children)m.visible=visible.has(m.userData.layer)&&(!floor||(m.userData.levelKey||'UNKNOWN')===floor)&&m.userData.objectFilterVisible!==false;
  $('metric-visible').textContent=recordIndex.count({layers:visible,floor,hiddenKeys,isolatedKey}).toLocaleString();
- $('object-filter-state').textContent=isolatedKey?'One object isolated':hiddenKeys.size?`${hiddenKeys.size} objects hidden`:'';
+ {let own=0;for(const k of hiddenKeys)if(!flaggedKeys.has(k))own++;const flagged=hiddenKeys.size-own;
+ $('object-filter-state').textContent=isolatedKey?'One object isolated':[own?`${own} objects hidden`:'',flagged?`${flagged.toLocaleString()} non-part source objects not drawn`:''].filter(Boolean).join(' · ');}
  invalidate();
 }
 function highlight(key,enabled){
@@ -92,8 +98,8 @@ $('isolate').onclick=()=>{
 };
 $('hide-object').onclick=()=>{if(selected){hiddenKeys.add(selected);isolatedKey=null;applyObjectFilter();}};
 function restoreView(){
- hiddenKeys.clear();isolatedKey=null;floor='';$('floor').value='';
- highlight(selected,false);objectView?.restore();highlight(selected,true);
+ hiddenKeys=new Set(flaggedKeys);isolatedKey=null;floor='';$('floor').value='';
+ highlight(selected,false);if(flaggedKeys.size)objectView?.setObjectFilter({isolatedKey,hiddenKeys});else objectView?.restore();highlight(selected,true);
  setAllLayers(true);resetSection();fit();
 }
 $('restore-view').onclick=restoreView;
@@ -103,7 +109,7 @@ function setupFloors(){floor='';$('floor').replaceChildren();for(const key of ['
 $('floor').onchange=()=>{floor=$('floor').value;applyVisibility();fit();};
 function applyColours(){root?.traverse(m=>{for(const mat of Array.isArray(m.material)?m.material:[m.material])if(mat?.userData.sourceColour!==undefined){mat.color.setHex(mat.userData.sourceColour);if($('colours').value==='systems')mat.color.set(systems[m.userData.layer]?.color||'#829bad');}});invalidate();}
 $('colours').onchange=applyColours;
-$('all').onclick=()=>{hiddenKeys.clear();isolatedKey=null;applyObjectFilter();setAllLayers(true);event('All systems shown');};$('none').onclick=()=>{setAllLayers(false);event('All systems hidden');};
+$('all').onclick=()=>{hiddenKeys=new Set(flaggedKeys);isolatedKey=null;applyObjectFilter();setAllLayers(true);event('All systems shown');};$('none').onclick=()=>{setAllLayers(false);event('All systems hidden');};
 function renderLayers(){ $('layers').replaceChildren(...layers.map(l=>{const row=document.createElement('label'),input=document.createElement('input'),name=document.createElement('span'),count=document.createElement('em');row.className='layer-row';row.style.setProperty('--system-color',systems[l.key]?.color||'#607080');input.type='checkbox';input.checked=true;input.dataset.layer=l.key;input.setAttribute('aria-label',systems[l.key]?.label||l.key);input.onchange=()=>setLayer(l.key,input.checked);name.className='layer-name';name.textContent=systems[l.key]?.label||l.key;count.textContent=l.count;row.append(input,name,count);return row;}));$('layer-count').textContent=layers.length;visibleCount();}
 function options(){
  const {count,shown}=recordIndex.search($('search').value,100,selected);
@@ -122,7 +128,7 @@ function select(key){
  $('objects').value=key;$('type').textContent=e.type||e.category||'BIM component';
  $('system-name').textContent=systems[e.layer]?.label||e.layer;
  $('key').textContent=`${e.buildingId} / ${e.layer} / ${e.sourceId}`;$('props').replaceChildren();
- for(const [label,value]of [['Tag',e.element_tag||e.mark||'Not supplied'],['System',e.system||e.layer],['Level',e.level||'Not supplied'],['Source ID',e.sourceId],['Location',e.location||'Not supplied']]){
+ for(const [label,value]of [['Tag',e.element_tag||e.mark||'Not supplied'],['System',e.system||e.layer],['Level',(e.level||'Not supplied')+(e.sourceLevelKey?` (geometry is on ${levelName(e.levelKey)})`:'')],...(qualityText(e)?[['Model note',qualityText(e)]]:[]),['Source ID',e.sourceId],['Location',e.location||'Not supplied']]){
   const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=String(value);$('props').append(dt,dd);
  }
  $('raw').textContent=JSON.stringify(e,null,2);invalidate();
@@ -137,7 +143,7 @@ async function decode(buffer,metadata,transform=null){const validated=validatePa
  return {meshes:built.meshes,records:mapped,validation:validated,stats:built.stats,bytes:buffer.byteLength,layer:metadata.layer};
  }catch(e){if(built){const g=new THREE.Group();g.add(...built.meshes);dispose(g);}else dispose(gltf.scene);throw e;}finally{releaseElementSource(gltf);}}
 async function loadExample(){const choice=$('dataset').value;return requestLoad(async next=>{if(choice==='full'){buildingSource=true;try{return await loadFull(next);}finally{buildingSource=false;}}if(choice==='conduit'){const [buffer,metadata]=await Promise.all([checked(deployment.asset('sample.glb'),'buffer'),checked(deployment.asset('sample.json'))]);const l=await decode(buffer,metadata);next.add(...l.meshes);return {parts:[l],choice,scope:'Conduit identity exercise · 24 source objects'};}
- const manifest=await checked(deployment.asset('regional/manifest.json')),all=await checked(deployment.asset('regional/'+manifest.elements)),parts=[];for(const l of manifest.layers){$('loading').textContent=`Loading ${systems[l.layer]?.label||l.layer}…`;const part=await decode(await checked(deployment.asset('regional/'+l.file),'buffer'),layerMetadata(all,l.layer),manifest.sourceTransform);next.add(...part.meshes);parts.push(part);if(part.validation.matched!==l.objects)throw Error(`Object count mismatch in ${l.layer}`);event(`${systems[l.layer]?.label||l.layer}: ${part.validation.matched} identities verified`);}if(parts.reduce((s,p)=>s+p.stats.renderTriangles,0)!==manifest.triangleInstances)throw Error('Triangle count mismatch');if(parts.reduce((s,p)=>s+p.validation.matched,0)!==manifest.objectCount)throw Error('Package identity count mismatch');return {parts,choice,center:manifest.zone.centerBim,scope:'Level 1 regional package · Eight disciplines · Partial coverage'};});}
+ const manifest=await checked(deployment.asset('regional/manifest.json')),all=await checked(deployment.asset('regional/'+manifest.elements)),parts=[];for(const l of manifest.layers){$('loading').textContent=`Loading ${systems[l.layer]?.label||l.layer}…`;const md=layerMetadata(all,l.layer);applyElementQuality(md.elements,await elementQuality(),l.layer,{keepHidden:true});const part=await decode(await checked(deployment.asset('regional/'+l.file),'buffer'),md,manifest.sourceTransform);next.add(...part.meshes);parts.push(part);if(part.validation.matched!==l.objects)throw Error(`Object count mismatch in ${l.layer}`);event(`${systems[l.layer]?.label||l.layer}: ${part.validation.matched} identities verified`);}if(parts.reduce((s,p)=>s+p.stats.renderTriangles,0)!==manifest.triangleInstances)throw Error('Triangle count mismatch');if(parts.reduce((s,p)=>s+p.validation.matched,0)!==manifest.objectCount)throw Error('Package identity count mismatch');return {parts,choice,center:manifest.zone.centerBim,scope:'Level 1 regional package · Eight disciplines · Partial coverage'};});}
 async function fetchSourceFile(path){return checked(deployment.source(path),'buffer');}
 async function sourceFile(path,hash){
  return verifiedAsset(path,hash,{fetchBuffer:fetchSourceFile,verify:verifyBytes,onRead:r=>cacheReads.push(r)});
@@ -164,7 +170,7 @@ async function loadFull(next){
  const chunksBy=new Map(order.map(l=>[l.key,[]])),metaBy=new Map();let completed=0;
  for(let i=0;i<total;i++){
   const {layer,file}=tasks[i],label=systems[layer.key]?.label||layer.key;
-  if(!metaBy.has(layer.key)){$('loading').textContent=`Restoring ${label} · ${completed}/${total} files`;const raw=await sourceFile(layer.metadata,layer.metadataSHA256);metaBy.set(layer.key,sourceMetadata(JSON.parse(new TextDecoder().decode(raw)),layer.key));}
+  if(!metaBy.has(layer.key)){$('loading').textContent=`Restoring ${label} · ${completed}/${total} files`;const raw=await sourceFile(layer.metadata,layer.metadataSHA256);const md=sourceMetadata(JSON.parse(new TextDecoder().decode(raw)),layer.key);applyElementQuality(md.elements,await elementQuality(),layer.key,{keepHidden:true});metaBy.set(layer.key,md);}
   $('loading').textContent=`Loading ${label} · ${completed+1}/${total} files`;await new Promise(r=>setTimeout(r,0));
   prefetch(i);const buffer=await fetched.get(i);fetched.delete(i);prefetch(i+1);
   const part=await decode(buffer,metaBy.get(layer.key),catalog.transform);
@@ -177,7 +183,7 @@ async function loadFull(next){
  const scope=omitted.length?`Grimes BIM · ${requested.length} of ${catalog.layers.length} disciplines on this phone · ${omitted.map(k=>(systems[k]?.label||k).toLowerCase()).join(' and ')} not loaded`:'Complete BIM · 10 disciplines · Existing source geometry';
  return {parts,choice:'full',scope,omitted,subset:omitted.length>0,previewed:true};
 }
-async function requestLoad(build){return gate.run(async()=>{const next=new THREE.Group(),started=performance.now();cacheReads=[];for(const id of ['demo','load','dataset'])$(id).disabled=true;$('loading').hidden=false;status('Checking the package…');event('Package load started');try{const result=await build(next),newRecords=Object.assign({},...result.parts.map(p=>p.records));if(Object.keys(newRecords).length!==result.parts.reduce((s,p)=>s+p.validation.matched,0))throw Error('Duplicate identity across packages');const old=root;objectView?.dispose();root=next;records=newRecords;recordIndex=createRecordIndex(records);selected=null;hiddenKeys=new Set();isolatedKey=null;objectView=createObjectView(THREE,root.children,(m,id)=>identityKey(m.userData.buildingId,m.userData.layer,id));mode=result.choice;layers=result.parts.map(p=>({key:p.layer,count:p.validation.matched,visible:true}));setupFloors();scene.add(root);if(old){scene.remove(old);dispose(old);}report={matched:Object.keys(records).length,ids:Object.keys(records),layers:result.parts.map(p=>({layer:p.layer,...p.stats,matched:p.validation.matched,bytes:p.bytes})),fileBytes:result.parts.reduce((s,p)=>s+p.bytes,0),triangles:result.parts.reduce((s,p)=>s+p.stats.renderTriangles,0),segments:result.parts.reduce((s,p)=>s+p.stats.renderSegments,0),sourceGeometryPreserved:true,batching:query.get('batching')==='legacy'?'by-type':'compatible-material-floor-system',cache:{hits:cacheReads.filter(r=>r.source==='verified-cache').length,reads:cacheReads.length,assets:cacheReads},mode:result.choice,scope:result.scope,omittedLayers:result.omitted||[],units:'m',upAxis:'Y',spatiallyRegistered:false,hardwareValidated:false,validatedAt:new Date().toISOString(),loadMs:Math.round(performance.now()-started)};
+async function requestLoad(build){return gate.run(async()=>{const next=new THREE.Group(),started=performance.now();cacheReads=[];for(const id of ['demo','load','dataset'])$(id).disabled=true;$('loading').hidden=false;status('Checking the package…');event('Package load started');try{const result=await build(next),newRecords=Object.assign({},...result.parts.map(p=>p.records));if(Object.keys(newRecords).length!==result.parts.reduce((s,p)=>s+p.validation.matched,0))throw Error('Duplicate identity across packages');const old=root;objectView?.dispose();root=next;records=newRecords;recordIndex=createRecordIndex(records);selected=null;flaggedKeys=new Set(SHOW_FLAGGED?[]:Object.keys(records).filter(k=>isNonPart(records[k])));hiddenKeys=new Set(flaggedKeys);isolatedKey=null;objectView=createObjectView(THREE,root.children,(m,id)=>identityKey(m.userData.buildingId,m.userData.layer,id));if(flaggedKeys.size)objectView.setObjectFilter({isolatedKey,hiddenKeys});mode=result.choice;layers=result.parts.map(p=>({key:p.layer,count:p.validation.matched,visible:true}));setupFloors();scene.add(root);if(old){scene.remove(old);dispose(old);}report={matched:Object.keys(records).length,ids:Object.keys(records),layers:result.parts.map(p=>({layer:p.layer,...p.stats,matched:p.validation.matched,bytes:p.bytes})),fileBytes:result.parts.reduce((s,p)=>s+p.bytes,0),triangles:result.parts.reduce((s,p)=>s+p.stats.renderTriangles,0),segments:result.parts.reduce((s,p)=>s+p.stats.renderSegments,0),sourceGeometryPreserved:true,batching:query.get('batching')==='legacy'?'by-type':'compatible-material-floor-system',cache:{hits:cacheReads.filter(r=>r.source==='verified-cache').length,reads:cacheReads.length,assets:cacheReads},mode:result.choice,scope:result.scope,omittedLayers:result.omitted||[],units:'m',upAxis:'Y',spatiallyRegistered:false,hardwareValidated:false,validatedAt:new Date().toISOString(),loadMs:Math.round(performance.now()-started)};
  applyColours();$('scope').textContent=result.scope;$('search').value='';options();renderLayers();resetSection();select(Object.keys(records).find(k=>records[k].sourceId==='160988'&&records[k].layer==='equipment')||report.ids[0]);if(!result.previewed)fit();if(result.choice==='full'&&!result.previewed){camera.position.sub(controls.target).multiplyScalar(.84).add(controls.target);controls.update();}if(result.center){const c=new THREE.Vector3(...result.center);controls.target.copy(c);camera.position.copy(c).add(new THREE.Vector3(10,7,12).multiplyScalar(1.2*Math.max(1,1/camera.aspect)));controls.update();$('view-label').textContent='Regional overview';invalidate();}if(result.previewed)$('view-label').textContent='Model overview';subsetShown=!!result.subset;$('load-all').hidden=!subsetShown;$('metric-objects').textContent=report.matched.toLocaleString();$('metric-bytes').textContent=report.fileBytes>1e6?`${(report.fileBytes/1e6).toFixed(2)} MB`:`${(report.fileBytes/1000).toFixed(1)} kB`;$('summary').textContent=`${report.matched} objects · ${report.triangles} triangles · identity preserved`;$('report').disabled=false;status('Ready. Select a component to inspect its source properties.');event(`Ready: ${report.matched} objects in ${layers.length} systems`);
  }catch(e){endPreview(true,next);dispose(next);if(subsetShown)forceAll=wantAllLayers();status(e.message,true);event('Load failed; previous model retained');if(mode&&mode!=='upload')$('dataset').value=mode;}finally{endPreview(false,next);$('loading').hidden=true;for(const id of ['demo','load','dataset'])$(id).disabled=false;invalidate();}});}
 $('load-all').onclick=()=>{forceAll=true;loadExample();};$('demo').onclick=loadExample;$('dataset').onchange=loadExample;

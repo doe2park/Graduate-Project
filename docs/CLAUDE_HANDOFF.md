@@ -100,7 +100,9 @@ The October 14 local experiment (section 5) has additional concepts named materi
 
 ## 4. Source identity, model scope and hard invariants
 
-The ten BIM layers contain **66,620 source identities**:
+The ten BIM layers contain **66,620 source identities**. Since November 11, 2026 a derived overlay
+(`buildings/grimes/element-quality.json`, see `docs/ELEMENT_QUALITY.md`) hides 3,750 non-part source objects at load time
+and files 1,665 elements under the storey that holds their geometry; the source files are unchanged:
 
 | Layer | Identities |
 |---|---:|

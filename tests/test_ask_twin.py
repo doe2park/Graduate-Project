@@ -55,10 +55,27 @@ class IndexTests(unittest.TestCase):
     def test_real_index_matches_sidecar_elevations(self):
         tw = twin()
         side = json.loads((ROOT / 'buildings/grimes/elements.json').read_text())['elements']
-        diffs = sorted(tw.box[k][1] - v['elevation_m'] for k, v in side.items() if v.get('elevation_m') is not None)
+        diffs = sorted(tw.box[k][1] - v['elevation_m'] for k, v in side.items() if k in tw.box and v.get('elevation_m') is not None)
         self.assertLess(abs(diffs[len(diffs) // 2]), 0.15, 'equipment box bottoms should sit at the Revit elevation (frame check)')
         for key, L in tw.index['layers'].items():
             self.assertEqual(L['withBox'], L['sidecarElements'], key)
+
+    def test_quality_overlay_hides_non_parts_and_files_elements_by_geometry(self):
+        tw = twin()
+        quality = json.loads((ROOT / 'buildings/grimes/element-quality.json').read_text())['layers']
+        anno, moved = quality['duct']['hidden']['annotation'][0], quality['fixtures']['storey']['L1'][0]
+        self.assertNotIn(anno, tw.box)
+        self.assertEqual(tw.hidden[anno], 'annotation')
+        self.assertIn('error', tw.get_element(anno))
+        summary = tw.summary(moved)
+        self.assertEqual(summary['level'], 'L1')
+        self.assertNotEqual(summary['level_label_in_source'], 'L1')
+        self.assertIn('level label disagrees', summary['model_note'])
+        self.assertEqual(len(tw.box) + len(tw.hidden), sum(L['withBox'] for L in tw.index['layers'].values()))
+
+    def test_level_of_y_uses_measured_slab_heights(self):
+        from scripts.ask_twin.tools import level_of_y
+        self.assertEqual([level_of_y(y) for y in (0.9, 5.2, 5.9, 9.4, 9.6, 14.6, 19.5)], ['LOWER', 'L1', 'L1', 'L2', 'L2', 'L3', 'ROOF'])
 
     def test_box_gap(self):
         self.assertEqual(ix.box_gap([0, 0, 0, 1, 1, 1], [0.5, 0.5, 0.5, 2, 2, 2]), 0)

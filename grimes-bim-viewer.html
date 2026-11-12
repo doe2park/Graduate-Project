@@ -403,6 +403,7 @@ body.capture #clickHint{display:none!important}
 
 <script type="module">
 import * as THREE from 'three';
+import {applyElementQuality,dropHiddenObjects,qualityText,hiddenSummary,showFlagged,ELEMENT_QUALITY_PATH} from './twin/element-quality.mjs?v=1';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -1544,6 +1545,10 @@ const cachedJson = u => {
   p.catch(() => delete _jsonCache[u]);
   return p;
 };
+/* Known content defects of the element model (scripts/build_element_quality.py). Non-part source objects are not
+   drawn and storey labels follow the geometry; ?flagged=1 draws everything as exported. Source files are unchanged. */
+const SHOW_FLAGGED = showFlagged(location.search);
+const elementQualityOverlay = () => cachedJson(ELEMENT_QUALITY_PATH).catch(error => { console.warn('Element quality overlay unavailable; drawing the model as exported.', error); return null; });
 window.calculateElementCarbon = event => {
   event.preventDefault();
   const info = equipPicked && equipMeta[equipPicked.id];
@@ -1645,6 +1650,8 @@ window.toggleLayer = (key, {bulk=false}={}) => {
   st.pending = cachedJson(L.json).then(async metaJson => {
     const meta = metaJson.elements || {};
     for (const info of Object.values(meta)) info.levelKey = elementLevel(info) || 'UNKNOWN';
+    const quality = applyElementQuality(meta, await elementQualityOverlay(), key, {keepHidden: SHOW_FLAGGED});
+    st.quality = quality.counts; st.hidden = quality.hidden;
     for (const [id, info] of Object.entries(meta)) { info.layer = key; equipMeta[id] = info; }
     st.survival = metaJson.survival || null;
     const partPaths = L.partsManifest ? (await cachedJson(L.partsManifest)).chunks.map(c => 'buildings/grimes/' + c.file) : [L.glb];
@@ -1657,6 +1664,7 @@ window.toggleLayer = (key, {bulk=false}={}) => {
         sourceGroup.position.set(EQUIP_OFFSET.x, EQUIP_OFFSET.y, EQUIP_OFFSET.z);
         sourceGroup.updateMatrixWorld(true);
         const identityBinding = bindElementSourceIds(gltf);
+        dropHiddenObjects(sourceGroup, st.hidden, meta);
         const built = await buildElementRenderTier(THREE, sourceGroup, meta, key);
         return {...built, identityBinding};
       }, releaseElementSource);
@@ -1776,7 +1784,7 @@ function buildEquipFilter() {
       const denominator = c.eligible ?? c.total;
       return `${name}: ${c.with_geometry.toLocaleString()} / ${denominator.toLocaleString()} ${c.eligible != null ? 'eligible' : 'source'} elements with geometry` + (c.excluded ? ` · ${c.excluded.toLocaleString()} intentionally excluded` : '') + (c.eligible == null ? ' (exclusions not separated)' : '');
       }).join('; ');
-      coverage.innerHTML = `<details><summary>Geometry ${totals.shown.toLocaleString()} / ${totals.total.toLocaleString()}${totals.excluded ? ' · '+totals.excluded.toLocaleString()+' excluded' : ''}</summary>${esc(detail)}</details>`;
+      coverage.innerHTML = `<details><summary>Geometry ${totals.shown.toLocaleString()} / ${totals.total.toLocaleString()}${totals.excluded ? ' · '+totals.excluded.toLocaleString()+' excluded' : ''}</summary>${esc(detail)}${st.hidden?.size ? esc('; ' + hiddenSummary(st.quality) + ' (annotation copies, layout points, double exports)') : ''}</details>`;
     }
     const counts = perLayer[key];
     box.hidden = !counts;
@@ -1946,7 +1954,9 @@ async function pickEquipment(mesh, instanceId, explicitId = null) {
     + (info.category ? drow('revit category', esc(info.category)) : '')
     + (info.system ? drow('system', esc(info.system)) : '')
     + (elementLevel(info) ? drow('level', esc(info.level || elementLevel(info))
-        + (info.levelSource === 'geometry' ? ' <span class="mut">(inferred from position; pooled validation, not element certainty)</span>' : info.levelSource === 'source-file' ? ' <span class="mut">(from source filename)</span>' : '')) : '')
+        + (info.levelSource === 'geometry' ? ' <span class="mut">(inferred from position; pooled validation, not element certainty)</span>' : info.levelSource === 'source-file' ? ' <span class="mut">(from source filename)</span>' : '')
+        + (info.sourceLevelKey ? ' <span class="mut">(geometry is on ' + esc(info.levelKey) + ')</span>' : '')) : '')
+    + (qualityText(info) ? drow('model note', esc(qualityText(info))) : '')
     + (info.elevation_m != null ? drow('elevation', info.elevation_m.toFixed(2) + ' m') : '')
     + (info.source_file ? drow('source model', esc(info.source_file)) : '')
     + revitRows(info)

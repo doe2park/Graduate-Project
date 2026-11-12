@@ -17,7 +17,7 @@ The base URL chooses a regional example on narrow screens. The model selector ca
 
 | Mode | URL parameter | Contents |
 |---|---|---|
-| Whole building | `?model=full` | Ten layers and 66,620 source identities |
+| Whole building | `?model=full` | Ten layers and 66,620 source identities; 3,750 non-part objects start hidden ([ELEMENT_QUALITY.md](ELEMENT_QUALITY.md), `&flagged=1` shows them) |
 | Regional example | `?model=regional` | Partial Level 1 area: 492 objects across eight systems |
 | Conduit example | `?model=conduit` | 24-object GLB/JSON teaching package |
 

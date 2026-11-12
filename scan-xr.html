@@ -79,6 +79,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
 import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight,applyRadius,pruneGlbToLevels} from './twin/xr-spatial-tier.mjs?v=2';   // ?v: a cached older copy lacks pruneGlbToLevels and the import would fail
+import {applyElementQuality,metaForPruning,showFlagged,ELEMENT_QUALITY_PATH} from './twin/element-quality.mjs?v=1';
 const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
 /* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
    inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
@@ -275,6 +276,10 @@ async function fetchGlb(path,onProgress){
 }
 function glbPrefetch(path){if(!path||glbAhead.has(path)||glbAhead.size>=2)return;const p=fetchGlb(path);p.catch(()=>{});glbAhead.set(path,p);}   // at most two files held ahead
 function glbTake(path,onProgress){const p=glbAhead.get(path);glbAhead.delete(path);return p?p.catch(()=>fetchGlb(path,onProgress)):fetchGlb(path,onProgress);}
+/* Known content defects of the element model (scripts/build_element_quality.py): annotation copies, layout points and double
+   exports are cut before decode, and an element is shown on the storey that holds its geometry. ?flagged=1 shows the export as is. */
+let qualityAhead=null;
+function elementQuality(){return qualityAhead||(qualityAhead=fetchJson(ELEMENT_QUALITY_PATH).catch(e=>{console.warn('Element quality overlay unavailable; using the model as exported.',e);return null;}));}
 function sidecar(key){if(!sidecarAhead.has(key)){const p=fetchJson(LAYERS[key].json);p.catch(()=>sidecarAhead.delete(key));sidecarAhead.set(key,p);}return sidecarAhead.get(key);}
 async function loadLayer(key,{onBytes}={}){
  const L=LAYERS[key],old=layerState[key];if(old&&!old.error)return old.pending;
@@ -285,14 +290,15 @@ async function loadLayer(key,{onBytes}={}){
   try{
    const metaJson=await sidecar(key),meta=metaJson.elements||{};
    for(const [id,info] of Object.entries(meta)){info.layer=key;info.levelKey=elementLevel(info)||'UNKNOWN';}
-   st.meta=meta;
+   const quality=applyElementQuality(meta,await elementQuality(),key,{keepHidden:showFlagged(location.search)}),pruneMeta=metaForPruning(meta,quality.hidden);
+   st.meta=meta;st.quality=quality.counts;
    let paths=[L.glb],expect=[L.mb*1e6];   // expect = known raw (uncompressed) size: the progress event's total is the gzip Content-Length, never trusted
    if(L.partsManifest){const man=await fetchJson(L.partsManifest);const parts=man.chunks.filter(c=>P.levels.has(c.levelKey));paths=parts.map(c=>'buildings/grimes/'+c.file);expect=parts.map(c=>c.bytes);st.bytes=parts.reduce((a,c)=>a+c.bytes,0);}
    for(const [pi,path] of paths.entries()){
     status(L.label+' · loading…',true);
     const bytes=await glbTake(path,n=>status(X.loadProgressText(L.label+(paths.length>1?' '+(pi+1)+'/'+paths.length:''),n,expect[pi]),true));
     if(pi+1<paths.length)glbPrefetch(paths[pi+1]);else if(onBytes)onBytes();   // the next download overlaps this decode
-    const cut=pruneGlbToLevels(bytes,meta,P.levels);st.stats.prunedMeshNodes=(st.stats.prunedMeshNodes||0)+cut.droppedMeshNodes;
+    const cut=pruneGlbToLevels(bytes,pruneMeta,P.levels);st.stats.prunedMeshNodes=(st.stats.prunedMeshNodes||0)+cut.droppedMeshNodes;
     status(L.label+' · decoding…',true);
     const gltf=await gltfLoader.parseAsync(cut.buffer,'');
     try{
@@ -310,7 +316,7 @@ async function loadLayer(key,{onBytes}={}){
  })();
  return st.pending;
 }
-async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);for(const k of order)if(!layerState[k])sidecar(k).catch(()=>{});
+async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-LAYERS[b].mb);elementQuality();for(const k of order)if(!layerState[k])sidecar(k).catch(()=>{});
  for(const [i,k] of order.entries()){const next=LAYERS[order[i+1]];await loadLayer(k,{onBytes:()=>{if(next&&!next.partsManifest&&!layerState[order[i+1]])glbPrefetch(next.glb);}});}timing.layersDoneMs=Math.round(performance.now()-T0);const failed=order.filter(k=>layerState[k]?.error).map(k=>LAYERS[k].label);
  status(failed.length?(failed.length<order.length?'Services ready except ':'')+failed.join(', ')+' failed to load · turn the layer on again to retry':'Services ready · Level '+[...P.levels].join('+')+' within '+P.radius+' m',!!failed.length);updateStats();}
 const layerMissing=k=>!layerState[k]||!!layerState[k].error;
