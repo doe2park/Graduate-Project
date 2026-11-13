@@ -21,6 +21,11 @@ function bindElementSourceIds(gltf) {
    Repeated geometry remains instanced to avoid expanding thousands of fittings. */
 async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey, options = {}) {
   const MAX_VERTICES = 180000, INSTANCE_REUSE = 8;
+  // Instancing saves memory but costs one draw call per distinct shape. The full Grimes model has about 4,300 reused shapes, most of
+  // them small fittings, and a phone's processor then spends each frame issuing draw calls (measured 2026-11-13: 4,647 calls,
+  // about 18 frames/s while orbiting on a 4x-slowed CPU). A reused shape is instanced only when that saves at least this many
+  // triangles in total (copies x triangles); smaller ones are merged into the shared batches. 0 = the old rule.
+  const INSTANCE_MIN_TRIANGLES = Number.isFinite(options.instanceMinTriangles) ? options.instanceMinTriangles : 2000;
   const fragments = [], repeated = new Map(), mergeBuckets = new Map(), meshes = [];
   const stats = { sourceObjects: 0, unidentifiedObjects: 0, unidentifiedNames: [], sourceTriangles: 0, renderTriangles: 0, sourceSegments: 0, renderSegments: 0, mergedMeshes: 0, instancedMeshes: 0, instances: 0, drawCalls: 0 };
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -74,7 +79,8 @@ async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey, options
   };
   const instanceBuckets = new Map();
   for (const part of fragments) {
-    const target = part.canInstance && repeated.get(part.reuseKey) >= INSTANCE_REUSE ? instanceBuckets : mergeBuckets;
+    const copies = part.canInstance ? repeated.get(part.reuseKey) : 0;
+    const target = copies >= INSTANCE_REUSE && copies * Math.floor((part.end-part.start)/3) >= INSTANCE_MIN_TRIANGLES ? instanceBuckets : mergeBuckets;
     const key = target === instanceBuckets ? part.reuseKey : part.key;
     if (!target.has(key)) target.set(key, []);
     target.get(key).push(part);

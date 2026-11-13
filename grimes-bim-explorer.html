@@ -57,6 +57,7 @@ function bindElementSourceIds(gltf) {
 }
 async function buildElementRenderTier(THREE2, sceneGroup, meta, layerKey, options2 = {}) {
   const MAX_VERTICES = 18e4, INSTANCE_REUSE = 8;
+  const INSTANCE_MIN_TRIANGLES = Number.isFinite(options2.instanceMinTriangles) ? options2.instanceMinTriangles : 2e3;
   const fragments = [], repeated = /* @__PURE__ */ new Map(), mergeBuckets = /* @__PURE__ */ new Map(), meshes = [];
   const stats = { sourceObjects: 0, unidentifiedObjects: 0, unidentifiedNames: [], sourceTriangles: 0, renderTriangles: 0, sourceSegments: 0, renderSegments: 0, mergedMeshes: 0, instancedMeshes: 0, instances: 0, drawCalls: 0 };
   const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -116,7 +117,8 @@ async function buildElementRenderTier(THREE2, sceneGroup, meta, layerKey, option
   };
   const instanceBuckets = /* @__PURE__ */ new Map();
   for (const part of fragments) {
-    const target = part.canInstance && repeated.get(part.reuseKey) >= INSTANCE_REUSE ? instanceBuckets : mergeBuckets;
+    const copies = part.canInstance ? repeated.get(part.reuseKey) : 0;
+    const target = copies >= INSTANCE_REUSE && copies * Math.floor((part.end - part.start) / 3) >= INSTANCE_MIN_TRIANGLES ? instanceBuckets : mergeBuckets;
     const key = target === instanceBuckets ? part.reuseKey : part.key;
     if (!target.has(key)) target.set(key, []);
     target.get(key).push(part);
