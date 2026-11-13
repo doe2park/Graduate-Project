@@ -1363,7 +1363,7 @@ function endPreview(failed, next) {
     updateSection();
   }
 }
-var skippedOnPhone = ["fire", "fixtures"];
+var skippedOnPhone = ["fire", "fixtures", "hydronic", "plumbing", "conduit"];
 async function loadFull(next) {
   const catalog = await checked(deployment.asset("source-catalog.json")), phone = phoneMedia.matches && !forceAll && !wantAllLayers();
   const bytesOf = (l) => l.parts.reduce((n, p) => n + p.bytes, 0), omitted = phone ? skippedOnPhone.filter((k) => catalog.layers.some((l) => l.key === k)) : [];
@@ -1415,7 +1415,7 @@ async function loadFull(next) {
   }
   const parts = requested.map((l) => combineParts(chunksBy.get(l.key), l.key)), expected = requested.reduce((n, l) => n + l.objects, 0);
   if (parts.reduce((n, p) => n + p.validation.matched, 0) !== expected || !omitted.length && expected !== catalog.objects) throw Error("Incomplete building identities");
-  const scope = omitted.length ? `Grimes BIM · ${requested.length} of ${catalog.layers.length} disciplines on this phone · ${omitted.map((k) => (systems[k]?.label || k).toLowerCase()).join(" and ")} not loaded` : "Complete BIM · 10 disciplines · Existing source geometry";
+  const scope = omitted.length ? `Grimes BIM · ${requested.length} of ${catalog.layers.length} disciplines on this phone · ${omitted.length > 2 ? "the heavier piping, conduit and fixture models are" : omitted.map((k) => (systems[k]?.label || k).toLowerCase()).join(" and ") + " are"} not loaded` : "Complete BIM · 10 disciplines · Existing source geometry";
   return { parts, choice: "full", scope, omitted, subset: omitted.length > 0, previewed: true };
 }
 async function requestLoad(build) {

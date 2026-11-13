@@ -160,7 +160,9 @@ function endPreview(failed,next){
  if(!previewShown)return;previewShown=false;previewGroup=null;
  if(failed){scene.remove(next);if(root)root.visible=true;updateSection();}
 }
-const skippedOnPhone=['fire','fixtures'];
+/* Phones first load five disciplines, about 4.1 million triangles. The eight loaded before (12.3 million) stopped the page while
+   loading on a real phone on 2026-11-13: a phone browser gives one tab far less memory than a laptop does. The button loads the rest. */
+const skippedOnPhone=['fire','fixtures','hydronic','plumbing','conduit'];
 async function loadFull(next){
  const catalog=await checked(deployment.asset('source-catalog.json')),phone=phoneMedia.matches&&!forceAll&&!wantAllLayers();
  const bytesOf=l=>l.parts.reduce((n,p)=>n+p.bytes,0),omitted=phone?skippedOnPhone.filter(k=>catalog.layers.some(l=>l.key===k)):[];
@@ -180,7 +182,7 @@ async function loadFull(next){
  }
  const parts=requested.map(l=>combineParts(chunksBy.get(l.key),l.key)),expected=requested.reduce((n,l)=>n+l.objects,0);
  if(parts.reduce((n,p)=>n+p.validation.matched,0)!==expected||(!omitted.length&&expected!==catalog.objects))throw Error('Incomplete building identities');
- const scope=omitted.length?`Grimes BIM · ${requested.length} of ${catalog.layers.length} disciplines on this phone · ${omitted.map(k=>(systems[k]?.label||k).toLowerCase()).join(' and ')} not loaded`:'Complete BIM · 10 disciplines · Existing source geometry';
+ const scope=omitted.length?`Grimes BIM · ${requested.length} of ${catalog.layers.length} disciplines on this phone · ${omitted.length>2?'the heavier piping, conduit and fixture models are':omitted.map(k=>(systems[k]?.label||k).toLowerCase()).join(' and ')+' are'} not loaded`:'Complete BIM · 10 disciplines · Existing source geometry';
  return {parts,choice:'full',scope,omitted,subset:omitted.length>0,previewed:true};
 }
 async function requestLoad(build){return gate.run(async()=>{const next=new THREE.Group(),started=performance.now();cacheReads=[];for(const id of ['demo','load','dataset'])$(id).disabled=true;$('loading').hidden=false;status('Checking the package…');event('Package load started');try{const result=await build(next),newRecords=Object.assign({},...result.parts.map(p=>p.records));if(Object.keys(newRecords).length!==result.parts.reduce((s,p)=>s+p.validation.matched,0))throw Error('Duplicate identity across packages');const old=root;objectView?.dispose();root=next;records=newRecords;recordIndex=createRecordIndex(records);selected=null;flaggedKeys=new Set(SHOW_FLAGGED?[]:Object.keys(records).filter(k=>isNonPart(records[k])));hiddenKeys=new Set(flaggedKeys);isolatedKey=null;objectView=createObjectView(THREE,root.children,(m,id)=>identityKey(m.userData.buildingId,m.userData.layer,id));if(flaggedKeys.size)objectView.setObjectFilter({isolatedKey,hiddenKeys});mode=result.choice;layers=result.parts.map(p=>({key:p.layer,count:p.validation.matched,visible:true}));setupFloors();scene.add(root);if(old){scene.remove(old);dispose(old);}report={matched:Object.keys(records).length,ids:Object.keys(records),layers:result.parts.map(p=>({layer:p.layer,...p.stats,matched:p.validation.matched,bytes:p.bytes})),fileBytes:result.parts.reduce((s,p)=>s+p.bytes,0),triangles:result.parts.reduce((s,p)=>s+p.stats.renderTriangles,0),segments:result.parts.reduce((s,p)=>s+p.stats.renderSegments,0),sourceGeometryPreserved:true,batching:query.get('batching')==='legacy'?'by-type':'compatible-material-floor-system',cache:{hits:cacheReads.filter(r=>r.source==='verified-cache').length,reads:cacheReads.length,assets:cacheReads},mode:result.choice,scope:result.scope,omittedLayers:result.omitted||[],units:'m',upAxis:'Y',spatiallyRegistered:false,hardwareValidated:false,validatedAt:new Date().toISOString(),loadMs:Math.round(performance.now()-started)};
