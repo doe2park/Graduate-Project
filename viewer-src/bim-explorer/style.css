@@ -29,3 +29,7 @@
 /* Load all: a busy state with progress, because the load takes a while and the button would otherwise look dead. */
 #load-all[aria-busy=true]{opacity:.9;cursor:progress}#load-all[aria-busy=true]::before{content:"";width:14px;height:14px;margin-right:8px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:load-spin .8s linear infinite}
 @keyframes load-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#load-all[aria-busy=true]::before{animation:none}}
+
+/* From the model to the photo overlay (the poster's "Explore the model" code lands here; the phone follow mode lives in the overlay). */
+#to-overlay{text-decoration:none;font-weight:700;border-color:var(--teal);color:var(--teal);background:#fff}#to-overlay .narrow{display:none}
+@media(max-width:768px),(pointer:coarse){#to-overlay .wide{display:none}#to-overlay .narrow{display:inline}}
