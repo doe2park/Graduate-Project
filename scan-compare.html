@@ -222,7 +222,7 @@ const mode=document.getElementById('scanMode');
 mode.onchange=()=>navigateCapture(capture.date,mode.value);
 const requestedMode=new URLSearchParams(location.search).get('mode');
 // The 3D mesh view was retired (reconstruction too distorted to read); old ?mode=mesh links open the 360° photos.
-const photoSource='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&revision=mobile-controls2';
+const photoSource='scan-photo.html?manifest='+encodeURIComponent(capture.photo)+'&revision=mobile-controls3';
 /* a requested Gaussian loads only after its manifest/index validates (no photo first, so ?at= reaches the right pane) */
 if(capture.display!=='splat')frames[0].src=photoSource;
 

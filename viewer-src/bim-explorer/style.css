@@ -21,3 +21,11 @@
 @media(max-width:600px){.canvas-tools{align-items:flex-start;gap:8px}.canvas-tools>div{gap:4px}.canvas-tools button{padding:8px 9px;min-height:44px}.object-actions button{min-height:44px}}
 
 #load-all{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:700}#load-all[hidden]{display:none}
+
+/* Phone: a tapped component opens a bottom sheet over the model, so its properties can be read without scrolling away from it. */
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(0,50,98,.2);padding:14px 16px calc(14px + env(safe-area-inset-bottom));max-height:55vh;overflow:auto}
+.sheet[hidden]{display:none}.sheet h2{margin:8px 48px 4px 0;font-size:18px}#sheet-close{position:absolute;top:8px;right:8px;min-width:44px;font-size:22px;line-height:1}
+#sheet-key{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.sheet dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;margin:10px 0 0;font-size:13px}.sheet dt{color:var(--muted)}.sheet dd{margin:0;overflow-wrap:anywhere}.sheet-more{margin-top:8px;width:100%}
+/* Load all: a busy state with progress, because the load takes a while and the button would otherwise look dead. */
+#load-all[aria-busy=true]{opacity:.9;cursor:progress}#load-all[aria-busy=true]::before{content:"";width:14px;height:14px;margin-right:8px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:load-spin .8s linear infinite}
+@keyframes load-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#load-all[aria-busy=true]::before{animation:none}}
