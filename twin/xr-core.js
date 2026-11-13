@@ -488,11 +488,41 @@ function xrQuality(ua, params) {
     scaleSource: hasScale ? 'url' : 'device-default', foveationSource: hasFov ? 'url' : 'device-default'};
 }
 
+/* ── Frame guard (2026-11-13, before the first on-site headset test) ── No Quest frame rate was ever measured, so the page watches
+   its own XR frame intervals and steps the quality DOWN when they stay slow: first a smaller render viewport (fragment cost),
+   then also a shorter services radius (triangle cost). It never steps up inside a session (no oscillation); a new session
+   starts at full again. A single long frame (a photo upload, a layer decode) is a hitch, not slowness, and is ignored.
+   slowMs 20 = under 50 frames/s: one missed refresh in three at 72 Hz, or every second frame missed at 90 Hz. */
+const FRAME_GUARD = {slowMs: 20, holdMs: 2500, graceMs: 4000, settleMs: 1500, hitchMs: 250,
+  levels: [{label: 'full', scale: 1, radius: 1}, {label: 'reduced', scale: 0.8, radius: 1}, {label: 'low', scale: 0.65, radius: 0.7}, {label: 'lowest', scale: 0.5, radius: 0.5}]};
+function frameGuardInit() { return {level: 0, ema: 0, n: 0, age: 0, slowFor: 0}; }
+/* One XR frame interval (ms). Mutates g; returns true when the level changed (the page then applies FRAME_GUARD.levels[g.level]). */
+function frameGuardStep(g, dtMs, cfg) {
+  const c = cfg || FRAME_GUARD;
+  if (!g || !(dtMs > 0)) return false;
+  g.age += dtMs;
+  if (dtMs > c.hitchMs) { g.slowFor = 0; return false; }
+  g.ema = g.n++ ? g.ema + (dtMs - g.ema) * 0.1 : dtMs;
+  if (g.age < c.graceMs) return false;
+  g.slowFor = g.ema > c.slowMs ? g.slowFor + dtMs : 0;
+  if (g.slowFor < c.holdMs || g.level >= c.levels.length - 1) return false;
+  g.level++; g.slowFor = 0; g.age = c.graceMs - c.settleMs;
+  return true;
+}
+function frameGuardText(g, cfg) { const c = cfg || FRAME_GUARD; return (g && g.n ? Math.round(1000 / g.ema) + ' frames/s' : 'frames/s not measured yet') + ' · quality ' + c.levels[g ? g.level : 0].label; }
+/* Headset default (2026-11-13): only captures with an accepted registration are listed, so the Capture button cannot land on a
+   provisional alignment by accident. ?captures=all lists every published capture; a capture named in ?capture= is always kept. */
+function headsetCaptures(published, params) {
+  const all = !!(params && params.get && params.get('captures') === 'all'), want = params && params.get ? params.get('capture') : null;
+  const list = CAPTURE_ORDER.filter(d => published.includes(d) && (all || !CAPTURES[d].provisional || d === want));
+  return list.length ? list : published.slice();
+}
+
 /* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
    Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
-const API = 6;   // 6: cache refresh only (the file changed after v5 shipped without a bump)
+const API = 7;   // 7: frame guard, headsetCaptures
 
-return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
+return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, FRAME_GUARD, frameGuardInit, frameGuardStep, frameGuardText, headsetCaptures, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
   chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines,
   loadProgressText, MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,

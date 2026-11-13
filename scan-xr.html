@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=6"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=6"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=7"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=7"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -83,7 +83,7 @@ import {applyElementQuality,metaForPruning,showFlagged,ELEMENT_QUALITY_PATH} fro
 const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
 /* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
    inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
-const XR_CORE_API=6,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
+const XR_CORE_API=7,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
 const T0=performance.now(),q=new URLSearchParams(location.search);
 const MODE_AR=q.get('mode')==='ar';   // mixed-reality passthrough mode (immersive-ar, manual alignment); default = the 360° photo VR overlay
 const MR_DEFAULT_LAYERS=['fire','duct','plumbing'];   // Quest 2 budget: fire piping, ducts, plumbing on; the rest toggle from the MR panel
@@ -111,6 +111,8 @@ const P={
  xrScale:XQ.xrScale,foveation:XQ.foveation,
 };
 const XR_SNAP=Math.PI/6;
+/* Frame guard state (see guardFrame). The fallbacks keep the page alive next to an older cached twin/xr-core.js. */
+const FG=X?.FRAME_GUARD||{levels:[{label:'full',scale:1,radius:1}]},guardNew=()=>X?.frameGuardInit?X.frameGuardInit():{level:0,n:0,ema:0},guardText=()=>X?.frameGuardText?X.frameGuardText(guard):'';let guard=guardNew();
 /* ── Renderer / scene ── no shadows, no lights, no tone mapping; capped pixel ratio; XR framebuffer scale + fixed foveation. */
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=false;
@@ -205,7 +207,7 @@ let capture=null,reg=null,stations=[],manifestURL=null,active=-1,stationBim=[0,0
 /* Published captures (2026-10-21): only dates whose photo manifest loads are listed and cycled; the public site omits captures under review. */
 let availableCaptures=null;
 async function probeCaptures(){const ok=await Promise.all(X.CAPTURE_ORDER.map(d=>fetch(X.captureConfig(d).photo,{method:'HEAD',cache:'no-store'}).then(r=>r.ok,()=>false)));
- availableCaptures=X.CAPTURE_ORDER.filter((d,i)=>ok[i]);for(const o of [...$('capture').options])if(!availableCaptures.includes(o.value))o.remove();return availableCaptures;}
+ availableCaptures=X.CAPTURE_ORDER.filter((d,i)=>ok[i]);if(X.headsetCaptures)availableCaptures=X.headsetCaptures(availableCaptures,q);for(const o of [...$('capture').options])if(!availableCaptures.includes(o.value))o.remove();return availableCaptures;}
 const timing={firstPhotoMs:null,layersDoneMs:null};
 let yaw=0,pitch=0;const axisQ=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
 function setDesktopLook(){camera.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));invalidate();}
@@ -320,7 +322,7 @@ async function loadLayers(keys){const order=[...keys].sort((a,b)=>LAYERS[a].mb-L
  for(const [i,k] of order.entries()){const next=LAYERS[order[i+1]];await loadLayer(k,{onBytes:()=>{if(next&&!next.partsManifest&&!layerState[order[i+1]])glbPrefetch(next.glb);}});}timing.layersDoneMs=Math.round(performance.now()-T0);const failed=order.filter(k=>layerState[k]?.error).map(k=>LAYERS[k].label);
  status(failed.length?(failed.length<order.length?'Services ready except ':'')+failed.join(', ')+' failed to load · turn the layer on again to retry':'Services ready · Level '+[...P.levels].join('+')+' within '+P.radius+' m',!!failed.length);updateStats();}
 const layerMissing=k=>!layerState[k]||!!layerState[k].error;
-function updateRadius(){let n=0;const r=MODE_AR?mrCullRadius():P.radius;for(const st of Object.values(layerState))n+=applyRadius(st.meshes,stationBim,r);invalidate();return n;}
+function updateRadius(){let n=0;const r=(MODE_AR?mrCullRadius():P.radius)*FG.levels[guard.level].radius;for(const st of Object.values(layerState))n+=applyRadius(st.meshes,stationBim,r);invalidate();return n;}
 function setFire(on){setLayer('fire',on);}
 const fireOn=()=>!!layerState.fire&&layerState.fire.group.visible;
 /* ── Picking + info card ── ray = controller (XR) or mouse (desktop); only visible, in-radius batches are tested. */
@@ -502,7 +504,7 @@ function drawMenu(){const {ctx,canvas}=menu,W=canvas.width,H=canvas.height,{butt
  ctx.fillStyle='rgba(8,16,28,.95)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,36);ctx.fill();ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,92);ctx.fillStyle='#FDB515';ctx.fillRect(4,92,W-8,6);
  ctx.fillStyle='#fff';fitFont(ctx,more?'More · settings and layers':'Grimes L1 · Scan↔BIM',36,64,W-300,48,'700');ctx.fillStyle='#9fb6cb';ctx.textAlign='right';ctx.font='600 30px Arial';ctx.fillText('B/Y closes',W-36,62);ctx.textAlign='left';
  const rows=more?[[`Opacity is fixed (Lens ${Math.round(state.opacity.lens*100)} %, All ${Math.round(state.opacity.all*100)} %) · Right stick ↑↓ widens / narrows the flashlight (${state.coneDeg}°)`,'#cfe3f5'],
-   ['Layers load on demand · loading inside VR can stutter for a few seconds','#9fb6cb'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · Design (BIM) positions`,'#9fb6cb']]
+   ['Layers load on demand · loading inside VR can stutter for a few seconds','#9fb6cb'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · ${guardText()}`,guard.level?'#ffb4a8':'#9fb6cb']]
   :[[`${capture?.label||''} · capture ${active+1}/${stations.length}${gauss.scene==='gaussian'&&gauss.fallback?' · '+X.gaussianOutsideNote():gauss.scene==='gaussian'&&gauss.label?' · '+gauss.label:''}`,gauss.scene==='gaussian'?'#ffd9a0':'#e8f1f8'],
    [`Alignment: ${capture?.alignmentText||''} · Design (BIM) positions`,capture?.provisional?'#ffb4a8':'#ffe495'],
    ['Left stick ↑ hold: aim · release: go · ←→ turn 30° · Right hand: flashlight, trigger = info card · A/X Lens/All','#9fb6cb']];
@@ -530,7 +532,7 @@ function setHands(h){state.hands=h==='both'?'both':'right';if(state.hands==='rig
 /* id ('capture', 'style', …) or a button index on the current page; returns the id that acted. */
 async function menuAction(k){const {buttons}=menuModel(),id=(typeof k==='number'?buttons[k]:buttons.find(b=>b.id===k)||{id:k})?.id;if(!id)return null;
  menuHover.clear();
- if(id==='capture')await switchCapture(X.nextCapture(capture.date,availableCaptures));
+ if(id==='capture'){const nx=X.nextCapture(capture.date,availableCaptures);if(nx===capture.date)status('Only '+capture.label+' is listed in the headset (registered) · add &captures=all to the link for the provisional captures');else await switchCapture(nx);}
  else if(id==='style')setStyle(state.mode==='lens'?'all':'lens');
  else if(id==='scene')await setScene(X.toggleScene(gauss.scene));
  else if(id==='recenter'){await recenter();if(state.menu)placeInFront(menu.mesh,MENU_DIST,MENU_DROP);}
@@ -1408,8 +1410,17 @@ function askInspection(){if(!ASK?.on)return {on:false,available:XAOK};const w=ne
 let xrFrameErrors=0,lastXrFrameError=null;
 function xrFrameSafe(){try{if(MODE_AR){if(BD.state!=='off'&&BD.state!=='idle')mrBackdropOff();mrFrame();}else{if(pendingPlace&&--pendingPlace===0){placeRig();if(active>=0)placeTag();}xrInput();}sensorsTick();}
  catch(e){xrFrameErrors++;const m=String(e?.message||e);if(m!==lastXrFrameError){lastXrFrameError=m;console.error('XR frame error (rendering continues):',e);try{status('XR controls error · '+m);}catch(_){}}}}
+/* Frame guard (X.frameGuardStep): watches the XR frame interval and lowers the quality when it stays slow. &guard=0 turns it off. */
+let guardWasXr=false,guardT=0;const GUARD_ON=q.get('guard')!=='0'&&!!X?.frameGuardStep;
+function guardApply(announce){updateRadius();const L=FG.levels[guard.level];if(announce)status('Slow frames · quality lowered to "'+L.label+'" · '+guardText());if(state.menu)drawMenu();}
+function guardFrame(t){const xr=renderer.xr.isPresenting;
+ if(xr!==guardWasXr){guardWasXr=xr;guardT=0;const had=guard.level;guard=guardNew();if(had)guardApply(false);}
+ if(!xr||!GUARD_ON)return;const dt=guardT?t-guardT:0;guardT=t;
+ try{if(X.frameGuardStep(guard,dt))guardApply(true);
+  const s=FG.levels[guard.level].scale;if(s<1){const f=renderer.xr.getFrame(),ref=renderer.xr.getReferenceSpace(),pose=f&&ref?f.getViewerPose(ref):null;if(pose)for(const v of pose.views)v.requestViewportScale?.(s);}}
+ catch(e){if(!guard.error){guard.error=String(e?.message||e);console.warn('frame guard',e);}}}
 renderer.setAnimationLoop((t)=>{
- const xr=renderer.xr.isPresenting;
+ const xr=renderer.xr.isPresenting;guardFrame(t);
  if(xr)xrFrameSafe();
  else{if(!pointerInside&&!drag)coneFromViewIfIdle();try{sensorsTick();}catch(e){console.error('sensors',e);}}
  let askAnim=false;if(ASK?.on)try{askAnim=askTick();}catch(e){console.error('ask',e);}
@@ -1429,7 +1440,7 @@ function inspection(){const heap=performance.memory?Math.round(performance.memor
  return {ready:active>=0&&!gauss.loading,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},availableCaptures,station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
   style:state.mode,opacity:state.opacity[state.mode],coneDeg:state.coneDeg,radius:P.radius,levels:[...P.levels],hiRes:state.hiRes,texture:sphereMat.map?.image?{width:sphereMat.map.image.width,height:sphereMat.map.image.height}:null,
   layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{loaded:s.loaded,loading:s.loading,error:s.error||null,visible:s.group.visible,loadMs:s.loadMs??null,...s.stats,visibleBatches:s.meshes.filter(m=>m.visible).length}])),
-  totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation,device:XQ.device,scaleSource:XQ.scaleSource,foveationSource:XQ.foveationSource,antialias:!!renderer.getContext().getContextAttributes()?.antialias,layerSize:xrLayerSize(),coreInSync:CORE_OK,coreApi:X?.API??null,frameErrors:xrFrameErrors,lastFrameError:lastXrFrameError},
+  totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation,device:XQ.device,scaleSource:XQ.scaleSource,foveationSource:XQ.foveationSource,antialias:!!renderer.getContext().getContextAttributes()?.antialias,layerSize:xrLayerSize(),coreInSync:CORE_OK,coreApi:X?.API??null,guard:{on:GUARD_ON,level:guard.level,label:FG.levels[guard.level].label,fps:guard.n?Math.round(1000/guard.ema):null,error:guard.error||null},frameErrors:xrFrameErrors,lastFrameError:lastXrFrameError},
   card:picked?{id:picked.id,layer:picked.layer,tier:picked.tier,lines:picked.lines}:null,bimRoot:{rotationY:bimRoot.rotation.y,position:bimRoot.position.toArray()},rig:{position:rig.position.toArray(),yaw:rig.rotation.y},camera:{world:camera.getWorldPosition(new THREE.Vector3()).toArray()},
   viewPos:viewPos.slice(),photoSphereVisible:sphere.visible,mode:MODE_AR?'ar':'vr',mr:MODE_AR?mrInspection():null,sensors:sensorsInspection(),ask:askInspection(),
   menu:{open:state.menu,page:state.page,buttons:CORE_OK?menuModel().buttons.map(b=>b.id):null,hover:[...menuHover],distance:state.menu?menu.mesh.getWorldPosition(new THREE.Vector3()).distanceTo(camera.getWorldPosition(new THREE.Vector3())):null},
@@ -1460,6 +1471,8 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
  snapTurn:sign=>{const before=camera.getWorldPosition(new THREE.Vector3()).toArray();snapBy(sign<0?XR_SNAP:-XR_SNAP);camera.updateMatrixWorld(true);return {before,after:camera.getWorldPosition(new THREE.Vector3()).toArray(),yaw:rig.rotation.y};},
  lookAtScan:p=>{const c=camera.getWorldPosition(new THREE.Vector3()),d=new THREE.Vector3().fromArray(p).sub(c).normalize(),ry=rig.rotation.y;yaw=Math.atan2(-d.x,-d.z)-ry;pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();return d.toArray();},
  setHands,
+ // frame guard test aid: jump to a quality level through the same apply path the guard uses
+ guardForce:l=>{guard.level=clamp(l|0,0,FG.levels.length-1);try{guardApply(true);}catch(e){return {error:String(e?.stack||e).split('\n').slice(0,10).join(' | ')};}return {level:guard.level,label:FG.levels[guard.level].label};},
  sensors:{setScene:sc=>(SENS.on?sensorsSetScene(sc):(SENS.scene=sc,sensorsEnable(true))),enable:on=>sensorsEnable(on),next:()=>sensorsNextScene(),menuCycle:()=>sensorsMenuCycle(),tick:()=>sensorsTick(),pinWorld:id=>{const r=SENS.recs.get(id);return r?_sw.fromArray(r.point).applyMatrix4(bimRoot.matrixWorld).toArray():null;},
   lookAt:id=>{const r=SENS.recs.get(id);if(!r)return null;bimRoot.updateMatrixWorld(true);const w=new THREE.Vector3().fromArray(r.point).applyMatrix4(bimRoot.matrixWorld),c=camera.getWorldPosition(new THREE.Vector3()),d=w.sub(c).normalize();yaw=Math.atan2(-d.x,-d.z)-rig.rotation.y;pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();sensorsTick();return d.toArray();}},
  mrChoose,mrSyncUrl,

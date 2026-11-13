@@ -496,3 +496,37 @@ The same illustrative sensors as the 2D overlay (`scan-compare.html?sensors=demo
 - **Versions.** `xr-core.js` API 4 (`?v=4`, new `loadProgressText`, 14th More-menu button), new `twin/sensor-xr.js?v=1` (pure helpers, tests in `tests/sensor-xr.test.cjs`); `sensor-demo.js` and `feed.js` are loaded with `?v=1` only when sensors are on (no request without the opt-in).
 - **Not verified:** everything on a headset (pin size and legibility, chip readability at distance, ray picking of pins, frame cost of the extra sprites and the fire layer on demand, the Demo placement feel). Desktop smoke only: `tests/scan-xr-smoke.cjs` (`XR_SMOKE_SENSORS=0` skips).
 
+
+## On-site headset test (prepared 2026-11-13, not yet run on a headset)
+
+Everything in this section was checked on the Mac only: unit tests, the desktop smoke, and an emulated Quest 3 (Meta IWER) that opened the two headset links, entered VR and MR, placed the MR demo, picked a duct, asked a live question and switched to the Gaussian scene. No Quest frame rate, passthrough, controller mapping or microphone was tested.
+
+### Start (laptop) and open (headset)
+
+```sh
+cd ~/Graduate-Project-asktwin
+scripts/ask_twin_public.sh --idle-minutes 0
+```
+
+The script prints a temporary address and a six-character code. On the headset type the short form, `<address>/vr/?code=<code>` or `<address>/mr/?code=<code>`. That page hands over to the public site with `&ask=1&server=<address>`, so the page and about 95 MB of models come from GitHub Pages and only the AI calls go to the laptop. Measured on 2026-11-13 from the Mac: models through the laptop address took about 5 minutes to load, from the public site 6 to 8 seconds. `&direct=1` keeps everything on the laptop address (for edits that are not on the site yet).
+
+The laptop must stay awake and online. The address and the code change on every start.
+
+### What changed for the test
+
+- **Captures:** the headset lists only captures with an accepted registration (May 6). Sep 17 and Oct 18 are provisional and appear only with `&captures=all`, or when named in `&capture=`. The May 6 Gaussian scene (350,000 splats on a headset) is the one behind Photo / Gaussian.
+- **Frame guard:** the page measures its own XR frame intervals. When they stay under 50 frames/s for 2.5 s it steps the quality down and says so in the headset: *reduced* (render viewport 0.8), *low* (0.65, services within 70 % of the radius), *lowest* (0.5, 50 %). It never steps up inside a session; leaving and entering again starts at full. The first 4 s of a session and single long frames (photo upload, layer decode) are ignored. Menu → More shows the measured frames/s and the level. `&guard=0` turns it off. The viewport step uses `XRView.requestViewportScale`; where the browser lacks it, only the radius step acts.
+- **Ask from the public page:** `&server=` now also accepts the temporary address (`https://<words>.trycloudflare.com`, exactly that form), next to private LAN addresses.
+
+### What to record on site
+
+| Check | Note |
+|---|---|
+| Load time from opening the link to *Services ready* | seconds, which Wi-Fi |
+| Enter VR, sweep the flashlight for 30 s, then Menu → More | frames/s and quality level shown; whether a *Slow frames* message appeared |
+| Photo / Gaussian | load time, frames/s, any stall when turning |
+| Point at a duct, hold the trigger, ask by voice | recognised text, seconds to the answer, whether the lit run is visible |
+| MR: Demo here, walk 3 m, look up | frames/s, whether services stay put |
+| Anything that looks wrong | a photo through the lens or a screen recording |
+
+Budget on a headset is unmeasured. For reference, the default VR view draws about 1.0 million triangles per frame for both eyes in 112 to 168 draw calls; MR Room range draws about 0.35 million.

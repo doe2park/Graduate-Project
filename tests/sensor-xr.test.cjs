@@ -28,6 +28,22 @@ test('/mr defaults: demo + sensors unless the query says otherwise; extra params
   const html = read('mr/index.html');
   assert.ok(html.includes('place=demo') && html.includes('sensors=demo') && html.includes('Tap here if it does not open'), 'fallback link kept, defaults named');
 });
+test('/vr and /mr opened through the temporary public address hand over to the public site and keep the AI on the laptop', () => {
+  const vm = require('node:vm'), XA = require('../twin/xr-ask.js');
+  const go = (file, host, search) => { const js = /<script>([\s\S]*?)<\/script>/.exec(read(file))[1]; let to = null;
+    vm.runInNewContext(js, {URLSearchParams, location: {hostname: host, origin: 'https://' + host, search, hash: '', replace: u => { to = u; }}}); return to; };
+  const T = 'calm-river-two-words.trycloudflare.com', SITE = 'https://doe2park.github.io/Graduate-Project/scan-xr.html?';
+  let u = go('vr/index.html', T, '?code=ABC234'); assert.ok(u.startsWith(SITE), u);
+  let q = new URLSearchParams(u.slice(SITE.length)); assert.deepEqual([q.get('ask'), q.get('code'), XA.serverOrigin(q.get('server'))], ['1', 'ABC234', 'https://' + T]);
+  u = go('mr/index.html', T, '?code=ABC234&scene=air'); assert.ok(u.startsWith(SITE), u); q = new URLSearchParams(u.slice(SITE.length));
+  assert.deepEqual([q.get('mode'), q.get('place'), q.get('sensors'), q.get('scene'), q.get('ask'), XA.serverOrigin(q.get('server'))], ['ar', 'demo', 'demo', 'air', '1', 'https://' + T]);
+  assert.equal(XA.parseParams(u.slice(u.indexOf('?'))).server, 'https://' + T, 'the page accepts what the redirect sends');
+  assert.equal(go('vr/index.html', T, '?direct=1&ask=1'), '../scan-xr.html?direct=1&ask=1');
+  assert.equal(go('vr/index.html', 'doe2park.github.io', '?ask=1'), '../scan-xr.html?ask=1');
+  assert.equal(go('vr/index.html', 'evil.trycloudflare.com.example', ''), '../scan-xr.html');
+  assert.equal(go('mr/index.html', 'doe2park.github.io', ''), '../scan-xr.html' + SX.mrDefaults(''));
+  assert.ok(go('mr/index.html', T, '?direct=1').startsWith('../scan-xr.html?'));
+});
 test('cluster centre and the demo reference: the floor point lands under the scene centroid', () => {
   assert.equal(SX.clusterCenter([]), null);
   const c = SX.clusterCenter([[0, 4, 0], [2, 6, 4], [NaN, 1, 1]]); assert.deepEqual(c, [1, 5, 2]);
@@ -59,7 +75,7 @@ test('card and chip never present a simulated value as real', () => {
 });
 test('page wiring: loadProgressText, versions, no real-reading claims', () => {
   const html = read('scan-xr.html');
-  assert.equal(X.API, 6); assert.ok(html.includes('twin/xr-core.js?v=6') && html.includes('XR_CORE_API=6,'));
+  assert.equal(X.API, 7); assert.ok(html.includes('twin/xr-core.js?v=7') && html.includes('XR_CORE_API=7,'));
   assert.equal(X.loadProgressText('Fire piping', 21.8e6, 2.0e6), 'Fire piping · 21.8 MB loaded', 'loaded > total is never a fraction');
   assert.equal(X.loadProgressText('Fire', 5e6, 24.2e6), 'Fire · 5.0 / 24.2 MB'); assert.equal(X.loadProgressText('Duct', 21.11e6, 21.1e6), 'Duct · 21.1 / 21.1 MB');
   assert.equal(X.loadProgressText('Duct', 30e6, 21.1e6), 'Duct · 30.0 MB loaded'); assert.equal(X.loadProgressText('X', 3e6), 'X · 3.0 MB loaded'); assert.equal(X.loadProgressText('X', NaN, 5), 'X · loading…');

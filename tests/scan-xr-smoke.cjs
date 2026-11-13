@@ -20,7 +20,7 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   await page.route('**/raw.githubusercontent.com/**/building_data.json',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({meters:{76:{latest:{kw:120.5,t:now}},77:{latest:{kw:40.2,t:now}},3:{latest:{kw:12,t:now}}}})}));
   const layers=process.env.XR_SMOKE_LAYERS?'&layers='+process.env.XR_SMOKE_LAYERS:'';
   await page.addInitScript(()=>{window.__status=[];addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('status');new MutationObserver(()=>window.__status.push(el.textContent)).observe(el,{childList:true,characterData:true,subtree:true});});});
-  const t0=Date.now();await page.goto(base+'/scan-xr.html?'+layers.slice(1));
+  const t0=Date.now();await page.goto(base+'/scan-xr.html?captures=all'+layers);
   await page.waitForFunction(()=>window.xrInspection?.().ready,null,{timeout:60000});
   const first=await page.evaluate(()=>xrInspection());
   assert.equal(first.capture.date,'2026-05-06');assert.equal(first.capture.provisional,false);assert.equal(first.station.id,'83697765','manifest default station');

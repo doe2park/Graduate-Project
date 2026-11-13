@@ -148,6 +148,8 @@ address with a fresh access code; pages and API share that address, so a headset
 - The 3D model files are sent from the laptop: the first load is slower than on the public site.
 - Checked from a desktop browser through the tunnel (page load and one live answer); not yet tried on a Quest.
 
+**Fast links (2026-11-13).** Loading the models through the laptop address is slow (about 5 minutes for the headset page, measured from the Mac). The script therefore prints links that load the page from the public site and send only the AI calls to the laptop: `https://doe2park.github.io/Graduate-Project/vr/?ask=1&server=<address>&code=<code>` (same for `/mr/`). On a headset, type the short form `<address>/vr/?code=<code>`; it hands over to the fast link. `&direct=1` keeps everything on the laptop address. The PC page has no `&server=` option: on the laptop itself use `http://127.0.0.1:8765/scan-compare.html?...`. `--idle-minutes 0` keeps the server up for a field session.
+
 ## How an answer is made
 
 1. The browser sends the question, the selected element id and the clicked 3D point (viewer frame).

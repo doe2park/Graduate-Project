@@ -530,3 +530,28 @@ test('outside the published zones: splats hidden (zone kept, still one viewer), 
   for (const s of OCT_ST) if (X.gaussianZoneFor(ix.zones, OCT_ST, s.position, {current: 'l1-c'}).outside) fb++;
   assert.equal(fb, 23);
 });
+
+test('frame guard: sustained slow XR frames step the quality down, hitches and the first seconds do not', () => {
+  const C = X.FRAME_GUARD, run = (g, dt, ms) => { let ch = 0; for (let t = 0; t < ms; t += dt) if (X.frameGuardStep(g, dt)) ch++; return ch; };
+  let g = X.frameGuardInit();
+  assert.equal(run(g, 13.9, 60000), 0, '72 Hz for a minute stays full'); assert.equal(g.level, 0); assert.match(X.frameGuardText(g), /^72 frames\/s · quality full$/);
+  g = X.frameGuardInit(); assert.equal(run(g, 16.7, 60000), 0, '60 Hz stays full');
+  g = X.frameGuardInit(); assert.equal(run(g, 27.8, 3000), 0, 'slow frames inside the first seconds of a session are ignored');
+  assert.equal(run(g, 27.8, 4000), 1, '36 frames/s held: one step'); assert.equal(g.level, 1); assert.equal(C.levels[1].radius, 1, 'the first step keeps the services radius');
+  assert.equal(run(g, 13.9, 30000), 0, 'recovered: stays where it is (never steps up in a session)'); assert.equal(g.level, 1);
+  assert.equal(run(g, 27.8, 60000), C.levels.length - 2, 'still slow: down to the last level and no further'); assert.equal(g.level, C.levels.length - 1);
+  g = X.frameGuardInit(); run(g, 13.9, 6000);
+  for (let i = 0; i < 40; i++) { assert.equal(X.frameGuardStep(g, 600), false); run(g, 13.9, 500); }   // layer decodes, photo uploads
+  assert.equal(g.level, 0, 'single long frames are hitches');
+  assert.equal(X.frameGuardStep(g, NaN), false); assert.equal(X.frameGuardStep(g, 0), false); assert.equal(X.frameGuardStep(null, 20), false);
+  for (let i = 1; i < C.levels.length; i++) assert.ok(C.levels[i].scale < C.levels[i - 1].scale && C.levels[i].radius <= C.levels[i - 1].radius && C.levels[i].scale >= 0.5);
+});
+
+test('headset capture list: registered captures only unless asked', () => {
+  const pub = ['2026-05-06', '2026-09-17', '2026-10-18'], P = s => new URLSearchParams(s);
+  assert.deepEqual(X.headsetCaptures(pub, P('')), ['2026-05-06']);
+  assert.deepEqual(X.headsetCaptures(pub, P('captures=all')), pub);
+  assert.deepEqual(X.headsetCaptures(pub, P('capture=2026-10-18')), ['2026-05-06', '2026-10-18']);
+  assert.deepEqual(X.headsetCaptures(['2026-09-17'], P('')), ['2026-09-17'], 'never an empty list');
+  assert.equal(X.nextCapture('2026-05-06', X.headsetCaptures(pub, P(''))), '2026-05-06');
+});

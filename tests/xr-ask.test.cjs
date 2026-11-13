@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=6"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=7"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -153,6 +153,12 @@ test('server= (Method A): https + private LAN IPv4 or localhost + explicit port,
     'https://192.168.1.2.nip.io:8765', 'https://user:pw@192.168.1.2:8765', 'https://192.168.1.2:8765/api', 'https://192.168.1.2:8765?x=1',
     'https://192.168.1.2:8765#a', 'https://[::1]:8765', 'https://0x7f.0.0.1:8765', 'https://192.168.001.2:8765', 'https://256.168.1.2:8765',
     'javascript:alert(1)', '//192.168.1.2:8765', '', ' ']) assert.equal(XA.serverOrigin(raw), null, raw);
+  // the temporary public address (scripts/ask_twin_public.sh): exactly <words>.trycloudflare.com on 443, nothing that only looks like it
+  assert.equal(XA.serverOrigin('https://tutorial-fairly-origins-brilliant.trycloudflare.com'), 'https://tutorial-fairly-origins-brilliant.trycloudflare.com');
+  assert.equal(XA.serverOrigin('https://Two-Words.trycloudflare.com/'), 'https://two-words.trycloudflare.com');
+  for (const raw of ['http://a-b.trycloudflare.com', 'https://trycloudflare.com', 'https://a.trycloudflare.com', 'https://a-b.trycloudflare.com.evil.example',
+    'https://a-b.trycloudflare.com:8443', 'https://a-b.trycloudflare.com/api', 'https://x.a-b.trycloudflare.com', 'https://a_b-c.trycloudflare.com',
+    'https://user@a-b.trycloudflare.com', 'https://a-b.cloudflare.com']) assert.equal(XA.serverOrigin(raw), null, raw);
   const p = XA.parseParams('?mode=ar&ask=1&server=https://192.168.68.52:8765');
   assert.deepEqual([p.enabled, p.server, p.serverIgnored], [true, 'https://192.168.68.52:8765', false]);
   const bad = XA.parseParams('?ask=1&server=https://evil.example:8765');

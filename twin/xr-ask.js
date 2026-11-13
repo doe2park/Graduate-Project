@@ -54,13 +54,17 @@ function privateIPv4(host) {
   if (o.some(n => n > 255) || m.slice(1).some(t => t.length > 1 && t[0] === '0')) return false;
   return o[0] === 10 || (o[0] === 172 && o[1] >= 16 && o[1] <= 31) || (o[0] === 192 && o[1] === 168) || (o[0] === 127 && o[1] === 0 && o[2] === 0 && o[3] === 1);
 }
+const TUNNEL_HOST = /^[a-z0-9]+(?:-[a-z0-9]+){1,7}\.trycloudflare\.com$/;
 function serverOrigin(raw) {
   const s = String(raw || '').trim();
   if (!/^https:\/\/[^/?#@\s]+(\/)?$/i.test(s)) return null;   // https only, no path, query, fragment or credentials
   let u; try { u = new URL(s); } catch (e) { return null; }
-  if (u.protocol !== 'https:' || u.username || u.password || !u.port) return null;   // explicit (non-443) port required
+  if (u.protocol !== 'https:' || u.username || u.password) return null;
   const host = u.hostname.toLowerCase(), typed = /^https:\/\/([^:/]+)/i.exec(s)[1].toLowerCase();
   if (typed !== host) return null;   // refuse anything the URL parser had to rewrite (0x7f.1, 192.168.001.2, ...)
+  // The temporary public address of scripts/ask_twin_public.sh (a Cloudflare quick tunnel in front of the laptop): exactly
+  // <words>.trycloudflare.com on 443. The page then comes from GitHub Pages (fast) and only the AI calls go to the laptop.
+  if (!u.port) return TUNNEL_HOST.test(host) ? 'https://' + host : null;   // every other host needs an explicit (non-443) port
   if (!(host === 'localhost' || privateIPv4(host))) return null;
   return 'https://' + host + ':' + u.port;
 }

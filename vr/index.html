@@ -1,7 +1,9 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Grimes VR overlay</title>
-<script>location.replace('../scan-xr.html'+location.search+location.hash);</script>
+<!-- Opened through the laptop's temporary public address (scripts/ask_twin_public.sh, *.trycloudflare.com): go to the public site for the
+     page and the models (fast) and keep only the AI calls on the laptop (&server=<that address>, Ask on). &direct=1 stays on the laptop. -->
+<script>(function(){var p=new URLSearchParams(location.search);if(/^[a-z0-9-]+\.trycloudflare\.com$/.test(location.hostname)&&!p.has('direct')){if(!p.has('ask'))p.set('ask','1');p.set('server',location.origin);location.replace('https://doe2park.github.io/Graduate-Project/scan-xr.html?'+p.toString()+location.hash);return;}location.replace('../scan-xr.html'+location.search+location.hash);})()</script>
 <meta http-equiv="refresh" content="0; url=../scan-xr.html">
 <style>body{margin:0;background:#0a1020;color:#e2e8f0;font:16px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh}a{color:#FDB515}</style>
 </head><body><p>Opening the Grimes VR overlay… <a href="../scan-xr.html">Continue</a></p></body></html>
