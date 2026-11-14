@@ -38,7 +38,7 @@ announce() {
    blob=$(printf '{"server":"%s","updated":"%s"}\n' "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | git hash-object -w --stdin) &&
    tree=$(printf '100644 blob %s\task-endpoint.json\n' "$blob" | git mktree) &&
    commit=$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "Ask the twin: current temporary address") &&
-   git push -q origin "$commit:refs/heads/ask-endpoint") >/dev/null 2>&1 &&
+   git push -q origin "${commit}:refs/heads/ask-endpoint") >/dev/null 2>&1 &&
    echo "[ask-twin public] Address announced: on the headset open  ${SITE#https://}/vr/  (or /mr/) and type only the code  $CODE" ||
    echo "[ask-twin public] Could not announce the address (no push access or offline): type the short address below instead."
 }
