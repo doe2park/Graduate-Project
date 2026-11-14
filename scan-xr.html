@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=7"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=7"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=7"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=8"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -1372,11 +1372,27 @@ function askHoldEnd(c){const u=c.userData;clearTimeout(u.askHoldT);const was=u.a
  if(was==='active'&&ASK.voice==='recording')askRecStop();}
 for(const c of controllers){c.addEventListener('selectstart',()=>{askSelectStart(c);askHoldStart(c);});c.addEventListener('selectend',()=>{askSelectEnd(c);askHoldEnd(c);});}
 /* 2D page box: server status, and the two things that need a 2D click before entering the headset session (mic permission, audio unlock). */
-async function askBoot(){if(!ASK.on)return;
+/* Connect with the code only: look up the laptop's current address (XA.ENDPOINT), check that it answers, then reopen this page
+   with &ask=1&server=…&code=…. Shown when Ask is off, and inside the Ask box for a new code or a restarted laptop. */
+function askConnectRow(){const d=document.createElement('div');d.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid #2a3b52';
+ d.innerHTML='<label for="askCode" style="display:block;color:#fff;font-weight:700;font-size:13px">Connect with the code on the laptop</label><div style="display:flex;gap:6px;margin-top:6px"><input id="askCode" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="CODE" style="flex:1;min-width:0;height:44px;padding:0 10px;border-radius:8px;border:1px solid #58708a;background:#0b1626;color:#fff;font:700 20px/1 ui-monospace,Menlo,monospace;letter-spacing:3px;text-transform:uppercase"><button id="askConnectBtn" class="b" style="height:44px;padding:0 14px;font-weight:700">Connect</button></div><p id="askConnectNote" role="status" style="margin:6px 0 0;color:#fcd34d"></p>';return d;}
+async function askConnect(){const note=t=>{$('askConnectNote').textContent=t;},code=XA.connectCode($('askCode').value);
+ if(!code)return note('Type the code shown on the laptop (letters and digits).');
+ $('askConnectBtn').disabled=true;note('Looking for the laptop…');
+ try{let doc=null;for(const [u,h] of [[XA.ENDPOINT.api,{Accept:'application/vnd.github.raw+json'}],[XA.ENDPOINT.raw+'?t='+Date.now(),{}]]){try{const r=await fetch(u,{headers:h,cache:'no-store'});if(r.ok){doc=await r.json();break;}}catch(e){}}
+  const e=XA.endpointFrom(doc,Date.now());if(!e.ok)return note(e.why);
+  try{const r=await fetch(e.server+'/api/health',{cache:'no-store'});if(!r.ok)throw Error('status '+r.status);}catch(err){return note('The laptop'+(e.stale?' has not announced a new address for a while and':'')+' does not answer. Start the server on the laptop again, then press Connect.');}
+  note('Connected · opening…');const u=new URLSearchParams(location.search);u.set('ask','1');u.set('server',e.server);u.set('code',code);location.search='?'+u.toString();}
+ finally{$('askConnectBtn').disabled=false;}}
+function askConnectWire(){$('askConnectBtn').onclick=askConnect;$('askCode').addEventListener('keydown',e=>{if(e.key==='Enter')askConnect();});}
+function askConnectBox(){if(!XAOK||!XA.ENDPOINT||$('askBox'))return;const box=document.createElement('section');box.id='askBox';box.setAttribute('aria-label','Ask the twin');
+ box.style.cssText='position:fixed;right:8px;top:50px;z-index:7;width:min(300px,calc(100% - 16px));padding:10px 12px;border-radius:10px;background:rgba(5,10,18,.92);border:1px solid #D97757;font:500 12px/1.4 Arial,Helvetica,sans-serif;color:#cfe3f5';
+ box.innerHTML='<b style="color:#fff">Ask the twin</b> <span style="color:#8aa2b8">· voice questions about what you point at</span>';const row=askConnectRow();row.style.borderTop='0';row.style.paddingTop='0';box.appendChild(row);document.body.appendChild(box);askConnectWire();}
+async function askBoot(){if(!ASK.on){askConnectBox();return;}
  const box=document.createElement('section');box.id='askBox';box.setAttribute('aria-label','Ask the twin');
  box.style.cssText='position:fixed;right:8px;top:50px;z-index:7;width:min(340px,calc(100% - 16px));padding:10px 12px;border-radius:10px;background:rgba(5,10,18,.92);border:1px solid #D97757;font:500 12px/1.4 Arial,Helvetica,sans-serif;color:#cfe3f5';
  box.innerHTML='<b style="color:#fff">Ask the twin</b> <span id="askMode" style="color:#fcd34d"></span><p id="askKeyNote" hidden style="margin:4px 0 0;color:#fcd34d"></p><div class="row" style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap"><button id="askMicBtn" class="b">Allow mic</button><button id="askVoiceBtn" class="b">Test voice</button><button id="askPreferBtn" class="b"></button><button id="askRetryBtn" class="b" style="display:none">Retry</button></div><p id="askTrust" hidden style="margin:6px 0 0"><a id="askTrustLink" target="_blank" rel="noopener" style="color:#ffd479;font-weight:700"></a></p><p id="askNote" style="margin:6px 0 0;color:#8aa2b8"></p><p style="margin:4px 0 0;color:#8aa2b8">In the headset: point at a duct, pipe or light and <b>hold the trigger</b> while you speak, release to ask (a short trigger press shows the 1-4 buttons). Before Enter MR/VR: Allow mic, then Test voice. Not headset-verified.</p>';
- document.body.appendChild(box);
+ box.appendChild(askConnectRow());document.body.appendChild(box);askConnectWire();
  addEventListener('pointerdown',askUnlockAudio,{capture:true});$('enterMR')?.addEventListener('click',askUnlockAudio,{capture:true});$('enterVR')?.addEventListener('click',askUnlockAudio,{capture:true});
  $('askMicBtn').onclick=()=>{askUnlockAudio();askOpenMic();};
  $('askVoiceBtn').onclick=()=>{askUnlockAudio();askSpeak('Ask the twin is ready.');};

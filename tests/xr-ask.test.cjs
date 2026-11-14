@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=7"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=8"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -329,4 +329,17 @@ test('visual cards draw without throwing for every kind, with headline, check ch
   }
   assert.ok(page.includes('if(ev.visual&&typeof ev.visual===\'object\')ASK.vis.push(ev.visual);'));
   assert.ok(page.includes('visuals:ASK.vis,selected:'));
+});
+
+test('connect with the code only: the announced address must have the temporary-address form; the code is cleaned, never looked up', () => {
+  const now = Date.parse('2026-11-13T20:00:00Z'), T = 'https://calm-river-two-words.trycloudflare.com';
+  assert.deepEqual(XA.endpointFrom({server: T, updated: '2026-11-13T19:00:00Z'}, now), {ok: true, server: T, ageH: 1, stale: false});
+  assert.equal(XA.endpointFrom({server: T + '/', updated: '2026-11-12T00:00:00Z'}, now).stale, true);
+  assert.equal(XA.endpointFrom({server: T}, now).ageH, null);
+  for (const bad of [null, {}, {server: null}, {server: 'https://evil.example'}, {server: 'https://192.168.1.2:8765'}, {server: 'https://localhost:8765'},
+    {server: 'http://calm-river.trycloudflare.com'}, {server: T + '/x'}, {server: 'https://a-b.trycloudflare.com.evil.example'}, 'text', 7])
+    assert.equal(XA.endpointFrom(bad, now).ok, false, JSON.stringify(bad));
+  assert.equal(XA.connectCode(' q47-hwc '), 'Q47HWC'); assert.equal(XA.connectCode('abc'), null); assert.equal(XA.connectCode(''), null); assert.equal(XA.connectCode(null), null);
+  assert.ok(XA.ENDPOINT.api.startsWith('https://api.github.com/repos/doe2park/Graduate-Project/') && XA.ENDPOINT.raw.includes('/ask-endpoint/ask-endpoint.json'));
+  assert.ok(!/code/i.test(JSON.stringify(XA.ENDPOINT)), 'the endpoint file never carries the access code');
 });

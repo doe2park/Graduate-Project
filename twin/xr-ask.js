@@ -68,6 +68,21 @@ function serverOrigin(raw) {
   if (!(host === 'localhost' || privateIPv4(host))) return null;
   return 'https://' + host + ':' + u.port;
 }
+/* Connect with the code only (2026-11-13): the laptop's temporary address changes on every start and is far too long to type
+   on a headset. scripts/ask_twin_public.sh writes the current address (never the access code) to one small file on the
+   'ask-endpoint' branch of the public repository; the page reads it, checks that it has exactly the temporary-address form, and
+   the visitor types only the six-character code from the laptop screen. The address alone opens nothing: questions need the code. */
+const ENDPOINT = {api: 'https://api.github.com/repos/doe2park/Graduate-Project/contents/ask-endpoint.json?ref=ask-endpoint',
+  raw: 'https://raw.githubusercontent.com/doe2park/Graduate-Project/ask-endpoint/ask-endpoint.json', staleHours: 18};
+function endpointFrom(doc, nowMs) {
+  if (!doc || typeof doc !== 'object' || typeof doc.server !== 'string') return {ok: false, why: 'No laptop has announced an address yet. Start the server on the laptop.'};
+  const server = serverOrigin(doc.server);
+  if (!server || !TUNNEL_HOST.test(server.slice(8))) return {ok: false, why: 'The announced address is not a valid temporary address. Start the server on the laptop again.'};
+  const t = Date.parse(doc.updated), ageH = Number.isFinite(t) && Number.isFinite(nowMs) ? Math.max(0, (nowMs - t) / 3600000) : null;
+  return {ok: true, server, ageH, stale: ageH != null && ageH > ENDPOINT.staleHours};
+}
+/* What the visitor typed -> the access code (letters and digits, upper case), or null. */
+function connectCode(raw) { const c = String(raw == null ? '' : raw).toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length >= 4 && c.length <= 32 ? c : null; }
 /* API URL: same origin (relative, as before) or the validated laptop origin. */
 function apiUrl(base, name) { return (base ? base + '/' : '') + 'api/' + name; }
 /* Health check failed: what the 2D box says, and (Method A) the one-tap link that makes the headset accept the laptop's
@@ -621,5 +636,5 @@ function drawBar(ctx, W, H, buttons, hover = new Set()) {
 return {API, LEVELS, COLORS, BAR, SYS, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
   barRects, barHit, barButtons, micPlan, ttsPlan, wrap, drawMark, drawPicto, drawAnswer, drawBar,
   pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
-  serverOrigin, privateIPv4, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
+  serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

@@ -28,8 +28,23 @@ done
 [ -n "$URL" ] || { echo "no tunnel address after 30 s; see $LOG" >&2; exit 1; }
 
 CODE=$(LC_ALL=C tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' </dev/urandom | head -c 6)
+# Announce the address (never the code) on the 'ask-endpoint' branch of the public repository, so a headset connects by typing
+# only the code (twin/xr-ask.js ENDPOINT). One small file, written with git plumbing: the working tree and the current branch are
+# not touched. ASK_PUBLISH=0 skips it; a failure only means the long address has to be typed.
+announce() {
+  [ "${ASK_PUBLISH:-1}" = 1 ] || return 0
+  (cd "$ROOT" && git fetch -q origin ask-endpoint 2>/dev/null; parent=$(git rev-parse -q --verify FETCH_HEAD 2>/dev/null || true)
+   git ls-remote --exit-code --heads origin ask-endpoint >/dev/null 2>&1 || parent=
+   blob=$(printf '{"server":"%s","updated":"%s"}\n' "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | git hash-object -w --stdin) &&
+   tree=$(printf '100644 blob %s\task-endpoint.json\n' "$blob" | git mktree) &&
+   commit=$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "Ask the twin: current temporary address") &&
+   git push -q origin "$commit:refs/heads/ask-endpoint") >/dev/null 2>&1 &&
+   echo "[ask-twin public] Address announced: on the headset open  ${SITE#https://}/vr/  (or /mr/) and type only the code  $CODE" ||
+   echo "[ask-twin public] Could not announce the address (no push access or offline): type the short address below instead."
+}
 SITE=${SITE:-https://doe2park.github.io/Graduate-Project}
 echo "[ask-twin public] address: $URL   (new on every start; it can take a minute before it opens)"
+announce "$URL"
 echo "[ask-twin public] Headset, fast: the page and the models come from the public site, only the AI calls come here."
 echo "[ask-twin public] VR:  $SITE/vr/?ask=1&server=$URL&code=$CODE"
 echo "[ask-twin public] MR:  $SITE/mr/?ask=1&server=$URL&code=$CODE"
