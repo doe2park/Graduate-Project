@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=9"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=10"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -157,14 +157,16 @@ function fakeCtx() {
     get: (o, k) => k in o ? o[k] : (k === 'roundRect' ? () => {} : typeof k === 'string' && /^[a-z]/.test(k) && !['font', 'fillStyle', 'strokeStyle', 'lineWidth', 'textAlign', 'lineCap', 'lineJoin'].includes(k) ? () => {} : o[k]),
     set: (o, k, v) => { o[k] = v; return true; }});
 }
-test('canvas drawing: answer card (thinking / answer / error) and bar draw without throwing; small AI mark (no chat header) + cited ids + footer', () => {
+test('canvas drawing: answer card (thinking / answer / error) and bar draw without throwing; Claude-style header + cited ids + footer', () => {
   const m = XA.cardModel({question: 'Which VAV box feeds this?', answer: ANSWER, final: FINAL, level: 3});
-  for (const view of [{phase: 'thinking', model: {question: 'q', level: 3}, steps: ['connected_run · 250 touching elements']}, {phase: 'answer', model: m, speech: 'speaking', runNote: 'Lit run: 11 pieces'}, {phase: 'error', model: {}, error: 'server 404'}]) {
-    const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, view);
-    assert.ok(ctx.calls.includes('AI answer'), view.phase); assert.ok(!ctx.calls.includes('Claude'), view.phase);
+  const steps = XA.stepsFrom([{type: 'tool', name: 'connected_run', input: {}}], {layer: 'duct'});
+  for (const view of [{phase: 'thinking', model: {question: 'q', level: 3}, wait: {steps}}, {phase: 'answer', model: m, speech: 'speaking', runNote: 'Lit run: 11 pieces'}, {phase: 'error', model: {}, error: 'server 404'}]) {
+    const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, view), live = fakeCtx(); XA.drawAnswer(live, 1024, 800, {...view, modeLabel: 'LIVE'});
+    assert.ok(live.calls.includes('Claude') && live.calls.includes('LIVE'), view.phase); assert.ok(!ctx.calls.includes('AI answer'), view.phase);
+    assert.ok(!ctx.calls.includes('Claude') || m.mode === 'live', 'Claude is named only on live answers');
     if (view.phase === 'answer') { assert.ok(ctx.calls.some(t => t.startsWith('#400766'))); assert.ok(ctx.calls.includes('B/Y closes')); assert.ok(!ctx.calls.includes('READ ALOUD'));
       const foot = ctx.calls.filter(t => /SIMULATED/.test(t)); assert.equal(foot.length, 1, 'one honesty line'); assert.match(foot[0], /^MOCK · scripted · 1 lookups · 3\/4 cited IDs verified · Design BIM/); }   // no picture card: the counts stay in the footer
-    if (view.phase === 'thinking') assert.ok(ctx.calls.some(t => /connected_run/.test(t)));
+    if (view.phase === 'thinking') { assert.ok(ctx.calls.includes('Following the duct…')); assert.ok(!ctx.calls.some(t => /connected_run/.test(t)), 'no tool names on the card'); }
     if (view.phase === 'error') assert.ok(ctx.calls.includes('Could not answer'));
   }
   const ctx = fakeCtx(); XA.drawBar(ctx, 1024, 300, XA.barButtons({}), new Set([1]));
@@ -218,8 +220,85 @@ test('waiting feedback: progress lines from server events, earcons, hold-to-ask 
   assert.equal(XA.holdAskAllowed(base), true);
   for (const k of [{hoverPanel: 'ask'}, {aiming: true}, {grip: true}, {placing: true}, {placed: false}, {busy: true}, {on: false}])
     assert.equal(XA.holdAskAllowed({...base, ...k}), false, JSON.stringify(k));
-  const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, {phase: 'thinking', model: {question: 'q'}, progress: 'Following the ducts…', steps: []});
-  assert.ok(ctx.calls.includes('Following the ducts…'));
+  const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, {phase: 'thinking', model: {question: 'q'}, wait: {steps: [], heard: true}});
+  assert.ok(ctx.calls.includes('Listening done · thinking') && ctx.calls.includes('HEARD') && ctx.calls.includes('“q”'));
+});
+
+test('waiting steps: one line per tool from the stream events, pictogram per tool, tick on finished steps, no emoji', () => {
+  assert.deepEqual(['room_of', 'elements_near', 'connected_run', 'get_element', 'find_elements', 'sensor_readings', 'anything_new'].map(XA.stepIcon),
+    ['room', 'height', 'route', 'lookup', 'lookup', 'sensor', 'twin']);
+  const el = {layer: 'duct'};
+  assert.equal(XA.stepPhrase({type: 'tool', name: 'room_of', input: {}}), 'Finding the room…');
+  assert.equal(XA.stepPhrase({type: 'tool', name: 'elements_near', input: {above_only: true}}), 'Checking above…');
+  assert.equal(XA.stepPhrase({type: 'tool', name: 'elements_near', input: {layers: ['duct']}}), 'Checking the ducts nearby…');
+  assert.equal(XA.stepPhrase({type: 'tool', name: 'connected_run', input: {}}, el), 'Following the duct…');
+  assert.equal(XA.stepPhrase({type: 'tool', name: 'connected_run', input: {}}, {layer: 'fire'}), 'Following the sprinkler pipe…');
+  assert.equal(XA.stepPhrase({type: 'tool', name: 'get_element', input: {}}), 'Looking it up…');
+  assert.equal(XA.stepPhrase({type: 'status', phase: 'thinking', text: 'Thinking…'}), null);
+  // the mock feed route (diffuser): elements_near(duct) -> connected_run -> answer text -> final
+  const evs = [{type: 'status', phase: 'thinking'}, {type: 'tool', name: 'elements_near', input: {layers: ['duct']}}, {type: 'tool', name: 'connected_run', input: {}},
+    {type: 'text', text: 'The '}, {type: 'text', text: 'air'}];
+  let s = [], changes = 0;
+  for (const ev of evs) { const r = XA.stepsAdd(s, ev, el); if (r.changed) changes++; else assert.equal(r.steps, s, 'unchanged -> same array (no redraw)'); s = r.steps; }
+  assert.equal(changes, 3, 'two tools + the first text chunk; the rest of the stream redraws nothing');
+  assert.deepEqual(s.map(x => [x.icon, x.state]), [['height', 'done'], ['route', 'done'], ['write', 'current']]);
+  s = XA.stepsAdd(s, {type: 'final'}).steps; assert.ok(s.every(x => x.state === 'done'));
+  assert.equal(XA.stepsAdd(s, {type: 'final'}).changed, false);
+  // parallel calls of one tool share a line; text before a tool call (a preamble) does not stay as "Writing the answer"
+  const par = XA.stepsFrom([{type: 'tool', name: 'get_element', input: {}}, {type: 'tool', name: 'get_element', input: {}}]);
+  assert.deepEqual(par.map(x => [x.text, x.n, x.state]), [['Looking it up…', 2, 'current']]);
+  const pre = XA.stepsFrom([{type: 'text', text: 'Let me check.'}, {type: 'tool', name: 'room_of', input: {}}]);
+  assert.deepEqual(pre.map(x => x.key), ['room_of']);
+  assert.deepEqual(['LIVE', 'MOCK', ''].map(XA.headerWord), ['Claude', 'Scripted answer', 'Answer']);
+  assert.equal(XA.waitLabel({heard: true}), 'Listening done · thinking'); assert.equal(XA.waitLabel({}), 'Thinking');
+  // drawing: the current step leaves a slot for the animated dots (indicator), finished steps get the drawn tick, phrases lose "…"
+  const ctx = fakeCtx(), lay = XA.drawAnswer(ctx, 1024, 800, {phase: 'thinking', model: {question: 'Where does the air from this vent come from?'}, wait: {steps: XA.stepsFrom(evs.slice(0, 3), el), heard: true}, markLayer: true});
+  assert.ok(lay.indicator && lay.indicator.x > 0 && lay.indicator.y > 200, 'indicator slot on the current line');
+  assert.ok(ctx.calls.includes('Checking the ducts nearby') && ctx.calls.includes('Following the duct…') && ctx.calls.includes('LISTENING DONE · THINKING'));
+  assert.deepEqual(lay.mark, XA.MARK); assert.equal(lay.picture, null);
+  const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+  for (const t of ctx.calls) assert.ok(!emoji.test(t), 'no emoji: ' + t);
+  for (const k of ['tick', 'room', 'height', 'route', 'lookup', 'twin', 'write']) { const c = fakeCtx(); XA.drawPicto(c, k, 50, 50, 40); }
+});
+
+test('waiting animation timing: mark spins + breathes, settles on the answer, dots wave, reveal eases in with the picture last', () => {
+  const a = XA.markPose(0), b = XA.markPose(XA.WAIT.spinMs / 4);
+  assert.equal(a.rot, 0); assert.ok(Math.abs(b.rot - Math.PI / 2) < 1e-9); assert.ok(a.moving && b.moving);
+  for (let t = 0; t < 4000; t += 97) { const p = XA.markPose(t); assert.ok(p.scale >= .93 && p.scale <= 1.07 && p.opacity >= .82 && p.opacity <= 1); }
+  const settleAt = 3000, mid = XA.markPose(settleAt + XA.WAIT.settleMs / 2, {settleAt}), end = XA.markPose(settleAt + XA.WAIT.settleMs + 1, {settleAt});
+  const step = 2 * Math.PI / 12, start = XA.markPose(settleAt).rot;
+  assert.ok(mid.moving && mid.rot >= start); assert.equal(end.moving, false); assert.equal(end.scale, 1); assert.equal(end.opacity, 1);
+  assert.ok(Math.abs(end.rot / step - Math.round(end.rot / step)) < 1e-9, 'stops on a ray step'); assert.ok(end.rot - start < step + 1e-9, 'never more than one ray step');
+  assert.deepEqual(XA.markPose(5000, {settleAt: 4000}), XA.markPose(9000, {settleAt: 4000}), 'settled = still');
+  assert.deepEqual(XA.markPose(1234, {reduced: true}), {rot: 0, scale: 1, opacity: 1, moving: false});
+  const w = XA.dotWave(200); assert.equal(w.length, 3); assert.ok(w.every(d => d.a >= .3 && d.a <= 1 && d.dy <= 0));
+  assert.notDeepEqual(w.map(d => d.a), XA.dotWave(500).map(d => d.a), 'the wave moves');
+  assert.deepEqual(XA.dotWave(200, {reduced: true}).map(d => d.dy), [0, 0, 0]);
+  const r0 = XA.revealPose(0), rM = XA.revealPose(XA.WAIT.revealMs), rP = XA.revealPose(XA.WAIT.pictureDelayMs - 1), rE = XA.revealPose(XA.WAIT.pictureDelayMs + XA.WAIT.pictureMs);
+  assert.deepEqual([r0.opacity, r0.scale, r0.cover], [0, .94, 1]); assert.ok(Math.abs(rM.opacity - 1) < 1e-9 && Math.abs(rM.scale - 1) < 1e-9);
+  assert.equal(rP.cover, 1, 'picture still covered while the card eases in'); assert.equal(rE.cover, 0); assert.equal(rE.done, true);
+  assert.ok(XA.WAIT.revealMs <= 250 && XA.WAIT.pictureDelayMs + XA.WAIT.pictureMs <= 450, 'short');
+  assert.deepEqual(XA.revealPose(0, {reduced: true}), {scale: 1, opacity: 1, cover: 0, done: true});
+  const x0 = XA.revealPose(0, {from: .55}), q0 = XA.revealPose(0, {picture: false});
+  assert.equal(x0.opacity, .55, 'waiting card -> answer: a soft cross-fade, not a blink'); assert.ok(x0.scale > .97 && x0.scale < 1);
+  assert.equal(q0.cover, 0); assert.equal(XA.revealPose(XA.WAIT.revealMs, {picture: false}).done, true);
+  const ps = Array.from({length: 30}, (_, i) => XA.waitPulse(i * 50));
+  assert.ok(Math.min(...ps.map(p => p.opacity)) < .3 && Math.max(...ps.map(p => p.opacity)) > .55, 'element brightness pulses');
+  assert.deepEqual(XA.waitPulse(10, {reduced: true}), XA.waitPulse(700, {reduced: true}));
+  // the mark: 12 round rays in Claude terracotta, drawn in code
+  assert.equal(XA.starburstRays().length, 12); assert.equal(XA.CLAUDE_COLOR, '#D97757');
+  const ctx = fakeCtx(); XA.drawStarburst(ctx, 48, 48, 44); XA.drawStarburst(ctx, 48, 48, 44, '#fff', 1);
+});
+
+test('page: the waiting overlays animate per frame without redrawing the big card canvas', () => {
+  const tick = page.slice(page.indexOf('function askTick(){'), page.indexOf('async function askQuestion('));
+  assert.ok(tick.includes('XA.markPose(') && tick.includes('XA.dotWave(') && tick.includes('XA.revealPose(') && tick.includes('XA.waitPulse('));
+  assert.equal((tick.match(/askDraw\(\)/g) || []).length, 1, 'only the throttled redraw');
+  assert.ok(tick.includes('if(ASK.dirty&&now-ASK.lastDraw>160)askDraw();'));
+  assert.ok(!/drawStarburst|drawAnswer|needsUpdate/.test(tick), 'no canvas work or texture upload per frame');
+  assert.ok(page.includes("askMark=makeSurface(ASK_MARK_PX,ASK_MARK_PX,"), 'the mark has its own small surface (panel scale + &panelres)');
+  assert.ok(page.includes('markLayer:true') && page.includes('XA.stepsAdd(ASK.wsteps,ev,ASK.el)') && page.includes('askQuestion(null,j.text,{heard:true})'));
+  assert.ok(page.includes('askWaitGlowOff();ASK.wsteps=XA.stepsAdd(ASK.wsteps,{type:\'final\'}).steps'));
 });
 
 test('access code (API 3): code= from the URL, X-Ask-Code on ask/transcribe/speak, friendly 401/429', () => {

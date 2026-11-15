@@ -472,7 +472,11 @@ class Handler(SimpleHTTPRequestHandler):
         twin = self.app.twin
         type_of = lambda cid: twin.summary(cid) if cid in twin.box else None   # noqa: E731
         try:
-            for ev in with_speech(self.app.agent.ask(q, eid, pt, hist), type_of, eid):
+            events = self.app.agent.ask(q, eid, pt, hist)
+            if self.app.mode == 'mock' and getattr(self.app, 'mock_pace', 0):
+                from ask_twin.agent import paced
+                events = paced(events, self.app.mock_pace)   # debug: show the waiting state of scripted answers (recordings)
+            for ev in with_speech(events, type_of, eid):
                 self.wfile.write(f'data: {json.dumps(ev)}\n\n'.encode())
                 self.wfile.flush()
                 if ev['type'] == 'final':
@@ -603,12 +607,14 @@ def build_app(args, log=print):
             ap.error('--public-origin needs an access code (remove --no-code)')
     app = App(agent, mode, model, twin, stt, args.port, args.verbose, args.lan, tts=TTS(not args.no_tts, voice=args.voice), limits=limits, public_origin=args.public_origin)
     app.note = note
+    app.mock_pace = args.mock_pace if mode == 'mock' else 0
     return app
 
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description='Ask-the-twin local demo server')
     ap.add_argument('--mock', action='store_true', help='no API key: scripted answers from the same read-only tools')
+    ap.add_argument('--mock-pace', type=float, default=0, metavar='SECONDS', help='debug, --mock only: wait this long before each tool step and the answer text (e.g. 1.2), so the waiting state shows as in a live answer')
     ap.add_argument('--auto', action='store_true', help='live Claude if a key is found, else scripted answers (the page says so)')
     ap.add_argument('--model', default=None, help='Claude model id (default claude-sonnet-5-5; e.g. claude-opus-5-5)')
     ap.add_argument('--effort', default='medium', choices=['low', 'medium', 'high', 'xhigh', 'max'])
@@ -635,6 +641,10 @@ def parse_args(argv=None):
     args = ap.parse_args(argv)
     if args.code is not None and not re.fullmatch(r'[A-Za-z0-9]{4,32}', args.code):
         ap.error('--code must be 4-32 letters or digits')
+    if args.mock_pace and not args.mock:
+        ap.error('--mock-pace is for --mock only (live answers are never delayed)')
+    if not 0 <= args.mock_pace <= 5:
+        ap.error('--mock-pace must be between 0 and 5 seconds')
     if args.no_code and args.code:
         ap.error('use either --code or --no-code')
     if args.no_code and args.lan:

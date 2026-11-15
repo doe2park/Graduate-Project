@@ -5,6 +5,8 @@
      - the answer stream parser (Server-Sent Events from /api/ask),
      - the in-view answer card (headline + a picture built from the tool results + caption, check chip, cited ids, provenance),
      - the spoken text, the run lighting timing for connected_run, the voice/TTS plans,
+     - the waiting state (2026-11-15): step lines from the stream events (stepsAdd), the Claude-style starburst, and the pure
+       timing of what the page animates on small overlay meshes (markPose, dotWave, revealPose, waitPulse),
      - the decluttered in-view controls (2026-11-15): one compact element label with a hold-to-ask hint and a small "⋯", the
        presets panel behind that "⋯", and their hit tests.
    Unit-tested in tests/xr-ask.test.cjs. The page is unchanged unless it is opened with ?ask=1. NOT verified on a headset. */
@@ -208,6 +210,104 @@ function progressText(ev, el = null) {
     default: return 'Checking the twin…';
   }
 }
+/* ---------------------------------------------------------------- waiting state (2026-11-15)
+   While the answer is on its way the card shows real progress, driven only by the server's stream events:
+     before the first tool event -> "Listening done · thinking" (voice) / "Thinking" (preset), the animated mark only
+     each 'tool' event            -> one step line: a line pictogram for the tool + a short phrase ("Following the duct…");
+                                     the previous step gets a drawn tick, the newest one an animated three-dot wave
+     the first 'text' event       -> "Writing the answer…"
+     'final'                      -> every step done (the card then switches to the answer)
+   Parallel calls of the same tool with the same phrase share one line (n counts them). No emoji anywhere. */
+const STEP_ICON = {room_of: 'room', elements_near: 'height', connected_run: 'route', get_element: 'lookup', find_elements: 'lookup',
+  list_sensors: 'sensor', sensor_readings: 'sensor'};
+function stepIcon(name) { return STEP_ICON[name] || 'twin'; }
+const RUN_WORD = {duct: 'duct', fire: 'sprinkler pipe', plumbing: 'pipe', hydronic: 'pipe', conduit: 'conduit'};
+function stepPhrase(ev, el = null) {
+  if (!ev) return null;
+  if (ev.type === 'text') return 'Writing the answer…';
+  if (ev.type !== 'tool') return null;
+  const inp = ev.input || {}, layers = inp.layers || [];
+  switch (ev.name) {
+    case 'room_of': return 'Finding the room…';
+    case 'elements_near': return inp.above_only ? 'Checking above…' : layers.length === 1 && LAYER_WORDS[layers[0]] ? 'Checking the ' + LAYER_WORDS[layers[0]] + ' nearby…' : 'Checking around it…';
+    case 'connected_run': return 'Following the ' + (RUN_WORD[(el && el.layer) || ''] || 'run') + '…';
+    case 'get_element': return 'Looking it up…';
+    case 'find_elements': return 'Searching the model…';
+    case 'list_sensors': return 'Finding the demo sensors…';
+    case 'sensor_readings': return 'Reading the demo sensors (simulated)…';
+    default: return 'Checking the twin…';
+  }
+}
+/* steps + one stream event -> {steps, changed}. steps: [{key, icon, text, state: 'done'|'current', n}] (a new array when changed). */
+function stepsAdd(steps, ev, el = null) {
+  const list = Array.isArray(steps) ? steps : [];
+  if (!ev) return {steps: list, changed: false};
+  if (ev.type === 'final') {
+    if (!list.some(s => s.state !== 'done')) return {steps: list, changed: false};
+    return {steps: list.map(s => Object.assign({}, s, {state: 'done'})), changed: true};
+  }
+  const text = stepPhrase(ev, el);
+  if (!text) return {steps: list, changed: false};
+  const key = ev.type === 'text' ? 'write' : String(ev.name || 'tool');
+  // text streamed before a tool call was a preamble ("Let me check…"), not the answer: that "Writing" line goes away again
+  const base = key !== 'write' && list.length && list[list.length - 1].key === 'write' ? list.slice(0, -1) : list, last = base[base.length - 1];
+  if (last && last.key === key && last.text === text) {
+    if (key === 'write') return {steps: list, changed: false};   // one line for the whole streamed answer
+    return {steps: base.slice(0, -1).concat(Object.assign({}, last, {n: (last.n || 1) + 1, state: 'current'})), changed: true};
+  }
+  const done = base.map(s => s.state === 'done' ? s : Object.assign({}, s, {state: 'done'}));
+  return {steps: done.concat({key, icon: key === 'write' ? 'write' : stepIcon(ev.name), text, state: 'current', n: 1}), changed: true};
+}
+function stepsFrom(events, el = null) { let s = []; for (const ev of events || []) s = stepsAdd(s, ev, el).steps; return s; }
+/* the line above the steps: before any tool event this is the whole status */
+function waitLabel({heard = false} = {}) { return heard ? 'Listening done · thinking' : 'Thinking'; }
+/* done steps read as finished: no trailing ellipsis */
+const doneText = t => String(t || '').replace(/…$/, '');
+
+/* Animation timing (pure, ms). Everything that moves per frame is a small separate mesh over the card (mark, three dots, the
+   picture cover) or a uniform (element pulse), so the big card canvas is redrawn only on step changes and on the answer. */
+const WAIT = {spinMs: 6400, breatheMs: 1800, settleMs: 420, dotMs: 1050, revealMs: 200, pictureDelayMs: 120, pictureMs: 240, pulseMs: 1500};
+const clamp01 = x => Math.max(0, Math.min(1, x)), easeOut = x => 1 - Math.pow(1 - clamp01(x), 3);
+const RAYS = 12;
+/* the mark's rays: n round-capped strokes, evenly spaced, lengths varied in a fixed pattern (drawn in code, not a logo file) */
+function starburstRays(n = RAYS) {
+  const L = [1, .74, .9, .68, .97, .78, .86, .7, .95, .76, .88, .72];
+  return Array.from({length: n}, (_, i) => ({a: -Math.PI / 2 + i * 2 * Math.PI / n + (i % 2 ? .05 : -.03), len: L[i % L.length], w: i % 3 === 0 ? .2 : .17}));
+}
+/* mark pose at time t (ms since waiting began). settleAt: t when the answer arrived (null = still waiting). While waiting: slow
+   rotation + gentle breathing (scale, opacity). After the answer it eases to the next ray-step angle within settleMs and stops. */
+function markPose(t, {settleAt = null, reduced = false, rays = RAYS} = {}) {
+  if (reduced) return {rot: 0, scale: 1, opacity: 1, moving: false};
+  const spin = tt => 2 * Math.PI * tt / WAIT.spinMs, breathe = tt => Math.sin(2 * Math.PI * tt / WAIT.breatheMs);
+  const wait = tt => ({rot: spin(tt), scale: 1 + .07 * breathe(tt), opacity: .82 + .18 * (.5 + .5 * breathe(tt))});
+  if (settleAt == null || t < settleAt) return Object.assign(wait(Math.max(0, t)), {moving: true});
+  const from = wait(settleAt), stepA = 2 * Math.PI / rays, to = Math.ceil(from.rot / stepA + 1e-6) * stepA, k = easeOut((t - settleAt) / WAIT.settleMs);
+  const moving = t - settleAt < WAIT.settleMs;
+  return {rot: from.rot + (to - from.rot) * k, scale: from.scale + (1 - from.scale) * k, opacity: from.opacity + (1 - from.opacity) * k, moving};
+}
+/* three-dot wave of the current step: [{a, dy}] (opacity 0.3-1, lift in layout px) */
+function dotWave(t, {reduced = false} = {}) {
+  return [0, 1, 2].map(i => {
+    if (reduced) return {a: .8, dy: 0};
+    const p = Math.max(0, Math.sin(2 * Math.PI * (t / WAIT.dotMs) - i * .9)), e = p * p;
+    return {a: .3 + .7 * e, dy: -5 * e};
+  });
+}
+/* card reveal at t ms: it eases in (scale 0.94 -> 1, opacity from -> 1, revealMs). from = 0 when the card first appears (the
+   question is sent); from = 0.55 when the waiting card turns into the answer (a soft cross-fade, not a blink). picture: the picture
+   block fills in last (cover 1 -> 0 after pictureDelayMs). */
+function revealPose(t, {reduced = false, from = 0, picture = true} = {}) {
+  if (reduced) return {scale: 1, opacity: 1, cover: 0, done: true};
+  const f = clamp01(from), e = easeOut(t / WAIT.revealMs), c = picture ? 1 - easeOut((t - WAIT.pictureDelayMs) / WAIT.pictureMs) : 0;
+  return {scale: 1 - .06 * (1 - f) * (1 - e), opacity: f + (1 - f) * e, cover: c, done: t >= (picture ? WAIT.pictureDelayMs + WAIT.pictureMs : WAIT.revealMs)};
+}
+/* the asked element while waiting: a soft brightness pulse (glow copy's opacity and boost uniform), no rings */
+function waitPulse(t, {reduced = false} = {}) {
+  if (reduced) return {opacity: .45, boost: .2};
+  const p = .5 - .5 * Math.cos(2 * Math.PI * t / WAIT.pulseMs);
+  return {opacity: .22 + .38 * p, boost: .55 * p};
+}
+
 /* Earcons (Web Audio tones): [frequency Hz, start s, duration s, gain]. listen = recording started, send = question sent,
    done = answer ready, miss = nothing heard / error. Short and quiet so they do not cover speech. */
 const EARCONS = {
@@ -345,7 +445,8 @@ const hex = c => '#' + c.toString(16).padStart(6, '0');
      nearby   (elements_near)          -> "what's above" height graph with pictogram markers + counts by system
      trace    (connected_run)          -> mini path diagram: this element -> n pieces along the run -> source
    The full sentence answer stays as a 1-2 line caption; a "check on site" chip and the evidence ids sit at the bottom.
-   A small neutral spark mark + "AI answer" replaces the chat-style header (no logo, no bubble). */
+   Header (2026-11-15): a Claude-style starburst drawn in code (no logo file) + "Claude · LIVE/MOCK"; MOCK answers are scripted,
+   which the mode pill and the footer say. */
 const SYS = {duct: '#7dd3fc', fire: '#f87171', hydronic: '#fb923c', plumbing: '#60a5fa', structural: '#cbd5e1', lighting: '#fde68a',
   equipment: '#86efac', conduit: '#c4b5fd', lifesafety: '#fca5a5', fixtures: '#e2e8f0', ceiling: '#94a3b8'};
 const SYS_WORD = {duct: 'ducts', fire: 'sprinkler pipes', hydronic: 'heating/cooling pipes', plumbing: 'plumbing', structural: 'structure',
@@ -463,7 +564,17 @@ function answerVisual({visuals = [], citations = [], primary = null, selected = 
   return out;
 }
 
-/* small neutral mark (four-point spark) drawn here, no logo file */
+/* Claude-style starburst: radiating round-capped rays in Claude terracotta, drawn in code (no logo file). rot in radians. */
+const CLAUDE_COLOR = '#D97757';
+function drawStarburst(ctx, cx, cy, r, color = CLAUDE_COLOR, rot = 0) {
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.strokeStyle = color; ctx.lineCap = 'round';
+  for (const ray of starburstRays()) {
+    ctx.lineWidth = r * ray.w; ctx.beginPath(); ctx.moveTo(Math.cos(ray.a) * r * .12, Math.sin(ray.a) * r * .12);
+    ctx.lineTo(Math.cos(ray.a) * r * (ray.len - ray.w / 2), Math.sin(ray.a) * r * (ray.len - ray.w / 2)); ctx.stroke();
+  }
+  ctx.restore();
+}
+/* small neutral mark (four-point spark) drawn here, no logo file (kept for other panels) */
 function drawMark(ctx, cx, cy, r, color = '#e2e8f0') {
   ctx.save(); ctx.fillStyle = color; ctx.translate(cx, cy); ctx.beginPath();
   for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); ctx.quadraticCurveTo(0, 0, Math.cos(a + Math.PI / 4) * r * .22, Math.sin(a + Math.PI / 4) * r * .22); }
@@ -490,6 +601,15 @@ function drawPicto(ctx, key, cx, cy, s, color = '#e2e8f0') {
     case 'sensor': C(0, .1, .22, true); ctx.beginPath(); ctx.arc(cx, cy + .1 * h, .5 * h, -2.4, -.75); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy + .1 * h, .8 * h, -2.4, -.75); ctx.stroke(); break;
     case 'equipment': R(-.75, -.6, 1.5, 1.2); C(0, 0, .3); L(-.75, -.3, -.95, -.3); L(.75, .3, .95, .3); break;
     case 'check': C(0, 0, .8); L(-.35, 0, -.08, .3); L(-.08, .3, .4, -.3); break;
+    // waiting steps (same stroke weight): a drawn tick, floor plan, vertical ruler, route, magnifier, generic twin, writing
+    case 'tick': L(-.55, .02, -.15, .42); L(-.15, .42, .6, -.4); break;
+    case 'room': R(-.8, -.7, 1.6, 1.4); L(-.1, -.7, -.1, -.05); L(-.1, .3, -.1, .7); L(-.1, -.05, .25, -.05); L(.5, -.05, .8, -.05); break;
+    case 'height': L(-.3, -.8, -.3, .8); for (const [y, w] of [[-.8, .5], [-.4, .3], [0, .5], [.4, .3], [.8, .5]]) L(-.3, y, -.3 + w, y); L(.45, -.65, .45, .65); L(.3, -.45, .45, -.65); L(.6, -.45, .45, -.65); L(.3, .45, .45, .65); L(.6, .45, .45, .65); break;
+    case 'route': ctx.beginPath(); ctx.moveTo(cx - .65 * h, cy + .55 * h); ctx.lineTo(cx - .1 * h, cy + .55 * h); ctx.lineTo(cx - .1 * h, cy - .5 * h); ctx.lineTo(cx + .6 * h, cy - .5 * h); ctx.stroke();
+      C(-.65, .55, .16, true); C(-.1, .02, .12, true); C(.6, -.5, .16); break;
+    case 'lookup': C(-.15, -.15, .5); L(.22, .22, .72, .72); L(-.38, -.15, .08, -.15); break;
+    case 'twin': R(-.7, -.25, 1.05, .95); L(-.7, -.25, -.35, -.65); L(.35, -.25, .7, -.65); L(-.35, -.65, .7, -.65); L(.7, -.65, .7, .3); L(.35, .7, .7, .3); break;
+    case 'write': for (const [y, w] of [[-.55, 1.5], [-.15, 1.5], [.25, 1.0]]) L(-.75, y, -.75 + w, y); L(.35, .65, .8, .2); L(.25, .75, .35, .65); break;
     default: R(-.6, -.45, 1, .9); L(-.6, -.45, -.25, -.75); L(.4, -.45, .75, -.75); L(-.25, -.75, .75, -.75); L(.75, -.75, .75, .15); L(.4, .45, .75, .15);
   }
   ctx.restore();
@@ -581,32 +701,60 @@ function drawItems(ctx, v, x, y, w, h) {
     ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; fit(ctx, it.label, tx + tw / 2, y + h - 52, tw - 20, 26, '600'); ctx.fillStyle = '#8aa2b8'; fit(ctx, '#' + it.id, tx + tw / 2, y + h - 18, tw - 20, 20, ''); ctx.textAlign = 'left'; });
   return true;
 }
-/* The answer card. view: {phase: 'thinking'|'answer'|'error', model (cardModel; model.visual from answerVisual), steps: [text],
-   error, speech: 'speaking'|'done'|'text only'|..., progress, modeLabel, footer} */
+/* The answer card. view: {phase: 'thinking'|'answer'|'error', model (cardModel; model.visual from answerVisual),
+   wait: {steps (stepsAdd), heard}, error, speech: 'speaking'|'done'|'text only'|..., modeLabel, footer,
+   markLayer: true = the page draws the animated mark on its own small mesh (the spot stays empty here)}.
+   Returns the layout the page needs for its overlay meshes (layout units): {mark: {x, y, r}, indicator: {x, y} | null,
+   picture: {x, y, w, h} | null, h}. h: the height actually used. The waiting card is compact (h < H: the page shows only the top
+   h of the canvas, so a two-step wait is not a mostly empty panel); the answer and error cards use the full H. */
+function waitHeight(ctx, W, H, question, nSteps) {
+  ctx.font = 'italic 27px Arial';
+  const q = question ? 50 + wrap(ctx, '“' + question + '”', W - 80, 2).length * 35 + 58 : 0;
+  return Math.min(H, Math.max(360, Math.round(92 + q + (nSteps ? 44 + nSteps * 70 : 70) + 70)));
+}
+const CARD_BG = 'rgba(10,16,24,.97)', MARK = {x: 64, y: 50, r: 30};
+/* the header word: "Claude" only when Claude answers (LIVE); scripted answers (MOCK) never carry the name */
+function headerWord(mode) { return mode === 'LIVE' ? 'Claude' : mode === 'MOCK' ? 'Scripted answer' : 'Answer'; }
 function drawAnswer(ctx, W, H, view) {
-  const m = view.model || {}, pad = 40, v = m.visual || null;
+  const m = view.model || {}, pad = 40, v = m.visual || null, wait = view.wait || {}, heard = !!wait.heard, wsteps = (wait.steps || []).slice(-5);
+  const HH = view.phase === 'thinking' ? waitHeight(ctx, W, H, m.question, wsteps.length) : H;
+  const layout = {mark: Object.assign({}, MARK), indicator: null, picture: null, h: HH};
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = 'rgba(10,16,24,.97)'; rr(ctx, 4, 4, W - 8, H - 8, 28); ctx.fill();
+  ctx.fillStyle = CARD_BG; rr(ctx, 4, 4, W - 8, HH - 8, 28); ctx.fill();
   ctx.strokeStyle = view.phase === 'error' ? '#e2725b' : 'rgba(226,232,240,.35)'; ctx.lineWidth = 3; ctx.stroke();
-  // header: small mark + "AI answer", mode; right: a speaker icon while it is read aloud, "B/Y closes", and the small "⋯"
-  drawMark(ctx, pad + 14, 48, 16, '#e2e8f0');
-  ctx.font = '600 26px Arial'; ctx.fillStyle = '#a9c1d6'; ctx.fillText('AI answer', pad + 40, 57);
-  let hx = pad + 40 + ctx.measureText('AI answer').width + 16;
-  const mode = view.modeLabel || (m.mode === 'live' ? 'LIVE' : m.mode === 'mock' ? 'MOCK' : '');
-  if (mode) hx += pill(ctx, hx, 32, mode, {h: 34, size: 21, weight: '700', fill: mode === 'LIVE' ? '#14532d' : '#6a4a10', color: mode === 'LIVE' ? '#86efac' : '#fcd34d'}) + 12;
+  // header: Claude-style mark + "Claude", mode; right: a speaker icon while it is read aloud, "B/Y closes", and the small "⋯"
+  if (!view.markLayer) drawStarburst(ctx, MARK.x, MARK.y, MARK.r);
+  const mode = view.modeLabel || (m.mode === 'live' ? 'LIVE' : m.mode === 'mock' ? 'MOCK' : ''), brand = headerWord(mode);
+  ctx.font = '600 30px Arial'; ctx.fillStyle = '#f1f5f9'; ctx.fillText(brand, pad + 66, 60);
+  let hx = pad + 66 + ctx.measureText(brand).width + 10;
+  if (mode) { ctx.fillStyle = '#7f94a8'; ctx.fillText('·', hx, 60); hx += ctx.measureText('·').width + 10; }
+  if (mode) hx += pill(ctx, hx, 33, mode, {h: 34, size: 21, weight: '700', fill: mode === 'LIVE' ? '#14532d' : '#6a4a10', color: mode === 'LIVE' ? '#86efac' : '#fcd34d'}) + 12;
   const mx = W * ANSWER_MORE.x0 + (W - W * ANSWER_MORE.x0) / 2 - 6;
   drawMore(ctx, mx, 48, 30, !!view.hoverMore);
   let rx = mx - 46;
   if (view.speech === 'speaking') { drawSpeaker(ctx, rx - 30, 48, 30, '#fde68a'); rx -= 46; }
   if (view.phase === 'answer' || view.phase === 'error') { ctx.textAlign = 'right'; ctx.font = '500 21px Arial'; ctx.fillStyle = '#7f94a8'; ctx.fillText('B/Y closes', rx, 56); ctx.textAlign = 'left'; }
-  let y = 92;
-  if (view.phase === 'thinking' || view.phase === 'error' || !v) {
+  let y = 96;
+  if (view.phase === 'thinking' && m.question) {   // what was heard (voice) or asked (preset), small, at the top
+    ctx.font = '600 20px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(heard ? 'HEARD' : 'ASKED', pad, y + 14);
+    ctx.font = 'italic 27px Arial'; ctx.fillStyle = '#cfe3f5'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y + 50); y += 35; }
+    y += 40; ctx.strokeStyle = 'rgba(226,232,240,.14)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke(); y += 18;
+  } else if (view.phase === 'error' || !v) {
     if (m.question) { ctx.font = 'italic 28px Arial'; ctx.fillStyle = '#a9c1d6'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y + 20); y += 36; } y += 14; }
   }
   if (view.phase === 'thinking') {
-    ctx.fillStyle = '#e8f1f8'; fit(ctx, view.progress || 'Thinking…', pad, y + 30, W - 2 * pad, 40, '700'); y += 80;
-    ctx.font = '26px Arial';
-    for (const s of (view.steps || []).slice(-6)) { drawPicto(ctx, 'check', pad + 14, y - 9, 26, '#34d399'); ctx.fillStyle = '#cfe3f5'; fit(ctx, s, pad + 40, y, W - 2 * pad - 40, 26); y += 40; }
+    const steps = wsteps;
+    ctx.fillStyle = steps.length ? '#8aa2b8' : '#e8f1f8';
+    if (steps.length) { ctx.font = '600 20px Arial'; ctx.fillText(waitLabel({heard}).toUpperCase(), pad, y + 24); y += 44; }
+    else { fit(ctx, waitLabel({heard}), pad, y + 44, W - 2 * pad, 38, '700'); y += 70; }
+    for (const st of steps) {
+      const cur = st.state === 'current', my = y + 32;
+      if (cur) layout.indicator = {x: pad + 20, y: my}; else drawPicto(ctx, 'tick', pad + 20, my, 30, '#34d399');
+      drawPicto(ctx, st.icon || 'twin', pad + 82, my, 42, cur ? '#ffffff' : '#9fb6cb');
+      const t = (cur ? st.text : doneText(st.text)) + (st.n > 1 ? ' ×' + st.n : '');
+      ctx.fillStyle = cur ? '#ffffff' : '#9fb6cb'; fit(ctx, t, pad + 124, my + (cur ? 11 : 10), W - 2 * pad - 130, cur ? 32 : 28, cur ? '700' : '500');
+      y += 70;
+    }
   } else if (view.phase === 'error') {
     ctx.font = '700 38px Arial'; ctx.fillStyle = '#ffb4a8'; ctx.fillText('Could not answer', pad, y + 20); y += 66;
     ctx.font = '30px Arial'; ctx.fillStyle = '#e8f1f8'; for (const t of wrap(ctx, view.error || '', W - 2 * pad, 4)) { ctx.fillText(t, pad, y); y += 40; }
@@ -617,6 +765,7 @@ function drawAnswer(ctx, W, H, view) {
     const bh = 330, by = y;
     const drawn = v.kind === 'lookup' ? (drawLookup(ctx, v, pad, by, W - 2 * pad, bh), true) : v.kind === 'near' ? (drawNear(ctx, v, pad, by, W - 2 * pad, bh), true)
       : v.kind === 'trace' ? (drawTrace(ctx, v, pad, by, W - 2 * pad, bh), true) : drawItems(ctx, v, pad, by, W - 2 * pad, 250);
+    if (drawn) layout.picture = {x: pad - 6, y: by - 6, w: W - 2 * pad + 12, h: (v.kind === 'text' ? 250 : bh) + 12};
     y = drawn ? by + (v.kind === 'text' ? 250 : bh) + 14 : y;
     // caption (the sentence answer, 1-2 lines)
     ctx.font = '27px Arial'; ctx.fillStyle = '#c3d3e2';
@@ -647,7 +796,8 @@ function drawAnswer(ctx, W, H, view) {
   if (view.runNote && !(v && v.kind === 'trace') && view.phase === 'answer') { ctx.fillStyle = '#9fe7f5'; fit(ctx, view.runNote, pad, H - 52, W - 2 * pad, 21); }
   ctx.fillStyle = '#7f94a8';
   const foot = [f[0], m.stats && view.phase === 'answer' && !(v && (m.chips || []).length) ? m.stats : '', f[1]].filter(Boolean).join(' · ');
-  if (foot) fit(ctx, foot, pad, H - 20, W - 2 * pad, 21, '500');
+  if (foot) fit(ctx, foot, pad, HH - 20, W - 2 * pad, 21, '500');
+  return layout;
 }
 /* The ask bar (buttons). hover: Set of button indices under a ray. */
 function drawBar(ctx, W, H, buttons, hover = new Set()) {
@@ -691,7 +841,8 @@ function drawChip(ctx, W, H, model, hover = false) {
 }
 
 return {API, LEVELS, COLORS, BAR, CHIP, ANSWER_MORE, HONESTY, SYS, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
-  barRects, barHit, barButtons, chipModel, chipHit, answerHit, micPlan, ttsPlan, wrap, drawMark, drawPicto, drawAnswer, drawBar, drawChip, drawMore,
+  barRects, barHit, barButtons, chipModel, chipHit, answerHit, micPlan, ttsPlan, wrap, drawMark, drawStarburst, starburstRays, CLAUDE_COLOR, CARD_BG, MARK, drawPicto,
+  headerWord, waitHeight, STEP_ICON, stepIcon, stepPhrase, stepsAdd, stepsFrom, waitLabel, WAIT, markPose, dotWave, revealPose, waitPulse, drawAnswer, drawBar, drawChip, drawMore,
   pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
   serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

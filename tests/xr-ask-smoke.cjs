@@ -72,6 +72,12 @@ const URL_ = BASE + '/scan-xr.html?mode=ar&place=demo&sensors=demo&scene=air&lay
     assert.ok(st.run && st.run.pieces >= 3, 'connected_run path lit');
     assert.ok(st.glow.some(g => g.id === st.primary), 'primary citation glows');
     assert.ok(st.citations.every(c => c.verified));
+    // waiting state (2026-11-15): step lines from the stream events, all ticked once the answer is in; the mark settled; the asked
+    // element's pulsing wait glow replaced by the cited colours; the mark on its own small texture
+    assert.ok(st.wait.steps.length >= 1 && st.wait.steps.every(x => x.state === 'done'), 'steps from the tool events, all done');
+    assert.ok(st.wait.steps.some(x => x.icon === 'route'), 'connected_run step with the route pictogram');
+    assert.equal(st.wait.settled, true); assert.equal(st.wait.dots, false); assert.ok(!st.glow.some(g => g.kind === 'wait'), 'wait pulse removed');
+    assert.ok(st.tex.mark && st.tex.mark.w <= 512, 'small mark texture');
     report.level3 = {ms: st.answerMs, lead: st.lead, primary: st.primary, run: st.run, glow: st.glow.length, speechPlan: st.speechPlan};
     // turn the desktop view a little (right, down) so the card, the bar and the lit run are all in frame; everything is world-locked
     const frame = l => page.evaluate(({yaw, pitch}) => xrDebug.look(yaw - .12, pitch - .16), l);

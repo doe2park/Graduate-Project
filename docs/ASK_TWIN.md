@@ -49,7 +49,8 @@ Options: `--model claude-opus-5-5` (default `claude-sonnet-5-5`), `--effort low|
 `--port`, `--no-stt`, `--stt-model small.en`, `--stt-beam 1` (default 5), `--no-tts` (no laptop voice for `/api/speak`),
 `--voice "Zoe (Premium)"` (default: best installed English voice), `--no-fallbacks`, `--lan` (private-LAN HTTPS, see Headset
 below), `--auto` (live Claude when a key is found, else scripted answers with the note *Live AI needs a key on the laptop;
-running scripted answers* on the 2D page and the answer card), `--verbose`. Limits and access: `--code`, `--no-code`, `--per-minute`,
+running scripted answers* on the 2D page and the answer card), `--mock-pace 1.2` (debug, `--mock` only: wait before each
+tool step and the answer text so recordings show the headset card's waiting state as a live answer would), `--verbose`. Limits and access: `--code`, `--no-code`, `--per-minute`,
 `--per-day`, `--daily-tokens`, `--max-tokens`, `--idle-minutes`, `--usage-dir` (next section).
 
 ### Switching the running headset server to live answers (owner)

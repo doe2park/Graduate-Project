@@ -411,6 +411,18 @@ def mock_route(question: str) -> str:
     return next((name for name, rx in MOCK_ROUTES if rx.search(q)), 'describe')
 
 
+def paced(events, pace, sleep=time.sleep):
+    """Debug pacing for the scripted (mock) answers, whose events otherwise arrive almost at once: wait `pace` seconds before each
+    tool event and before the first text event, so the page's waiting state shows about as long as a live answer would.
+    Used only with --mock --mock-pace; live answers are never delayed."""
+    wrote = False
+    for ev in events:
+        if pace > 0 and (ev.get('type') == 'tool' or (ev.get('type') == 'text' and not wrote)):
+            sleep(pace)
+            wrote = wrote or ev.get('type') == 'text'
+        yield ev
+
+
 class MockAgent:
     """Scripted answers built only from real tool results (no API key). Labelled MOCK in every answer."""
 

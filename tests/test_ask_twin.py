@@ -1018,6 +1018,32 @@ class LimitedServerTests(unittest.TestCase):
             self.assertEqual(e.headers['Location'], '/grimes-bim-viewer.html?ask=1&code=AB23CD')
 
 
+class MockPaceTests(unittest.TestCase):
+    """--mock-pace (debug, recordings): scripted answers wait before each tool step and the first text, live answers never."""
+
+    def test_paced_sleeps_before_tools_and_first_text_only(self):
+        slept, log = [], []
+        evs = [{'type': 'status', 'phase': 'thinking'}, {'type': 'tool', 'name': 'elements_near'}, {'type': 'tool', 'name': 'connected_run'},
+               {'type': 'text', 'text': 'a '}, {'type': 'text', 'text': 'b'}, {'type': 'final'}]
+        out = []
+        for ev in A.paced(iter(evs), 1.2, sleep=lambda s: (slept.append(s), log.append('sleep'))):
+            out.append(ev); log.append(ev['type'])
+        self.assertEqual(out, evs)
+        self.assertEqual(slept, [1.2, 1.2, 1.2])
+        self.assertEqual(log, ['status', 'sleep', 'tool', 'sleep', 'tool', 'sleep', 'text', 'text', 'final'])
+        self.assertEqual(list(A.paced(iter(evs), 0, sleep=lambda s: self.fail('no pace, no sleep'))), evs)
+
+    def test_flag_is_mock_only_and_bounded(self):
+        import contextlib
+        import io
+        import ask_twin_server as S
+        self.assertEqual(S.parse_args(['--mock', '--mock-pace', '1.2']).mock_pace, 1.2)
+        self.assertEqual(S.parse_args(['--mock']).mock_pace, 0)
+        for bad in (['--mock-pace', '1'], ['--mock', '--mock-pace', '9'], ['--mock', '--mock-pace', '-1']):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                S.parse_args(bad)
+
+
 class LimitArgsTests(unittest.TestCase):
     def test_flags_defaults_and_refusals(self):
         import contextlib

@@ -35,7 +35,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#status{bottom:44px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=8"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=9"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=8"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=10"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -1203,14 +1203,14 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
 /* ══ Ask the twin in the headset (opt-in ?ask=1; docs/ASK_TWIN.md "Headset") ══ Needs the local server (scripts/ask_twin_server.py [--mock] --lan),
    which serves this page and answers /api/ask with read-only tools over the twin (Claude, or scripted mock answers). Nothing here exists without ?ask=1.
    Trigger on a service element (or a demo-sensor pin) -> the info card plus an ask bar: the four question levels, hold-to-speak, close.
-   The answer comes back as a world-locked card under the element (small AI mark, one headline, a picture built from the tool results, a short caption, check-on-site chip, cited ids), verified citations glow in the model
+   The answer comes back as a world-locked card under the element (Claude-style mark drawn in code, real progress steps while waiting, one headline, a picture built from the tool results, a short caption, check-on-site chip, cited ids), verified citations glow in the model
    (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
    and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
 var ASK=null;
 const XA=globalThis.XRAsk,XAOK=XA?.API===3,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
 ASK={on:!!XAP.enabled,base:XAP.server||null,code:XAP.code||'',prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
  paths:[],vis:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
- hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0,more:false,details:false};
+ hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0,more:false,details:false,wsteps:[],heard:false,tWait:0,markSettle:null,tReveal:null,layout:null};
 ASK.glow.name='ask: cited elements (render-only glow)';bimRoot.add(ASK.glow);
 if(q.get('ask')==='1'&&!XAOK)console.warn('scan-xr: twin/xr-ask.js missing or out of date · Ask the twin is off');
 /* Decluttered (2026-11-15): askChip = the one compact label at the picked element (type · level, "Hold trigger to ask", honesty line, "⋯");
@@ -1219,6 +1219,21 @@ const ASK_WH={card:[.66,.516],chip:[.36,.099],bar:[.6,.176]},ASK_MORE_BTN={chip:
 const askCard=makeSurface(1024,800,...ASK_WH.card,61),askBar=makeSurface(1024,300,...ASK_WH.bar,62),askChip=makeSurface(XA?.CHIP?.W||640,XA?.CHIP?.H||176,...ASK_WH.chip,62);scene.add(askCard.mesh,askBar.mesh,askChip.mesh);
 const askLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:0xD97757,transparent:true,opacity:.9,depthTest:false,depthWrite:false,toneMapped:false}));
 askLine.renderOrder=61;askLine.visible=false;askLine.frustumCulled=false;scene.add(askLine);
+/* Waiting overlays (2026-11-15), children of the answer card so they follow its placement and visibility. Per frame only these move:
+   the Claude-style mark (its own small texture, drawn ONCE; rotation / scale / opacity), the three-dot wave of the current step (three
+   tiny untextured discs) and the cover that lets the picture fill in last (an untextured plane). The big card canvas is redrawn only
+   when a step changes or the answer arrives (and still through the 160 ms throttle). */
+const ASK_U=ASK_WH.card[0]/1024,askF=()=>ASK?.cardF||1,askAt=(o,x,y,z=.0005)=>o.position.set((x/1024-.5)*ASK_WH.card[0],(.5-y/(800*askF()))*ASK_WH.card[1],z);
+/* compact waiting card: only the top layout.h of the canvas shows (texture crop + mesh height); children are counter-scaled in y */
+function askCrop(){const f=askF();askCard.texture.repeat.set(1,f);askCard.texture.offset.set(0,1-f);}
+const ASK_MARK_PX=96,ASK_MARK_R=44,askMarkSide=ASK_MARK_PX*(XA?.MARK?.r||24)/ASK_MARK_R*ASK_U;
+const askMark=makeSurface(ASK_MARK_PX,ASK_MARK_PX,askMarkSide,askMarkSide,64);askMark.mesh.visible=true;askMark.mesh.name='ask: animated mark';askMark.texture.center.set(.5,.5);   // spins as a UV rotation (the mesh itself is only counter-scaled for the crop, so no shear)
+if(XA?.drawStarburst){askMark.ctx.clearRect(0,0,ASK_MARK_PX,ASK_MARK_PX);XA.drawStarburst(askMark.ctx,ASK_MARK_PX/2,ASK_MARK_PX/2,ASK_MARK_R);askMark.texture.needsUpdate=true;}
+askAt(askMark.mesh,XA?.MARK?.x||58,XA?.MARK?.y||48);askCard.mesh.add(askMark.mesh);
+const askDots=[0,1,2].map(i=>{const d=new THREE.Mesh(new THREE.CircleGeometry(5.5*ASK_U,14),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthTest:false,depthWrite:false,toneMapped:false}));
+ d.renderOrder=64;d.visible=false;d.frustumCulled=false;d.name='ask: step dot '+i;askCard.mesh.add(d);return d;});
+const askCover=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0x0a1018,transparent:true,opacity:0,depthTest:false,depthWrite:false,toneMapped:false}));
+askCover.renderOrder=62;askCover.visible=false;askCover.frustumCulled=false;askCover.name='ask: picture cover (fill-in)';askCard.mesh.add(askCover);
 const askReduced=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
 /* "Listening…" ring at the pointed element while the trigger is held (point-and-ask). */
 const askRing=new THREE.Mesh(new THREE.RingGeometry(.07,.095,40),new THREE.MeshBasicMaterial({color:0xff4d6d,transparent:true,opacity:.9,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
@@ -1243,7 +1258,7 @@ function askPlace(){const a=ASK.anchor;if(!a)return;const up=new THREE.Vector3(0
  // 5 cm, so the element and what the answer lights up stay visible above. The presets panel and Details stack under whichever shows.
  const cardOn=!!ASK.phase,ray=a.p.clone().add(new THREE.Vector3(0,.14*s,0)),top=ray.clone().addScaledVector(up,-(cardOn?.05:.09)*s);
  const put=(m,h)=>{m.position.copy(top).addScaledVector(up,-(h/2)*s);m.quaternion.copy(a.q);m.scale.setScalar(s);top.addScaledVector(up,-h*s-gap);};
- const cardTop=top.clone();put(cardOn?askCard.mesh:askChip.mesh,cardOn?ASK_WH.card[1]:ASK_WH.chip[1]);
+ const cardTop=top.clone();put(cardOn?askCard.mesh:askChip.mesh,cardOn?ASK_WH.card[1]*askF():ASK_WH.chip[1]);if(cardOn)askCard.mesh.scale.y=s*askF();
  if(ASK.more)put(askBar.mesh,ASK_WH.bar[1]);
  if(!cardOn&&ASK.details)put(card.mesh,.306);
  if(ASK.el){askLine.geometry.setFromPoints([cardTop,ASK.el.world]);askLine.visible=cardOn;}}
@@ -1261,13 +1276,17 @@ function askDrawChip(){if(!ASK?.on||!ASK.el)return;const e=ASK.el,meta=layerStat
 function askFooter(){const h=ASK.health;return ['Read-only tools over the twin · '+(h?.mode==='mock'?'MOCK':h?.model||''),XA.HONESTY||'demo sensors SIMULATED · not headset-verified'];}
 function askDraw(){ASK.dirty=false;ASK.lastDraw=performance.now();
  const run=ASK.run?'Lit run: '+(ASK.run.ids.length-1)+' steps along touching pieces, cited source to here · inferred from geometry, no flow direction in the model':'';
- XA.drawAnswer(askCard.ctx,askCard.W,askCard.H,{phase:ASK.phase,model:ASK.model||{question:ASK.question,level:ASK.level},steps:ASK.steps,error:ASK.error,speech:ASK.speech,runNote:run,
-  progress:ASK.progress,modeLabel:ASK.health?.mode==='live'?'LIVE':ASK.health?.mode==='mock'?'MOCK':'',footer:askFooter(),hoverMore:ASK.hover.has(ASK_MORE_BTN.card)});
+ const fWas=askF();ASK.layout=XA.drawAnswer(askCard.ctx,askCard.W,askCard.H,{phase:ASK.phase,model:ASK.model||{question:ASK.question,level:ASK.level},steps:ASK.steps,error:ASK.error,speech:ASK.speech,runNote:run,
+  progress:ASK.progress,modeLabel:ASK.health?.mode==='live'?'LIVE':ASK.health?.mode==='mock'?'MOCK':'',footer:askFooter(),hoverMore:ASK.hover.has(ASK_MORE_BTN.card),
+  wait:{steps:ASK.wsteps,heard:ASK.heard},markLayer:true})||null;
+ ASK.cardF=Math.max(.3,Math.min(1,(ASK.layout?.h||800)/800));askCrop();askAt(askMark.mesh,XA?.MARK?.x||64,XA?.MARK?.y||50);if(ASK.cardF!==fWas)askPlace();
+ const pic=ASK.phase==='answer'?ASK.layout?.picture:null;if(pic){askAt(askCover,pic.x+pic.w/2,pic.y+pic.h/2);askCover.scale.set(pic.w*ASK_U,pic.h*ASK_WH.card[1]/800,1);}
  askCard.texture.needsUpdate=true;invalidate();}
 /* Remove the answer (glow, run, speech) but keep the pick. */
 function askResetAnswer(){ASK.epoch++;try{ASK.abort?.abort();}catch(e){}ASK.abort=null;ASK.busy=false;askStopSpeech();clearTimeout(ASK.filler);ASK.progress='';
  for(const o of [...ASK.glow.children]){ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();o.userData.edge?.geometry.dispose();o.userData.edge?.material.dispose();}ASK.run=null;
- ASK.phase=null;ASK.model=null;ASK.final=null;ASK.text='';ASK.steps=[];ASK.paths=[];ASK.vis=[];ASK.error=null;askCard.mesh.visible=false;askLine.visible=false;}
+ ASK.phase=null;ASK.model=null;ASK.final=null;ASK.text='';ASK.steps=[];ASK.paths=[];ASK.vis=[];ASK.error=null;askCard.mesh.visible=false;askLine.visible=false;
+ ASK.wsteps=[];ASK.heard=false;ASK.markSettle=null;ASK.tReveal=null;ASK.layout=null;ASK.cardF=1;askCrop();askCard.mesh.material.opacity=1;askCover.visible=false;for(const d of askDots)d.visible=false;}
 function askClear(){if(!ASK?.on)return;askResetAnswer();if(ASK.voice==='recording')askRecStop(true);askRing.visible=false;ASK.el=null;ASK.anchor=null;ASK.more=false;ASK.details=false;
  askBar.mesh.visible=false;askChip.mesh.visible=false;ASK.hover.clear();invalidate();}
 /* Glow: a render-only copy of the element's own batch vertices (never modifies the batches), additive, always on top. Element not drawn
@@ -1289,6 +1308,12 @@ function askGlowFor(id,layer,bbox,color,opacity){const st=layerState[layer];cons
  else if(bbox){const b=bbox,g=new THREE.EdgesGeometry(new THREE.BoxGeometry(Math.max(.05,b[3]-b[0]),Math.max(.05,b[4]-b[1]),Math.max(.05,b[5]-b[2])));g.translate((b[0]+b[3])/2,(b[1]+b[4])/2,(b[2]+b[5])/2);
   o=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color,transparent:true,opacity:Math.min(1,opacity+.3),depthTest:false,depthWrite:false,toneMapped:false}));o.userData.kind='box';}
  if(!o)return null;o.renderOrder=53;o.frustumCulled=false;o.userData.id=id;o.userData.base=opacity;ASK.glow.add(o);return o;}
+/* While waiting: the asked element's own geometry as a render-only copy in the pick colour, pulsing in brightness (askTick), no rings.
+   Removed when the answer (or an error) arrives; the cited elements then take the normal colours. */
+const ASK_WAIT_COLOR=0xfbbf24;
+function askWaitGlow(){const e=ASK.el;if(!e?.layer)return;const o=askGlowFor(e.id,e.layer,null,ASK_WAIT_COLOR,0);if(!o)return;
+ if(o.userData.edge){o.userData.kind='wait';o.material.uniforms.opacity.value=0;o.userData.edge.material.opacity=0;}else{ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();}}
+function askWaitGlowOff(){for(const o of [...ASK.glow.children])if(o.userData.kind==='wait'){ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();o.userData.edge?.geometry.dispose();o.userData.edge?.material.dispose();}}
 function askHighlight(final){const cites=(final.citations||[]).filter(c=>c.verified),primary=ASK.model?.primary;
  for(const c of cites)askGlowFor(c.id,c.layer,c.bbox_m,c.id===primary?XA.COLORS.primary:XA.COLORS.other,c.id===primary?.62:.4);
  const ids=XA.runPath(ASK.paths,primary,final.citations);if(!ids)return;
@@ -1300,9 +1325,19 @@ function askTick(){if(!ASK?.on)return false;const now=performance.now();let anim
  askRing.visible=ASK.voice==='recording'&&!!ASK.el&&!ASK.hideRing;
  if(askRing.visible){askRing.position.copy(ASK.el.world);camera.getWorldPosition(_head);askRing.lookAt(_head);const d=_head.distanceTo(ASK.el.world),k=clamp(d*.35,.25,3)*(1+.18*Math.sin(now/140));askRing.scale.setScalar(k);anim=true;}
  if(ASK.dirty&&now-ASK.lastDraw>160)askDraw();
+ // waiting / reveal overlays: transforms and opacities only, no canvas work
+ if(askCard.mesh.visible){const red=askReduced(),tw=now-ASK.tWait,mp=XA.markPose(tw,{settleAt:ASK.markSettle,reduced:red}),rv=ASK.tReveal!=null?XA.revealPose(now-ASK.tReveal,{reduced:red,...ASK.revealOpts}):{scale:1,opacity:1,cover:0,done:true};
+  const f=askF();askMark.texture.rotation=mp.rot;askMark.mesh.scale.set(mp.scale,mp.scale/f,1);askMark.mesh.material.opacity=mp.opacity*rv.opacity;
+  askCard.mesh.material.opacity=rv.opacity;if(ASK.anchor){const k=ASK.anchor.s*rv.scale;askCard.mesh.scale.set(k,k*f,k);}
+  askCover.visible=rv.cover>.002&&ASK.phase==='answer'&&!!ASK.layout?.picture;askCover.material.opacity=.97*rv.cover*rv.opacity;
+  const ind=ASK.phase==='thinking'?ASK.layout?.indicator:null,wv=ind?XA.dotWave(tw,{reduced:red}):null;
+  askDots.forEach((d,i)=>{d.visible=!!ind;if(ind){askAt(d,ind.x+(i-1)*15,ind.y+wv[i].dy,.0006);d.scale.set(1,1/f,1);d.material.opacity=wv[i].a*rv.opacity;}});
+  anim=anim||mp.moving||!rv.done||!!ind||ASK.phase==='thinking';}
  askDepth.visible=ASK.glow.children.length>0;
  if(ASK.glow.children.length){const red=askReduced(),ph=red?0:Math.sin(now/260)*.5+.5;
-  for(const o of ASK.glow.children){if(o.userData.kind==='box')o.material.opacity=o.userData.base*(.7+.6*ph);else if(o.userData.kind==='glow')o.material.uniforms.boost.value=.35*ph;}
+  const wp=XA.waitPulse(now-ASK.tWait,{reduced:red});
+  for(const o of ASK.glow.children){if(o.userData.kind==='box')o.material.opacity=o.userData.base*(.7+.6*ph);else if(o.userData.kind==='glow')o.material.uniforms.boost.value=.35*ph;
+   else if(o.userData.kind==='wait'){o.material.uniforms.opacity.value=wp.opacity;o.material.uniforms.boost.value=wp.boost;o.userData.edge.material.opacity=.25+.5*wp.opacity;}}
   // cited parts breathe in brightness (no fading); each run piece fades in once along the run and stays, the pulse only brightens it
   if(ASK.run){const n=ASK.run.meshes.length,t=now-ASK.run.t0;for(const {o,i} of ASK.run.meshes){const a=XA.runGlow(i,n,t,{reduced:red}),k=Math.min(1,a/.5);o.visible=a>.01;o.material.uniforms.opacity.value=ASK_FILL*k;o.material.uniforms.boost.value=Math.max(0,a-.5)/.3;o.userData.edge.material.opacity=ASK_LINE*k;}}
   anim=anim||!red;}
@@ -1311,10 +1346,11 @@ function askTick(){if(!ASK?.on)return false;const now=performance.now();let anim
    While waiting: a send earcon, the card's progress line from the server events ("Thinking…", "Following the ducts…"), and
    "One moment." if nothing has been said after XA.FILLER_MS. The server's 'speak' events (short lead, then one check) are
    spoken as soon as they arrive, before the rest of the card. */
-async function askQuestion(level,text){if(!ASK.on)return null;if(!ASK.el){status('Ask: point at an element and pull the trigger first');return null;}if(ASK.busy)return null;
+async function askQuestion(level,text,{heard=false}={}){if(!ASK.on)return null;if(!ASK.el){status('Ask: point at an element and pull the trigger first');return null;}if(ASK.busy)return null;
  const L=level?XA.LEVELS.find(l=>l.level===level):null,question=(text||L?.question||'').trim();if(!question)return null;
  askResetAnswer();const epoch=ASK.epoch,ac=typeof AbortController!=='undefined'?new AbortController():null;ASK.abort=ac;
- ASK.busy=true;ASK.asked++;ASK.question=question;ASK.level=L?.level||null;ASK.phase='thinking';ASK.progress='Thinking…';ASK.saidAny=false;ASK.model={question,level:ASK.level};ASK.more=false;askSync();askDraw();
+ ASK.busy=true;ASK.asked++;ASK.question=question;ASK.level=L?.level||null;ASK.phase='thinking';ASK.progress='Thinking…';ASK.saidAny=false;ASK.model={question,level:ASK.level};ASK.more=false;
+ ASK.heard=!!heard;ASK.wsteps=[];ASK.tWait=performance.now();ASK.markSettle=null;ASK.tReveal=ASK.tWait;ASK.revealOpts={from:0,picture:false};askWaitGlow();askSync();askDraw();
  askEarcon('send');ASK.filler=setTimeout(()=>{if(epoch===ASK.epoch&&ASK.busy&&!ASK.saidAny)askSay('One moment.',epoch);},XA.FILLER_MS);
  const t0=performance.now();let spoke=false;
  try{const res=await fetch(askApi('ask'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'}),signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
@@ -1322,6 +1358,7 @@ async function askQuestion(level,text){if(!ASK.on)return null;if(!ASK.el){status
   if(!res.ok||!res.body)throw new Error('ask server '+res.status+(res.status===404||res.status===501?' · open this page from scripts/ask_twin_server.py':''));
   let fail=null;const sp=XA.createStream(ev=>{if(epoch!==ASK.epoch)return;
    const pr=XA.progressText(ev,ASK.el);if(pr&&ASK.phase==='thinking'&&pr!==ASK.progress){ASK.progress=pr;ASK.dirty=true;}
+   const sa=XA.stepsAdd(ASK.wsteps,ev,ASK.el);if(sa.changed&&ASK.phase==='thinking'){ASK.wsteps=sa.steps;ASK.dirty=true;}   // the step line (redrawn through the throttle)
    if(ev.type==='tool'){ASK.steps.push(ev.name+' · '+(ev.summary||''));if(Array.isArray(ev.paths))ASK.paths.push(...ev.paths);if(ev.visual&&typeof ev.visual==='object')ASK.vis.push(ev.visual);ASK.dirty=true;}
    else if(ev.type==='status'){if(ev.phase!=='thinking'){ASK.steps.push(ev.text);ASK.dirty=true;}}
    else if(ev.type==='speak'){spoke=true;askSay(ev.text,epoch);}
@@ -1331,10 +1368,11 @@ async function askQuestion(level,text){if(!ASK.on)return null;if(!ASK.el){status
   sp.end();if(epoch!==ASK.epoch)return null;if(fail)throw new Error(fail);if(!ASK.final)throw new Error('the answer stream ended early');
   clearTimeout(ASK.filler);
   const f=ASK.final,answer=f.answer||ASK.text;ASK.text=answer;const se=ASK.el||{},selMeta=layerState[se.layer]?.meta?.[se.id]||{};ASK.model=XA.cardModel({question,answer,final:f,level:ASK.level,visuals:ASK.vis,selected:se.id?{id:se.id,layer:se.layer,type:selMeta.type,name:selMeta.name,sensor:se.sensor}:null});if(ASK.health?.note&&f.mode==='mock')ASK.model.footer[0]=ASK.model.footer[0].replace(/^MOCK · scripted/,'MOCK · '+ASK.health.note);ASK.phase='answer';ASK.tAnswer=Math.round(performance.now()-t0);
+  askWaitGlowOff();ASK.wsteps=XA.stepsAdd(ASK.wsteps,{type:'final'}).steps;{const tn=performance.now();ASK.markSettle=tn-ASK.tWait;ASK.tReveal=tn;ASK.revealOpts={from:.55,picture:true};}   // mark settles, card eases in, picture last
   askHighlight(f);askDraw();ASK.busy=false;askSync();if(!ASK.saidAny)askEarcon('done');
   if(!spoke)askSay(f.spoken||XA.speakable(answer,f.citations),epoch);   // older server: no 'speak' events
   return {ms:ASK.tAnswer,final:f};
- }catch(e){clearTimeout(ASK.filler);if(epoch!==ASK.epoch||e?.name==='AbortError')return null;ASK.phase='error';ASK.error=String(e?.message||e);console.warn('[ask]',e);askEarcon('miss');askDraw();return {error:ASK.error};}
+ }catch(e){clearTimeout(ASK.filler);if(epoch!==ASK.epoch||e?.name==='AbortError')return null;ASK.phase='error';ASK.error=String(e?.message||e);askWaitGlowOff();ASK.markSettle=performance.now()-ASK.tWait;console.warn('[ask]',e);askEarcon('miss');askDraw();return {error:ASK.error};}
  finally{if(epoch===ASK.epoch){ASK.busy=false;askSync();}}}
 /* ── voice out ── a queue of short parts. Laptop voice first (best installed macOS voice, /api/speak WAV via Web Audio) unless
    the viewer chose the headset voice (2D toggle or &voice=headset); else speechSynthesis (2.5 s start watchdog); else text only. */
@@ -1380,7 +1418,7 @@ async function askRecStop(discard=false){const r=ASK.rec;ASK.rec=null;clearTimeo
  if(blob.size<1500||performance.now()-ASK.recT0<500){ASK.voice='ready';status('Too short: hold the trigger on the element while you talk');askVoiceUi();return;}
  ASK.voice='transcribing';askVoiceUi();
  try{const res=await fetch(askApi('transcribe'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':blob.type}),body:blob});if(!res.ok){const rt=await askRefusal(res);if(rt)throw new Error(rt);}const j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
-  ASK.voice='ready';askVoiceUi();if(j.text&&!j.no_speech){status('Heard: “'+j.text+'”');await askQuestion(null,j.text);}else{askEarcon('miss');status('Didn’t catch that · hold the trigger and speak, or use ⋯ for preset questions');}}
+  ASK.voice='ready';askVoiceUi();if(j.text&&!j.no_speech){status('Heard: “'+j.text+'”');await askQuestion(null,j.text,{heard:true});}else{askEarcon('miss');status('Didn’t catch that · hold the trigger and speak, or use ⋯ for preset questions');}}
  catch(e){ASK.voice='ready';askVoiceUi();status('Speech-to-text failed ('+(e?.message||e)+') · use ⋯ for preset questions');}}
 /* A press on an Ask panel (controller select / desktop click): "⋯" (label or answer card) opens / closes the presets panel; a preset asks
    (and folds the panel away); Details shows / hides the full element card; Close = dismiss. The label and card bodies do nothing on a
@@ -1393,7 +1431,7 @@ function askButton(i,c){if(i===ASK_MORE_BTN.chip||i===ASK_MORE_BTN.card){ASK.mor
 function askPanelHit(o,d){if(!ASK?.on||!(askBar.mesh.visible||askChip.mesh.visible||askCard.mesh.visible))return null;raycaster.set(o,d);raycaster.far=10;
  const ms=[askChip.mesh,askCard.mesh,askBar.mesh].filter(m=>m.visible),h=raycaster.intersectObjects(ms,false)[0];if(!h)return null;
  const target=h.object===askChip.mesh?'chip':h.object===askCard.mesh?'card':'bar';
- const button=target==='bar'?XA.barHit(h.uv.x,h.uv.y):target==='chip'?(XA.chipHit(h.uv.x,h.uv.y)==='more'?ASK_MORE_BTN.chip:-1):(XA.answerHit(h.uv.x,h.uv.y)==='more'?ASK_MORE_BTN.card:-1);
+ const button=target==='bar'?XA.barHit(h.uv.x,h.uv.y):target==='chip'?(XA.chipHit(h.uv.x,h.uv.y)==='more'?ASK_MORE_BTN.chip:-1):(XA.answerHit(h.uv.x,1-(1-h.uv.y)*askF())==='more'?ASK_MORE_BTN.card:-1);
  return {panel:'ask',target,button,point:h.point.clone(),distance:h.distance};}
 function askRefreshHover(){if(!ASK?.on)return;const want=new Set([...controllers,mouse].filter(c=>c.userData.hoverPanel==='ask'&&c.userData.hoverBtn>=0).map(c=>c.userData.hoverBtn));
  if(want.size===ASK.hover.size&&[...want].every(i=>ASK.hover.has(i)))return;const was=ASK.hover;ASK.hover=want;
@@ -1462,7 +1500,8 @@ function askInspection(){if(!ASK?.on)return {on:false,available:XAOK};const w=ne
   glow:ASK.glow.children.map(o=>({id:o.userData.id,kind:o.userData.kind})),run:ASK.run?{pieces:ASK.run.meshes.length,ids:ASK.run.ids.length}:null,speech:ASK.speech,speechPlan:ASK.speechPlan||null,speechEngine:ASK.speechEngine||null,
   base:ASK.base,prefer:ASK.prefer,progress:ASK.progress,note:ASK.health?.note||null,ring:askRing.visible,
   voice:ASK.voice,voicePlan:ASK.voicePlan||null,voiceNote:ASK.voiceNote,bar:askBar.mesh.visible?askButtons().map(b=>b.id):null,moreVisible:askBar.mesh.visible,chipVisible:askChip.mesh.visible,details:ASK.details,cardVisible:askCard.mesh.visible,infoCardVisible:card.mesh.visible,
-  tex:Object.fromEntries([['card',askCard],['chip',askChip],['bar',askBar],['info',card]].map(([k,v])=>[k,{w:v.canvas.width,h:v.canvas.height,k:v.k,aniso:v.texture.anisotropy}])),
+  wait:{steps:ASK.wsteps.map(s=>({icon:s.icon,text:s.text,state:s.state,n:s.n})),heard:ASK.heard,settled:ASK.markSettle!=null,dots:askDots[0].visible,cover:askCover.visible,cardOpacity:askCard.mesh.material.opacity,markRot:+askMark.texture.rotation.toFixed(3)},
+  tex:Object.fromEntries([['card',askCard],['chip',askChip],['bar',askBar],['info',card],['mark',askMark]].map(([k,v])=>[k,{w:v.canvas.width,h:v.canvas.height,k:v.k,aniso:v.texture.anisotropy}])),
   cardWorld:askCard.mesh.visible?askCard.mesh.getWorldPosition(w).toArray():null};}
 /* ── Loop ── */
 /* XR per-frame work (input, placement, MR tracking) is guarded: three.js requests the next XR frame only after this callback returns,
@@ -1516,7 +1555,7 @@ window.xrInspection=inspection;
 /* debug: world point of an Ask control. i: a presets-panel index, 'more' (the "⋯" of the label, else of the answer card), 'chip' / 'card' (body) */
 function askTargetWorld(i){const at=(m,W,H,u,v)=>{if(!m.visible)return null;m.updateMatrixWorld(true);return new THREE.Vector3((u-.5)*W,(v-.5)*H,0).applyMatrix4(m.matrixWorld);};
  if(typeof i==='number'){const r=XA.barRects()[i];return r?at(askBar.mesh,...ASK_WH.bar,r.x+r.w/2,1-(r.y+r.h/2)):null;}
- if(i==='more')return askChip.mesh.visible?at(askChip.mesh,...ASK_WH.chip,(1+XA.CHIP.moreX)/2,.5):at(askCard.mesh,...ASK_WH.card,(1+XA.ANSWER_MORE.x0)/2,1-XA.ANSWER_MORE.y1/2);
+ if(i==='more')return askChip.mesh.visible?at(askChip.mesh,...ASK_WH.chip,(1+XA.CHIP.moreX)/2,.5):at(askCard.mesh,...ASK_WH.card,(1+XA.ANSWER_MORE.x0)/2,1-XA.ANSWER_MORE.y1/2/askF());
  if(i==='chip')return at(askChip.mesh,...ASK_WH.chip,.4,.5);if(i==='card')return at(askCard.mesh,...ASK_WH.card,.5,.5);return null;}
 window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};return lastInfo;},
  openStation:i=>openStation(i),mr:{demo:(pt,hy)=>mrPlaceDemo(pt,'debug',hy),beginDemo:()=>mrBeginDemo(),simulate:o=>mrSimulate(o),button:i=>mrButton(i),panel:on=>mrSetPanel(on),range:k=>mrApplyRange(k),startAlign:id=>mrStartAlign(id),capture:p=>mrCapture(p,'debug'),skip:()=>mrSkip(),solve:()=>mrSolveNow(),accept:()=>mrAccept(),nudge:(k,d)=>mrNudge(k,d),nextCheck:()=>mrNextCheck(),check:p=>mrCheck(p,'debug'),toggleLayer:k=>mrToggleLayer(k),forget:()=>mrForget(),restoreWith:ss=>mrRestoreOrAlign(ss),anchorPose:(p,o)=>mrApplyAnchorPose(p,o),useGrimes:id=>mrUseGrimes(id)},walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,setScene,recenter,syncZone,
@@ -1546,7 +1585,7 @@ window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.
  ask:{pickId:id=>{id=String(id);const k=Object.keys(layerState).find(k=>layerState[k].loaded&&layerState[k].meta?.[id]);if(!k)return null;const g=sensorElementGeom(layerState[k],id,false);if(!g)return null;
    const c=[0,0,0],n=g.pos.length/3;for(let i=0;i<n;i++)for(let j=0;j<3;j++)c[j]+=g.pos[i*3+j]/n;bimRoot.updateMatrixWorld(true);const w=new THREE.Vector3().fromArray(c).applyMatrix4(bimRoot.matrixWorld),o=camera.getWorldPosition(new THREE.Vector3()),d=w.clone().sub(o).normalize();
    yaw=Math.atan2(-d.x,-d.z)-rig.rotation.y;pitch=Math.asin(clamp(d.y,-1,1));setDesktopLook();camera.updateMatrixWorld(true);coneFromView();const look={yaw,pitch};return pickAlong(o,d).then(r=>r&&{...r,look});},
-  question:(level,text)=>askQuestion(level,text),button:i=>askButton(i,null),health:()=>askHealth(),
+  question:(level,text,opts)=>askQuestion(level,text,opts),button:i=>askButton(i,null),health:()=>askHealth(),
   // point-and-ask through the real hold path with a stand-in controller aimed from the camera at the element (desktop test only)
   holdSim:async(id,ms=2500)=>{id=String(id);const k=Object.keys(layerState).find(k=>layerState[k].loaded&&layerState[k].meta?.[id]);if(!k)return null;const g=sensorElementGeom(layerState[k],id,false);if(!g)return null;
    const cc=[0,0,0],n=g.pos.length/3;for(let i=0;i<n;i++)for(let j=0;j<3;j++)cc[j]+=g.pos[i*3+j]/n;bimRoot.updateMatrixWorld(true);const w=new THREE.Vector3().fromArray(cc).applyMatrix4(bimRoot.matrixWorld);
