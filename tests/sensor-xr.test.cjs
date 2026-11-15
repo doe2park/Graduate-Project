@@ -75,7 +75,7 @@ test('card and chip never present a simulated value as real', () => {
 });
 test('page wiring: loadProgressText, versions, no real-reading claims', () => {
   const html = read('scan-xr.html');
-  assert.equal(X.API, 7); assert.ok(html.includes('twin/xr-core.js?v=7') && html.includes('XR_CORE_API=7,'));
+  assert.equal(X.API, 8); assert.ok(html.includes('twin/xr-core.js?v=8') && html.includes('XR_CORE_API=8,'));
   assert.equal(X.loadProgressText('Fire piping', 21.8e6, 2.0e6), 'Fire piping · 21.8 MB loaded', 'loaded > total is never a fraction');
   assert.equal(X.loadProgressText('Fire', 5e6, 24.2e6), 'Fire · 5.0 / 24.2 MB'); assert.equal(X.loadProgressText('Duct', 21.11e6, 21.1e6), 'Duct · 21.1 / 21.1 MB');
   assert.equal(X.loadProgressText('Duct', 30e6, 21.1e6), 'Duct · 30.0 MB loaded'); assert.equal(X.loadProgressText('X', 3e6), 'X · 3.0 MB loaded'); assert.equal(X.loadProgressText('X', NaN, 5), 'X · loading…');

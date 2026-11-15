@@ -4,7 +4,9 @@
      - the preset questions of the four levels (look up · nearby in 3D · trace a system · reason across sources),
      - the answer stream parser (Server-Sent Events from /api/ask),
      - the in-view answer card (headline + a picture built from the tool results + caption, check chip, cited ids, provenance),
-     - the spoken text, the run lighting timing for connected_run, the ask-bar layout and hit test, and the voice/TTS plans.
+     - the spoken text, the run lighting timing for connected_run, the voice/TTS plans,
+     - the decluttered in-view controls (2026-11-15): one compact element label with a hold-to-ask hint and a small "⋯", the
+       presets panel behind that "⋯", and their hit tests.
    Unit-tested in tests/xr-ask.test.cjs. The page is unchanged unless it is opened with ?ask=1. NOT verified on a headset. */
 (function (root, factory) {
   const api = factory();
@@ -149,6 +151,7 @@ function sections(answer) {
 
 /* The short in-view card: lead + at most 2 evidence bullets + the first "check first" line, cited ids, provenance.
    final = the server's 'final' event (citations verified server-side; only verified ids are highlighted). */
+const HONESTY = 'Design BIM, inferred rooms · demo sensors SIMULATED · not headset-verified';
 function cardModel({question = '', answer = '', final = null, level = null, toolCount = null, visuals = null, selected = null} = {}) {
   const S = sections(answer), cites = (final && final.citations) || [], byId = new Map(cites.map(c => [c.id, c]));
   const label = id => { const c = byId.get(id); return c && c.type ? c.type : null; };
@@ -166,10 +169,10 @@ function cardModel({question = '', answer = '', final = null, level = null, tool
   if (visual && S.leadKind && visual.kind !== 'text') visual.caption = plainLine(S.lead.replace(/\s*·\s*confidence:\s*(low|medium|high)/i, ''), id => 'the ' + (byId.get(id)?.label || 'element'));   // older card format: the lead line
   return {question: plainLine(question), level, lead, leadKind: S.leadKind, confidence: conf, bullets, chips, primary: prim, visual,
     limits: plainLine(S.limits), mode, model: final ? final.model : null, label,
-    footer: [
-      (mode === 'live' ? 'LIVE · ' + (final.model || 'Claude') : mode === 'mock' ? 'MOCK · scripted from real tool results' : '') +
-        (final ? ` · ${toolCount != null ? toolCount : (final.tools_used || []).length} lookups · ${nv}/${cites.length} cited IDs verified` : ''),
-      'Design BIM · inferred geometry and rooms · demo sensors SIMULATED · not headset-verified'],
+    // honesty footer: ONE small line on the card (mode + provenance); the lookup / verification counts sit on the evidence row
+    verified: final ? {n: nv, of: cites.length} : null,
+    stats: final ? `${toolCount != null ? toolCount : (final.tools_used || []).length} lookups · ${nv}/${cites.length} cited IDs verified` : '',
+    footer: [mode === 'live' ? 'LIVE · ' + (final.model || 'Claude') : mode === 'mock' ? 'MOCK · scripted' : '', HONESTY],
   };
 }
 
@@ -242,7 +245,33 @@ function runGlow(i, n, t, {stepMs = 90, fadeMs = 220, pulseMs = 1600, base = .5,
   return Math.min(.8, a);
 }
 
-/* Ask bar under the card: 2 rows x 3 buttons. (u, v) are plane UVs, v up (three.js PlaneGeometry). */
+/* ---------------------------------------------------------------- decluttered headset controls (2026-11-15)
+   Demo feedback: picking an element showed an info card plus a six-button bar, too much at once. Now:
+     picked     -> ONE compact label next to the element: "<type> · <level>", a hint line ("Hold trigger to ask"), a small honesty
+                   line, and a small "⋯" at its right end. Holding the trigger on the element (or on the label) asks by voice.
+     listening  -> the same label says "Listening… release to ask" (the ring pulses on the element)
+     answer     -> only the answer card, with its own small "⋯" in the top-right corner
+     "⋯"        -> the presets panel: the four preset questions (noisy rooms, no microphone), Details (the full element card), Close
+   Dismiss without a button: point away and pull the trigger on empty space, or B/Y (Escape on the desktop).
+   (u, v) below are plane UVs, v up (three.js PlaneGeometry). Sizes are layout units; the page draws them at a higher pixel scale. */
+const CHIP = {W: 640, H: 176, moreX: .8};
+const PICTO_WORD = {vent: 'Air vent', vav: 'VAV box', duct: 'Duct', damper: 'Damper', sprinkler: 'Sprinkler pipe', pipe: 'Pipe', valve: 'Valve',
+  light: 'Light', beam: 'Beam', ceiling: 'Ceiling', conduit: 'Conduit', equipment: 'Equipment'};
+/* label model. el: {label?, type?, name?, layer?, level?}; sensorLabel: the demo sensor's type name when a sensor pin was picked;
+   honesty: the page's one-line provenance (alignment / simulated sensor). */
+function chipModel({el = null, sensorLabel = '', voice = 'off', busy = false, honesty = ''} = {}) {
+  const key = pictogram(el), level = LEVEL_WORD(el && el.level);
+  const name = sensorLabel ? sensorLabel : (PICTO_WORD[key] || shortName(el));
+  const hint = busy ? {text: 'Thinking…', tone: 'dim'} : voice === 'recording' ? {text: 'Listening… release to ask', tone: 'rec'}
+    : voice === 'transcribing' ? {text: 'Transcribing…', tone: 'dim'} : voice === 'off' ? {text: 'Voice off · ⋯ for questions', tone: 'dim'}
+    : {text: 'Hold trigger to ask', tone: 'hint'};
+  return {title: name + (level ? ' · ' + level : ''), picto: sensorLabel ? 'sensor' : key, layer: (el && el.layer) || null, hint, honesty: String(honesty || '')};
+}
+function chipHit(u, v) { return u >= CHIP.moreX && u <= 1 && v >= 0 && v <= 1 ? 'more' : 'body'; }
+/* the answer card's "⋯": top-right corner (layout 1024 x 800: x >= 914, y <= 92) */
+const ANSWER_MORE = {x0: 914 / 1024, y1: 92 / 800};
+function answerHit(u, v) { return u >= ANSWER_MORE.x0 && 1 - v <= ANSWER_MORE.y1 ? 'more' : 'body'; }
+/* Presets panel (behind "⋯"): 2 rows x 3 buttons. */
 const BAR = {cols: 3, rows: 2, left: .02, right: .98, top: .05, bottom: .95, gap: .03};
 function barRects(area = BAR) {
   const out = [], w = (area.right - area.left - area.gap * (area.cols - 1)) / area.cols, h = (area.bottom - area.top - area.gap * (area.rows - 1)) / area.rows;
@@ -254,13 +283,12 @@ function barHit(u, v, area = BAR) {
   for (let i = 0; i < rects.length; i++) { const r = rects[i]; if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i; }
   return -1;
 }
-/* Buttons: the four levels, voice, close. state: {busy, voice: 'ready'|'recording'|'transcribing'|'off', voiceNote} */
+/* Buttons: the four levels, Details (the full element card), Close. state: {busy, details}. Voice is not a button any more:
+   the trigger held on the element is the microphone. */
 function barButtons(state = {}) {
-  const v = state.voice || 'off';
   return [...LEVELS.map(l => ({id: l.id, label: l.level + ' · ' + l.label, sub: l.hint, disabled: !!state.busy})),
-    {id: 'mic', label: v === 'recording' ? 'Listening… release' : v === 'transcribing' ? 'Transcribing…' : 'Hold to speak', sub: v === 'off' ? (state.voiceNote || 'voice off: use 1-4') : 'trigger held on this button',
-      tone: v === 'recording' ? 'rec' : v === 'off' ? 'off' : '', disabled: v === 'off' || v === 'transcribing' || (!!state.busy && v !== 'recording')},
-    {id: 'close', label: 'Close', sub: 'clear the answer', tone: 'exit'}];
+    {id: 'details', label: state.details ? 'Hide details' : 'Details', sub: 'element record'},
+    {id: 'close', label: 'Close', sub: 'B/Y also closes', tone: 'exit'}];
 }
 
 /* Voice in: the permission prompt is a 2D dialog that cannot show inside an immersive session, so the microphone is
@@ -363,7 +391,7 @@ function sizeText(el) {
   if (plan[1] < .05) return null;
   return plan[0] > 3 ? r(plan[0]) + ' m long' : r(plan[0]) + ' × ' + r(plan[1]) + ' m';
 }
-const LEVEL_WORD = l => { const m = /^L?(\d+)$/i.exec(String(l || '')); return m ? 'Level ' + m[1] : (l ? String(l) : ''); };
+const LEVEL_WORD = l => { const m = /^(?:L|LEVEL\s*)?0*(\d+)$/i.exec(String(l || '').trim()); return m ? 'Level ' + m[1] : (l ? String(l) : ''); };
 /* room_of confidence -> chip: dots (1-3), word, basis */
 function roomChip(room) {
   if (!room || !room.room) return null;
@@ -558,15 +586,19 @@ function drawItems(ctx, v, x, y, w, h) {
 function drawAnswer(ctx, W, H, view) {
   const m = view.model || {}, pad = 40, v = m.visual || null;
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = 'rgba(10,16,24,.94)'; rr(ctx, 4, 4, W - 8, H - 8, 28); ctx.fill();
+  ctx.fillStyle = 'rgba(10,16,24,.97)'; rr(ctx, 4, 4, W - 8, H - 8, 28); ctx.fill();
   ctx.strokeStyle = view.phase === 'error' ? '#e2725b' : 'rgba(226,232,240,.35)'; ctx.lineWidth = 3; ctx.stroke();
-  // header: small mark + "AI answer", mode, read-aloud state
-  drawMark(ctx, pad + 14, 46, 15, '#e2e8f0');
-  ctx.font = '600 24px Arial'; ctx.fillStyle = '#a9c1d6'; ctx.fillText('AI answer', pad + 38, 55);
-  let hx = pad + 38 + ctx.measureText('AI answer').width + 16;
+  // header: small mark + "AI answer", mode; right: a speaker icon while it is read aloud, "B/Y closes", and the small "⋯"
+  drawMark(ctx, pad + 14, 48, 16, '#e2e8f0');
+  ctx.font = '600 26px Arial'; ctx.fillStyle = '#a9c1d6'; ctx.fillText('AI answer', pad + 40, 57);
+  let hx = pad + 40 + ctx.measureText('AI answer').width + 16;
   const mode = view.modeLabel || (m.mode === 'live' ? 'LIVE' : m.mode === 'mock' ? 'MOCK' : '');
-  if (mode) hx += pill(ctx, hx, 32, mode, {h: 32, size: 19, weight: '700', fill: mode === 'LIVE' ? '#14532d' : '#6a4a10', color: mode === 'LIVE' ? '#86efac' : '#fcd34d'}) + 12;
-  if (view.speech) { const sp = view.speech, t = sp === 'speaking' ? 'READ ALOUD' : sp.toUpperCase(), col = sp === 'speaking' ? '#fde68a' : '#8aa2b8'; ctx.textAlign = 'right'; ctx.font = '700 20px Arial'; ctx.fillStyle = col; ctx.fillText(t, W - pad, 55); const tw = ctx.measureText(t).width; ctx.textAlign = 'left'; drawSpeaker(ctx, W - pad - tw - 38, 48, 28, col); }
+  if (mode) hx += pill(ctx, hx, 32, mode, {h: 34, size: 21, weight: '700', fill: mode === 'LIVE' ? '#14532d' : '#6a4a10', color: mode === 'LIVE' ? '#86efac' : '#fcd34d'}) + 12;
+  const mx = W * ANSWER_MORE.x0 + (W - W * ANSWER_MORE.x0) / 2 - 6;
+  drawMore(ctx, mx, 48, 30, !!view.hoverMore);
+  let rx = mx - 46;
+  if (view.speech === 'speaking') { drawSpeaker(ctx, rx - 30, 48, 30, '#fde68a'); rx -= 46; }
+  if (view.phase === 'answer' || view.phase === 'error') { ctx.textAlign = 'right'; ctx.font = '500 21px Arial'; ctx.fillStyle = '#7f94a8'; ctx.fillText('B/Y closes', rx, 56); ctx.textAlign = 'left'; }
   let y = 92;
   if (view.phase === 'thinking' || view.phase === 'error' || !v) {
     if (m.question) { ctx.font = 'italic 28px Arial'; ctx.fillStyle = '#a9c1d6'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y + 20); y += 36; } y += 14; }
@@ -587,19 +619,20 @@ function drawAnswer(ctx, W, H, view) {
       : v.kind === 'trace' ? (drawTrace(ctx, v, pad, by, W - 2 * pad, bh), true) : drawItems(ctx, v, pad, by, W - 2 * pad, 250);
     y = drawn ? by + (v.kind === 'text' ? 250 : bh) + 14 : y;
     // caption (the sentence answer, 1-2 lines)
-    ctx.font = '25px Arial'; ctx.fillStyle = '#b8c9d9';
-    for (const t of wrap(ctx, v.caption || '', W - 2 * pad, drawn ? 2 : 6)) { ctx.fillText(t, pad, y + 22); y += 32; }
-    // bottom rows: check on site, then the evidence ids
-    const ry = H - 200;
-    const cw = pill(ctx, pad, ry, '      ' + v.check, {h: 46, size: 24, fill: 'rgba(251,191,36,.16)', stroke: '#fbbf24', color: '#fde68a', weight: '700', maxW: W - 2 * pad});
-    drawPicto(ctx, 'check', pad + 27, ry + 23, 26, '#fbbf24');
-    let cx = pad; const ey = H - 140;
-    ctx.font = '600 19px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText('EVIDENCE', cx, ey + 23); cx += ctx.measureText('EVIDENCE').width + 14;
+    ctx.font = '27px Arial'; ctx.fillStyle = '#c3d3e2';
+    for (const t of wrap(ctx, v.caption || '', W - 2 * pad, drawn ? 2 : 6)) { ctx.fillText(t, pad, y + 24); y += 34; }
+    // bottom rows: check on site, then the evidence ids (with the verification count)
+    const ry = H - 172;
+    pill(ctx, pad, ry, '      ' + v.check, {h: 48, size: 26, fill: 'rgba(251,191,36,.16)', stroke: '#fbbf24', color: '#fde68a', weight: '700', maxW: W - 2 * pad});
+    drawPicto(ctx, 'check', pad + 28, ry + 24, 28, '#fbbf24');
+    let cx = pad; const ey = H - 106;
+    const evl = 'EVIDENCE' + (m.verified ? ' ' + m.verified.n + '/' + m.verified.of + ' VERIFIED' : '');   // the verification count rides on the evidence row
+    ctx.font = '600 21px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(evl, cx, ey + 25); cx += ctx.measureText(evl).width + 14;
     for (const c of m.chips || []) {
       const col = !c.verified ? '#ef4444' : c.primary ? hex(COLORS.primary) : hex(COLORS.other);
-      ctx.font = '600 20px Arial'; const t = '#' + c.id + ' ' + shortName(c).toLowerCase(), wNeed = Math.min(ctx.measureText(t).width + 24, 260); if (cx + wNeed > W - pad) break;
-      const w = pill(ctx, cx, ey, t, {h: 34, size: 20, fill: 'rgba(255,255,255,.06)', stroke: col, color: c.verified ? '#f1f5f9' : '#fca5a5', maxW: 260});
-      if (!c.verified) { ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 8, ey + 17); ctx.lineTo(cx + w - 8, ey + 17); ctx.stroke(); }
+      ctx.font = '600 22px Arial'; const t = '#' + c.id + ' ' + shortName(c).toLowerCase(), wNeed = Math.min(ctx.measureText(t).width + 26, 270); if (cx + wNeed > W - pad) break;
+      const w = pill(ctx, cx, ey, t, {h: 36, size: 22, fill: 'rgba(255,255,255,.06)', stroke: col, color: c.verified ? '#f1f5f9' : '#fca5a5', maxW: 270});
+      if (!c.verified) { ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 8, ey + 18); ctx.lineTo(cx + w - 8, ey + 18); ctx.stroke(); }
       cx += w + 8;
     }
   } else {
@@ -609,12 +642,12 @@ function drawAnswer(ctx, W, H, view) {
     let cx = pad;
     for (const c of m.chips || []) { const w = pill(ctx, cx, H - 170, '#' + c.id + ' ' + c.label, {h: 40, size: 22, stroke: c.primary ? hex(COLORS.primary) : hex(COLORS.other), maxW: W - pad - cx}); cx += w + 10; if (cx > W - 200) break; }
   }
+  // ONE small honesty line (mode + provenance); the stats line only when there are no evidence chips to carry it
   const f = (m.footer && m.footer.length ? m.footer : view.footer) || [];
-  if (view.runNote && !(v && v.kind === 'trace') && view.phase === 'answer') { ctx.fillStyle = '#9fe7f5'; fit(ctx, view.runNote, pad, H - 70, W - 2 * pad, 20); }
+  if (view.runNote && !(v && v.kind === 'trace') && view.phase === 'answer') { ctx.fillStyle = '#9fe7f5'; fit(ctx, view.runNote, pad, H - 52, W - 2 * pad, 21); }
   ctx.fillStyle = '#7f94a8';
-  if (f[0]) fit(ctx, f[0], pad, H - 44, W - 2 * pad, 20);
-  ctx.fillStyle = '#7f94a8';
-  if (f[1]) fit(ctx, f[1], pad, H - 18, W - 2 * pad, 20);
+  const foot = [f[0], m.stats && view.phase === 'answer' && !(v && (m.chips || []).length) ? m.stats : '', f[1]].filter(Boolean).join(' · ');
+  if (foot) fit(ctx, foot, pad, H - 20, W - 2 * pad, 21, '500');
 }
 /* The ask bar (buttons). hover: Set of button indices under a ray. */
 function drawBar(ctx, W, H, buttons, hover = new Set()) {
@@ -627,14 +660,38 @@ function drawBar(ctx, W, H, buttons, hover = new Set()) {
     ctx.fillStyle = hov ? '#FDB515' : b.tone === 'rec' ? '#7a2633' : b.tone === 'exit' ? '#3a2633' : b.disabled ? '#1b2a3a' : '#123a5c';
     rr(ctx, x, y, w, h, 16); ctx.fill(); ctx.strokeStyle = hov ? '#fff' : b.id === 'mic' && b.tone !== 'off' ? '#fbbf24' : '#5d82a3'; ctx.lineWidth = hov ? 6 : 3; ctx.stroke();
     ctx.textAlign = 'center'; ctx.fillStyle = hov ? '#0b1020' : b.disabled ? '#7b8da0' : '#fff';
-    fit(ctx, b.label, x + w / 2, y + h * .48, w - 20, 34, '700');
-    ctx.fillStyle = hov ? '#0b1020' : '#9fb6cb'; fit(ctx, b.sub || '', x + w / 2, y + h * .8, w - 20, 22, '500');
+    fit(ctx, b.label, x + w / 2, y + h * .5, w - 20, 36, '700');
+    ctx.fillStyle = hov ? '#0b1020' : '#9fb6cb'; fit(ctx, b.sub || '', x + w / 2, y + h * .82, w - 20, 24, '500');
     ctx.textAlign = 'left';
   });
 }
+/* the small round "⋯" button */
+function drawMore(ctx, cx, cy, r, hover = false) {
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = hover ? '#FDB515' : 'rgba(255,255,255,.10)'; ctx.fill();
+  ctx.lineWidth = hover ? 4 : 2.5; ctx.strokeStyle = hover ? '#ffffff' : 'rgba(226,232,240,.45)'; ctx.stroke();
+  ctx.fillStyle = hover ? '#0b1020' : '#e2e8f0'; for (const dx of [-.42, 0, .42]) { ctx.beginPath(); ctx.arc(cx + dx * r, cy, r * .13, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+}
+/* The compact element label (chipModel). hover: the "⋯" is under a ray. Layout CHIP.W x CHIP.H. */
+function drawChip(ctx, W, H, model, hover = false) {
+  const m = model || {}, rec = m.hint && m.hint.tone === 'rec', col = sysColor(m.layer), mx = W * CHIP.moreX;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(10,16,24,.96)'; rr(ctx, 3, 3, W - 6, H - 6, 30); ctx.fill();
+  ctx.strokeStyle = rec ? '#fb7185' : 'rgba(226,232,240,.35)'; ctx.lineWidth = rec ? 4 : 2.5; ctx.stroke();
+  ctx.fillStyle = col; rr(ctx, 16, 24, 8, H - 48, 4); ctx.fill();
+  drawPicto(ctx, m.picto || 'box', 66, 52, 46, col);
+  ctx.fillStyle = '#ffffff'; fit(ctx, m.title || '', 104, 66, mx - 120, 40, '700');
+  const h = m.hint || {text: ''};
+  let hx = 40;
+  if (rec) { ctx.beginPath(); ctx.arc(hx + 9, 106, 9, 0, Math.PI * 2); ctx.fillStyle = '#fb7185'; ctx.fill(); hx += 28; }
+  ctx.fillStyle = rec ? '#fecdd3' : h.tone === 'hint' ? '#fde68a' : '#a9c1d6'; fit(ctx, h.text, hx, 116, mx - hx - 16, 31, '600');
+  ctx.fillStyle = '#7f94a8'; fit(ctx, m.honesty || '', 40, 156, mx - 56, 22, '500');
+  ctx.strokeStyle = 'rgba(226,232,240,.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mx, 26); ctx.lineTo(mx, H - 26); ctx.stroke();
+  drawMore(ctx, mx + (W - mx) / 2 - 2, H / 2, 40, hover);
+}
 
-return {API, LEVELS, COLORS, BAR, SYS, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
-  barRects, barHit, barButtons, micPlan, ttsPlan, wrap, drawMark, drawPicto, drawAnswer, drawBar,
+return {API, LEVELS, COLORS, BAR, CHIP, ANSWER_MORE, HONESTY, SYS, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
+  barRects, barHit, barButtons, chipModel, chipHit, answerHit, micPlan, ttsPlan, wrap, drawMark, drawPicto, drawAnswer, drawBar, drawChip, drawMore,
   pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
   serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

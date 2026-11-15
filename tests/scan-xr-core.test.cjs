@@ -555,3 +555,19 @@ test('headset capture list: registered captures only unless asked', () => {
   assert.deepEqual(X.headsetCaptures(['2026-09-17'], P('')), ['2026-09-17'], 'never an empty list');
   assert.equal(X.nextCapture('2026-05-06', X.headsetCaptures(pub, P(''))), '2026-05-06');
 });
+
+test('panel pixel scale: 2x on Quest 3 / desktop, 1.5x on other headsets, ?panelres= 1-3, capped by the texture limit', () => {
+  assert.equal(X.panelPixelScale({device: 'quest3'}), 2); assert.equal(X.panelPixelScale({device: 'quest3s'}), 2); assert.equal(X.panelPixelScale({device: 'unknown'}), 2);
+  assert.equal(X.panelPixelScale({device: 'quest2'}), 1.5); assert.equal(X.panelPixelScale({device: 'quest-other'}), 1.5);
+  assert.equal(X.panelPixelScale({device: 'quest3', param: '3'}), 3); assert.equal(X.panelPixelScale({device: 'quest3', param: '9'}), 3);
+  assert.equal(X.panelPixelScale({device: 'quest3', param: '0.2'}), 1); assert.equal(X.panelPixelScale({device: 'quest2', param: 'x'}), 1.5);
+  assert.equal(X.panelPixelScale({device: 'quest3', param: '3', maxTexture: 2048, width: 1280, height: 800}), 1.6);
+  assert.equal(X.panelPixelScale({device: 'quest3', maxTexture: 16384, width: 1280}), 2);
+  assert.equal(X.panelPixelScale({device: 'quest3', param: '3', maxTexture: 16384, width: 1600}), 2.56, 'never above 4096 px');
+  assert.equal(X.panelPixelScale({device: 'quest3', maxTexture: 512, width: 1024}), 1, 'never below 1');
+});
+test('back action (B/Y, Esc): menu first, then the picked element, then open the menu', () => {
+  assert.equal(X.backAction({menuOpen: true, picked: true}), 'close-menu');
+  assert.equal(X.backAction({menuOpen: false, picked: true}), 'dismiss');
+  assert.equal(X.backAction({}), 'open-menu');
+});

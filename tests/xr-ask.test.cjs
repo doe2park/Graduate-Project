@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=8"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=9"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -38,7 +38,7 @@ test('page loads the versioned helper and checks its API before turning on', () 
   assert.doesNotMatch(page, /fetch\('api\//);
   // every hook into the existing page is guarded, so the page is unchanged without ?ask=1
   for (const hook of ['if(ASK?.on)askOnPick', 'function hideCard(){if(ASK?.on)askClear();', 'if(ASK?.on)try{askAnim=askTick();}']) assert.ok(page.includes(hook), hook);
-  assert.match(page, /function askPanelHit\(o,d\)\{if\(!ASK\?\.on\|\|!askBar\.mesh\.visible\)return null;/);
+  assert.match(page, /function askPanelHit\(o,d\)\{if\(!ASK\?\.on\|\|!\(askBar\.mesh\.visible\|\|askChip\.mesh\.visible\|\|askCard\.mesh\.visible\)\)return null;/);
 });
 
 test('SSE stream: events split across arbitrary chunks', () => {
@@ -62,7 +62,7 @@ test('card model: short lead, 2 evidence bullets + first check, verified chips f
   assert.equal(m.chips[0].id, '400766'); assert.equal(m.chips[0].primary, true);
   assert.equal(m.chips.at(-1).verified, false);
   assert.match(m.limits, /not verified connections/); assert.doesNotMatch(m.limits, /mock mode/);
-  assert.match(m.footer[0], /^MOCK · scripted from real tool results · 1 lookups · 3\/4 cited IDs verified$/);
+  assert.equal(m.footer[0], 'MOCK · scripted'); assert.equal(m.stats, '1 lookups · 3/4 cited IDs verified');
   assert.match(m.footer[1], /SIMULATED/); assert.match(m.footer[1], /not headset-verified/);
   // an unverified lead id is never the highlighted primary
   const f2 = {...FINAL, citations: CITES.map(c => c.id === '400766' ? {...c, verified: false} : c)};
@@ -96,17 +96,44 @@ test('run glow: dark before its turn, lit in order, a pulse afterwards; reduced 
   assert.equal(XA.runGlow(5, 10, 0, {reduced: true}), 0.5);
 });
 
-test('ask bar: six buttons, plane-UV hit test (v up), gaps miss', () => {
-  const rects = XA.barRects(), btn = XA.barButtons({voice: 'ready'});
+test('presets panel (behind ⋯): six buttons, no microphone button, plane-UV hit test (v up), gaps miss', () => {
+  const rects = XA.barRects(), btn = XA.barButtons({});
   assert.equal(rects.length, btn.length);
-  assert.deepEqual(btn.map(b => b.id), ['q1', 'q2', 'q3', 'q4', 'mic', 'close']);
+  assert.deepEqual(btn.map(b => b.id), ['q1', 'q2', 'q3', 'q4', 'details', 'close']);
   rects.forEach((r, i) => assert.equal(XA.barHit(r.x + r.w / 2, 1 - (r.y + r.h / 2)), i));
   assert.equal(XA.barHit(.005, .5), -1);
   assert.equal(XA.barHit(rects[0].x + rects[0].w + XA.BAR.gap / 2, 1 - (rects[0].y + rects[0].h / 2)), -1);
   assert.deepEqual(XA.LEVELS.map(l => l.level), [1, 2, 3, 4]);
-  assert.equal(XA.barButtons({voice: 'off'})[4].disabled, true);
-  assert.equal(XA.barButtons({voice: 'recording', busy: false})[4].label, 'Listening… release');
+  assert.equal(XA.barButtons({details: true})[4].label, 'Hide details');
   assert.equal(XA.barButtons({busy: true})[0].disabled, true);
+  assert.equal(XA.barButtons({busy: true})[5].disabled, undefined, 'Close always works');
+});
+
+test('compact label: type · level, one hint line that follows the voice state, honesty line, "⋯" hit on the right end', () => {
+  const el = {type: 'Type F - 24x24 Perforated Supply Diffuser', layer: 'duct', level: 'LEVEL 01'};
+  const m = XA.chipModel({el, voice: 'ready', honesty: 'Design BIM · registered, not surveyed'});
+  assert.equal(m.title, 'Air vent · Level 1'); assert.equal(m.hint.text, 'Hold trigger to ask'); assert.equal(m.picto, 'vent');
+  assert.equal(XA.chipModel({el, voice: 'recording'}).hint.text, 'Listening… release to ask');
+  assert.equal(XA.chipModel({el, voice: 'transcribing'}).hint.text, 'Transcribing…');
+  assert.match(XA.chipModel({el, voice: 'off'}).hint.text, /⋯/);
+  assert.equal(XA.chipModel({el, voice: 'ready', busy: true}).hint.text, 'Thinking…');
+  const s = XA.chipModel({el: {layer: 'plumbing', level: 'L1'}, sensorLabel: 'Leak sensor', honesty: 'SIMULATED demo sensor · nothing installed'});
+  assert.equal(s.title, 'Leak sensor · Level 1'); assert.equal(s.picto, 'sensor');
+  assert.equal(XA.chipModel({el: {layer: 'lighting'}}).title, 'Light');   // no level: no dangling separator
+  assert.equal(XA.chipHit(.95, .5), 'more'); assert.equal(XA.chipHit(.5, .5), 'body'); assert.equal(XA.chipHit(XA.CHIP.moreX - .01, .5), 'body');
+  assert.equal(XA.answerHit(.97, .97), 'more'); assert.equal(XA.answerHit(.97, .5), 'body'); assert.equal(XA.answerHit(.5, .97), 'body');
+  const ctx = fakeCtx(); XA.drawChip(ctx, XA.CHIP.W, XA.CHIP.H, m, true);
+  assert.ok(ctx.calls.includes('Air vent · Level 1') && ctx.calls.includes('Hold trigger to ask') && ctx.calls.some(t => /not surveyed/.test(t)));
+});
+
+test('page: one label instead of the info card + six buttons; dismiss by B/Y / Esc / empty space; presets only behind ⋯', () => {
+  assert.ok(page.includes("askChip.mesh.visible=has&&!cardOn;askCard.mesh.visible=cardOn;askBar.mesh.visible=has&&ASK.more;if(has)card.mesh.visible=!cardOn&&ASK.details;"));
+  assert.ok(page.includes('if(edge(5))xrBack();'), 'B/Y goes through the back action (VR and MR)');
+  assert.equal(page.split('if(edge(5))xrBack();').length - 1, 2);
+  assert.ok(!page.includes('askSelectStart') && !page.includes("b.id==='mic'"), 'no microphone button any more');
+  assert.ok(page.includes("c.addEventListener('selectstart',()=>askHoldStart(c));"));
+  assert.ok(page.includes("if(onAsk&&ASK.el){"), 'holding the trigger on the label / answer asks about the picked element');
+  assert.ok(page.includes('hideCard();if(!info){status('), 'a press on empty space still closes everything');
 });
 
 test('voice plans: mic opened before the session, laptop voice when the browser has none', () => {
@@ -135,12 +162,13 @@ test('canvas drawing: answer card (thinking / answer / error) and bar draw witho
   for (const view of [{phase: 'thinking', model: {question: 'q', level: 3}, steps: ['connected_run · 250 touching elements']}, {phase: 'answer', model: m, speech: 'speaking', runNote: 'Lit run: 11 pieces'}, {phase: 'error', model: {}, error: 'server 404'}]) {
     const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, view);
     assert.ok(ctx.calls.includes('AI answer'), view.phase); assert.ok(!ctx.calls.includes('Claude'), view.phase);
-    if (view.phase === 'answer') { assert.ok(ctx.calls.some(t => t.startsWith('#400766'))); assert.ok(ctx.calls.includes('READ ALOUD')); assert.ok(ctx.calls.some(t => /SIMULATED/.test(t))); }
+    if (view.phase === 'answer') { assert.ok(ctx.calls.some(t => t.startsWith('#400766'))); assert.ok(ctx.calls.includes('B/Y closes')); assert.ok(!ctx.calls.includes('READ ALOUD'));
+      const foot = ctx.calls.filter(t => /SIMULATED/.test(t)); assert.equal(foot.length, 1, 'one honesty line'); assert.match(foot[0], /^MOCK · scripted · 1 lookups · 3\/4 cited IDs verified · Design BIM/); }   // no picture card: the counts stay in the footer
     if (view.phase === 'thinking') assert.ok(ctx.calls.some(t => /connected_run/.test(t)));
     if (view.phase === 'error') assert.ok(ctx.calls.includes('Could not answer'));
   }
-  const ctx = fakeCtx(); XA.drawBar(ctx, 1024, 300, XA.barButtons({voice: 'ready'}), new Set([1]));
-  assert.ok(ctx.calls.includes('1 · What is this?') && ctx.calls.includes('Hold to speak'));
+  const ctx = fakeCtx(); XA.drawBar(ctx, 1024, 300, XA.barButtons({}), new Set([1]));
+  assert.ok(ctx.calls.includes('1 · What is this?') && ctx.calls.includes('Details') && !ctx.calls.includes('Hold to speak'));
 });
 
 test('server= (Method A): https + private LAN IPv4 or localhost + explicit port, else ignored', () => {
@@ -325,6 +353,7 @@ test('visual cards draw without throwing for every kind, with headline, check ch
     const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, {phase: 'answer', model: m, speech: 'text only'});
     assert.ok(ctx.calls.includes(m.visual.headline), m.visual.kind); assert.ok(ctx.calls.some(t => t.includes(m.visual.check)), m.visual.kind);
     assert.ok(ctx.calls.some(t => /^#\d/.test(t)), m.visual.kind); assert.ok(ctx.calls.some(t => /SIMULATED/.test(t)), m.visual.kind);
+    assert.ok(ctx.calls.some(t => /^EVIDENCE \d+\/\d+ VERIFIED$/.test(t)), m.visual.kind); assert.equal(ctx.calls.filter(t => /SIMULATED/.test(t)).length, 1, 'one honesty line');
     assert.ok(!ctx.calls.some(t => /Claude/.test(t)) || m.mode === 'live', m.visual.kind);
   }
   assert.ok(page.includes('if(ev.visual&&typeof ev.visual===\'object\')ASK.vis.push(ev.visual);'));

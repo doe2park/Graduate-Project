@@ -518,11 +518,28 @@ function headsetCaptures(published, params) {
   return list.length ? list : published.slice();
 }
 
+/* ── Panel sharpness (2026-11-15) ── In-world panels are 2D canvases on planes. A canvas drawn at its layout size (e.g. 1024 px for a
+   0.6 m card) is close to the headset's own pixel density at arm's length, so text went soft once the texture was minified and
+   filtered. The page now draws every panel at k x its layout size (the drawing code keeps layout units through ctx.setTransform),
+   with mipmaps and the GPU's maximum anisotropy. k: ?panelres= (1-3) else 2 on Quest 3/3S and desktop, 1.5 on Quest 2 / other
+   headsets (less GPU memory). Never larger than the GPU texture limit (and 4096 px) on the longer side. */
+const PANEL_RES_MIN = 1, PANEL_RES_MAX = 3;
+function panelPixelScale({device = 'unknown', param = null, maxTexture = 4096, width = 1024, height = 1024} = {}) {
+  const raw = param == null || param === '' ? NaN : Number(param);
+  const want = Number.isFinite(raw) && raw > 0 ? Math.max(PANEL_RES_MIN, Math.min(PANEL_RES_MAX, raw))
+    : (device === 'quest2' || device === 'quest-other') ? 1.5 : 2;
+  const cap = Math.min(Number(maxTexture) > 0 ? Number(maxTexture) : 4096, 4096) / Math.max(1, width, height);
+  return Math.max(1, Math.min(want, cap));
+}
+/* B / Y button and Escape (2026-11-15): one "back" press closes the topmost thing. An open menu first, then the picked element
+   (its label, the answer and the lit parts), and only then does it open the menu. Info cards and answers need no Close button. */
+function backAction({menuOpen = false, picked = false} = {}) { return menuOpen ? 'close-menu' : picked ? 'dismiss' : 'open-menu'; }
+
 /* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
    Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
-const API = 7;   // 7: frame guard, headsetCaptures
+const API = 8;   // 7: frame guard, headsetCaptures · 8: panelPixelScale, backAction
 
-return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, FRAME_GUARD, frameGuardInit, frameGuardStep, frameGuardText, headsetCaptures, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
+return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, PANEL_RES_MIN, PANEL_RES_MAX, panelPixelScale, backAction, FRAME_GUARD, frameGuardInit, frameGuardStep, frameGuardText, headsetCaptures, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
   chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines,
   loadProgressText, MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,

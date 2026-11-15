@@ -294,9 +294,21 @@ the public page is unchanged.
 ### Asking in the headset (Nov 5 2026 flow)
 
 - **Point and ask:** point at a duct, pipe, light or diffuser and **hold the trigger** (≥ 0.4 s): a short chime, a red
-  *Listening…* ring pulses on the element and the info card + ask bar appear; speak; **release** → the question is sent with
-  that element. A short trigger press works as before (info card + ask bar with the four level buttons). The hold is not
-  armed while pointing at a panel, aiming a move, holding the grip, placing the demo, aligning or while an answer is busy.
+  *Listening…* ring pulses on the element and its compact label says *Listening… release to ask*; speak; **release** → the
+  question is sent with that element. A short trigger press shows only the label (see *Decluttered controls* below). Holding
+  the trigger on the label or on the answer card asks a follow-up about the same element. The hold is not armed while
+  pointing at another panel or a "⋯", aiming a move, holding the grip, placing the demo, aligning or while an answer is busy.
+- **Decluttered controls (Nov 15 2026, after demo feedback; not headset-verified):** a pick shows ONE compact label next to
+  the element: *type · level*, the hint *Hold trigger to ask*, one small honesty line (*Design BIM · registered, not
+  surveyed* / *SIMULATED demo sensor · nothing installed*) and a small **⋯**. While an answer shows, only the answer card is
+  visible (its own **⋯** in the corner; the honesty line is one footer line). **⋯** opens the presets panel: the four
+  preset questions (noisy rooms, no microphone), **Details** (the full element card) and **Close**. Dismiss without a
+  button: point away and pull the trigger on empty space, or **B/Y** (B/Y closes an open menu first, then the pick, and
+  only then opens the menu). Other demo sensors' value chips step back while something is picked (pins stay). Desktop
+  preview: click, hold **Space** to speak, **1-4** presets, **Esc** closes.
+- **Sharper panels (Nov 15 2026):** every in-world canvas panel is drawn at 2× its layout size on Quest 3/3S and desktop
+  (1.5× on other headsets; `&panelres=1`-`3` overrides), with mipmaps, the GPU's maximum anisotropy and premultiplied
+  alpha. The XR framebuffer scale is unchanged (1.0 on Quest 3/3S, with the frame guard stepping down when frames are slow).
 - **While waiting:** a send tone; the card shows *Thinking…* and then a line per server step (*Checking what is above it…*,
   *Following the ducts…*, *Reading the demo sensors (simulated)…*); if nothing has been said after 1.5 s the voice says
   *One moment.*
@@ -314,10 +326,10 @@ MR/VR page (`scan-xr.html`, the page behind `/mr`) in mock mode; nothing below i
 ### What you do in the headset
 
 0. (New) Hold the trigger on an element to ask by voice: see *Asking in the headset* above.
-1. Trigger on a service element (duct, pipe, light…) or on a demo-sensor pin: the usual info card appears, plus an
-   **ask bar** under it: `1 · What is this?` (look up), `2 · What's above?` (nearby in 3D), `3 · What feeds it?`
-   (trace a system), `4 · Why is it warm?` (reason across sources), **Hold to speak**, **Close**.
-2. Trigger on a level button, or hold the trigger on *Hold to speak*, say the question, release.
+1. Trigger on a service element (duct, pipe, light…) or on a demo-sensor pin: its compact label appears (type · level,
+   *Hold trigger to ask*, **⋯**). **⋯** opens the presets panel: `1 · What is this?` (look up), `2 · What's above?`
+   (nearby in 3D), `3 · What feeds it?` (trace a system), `4 · Why is it warm?` (reason across sources), **Details**, **Close**.
+2. Hold the trigger on the element (or its label), say the question, release; or press a preset.
 3. The answer comes back as a world-locked card just under the element (visual card since Nov 9, 2026; not
    headset-verified): a small neutral spark mark + *AI answer* and LIVE/MOCK, one large headline, then a picture chosen
    by the tool that answered, built from the structured tool results (`visual` on each server `tool` event,
@@ -361,7 +373,7 @@ The mock answers for the four levels are scripted from real tool runs (`MockAgen
 4. Wait for *Services ready*. In the **Ask the twin** box (top right): press **Allow mic** (allow the microphone
    prompt), then **Test voice** (you should hear "Ask the twin is ready"; this also unlocks sound).
 5. Press **Enter MR**. *Demo anywhere* is the default: point at the floor, trigger, the Grimes services appear at
-   real scale (DEMO, not aligned). Trigger on a duct or diffuser overhead → the ask bar → press `3` (or hold *Hold to speak*).
+   real scale (DEMO, not aligned). Hold the trigger on a duct or diffuser overhead and ask (or trigger → **⋯** → `3`).
 6. Ctrl+C on the Mac stops the server.
 
 Why HTTPS: WebXR and the microphone need a secure context; a LAN IP over plain http is not one. Alternative without a
@@ -436,7 +448,7 @@ The headless check loads three element layers under software WebGL and takes abo
 - `scripts/ask_twin/limits.py` — access code, rate limits, daily token budget (usage JSON outside the repo)
 - `scripts/ask_twin/index.py` — element box index; `tools.py` — read-only tools + schemas; `agent.py` — live and mock loops (+ `mock_route`); `speech.py` — short spoken version and `speak` events
 - `twin/ask-twin.js` — panel, citation chips, highlights, fly-to, push-to-talk, spoken reply
-- `twin/xr-ask.js` — headset helpers and canvas drawing (ask bar, visual answer card, pictograms); `scan-xr.html` `?ask=1` block wires it into the XR page
+- `twin/xr-ask.js` — headset helpers and canvas drawing (compact label, presets panel, visual answer card, pictograms); `scan-xr.html` `?ask=1` block wires it into the XR page
 - `tests/xr-ask.test.cjs`, `tests/xr-ask-smoke.cjs` — headset helper tests and the desktop-simulation smoke
 - `grimes-bim-viewer.html` — small `?ask=1` hook (`window.twinViewerApi`, pick context); inert without `?ask=1`
 - `tests/test_ask_twin.py`, `tests/ask-twin-smoke.cjs`
