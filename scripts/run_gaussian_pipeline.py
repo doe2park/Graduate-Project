@@ -6,7 +6,7 @@
     python scripts/run_gaussian_pipeline.py --capture 2026-09-17 --all-zones      # every zone in turn (owner; resumable)
     python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --zone l1-c --seed 43   # reproducibility experiment
 
-Stages: prepare dataset -> train (Brush v0.3.0) -> encode desktop .ksplat -> mobile .ply
+Stages: prepare dataset -> train (Brush v0.3.0) -> [--clean: remove floaters, raw checkpoint kept] -> encode desktop .ksplat -> mobile .ply
 + viewer.json with provenance -> optional publish into scan-assets/gaussian/<capture>/.
 Output: work/gaussian/<capture>/<timestamp>/ (zones: work/gaussian/<capture>/<zone>/<timestamp>/), gitignored. Nothing is published unless
 --publish --yes is given, and existing published files are never replaced without --overwrite.
@@ -129,6 +129,10 @@ def build_parser():
     p.add_argument('--seed', type=int, help='random seed for dataset point sampling and Brush training (default 42 in both); for reproducibility experiments, e.g. 42 43 44')
     p.add_argument('--quick', action='store_true', help='smoke test: 4 stations, 300 steps, tiny model; never publishable')
     p.add_argument('--mask-nadir', action='store_true', help='drop downward-looking faces where the camera operator appears')
+    p.add_argument('--clean', choices=['off', 'light', 'medium', 'strong'], default='off',
+                   help='remove floater Gaussians after training (scripts/clean_gaussian.py); the raw checkpoint is kept')
+    p.add_argument('--clean-mesh', action='store_true',
+                   help='with --clean: also drop Gaussians far from the scan mesh (mesh holes remove real content too)')
     p.add_argument('--watch', action='store_true', help="open Brush's live training window to watch the scene form")
     p.add_argument('--publish', action='store_true', help='copy results into scan-assets/gaussian/<capture>/ (zones: .../<capture>/zones/<zone>/) (needs --yes)')
     p.add_argument('--yes', action='store_true', help='confirm the publish checklist')
@@ -452,16 +456,22 @@ def execute(args, argv, preset, settings, folder, zone=None, geometry=None):
     import prepare_gaussian_dataset
     import train_gaussian
     import package_gaussian
+    import clean_gaussian
 
     timings = {name: s.get('seconds') for name, s in run.state['stages'].items() if s.get('seconds') is not None}
     dataset, train_dir = folder / 'dataset', folder / 'train'
     ply = train_dir / f'export_{settings["train"]["steps"]}.ply'
+    clean_preset = settings.get('clean')
+    clean_mesh = bool(settings.get('cleanMesh'))
+    clean_dir = folder / f'cleaned-{clean_preset}{"-mesh" if clean_mesh else ""}' if clean_preset else None
+    output_ply = clean_dir / 'cleaned.ply' if clean_preset else ply  # what encode/package use
+    clean_report = None
     ksplat = folder / 'encoded' / 'trained.ksplat'
     package_dir = folder / 'package'
     p = settings['prepare']
     manifest = ROOT / preset['manifest']
     seed_glbs = [ROOT / g for g in preset['seedGlbs']]
-    total = 4
+    total = 5 if clean_preset else 4
     try:
         stage_banner(1, total, 'Prepare dataset')
         if run.done('prepare'):
@@ -494,22 +504,42 @@ def execute(args, argv, preset, settings, folder, zone=None, geometry=None):
                 raise RuntimeError(f'Brush did not finish (exit {record.get("exitCode")}); see {train_dir / "train.log"}')
             run.mark('train', 'done', timings['train'])
 
-        stage_banner(3, total, 'Encode desktop .ksplat')
+        stage = 3
+        if clean_preset:
+            stage_banner(stage, total, f'Remove floaters ({clean_preset}); raw checkpoint kept')
+            if run.done('clean') and output_ply.is_file():
+                print('already done, skipping')
+            else:
+                t = time.monotonic()
+                if clean_dir.exists():
+                    shutil.rmtree(clean_dir)
+                cameras = [c for c in (dataset / 'transforms.json', dataset / 'transforms_val.json') if c.is_file()]
+                report = clean_gaussian.clean(ply, cameras, clean_dir, clean_preset,
+                                              mesh_glbs=seed_glbs if clean_mesh else None,
+                                              mesh_up_axis=preset['seedUpAxis'])
+                print(f'removed {report["removed"]:,} of {report["source"]["gaussians"]:,} '
+                      f'({report["removedFraction"]:.1%}); by rule: {report["flaggedByRule"]}')
+                timings['clean'] = round(time.monotonic() - t, 1)
+                run.mark('clean', 'done', timings['clean'])
+            clean_report = json.loads((clean_dir / 'clean-report.json').read_text())
+            stage += 1
+
+        stage_banner(stage, total, 'Encode desktop .ksplat')
         if run.done('encode') and ksplat.is_file():
             print('already done, skipping')
         else:
             t = time.monotonic()
             if ksplat.parent.exists():
                 shutil.rmtree(ksplat.parent)
-            encode_ksplat(ply, ksplat)
+            encode_ksplat(output_ply, ksplat)
             timings['encode'] = round(time.monotonic() - t, 1)
             run.mark('encode', 'done', timings['encode'])
 
-        stage_banner(4, total, 'Mobile preview and viewer.json')
+        stage_banner(stage + 1, total, 'Mobile preview and viewer.json')
         t = time.monotonic()
         if package_dir.exists():
             shutil.rmtree(package_dir)
-        package_gaussian.package(ply, package_dir, manifest, p['centerId'], settings['mobileBudget'],
+        package_gaussian.package(output_ply, package_dir, manifest, p['centerId'], settings['mobileBudget'],
                                  settings['train']['steps'], ksplat)
         timings['package'] = round(time.monotonic() - t, 1)
         record = json.loads((train_dir / 'command.json').read_text())
@@ -526,6 +556,8 @@ def execute(args, argv, preset, settings, folder, zone=None, geometry=None):
         viewer['capture'], viewer['building'] = extra['capture'], extra['building']
         viewer['provenance']['validation'] = extra['validation']
         viewer['provenance']['pipeline'] = extra['pipeline']
+        if clean_report:  # PSNR/SSIM above were measured by Brush on the raw checkpoint, before cleaning
+            viewer['provenance']['cleaning'] = clean_report
         viewer['provenance']['selectionStatus'] = ('Smoke test only; not a usable reconstruction.' if args.quick else
                                                    'Local run from the one-command pipeline; not yet reviewed or selected.')
         if zone:
@@ -583,6 +615,13 @@ def main(argv=None):
     base = build_settings(preset, presets['quick'], args.quick, args.steps, args.max_splats, args.resolution,
                           getattr(args, 'seed', None))
     base['maskNadir'] = args.mask_nadir
+    if getattr(args, 'clean', 'off') != 'off':  # only when requested, so existing run folders still resume
+        base['clean'] = args.clean
+        if getattr(args, 'clean_mesh', False):
+            base['cleanMesh'] = True
+    elif getattr(args, 'clean_mesh', False):
+        print('error: --clean-mesh needs --clean light|medium|strong', file=sys.stderr)
+        return 2
 
     zone_ids = gz.zone_ids(zones_doc, args.capture) if args.all_zones else [args.zone] if args.zone else [None]
     plans = []

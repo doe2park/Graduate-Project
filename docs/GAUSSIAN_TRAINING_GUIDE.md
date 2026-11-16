@@ -109,6 +109,51 @@ the standalone layer `scan-splat.html?manifest=...` and `scan-compare.html?mode=
 honours the `manifest` override on localhost only, and its splat mode uses the **May 6 registration**; for September
 results prefer the standalone layer.
 
+## Removing floaters (optional)
+
+`scripts/clean_gaussian.py` writes a separate floater-cleaned derivative; the trained checkpoint is only read. Whole
+Gaussians are dropped and every kept one keeps all of its parameters byte-for-byte. Rules are camera-aware (indoor
+walks: "far from the cloud centre" would delete corridor ends): near-invisible opacity, isolated specks, needle-shaped
+streaks (long axis much longer than the middle axis; flat surface discs are normal and kept), oversized Gaussians,
+and Gaussians far outside the camera path or far below/above the cameras. Presets `light` / `medium` / `strong`;
+`--set key=value` overrides one parameter; `--dry-run` only reports.
+
+```sh
+.venv-gaussian/bin/python scripts/clean_gaussian.py --run work/gaussian/2026-10-18/l1-a/<stamp> --preset medium --dry-run
+.venv-gaussian/bin/python scripts/clean_gaussian.py --run work/gaussian/2026-10-18/l1-a/<stamp> --preset medium --package
+.venv-gaussian/bin/python scripts/run_gaussian_pipeline.py --capture 2026-10-18 --zone l1-c --clean medium   # new runs
+```
+
+`--package` builds `<run>/cleaned-<preset>/package/` (preview it with `scan-splat.html?manifest=<that>/viewer.json`).
+With `--clean`, the pipeline encodes and packages the cleaned PLY and adds `provenance.cleaning` (hashes, parameters,
+counts per rule) to `viewer.json`. PSNR/SSIM in `viewer.json` are still Brush's numbers for the raw checkpoint.
+
+**Optional mesh rule (`--mesh`, pipeline `--clean-mesh`).** Also drops Gaussians farther than `offSurfaceMetres`
+(light/medium/strong 0.5/0.3/0.2 m) from the exported scan mesh that seeded training (the preset's `seedGlbs`, read
+with the same Z-up → Y-up basis as `prepare_gaussian_dataset.py`, sampled every ~5 cm). The output folder is
+`cleaned-<preset>-mesh/` and the report adds the mesh hashes and a risk note. **Risk:** the Cupix mesh has holes
+(glass, unscanned rooms, thin objects); real content there is also far from the mesh and gets removed. Off by default.
+
+**Measured on 2026-10-28 (Oct 18 zones, 1M Gaussians).** Removed without the mesh rule: l1-a 1.5 / 4.7 / 13.4 % and
+l1-c 1.8 / 5.5 / 15.8 % (light / medium / strong); opacity is the largest rule. l1-a medium + mesh: 5.9 % (the mesh
+rule flags 19,789 = 2.0 % at > 0.3 m, 12,271 of them not caught by the other rules). Distance of all l1-a Gaussians
+to the scan mesh: median 0.05 m, p95 0.19 m, p99 0.43 m.
+
+Fixed-pose comparisons of l1-a (raw / medium / medium + mesh, desktop KSplat; wait ≥ 6 s after setting the pose:
+earlier screenshots taken before the progressive sort settled showed differences that were not real):
+
+- Near the walked path: no visible change and no visible loss.
+- Above the ceiling: medium reduces white streaks.
+- Viewed alone, the > 0.3 m set is mostly scattered streaks and blobs (floaters), with a few compact patches that may
+  be real content in mesh holes.
+- The **remaining blur is not floaters.** The "haze" over the raked seating 2 m from the nearest station is ~22k
+  Gaussians lying on the mesh (median 4.7 cm from it): the seats seen far closer than any training view. The large
+  blobs in a corner overview sit on the nearby wall and ceiling. Neither clean-up changes these; they need closer or
+  denser capture, higher training resolution or training-side regularization.
+
+Cleaning is a safe size/streak clean-up, not a quality fix for under-observed surfaces. Not reviewed for
+publication; no published asset was changed.
+
 ## Publishing responsibly
 
 Nothing is published by default. `--publish` prints a checklist and refuses to continue without `--yes`:
