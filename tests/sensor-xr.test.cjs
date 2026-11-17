@@ -75,7 +75,7 @@ test('card and chip never present a simulated value as real', () => {
 });
 test('page wiring: loadProgressText, versions, no real-reading claims', () => {
   const html = read('scan-xr.html');
-  assert.equal(X.API, 8); assert.ok(html.includes('twin/xr-core.js?v=8') && html.includes('XR_CORE_API=8,'));
+  assert.equal(X.API, 9); assert.ok(html.includes('twin/xr-core.js?v=9') && html.includes('XR_CORE_API=9,'));
   assert.equal(X.loadProgressText('Fire piping', 21.8e6, 2.0e6), 'Fire piping · 21.8 MB loaded', 'loaded > total is never a fraction');
   assert.equal(X.loadProgressText('Fire', 5e6, 24.2e6), 'Fire · 5.0 / 24.2 MB'); assert.equal(X.loadProgressText('Duct', 21.11e6, 21.1e6), 'Duct · 21.1 / 21.1 MB');
   assert.equal(X.loadProgressText('Duct', 30e6, 21.1e6), 'Duct · 30.0 MB loaded'); assert.equal(X.loadProgressText('X', 3e6), 'X · 3.0 MB loaded'); assert.equal(X.loadProgressText('X', NaN, 5), 'X · loading…');
@@ -84,5 +84,5 @@ test('page wiring: loadProgressText, versions, no real-reading claims', () => {
   assert.match(html, /globalThis\.SensorXR,SXOK=SX\?\.API===3/, 'stale-cache guard for the sensor helper');
   assert.equal(SX.API, 3); assert.ok(html.includes('twin/sensor-xr.js?v=3') && html.includes('SX?.API===3'), 'page loads and checks the API 3 helper');
   const menu = X.menuButtons('more', {layers: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(k => ({key: k, label: k})), sensorsLabel: 'Leak'});
-  assert.equal(menu.length, X.menuLayout(X.MENU_PAGES.more).length); assert.equal(menu[13].id, 'sensors'); assert.equal(menu[13].value, 'Leak'); assert.equal(menu[13].tone, 'on');
+  assert.equal(menu.length, X.menuLayout(X.MENU_PAGES.more).length); assert.equal(menu[14].id, 'sensors'); assert.equal(menu[14].value, 'Leak'); assert.equal(menu[14].tone, 'on');
 });

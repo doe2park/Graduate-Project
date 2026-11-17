@@ -136,11 +136,12 @@ function withinRadius(center, sphereCenter, sphereRadius, radius) {
 }
 function cellKey(x, z, size) { return Math.floor(x / size) + ',' + Math.floor(z / size); }
 
-/* ── XR menu panel (2026-10-22 redesign after the first headset test) ──
-   Few, large buttons. Pages: 'main' = 5 buttons (Capture, Lens/All, Photo/Gaussian, Recenter, More), 'more' = settings + layer toggles.
+/* ── XR menu panel (2026-10-22 redesign after the first headset test; 2026-11-16 demo trim) ──
+   Few, large buttons. Pages: 'main' = 4 buttons for a walk-around demo (Lens/All, Recenter, Exit VR, More), 'more' = everything else:
+   Capture, Photo/Gaussian, flashlight hands, opacity, photo resolution, the 8 layer toggles and demo sensors (nothing was removed).
    Layout = rows of button counts inside the lower part of the canvas (fractions, y down). Buttons carry stable ids, so the
    page dispatches by id, never by a grid index. */
-const MENU_PAGES = {main: [3, 2], more: [5, 5, 4]};
+const MENU_PAGES = {main: [2, 2], more: [5, 5, 5]};
 const MENU_AREA = {left: .03, right: .97, top: .4, bottom: .965, gap: .022};
 function menuLayout(rows, area = MENU_AREA) {
   const out = [], n = rows.length, h = (area.bottom - area.top - area.gap * (n - 1)) / n;
@@ -164,17 +165,17 @@ function menuButtons(page, s = {}) {
   if (page === 'more') {
     const layers = (s.layers || []).slice(0, 8).map(l => ({id: 'layer:' + l.key, label: l.label, value: l.loading ? 'loading…' : l.on ? 'on' : 'off', tone: l.on ? 'on' : ''}));
     return [{id: 'back', label: '◂ Back', value: '', tone: 'nav'},
+      {id: 'capture', label: 'Capture', value: s.captureLabel || 'May 6', tone: ''},
+      {id: 'scene', label: 'Photo / Gaussian', value: s.gaussianLoading ? 'loading…' : s.scene === 'gaussian' ? 'Gaussian' : s.gaussianAvailable === false ? 'Photo (no Gaussian)' : 'Photo', tone: s.scene === 'gaussian' ? 'on' : ''},
       {id: 'hands', label: 'Flashlight', value: s.hands === 'both' ? 'both hands' : 'right hand', tone: s.hands === 'both' ? 'on' : ''},
       {id: 'opacity', label: 'Opacity', value: Math.round((s.opacity ?? DEFAULT_LENS_OPACITY) * 100) + '%', tone: ''},
-      {id: 'hires', label: 'Photo', value: s.scene === 'gaussian' ? 'n/a' : s.hiRes ? '4K' : '2K', tone: s.hiRes ? 'on' : ''},
-      {id: 'exit', label: 'Exit VR', value: '', tone: 'exit'}, ...layers,
+      {id: 'hires', label: 'Photo', value: s.scene === 'gaussian' ? 'n/a' : s.hiRes ? '4K' : '2K', tone: s.hiRes ? 'on' : ''}, ...layers,
       {id: 'sensors', label: 'Demo sensors', value: s.sensorsLabel || 'off', tone: s.sensorsLabel && s.sensorsLabel !== 'off' ? 'on' : ''}];
   }
-  return [{id: 'capture', label: 'Capture', value: s.captureLabel || 'May 6', tone: ''},
-    {id: 'style', label: 'Lens / All', value: s.mode === 'all' ? 'All' : 'Lens', tone: s.mode === 'all' ? 'on' : ''},
-    {id: 'scene', label: 'Photo / Gaussian', value: s.gaussianLoading ? 'loading…' : s.scene === 'gaussian' ? 'Gaussian' : s.gaussianAvailable === false ? 'Photo (no Gaussian)' : 'Photo', tone: s.scene === 'gaussian' ? 'on' : ''},
+  return [{id: 'style', label: 'Lens / All', value: s.mode === 'all' ? 'All' : 'Lens', tone: s.mode === 'all' ? 'on' : ''},
     {id: 'recenter', label: 'Recenter', value: 'nearest capture', tone: ''},
-    {id: 'more', label: 'More ▸', value: 'layers · settings', tone: 'nav'}];
+    {id: 'exit', label: 'Exit VR', value: '', tone: 'exit'},
+    {id: 'more', label: 'More ▸', value: 'capture · layers · settings', tone: 'nav'}];
 }
 
 /* Download progress text that can never show loaded > total. GitHub Pages serves GLBs gzip-compressed: the progress event's total is the
@@ -537,7 +538,7 @@ function backAction({menuOpen = false, picked = false} = {}) { return menuOpen ?
 
 /* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
    Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
-const API = 8;   // 7: frame guard, headsetCaptures · 8: panelPixelScale, backAction
+const API = 9;   // 7: frame guard, headsetCaptures · 8: panelPixelScale, backAction · 9: 4-button demo menu (Capture, Photo/Gaussian moved to More)
 
 return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, PANEL_RES_MIN, PANEL_RES_MAX, panelPixelScale, backAction, FRAME_GUARD, frameGuardInit, frameGuardStep, frameGuardText, headsetCaptures, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,

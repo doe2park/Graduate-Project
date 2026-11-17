@@ -286,7 +286,7 @@ CORS allow-list; preflights including Chrome's Private Network Access are answer
    If Quest Browser asks to let the page **access devices on your local network**, tap **Allow** (Chrome's Local Network Access;
    desktop Chrome 156 requires it; whether Quest Browser asks is not verified). If the box says *server not reachable*, tap the
    link *Open https://…/ once to trust it*, accept, come back and press **Retry**.
-4. Press **Allow mic**, then **Test voice**, then **Enter MR**.
+4. Press **Allow mic** (in the Ask line under **Enter MR**), optionally **Test voice** (under **More options**), then **Enter MR**.
 
 `server=` is used only if it is `https://` + a private-LAN IPv4 (10/8, 172.16/12, 192.168/16) or `localhost` + an explicit port,
 with nothing else (no path, query, user, hex or zero-padded IP); otherwise it is ignored and the box says so. Without `?ask=1`
@@ -310,6 +310,30 @@ the public page is unchanged.
 - **Sharper panels (Nov 15 2026):** every in-world canvas panel is drawn at 2× its layout size on Quest 3/3S and desktop
   (1.5× on other headsets; `&panelres=1`-`3` overrides), with mipmaps, the GPU's maximum anisotropy and premultiplied
   alpha. The XR framebuffer scale is unchanged (1.0 on Quest 3/3S, with the frame guard stepping down when frames are slow).
+- **Simpler entry page and controller menus (Nov 16 2026, for the Nov 19 live demo; desktop-checked only, not
+  headset-verified):** the 2D page the Quest browser shows before entering is one card at the top left:
+  - one big **Enter MR** button (shown only where the browser offers `immersive-ar`);
+  - one small secondary link: on the VR page **Enter VR · walk inside Grimes (360° photos)** (only where `immersive-vr`
+    exists), on the MR page **Walk inside Grimes in VR (360° photos)** (same link as the old *Walk inside Grimes* button:
+    MR-only keys dropped, `ask`, `code`, `capture`, `sensors` kept). VR stays reachable because it is the only way to stand
+    inside the real Grimes photos off site, and it is the mode the Ask slide recording shows;
+  - one status line (the last message, full text on hover) and, on a desktop, one note line;
+  - the **Ask the twin** box: without `&ask=1` a single collapsed line *Ask the twin · connect with the laptop code* that
+    opens the code field (`XA.ENDPOINT` + `XA.connectCode`, unchanged); with `&ask=1` and the laptop not answering, the box
+    stands out (terracotta border, code field open, trust link and **Retry**); once connected it is one line
+    *Ask the twin · connected · LIVE|MOCK* with **Allow mic** (the mic still needs a 2D click before entering) and a
+    collapsed *New code or restarted laptop*;
+  - **More options** (collapsed): the old top bar (capture, captured position, Lens/All, opacity, cone, 4K photo, fire
+    piping, Gaussian, Stats), the Ask details (full server line, **Test voice**, voice choice, how-to) and, on the MR page,
+    the whole old MR panel (mode buttons, sensors and scenes, area, landmark steps, Simulate / Forget / Check log / Export);
+  - the honesty line (alignment, design BIM) as a small footer at the bottom of the card.
+  Every URL parameter works as before; no other page's address changed. In the headset, B/Y opens a 4-button VR menu
+  (**Lens / All**, **Recenter**, **Exit VR**, **More ▸**; Capture and Photo / Gaussian moved to More) and, in MR, a
+  6-button panel for the current mode (demo: *Re-place demo*, *Sensors*, *Scene*, *Style*, *Close*, *More ▸*; Grimes
+  alignment: *Re-align*, *Accept + save*, *Skip point*, *Style*, *Close*, *More ▸*); **More ▸** is the full old grid, with
+  **◂ Back**. A demo placement no longer pops the panel up over the services (a short toast says *Demo placed · B/Y menu*),
+  the floor tag after a jump is one line (alignment caveat + *B/Y menu*; the control hint moved to the menu's More page),
+  and a trigger press on empty space (the close gesture) no longer flashes a toast.
 - **While waiting:** a send tone; the card shows *Thinking…* and then a line per server step (*Checking what is above it…*,
   *Following the ducts…*, *Reading the demo sensors (simulated)…*); if nothing has been said after 1.5 s the voice says
   *One moment.*

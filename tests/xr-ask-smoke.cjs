@@ -37,7 +37,7 @@ const URL_ = BASE + '/scan-xr.html?mode=ar&place=demo&sensors=demo&scene=air&lay
     await page.waitForFunction(() => { try { const i = xrInspection(); return i.layers.duct?.loaded && i.sensors.ready && i.mr?.demo && i.ask?.health; } catch (e) { return false; } }, null, {timeout: 180000});
     await page.click('#askMicBtn');
     await page.waitForFunction(() => xrInspection().ask.voice === 'ready', null, {timeout: 15000}).catch(() => {});
-    const hide = () => page.addStyleTag({content: '#bar,#mr,#askBox,.pill,#stats{display:none!important}'});
+    const hide = () => page.addStyleTag({content: '#entry,#bar,#mr,#askBox,.pill,#stats{display:none!important}'});
     const shot = async (name, note) => { const f = path.join(OUT, name); await page.screenshot({path: f}); report[name] = note; return f; };
     report.health = (await page.evaluate(() => xrInspection().ask)).health;
 

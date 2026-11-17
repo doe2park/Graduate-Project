@@ -130,21 +130,21 @@ async function pointAndGoSmoke(page,m){
 /* XR menu panel (desktop emulation of the controller ray via the camera ray through a button centre). */
 async function menuSmoke(page){
  const out={};await page.evaluate(()=>{xrDebug.look(0,0);xrDebug.setMenu(true);});
- let mi=(await page.evaluate(()=>xrInspection())).menu;assert.equal(mi.open,true);assert.deepEqual(mi.buttons,['capture','style','scene','recenter','more'],'≤ 5 main buttons');
+ let mi=(await page.evaluate(()=>xrInspection())).menu;assert.equal(mi.open,true);assert.deepEqual(mi.buttons,['style','recenter','exit','more'],'4 main buttons (2026-11-16 demo trim)');
  assert.ok(Math.abs(mi.distance-Math.hypot(.8,.15))<.02,'panel ≈0.8 m from the eye: '+mi.distance);out.distanceM=+mi.distance.toFixed(3);
  await page.screenshot({path:path.join(OUT,'scan-xr-menu.png')});
  const nd=await page.evaluate(()=>xrDebug.menuButtonNdc('style'));assert.ok(nd&&Math.abs(nd[0])<1&&Math.abs(nd[1])<1,'Lens/All button on screen');
- const hv=await page.evaluate(([x,y])=>xrDebug.hoverNdc(x,y),nd);assert.equal(hv.id,'style');assert.deepEqual((await page.evaluate(()=>xrInspection())).menu.hover,[1],'hover highlight');
+ const hv=await page.evaluate(([x,y])=>xrDebug.hoverNdc(x,y),nd);assert.equal(hv.id,'style');assert.deepEqual((await page.evaluate(()=>xrInspection())).menu.hover,[0],'hover highlight');
  await page.waitForTimeout(100);await page.screenshot({path:path.join(OUT,'scan-xr-menu-hover.png')});
  const s0=(await page.evaluate(()=>xrInspection())).style;const r=await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),nd);assert.equal(r.menu,'style');
  assert.notEqual((await page.evaluate(()=>xrInspection())).style,s0,'click acted on the highlighted button');
  // a click on the panel header (above the buttons) does nothing
- const hd=await page.evaluate(()=>{const [x,y]=xrDebug.menuButtonNdc('capture');return [x,y+.25];});const hr=await page.evaluate(([x,y])=>xrDebug.hoverNdc(x,y),hd);
+ const hd=await page.evaluate(()=>{const [x,y]=xrDebug.menuButtonNdc('style');return [x,y+.25];});const hr=await page.evaluate(([x,y])=>xrDebug.hoverNdc(x,y),hd);
  assert.ok(hr&&hr.button===-1,'header hit, no button');const before=(await page.evaluate(()=>xrInspection())).capture.date;assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),hd)).menu,null);assert.equal((await page.evaluate(()=>xrInspection())).capture.date,before);
  await page.evaluate(()=>xrDebug.hoverNdc(5,5));assert.deepEqual((await page.evaluate(()=>xrInspection())).menu.hover,[],'hover cleared off the panel');
  // More page: flashlight hands, fixed opacity cycle, layer toggles, back, exit
  const mp=await page.evaluate(()=>xrDebug.menuButtonNdc('more'));assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),mp)).menu,'more');
- mi=(await page.evaluate(()=>xrInspection())).menu;assert.equal(mi.page,'more');assert.deepEqual(mi.buttons.slice(0,5),['back','hands','opacity','hires','exit']);assert.equal(mi.buttons.filter(b=>b.startsWith('layer:')).length,8);
+ mi=(await page.evaluate(()=>xrInspection())).menu;assert.equal(mi.page,'more');assert.deepEqual(mi.buttons.slice(0,6),['back','capture','scene','hands','opacity','hires']);assert.equal(mi.buttons.filter(b=>b.startsWith('layer:')).length,8);
  await page.waitForTimeout(100);await page.screenshot({path:path.join(OUT,'scan-xr-menu-more.png')});
  const c=(await page.evaluate(()=>xrInspection())).controls;assert.equal(c.hands,'right');assert.equal(c.lensOpacity,.7);assert.equal(c.allOpacity,.35);
  await page.evaluate(()=>xrDebug.menuAction('hands'));assert.equal((await page.evaluate(()=>xrInspection())).controls.hands,'both');await page.evaluate(()=>xrDebug.menuAction('hands'));
@@ -238,7 +238,7 @@ async function mrSmoke(browser,base,now){
  for(const [k,l] of Object.entries(i.layers)){assert.equal(l.error,null,k);assert.ok(l.elements>0,k);assert.equal(l.unidentifiedObjects||0,0,k);}
  assert.deepEqual(Object.keys(i.layers).sort(),[...layers].sort());
  assert.equal(await page.locator('#enterMR').isHidden(),true,'no Enter MR without immersive-ar');assert.equal(await page.locator('#enterVR').isHidden(),true);
- assert.match(await page.locator('#xrNote').textContent(),/Desktop MR simulation/);assert.equal(await page.locator('#mr').isVisible(),true);
+ assert.match(await page.locator('#xrNote').textContent(),/Desktop MR simulation/);assert.equal(await page.evaluate(()=>document.getElementById('mr').hidden),false,'MR panel present (under More options)');
  assert.match(await page.locator('#align').textContent(),/MR passthrough · .* · manual alignment, not surveyed · not aligned yet/);
  assert.equal(i.mr.rangeKey,'room');assert.deepEqual(i.mr.fade,{on:1,range:[8,14]});assert.equal(i.mr.outside,.12,'Lens: faint outside the cone');
  // simulated alignment: 5 synthetic touches (1 cm noise) through the same state machine and solver

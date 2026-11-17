@@ -121,7 +121,7 @@ test('flashlight cone: inside, soft edge, outside, behind; Lens vs All alpha', (
   assert.equal(X.cellKey(-.1, 6.1, 6), '-1,1');
 });
 
-test('XR menu (2026-10-22): main page ≤ 5 large buttons, More holds settings + 8 layers; every centre hits its own index, gaps miss', () => {
+test('XR menu (2026-11-16 demo trim): main page = 4 large buttons, More holds Capture, Photo/Gaussian, settings + 8 layers; every centre hits its own index, gaps miss', () => {
   for (const [page, rows] of Object.entries(X.MENU_PAGES)) {
     const rects = X.menuLayout(rows), n = rows.reduce((a, b) => a + b, 0);
     assert.equal(rects.length, n);
@@ -131,17 +131,22 @@ test('XR menu (2026-10-22): main page ≤ 5 large buttons, More holds settings +
     for (const r of rects) assert.ok(r.x >= 0 && r.y >= X.MENU_AREA.top - 1e-12 && r.x + r.w <= 1 && r.y + r.h <= 1);
   }
   const main = X.menuButtons('main', {captureLabel: 'Sep 17', mode: 'lens', scene: 'photo', gaussianAvailable: false});
-  assert.ok(main.length <= 5 && main.length === X.menuLayout(X.MENU_PAGES.main).length);
-  assert.deepEqual(main.map(b => b.id), ['capture', 'style', 'scene', 'recenter', 'more']);
-  assert.equal(main[0].value, 'Sep 17'); assert.equal(main[1].value, 'Lens'); assert.match(main[2].value, /no Gaussian/);
+  assert.ok(main.length === 4 && main.length === X.menuLayout(X.MENU_PAGES.main).length);
+  assert.deepEqual(main.map(b => b.id), ['style', 'recenter', 'exit', 'more']);
+  assert.equal(main[0].value, 'Lens'); assert.equal(main[2].tone, 'exit');
   assert.ok(!main.some(b => /opacity/i.test(b.label + b.value)), 'opacity is not on the main page');
   // main buttons are big: at the 0.64 m panel width each is wider than 0.18 m and taller than 0.09 m (0.40 m panel height)
   for (const r of X.menuLayout(X.MENU_PAGES.main)) { assert.ok(r.w * .64 > .18, 'width ' + r.w * .64); assert.ok(r.h * .4 > .09, 'height ' + r.h * .4); }
   const layers = ['equipment', 'lighting', 'conduit', 'duct', 'hydronic', 'plumbing', 'lifesafety', 'fire'].map((key, i) => ({key, label: key, on: i < 7, loading: false}));
   const more = X.menuButtons('more', {hands: 'both', opacity: .7, hiRes: false, scene: 'photo', layers});
   assert.equal(more.length, X.menuLayout(X.MENU_PAGES.more).length);
-  assert.deepEqual(more.slice(0, 5).map(b => b.id), ['back', 'hands', 'opacity', 'hires', 'exit']);
-  assert.equal(more[13].id, 'sensors'); assert.equal(more[13].value, 'off'); assert.equal(more[1].value, 'both hands'); assert.equal(more[2].value, '70%'); assert.equal(more[12].id, 'layer:fire'); assert.equal(more[12].value, 'off');
+  assert.deepEqual(more.slice(0, 6).map(b => b.id), ['back', 'capture', 'scene', 'hands', 'opacity', 'hires']);
+  // nothing was removed in the trim: every action of the old two pages is still on one of them
+  const all = new Set([...main, ...more].map(b => b.id));
+  for (const id of ['capture', 'style', 'scene', 'recenter', 'more', 'back', 'hands', 'opacity', 'hires', 'exit', 'sensors']) assert.ok(all.has(id), id);
+  const more2 = X.menuButtons('more', {captureLabel: 'Sep 17', scene: 'photo', gaussianAvailable: false, layers});
+  assert.equal(more2[1].value, 'Sep 17'); assert.match(more2[2].value, /no Gaussian/);
+  assert.equal(more[14].id, 'sensors'); assert.equal(more[14].value, 'off'); assert.equal(more[3].value, 'both hands'); assert.equal(more[4].value, '70%'); assert.equal(more[13].id, 'layer:fire'); assert.equal(more[13].value, 'off');
   assert.equal(X.menuButtons('more', {scene: 'gaussian', layers}).find(b => b.id === 'hires').value, 'n/a');
   // fixed opacity defaults, More ▸ Opacity cycles 50/70/90 %
   assert.equal(X.DEFAULT_LENS_OPACITY, .7); assert.equal(X.DEFAULT_ALL_OPACITY, .35);
