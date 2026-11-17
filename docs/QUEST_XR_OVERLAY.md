@@ -31,7 +31,7 @@ The first test found the controls clumsy: the stick only stepped forward/back to
 | **Left or right stick ← / →** | Snap turn 30° about your head. There is no smooth locomotion. |
 | **Right controller** | Flashlight. The X-ray cone follows its ray. |
 | **Right trigger** | Info card on the element the ray highlights. Trigger on nothing clears the card. |
-| Right stick ↑ / ↓ | Widen / narrow the flashlight cone, 3° per push (4–30°). |
+| Right stick ↑ / ↓ | Widen / narrow the flashlight cone, 3° per push (4–30°, starts at 15°). |
 | Either trigger on the menu | Press the **highlighted** button. A click acts only on the button the ray is on, and the panel background does nothing. |
 | A / X | Lens ↔ All. |
 | B / Y | Open / close the menu. It also closes 1.5 s after every ray has left it. |
@@ -50,10 +50,23 @@ Gaussian mode: the target is a free teleport point on the floor (≤ 8 m, near t
 The haptics use `gamepad.hapticActuators[0].pulse()`, with `vibrationActuator.playEffect()` as a fallback. Whichever exists is used.
 
 **Menu (B/Y).** The panel is 0.64 × 0.40 m, about 0.8 m in front of you, 0.15 m below eye height and turned toward your head. It rides with you through jumps and snap turns.
-- Main page (Nov 16 2026 demo trim), four large buttons: **Lens / All** · **Recenter** (nearest capture) · **Exit VR** · **More ▸**. Its header shows the capture, the alignment caveat and, only when the frame guard has lowered the quality, a *Slow frames* line.
-- **More ▸:** Back · **Capture** (cycles the published captures) · **Photo / Gaussian** · **Flashlight: right hand / both hands** (both: the left controller also carries a cone, as a second cone in the same shader) · **Opacity** (fixed at Lens 70 % and All 35 %; the button cycles Lens 50 → 70 → 90 %) · Photo 2K/4K · eight layer toggles (a layer that is not loaded loads on demand, and frames can stutter) · Demo sensors. Its header carries the control hint, the opacity / cone line and the frame-guard line.
+- Main page (Nov 16 2026 demo trim), four large buttons: **Lens / All** · **Recenter** (nearest capture) · **Exit VR** · **More ▸**. Above them: the capture and station, the alignment caveat (*registered, not surveyed* / *PROVISIONAL alignment* · Design (BIM) positions) and, only when the frame guard has lowered the quality, one short *Quality lowered* line.
+- **More ▸ (Nov 17 2026 sub-pages):** no page has more than six buttons, except Layers; ◂ Back is always bottom right and goes one level up. Every old function is two presses from the main page (More, then the sub-page).
 
-A head-locked status line, about 15° below the view centre, shows messages in the headset, because the page's status line is not visible in VR (a trigger press on empty space, the close gesture, shows none). The world-locked tag after each jump is one line: the alignment caveat and *B/Y menu* (the control hint is on the menu's More page).
+  | Page | Buttons | Info line |
+  |---|---|---|
+  | More | **Layers ▸** (n of 8 on) · **View ▸** · **Demo sensors** (cycles the scenes, then off) · **Status ▸** (amber when the quality was lowered) · ◂ Back | controls hint |
+  | Layers | the eight layer toggles (a layer that is not loaded loads on demand, and frames can stutter) · ◂ Back | load note |
+  | View | **Capture date** (cycles the listed captures) · **Background** (*360 photo* / *Gaussian 3D*; was "Photo / Gaussian") · **Photo detail** (2K / 4K; was "Photo") · **Flashlight** (right hand / both hands) · **Lens opacity** (Lens 70 % default, cycles 50 → 70 → 90 %; All stays 35 %) · ◂ Back | capture + alignment caveat |
+  | Status | ◂ Back | rows: services radius, frame rate + quality (frame guard), stick / trigger / button help |
+
+  Text on the 1280 px = 0.64 m canvas at 0.8 m (1° ≈ 28 px): info lines 36–38 px, button labels 40–48 px, values 30–34 px.
+
+A head-locked status line, about 15° below the view centre, shows messages in the headset, because the page's status line is not visible in VR (a trigger press on empty space, the close gesture, shows none). Since Nov 17 2026 it uses a fixed 40 px font (about 1.2°), wraps to two lines and ends with an ellipsis instead of shrinking. The world-locked tag after each jump shows the alignment caveat (46 px) and *B/Y: menu* (38 px) below it.
+
+**Info card, aim marker, sensors (Nov 17 2026).** The trigger card shows a short title (the element type), the BIM family name on its own line (two lines at most, ellipsis at the end), system · level, the reading and the two honesty lines; it is only as tall as its content and sits beside the element (toward the middle of the view, 10 cm gap at its scale), facing you without roll. Point-and-go shows small arc dots, a soft floor disc (no ring) with a thin fading light line and the label at 1.1 m above the floor. Demo sensor pins are dark rounded squares in the type colour (about 4.3°, 0.15–1.2 m) with a chip *type · value* and an amber **SIMULATED** pill; alert sensors pulse a soft red glow instead of a ring.
+
+**Lens (Nov 17 2026).** Half-angle 15° (was 12°) with a 3° soft edge (was 2°), `X.LENS_HALF_DEG` / `X.lensSoft`. The MR page shares the same `state.coneDeg`, so its lens grew by the same proportion. The web overlay lens (scan-compare CSS, 22 % of the shorter side) is unchanged.
 
 **2D page before entering (Nov 16 2026).** One card at the top left. Since Nov 17 2026 it offers two equal big buttons and nothing is pre-armed: **At Grimes · MR** (in the building: passthrough + BIM; the saved anchor is restored, else the landmark-touch flow; *align once*) and **Anywhere · VR** (any room: the Grimes 360° photo walk + BIM, no alignment). A third, smaller outlined button under them, **This room · MR demo** (*Any room. Grimes BIM at real scale here. DEMO, not aligned, never saved.*), is **Demo here**: one tap arms it and starts the immersive-ar session in the same gesture, then point at the floor and pull the trigger. **At Grimes · MR** never starts a demo (it disarms one armed earlier). *Demo here · your own room* stays under **More options** (2D state switch used by the desktop simulation), and `/mr?place=demo` still arms it. Taps: on the MR page, **At Grimes · MR** and **This room · MR demo** start the immersive-ar session directly (1 tap each); **Anywhere · VR** opens the photo page (`&chosen=1`), where one big **Enter VR** is the only big button (2 taps; WebXR needs a fresh tap after the page load). On the VR page the same buttons exist, mirrored (VR 1 tap; MR and the demo 2 taps, the demo opening `?mode=ar&place=demo&chosen=1`), and the other modes are small links when you arrive from the chooser. An explicit `?place=` also shows one big MR button. Then one status line, the Ask box when Ask is on or being connected, and **More options** (collapsed) with every other control. The alignment caveat is the card's footer. See docs/ASK_TWIN.md, *Simpler entry page and controller menus*. `&hands=both` starts with both flashlights.
 
@@ -77,7 +90,7 @@ MR mode keeps its alignment controls (below), and gains the same laser, reticle,
 | 2–3 | Point at the floor next to a nearby station, hold ↑, release; then pull ↑ and back to cancel | The floor ring snaps to that station; the cancel does nothing |
 | 3   | **Snap turn:** left stick ←/→, then right stick ←/→ | 30° per push; you stay on the photo centre |
 | 3–4 | **Flashlight:** sweep the right controller across the ceiling; right stick ↑/↓; **info card:** right trigger on a duct or light | Services appear only inside the cone and the cone width changes; the card opens on the element the amber reticle was on |
-| 4–5 | **Menu:** B/Y → hover each button (gold, haptic tick) → Lens/All → More ▸ → Flashlight: both hands (both cones light) → Back → point away | Every click acts on the highlighted button; the panel closes about 1.5 s after the rays leave it |
+| 4–5 | **Menu:** B/Y → hover each button (gold, haptic tick) → Lens/All → More ▸ → View ▸ → Flashlight: both hands (both cones light) → Back → Back → point away | Every click acts on the highlighted button; the panel closes about 1.5 s after the rays leave it |
 
 Record any lag while sweeping the flashlight. If services stutter, retry with `&hover=0` and note the difference.
 
