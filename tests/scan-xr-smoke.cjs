@@ -232,7 +232,7 @@ async function mrSmoke(browser,base,now){
  await bdWait(page);i=await page.evaluate(()=>xrInspection());
  assert.equal(i.mode,'ar');assert.equal(i.capture,null,'no VR capture state in MR');assert.deepEqual(i.texture,{width:2048,height:1024},'desktop MR preview: 2K May 6 photo backdrop');assert.equal(i.photoSphereVisible,true);
  assert.equal(i.mr.backdrop.state,'photo');assert.equal(i.mr.backdrop.date,'2026-05-06');assert.equal(i.mr.backdrop.background,false);
- assert.equal(await page.locator('#mrBackdropNote').textContent(),'Desktop preview: May 6 photo as background · in Quest the real room shows instead');assert.equal(await page.locator('#mrBackdropNote').isVisible(),true);
+ assert.equal(await page.locator('#mrBackdropNote').textContent(),'Desktop preview: May 6 photo as background · in Quest the real room shows instead');await page.evaluate(()=>{document.getElementById('moreOpts').open=true;});assert.equal(await page.locator('#mrBackdropNote').isVisible(),true);   // the note lives under More options (collapsed since Nov 16)
  assert.equal(i.mr.area,'l1-auditorium-foyer','default area');assert.deepEqual(i.mr.areas,['l1-auditorium-foyer','l1-east-entrance']);
  assert.equal(i.mr.phase,'capture');assert.equal(i.mr.current,'A');assert.equal(i.mr.bimVisible,false,'services hidden until aligned');
  for(const [k,l] of Object.entries(i.layers)){assert.equal(l.error,null,k);assert.ok(l.elements>0,k);assert.equal(l.unidentifiedObjects||0,0,k);}
@@ -366,7 +366,7 @@ async function mrBackdropSmoke(browser,base,now){
   await page.reload();await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area,null,{timeout:120000});
   assert.deepEqual(await page.evaluate(()=>[localStorage.getItem('grimes-mr-alignment/1'),Object.keys(JSON.parse(localStorage.getItem('grimes-mr-alignment/2')).areas)]),[null,['l1-auditorium-foyer']]);
   // export download: no network, no pose, no handle
-  const [dl]=await Promise.all([page.waitForEvent('download'),page.locator('#mrExport').click()]);const ex=JSON.parse(fs.readFileSync(await dl.path(),'utf8'));
+  await page.evaluate(()=>{document.getElementById('moreOpts').open=true;});const [dl]=await Promise.all([page.waitForEvent('download'),page.locator('#mrExport').click()]);const ex=JSON.parse(fs.readFileSync(await dl.path(),'utf8'));
   assert.match(dl.suggestedFilename(),/^grimes-mr-alignments-\d{4}-\d\d-\d\d\.json$/);assert.equal(ex.rows.length,1);assert.deepEqual(Object.keys(ex.rows[0]).sort(),['anchorPresent','area','created','frame','heightSource','level','nudged','points','rmsCm']);assert.equal(ex.rows[0].anchorPresent,false);out.export=ex.rows[0];
   // restore with a mocked persistent-anchor API (foyer record with an anchor)
   await page.evaluate(()=>xrDebug.mr.startAlign('l1-auditorium-foyer'));   // the URL kept the last area (east)
@@ -439,9 +439,13 @@ async function mrSensorsSmoke(browser,base,now){
  const ctx=await browser.newContext({viewport:{width:1280,height:800}}),page=await ctx.newPage(),errors=[],out={};
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await page.route('**/raw.githubusercontent.com/**/building_data.json',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({meters:{76:{latest:{kw:120.5,t:now}}}})}));
- // plain /mr: the short address opens the demo with sensors; an explicit param wins; extra params pass through
+ // plain /mr: the short address opens the two-mode chooser with sensors and NOTHING armed (no place); /mr?place=demo arms Demo here; an explicit param wins; extra params pass through
  const q=async s=>{await page.goto(base+'/mr/'+s);await page.waitForURL(/scan-xr\.html/);return new URL(page.url()).searchParams;};
- let u=await q('?layers=fire,duct,plumbing');assert.equal(u.get('mode'),'ar');assert.equal(u.get('place'),'demo');assert.equal(u.get('sensors'),'demo');assert.equal(u.get('layers'),'fire,duct,plumbing');
+ let u=await q('?layers=duct');assert.equal(u.get('mode'),'ar');assert.equal(u.has('place'),false,'/mr arms neither Demo here nor alignment');assert.equal(u.get('sensors'),'demo');
+ await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area,null,{timeout:120000});
+ assert.equal(await page.evaluate(()=>xrInspection().mr.demoWanted),false);assert.equal(await page.locator('#entry').getAttribute('data-layout'),'pair');
+ assert.match(await page.locator('#toVR').textContent(),/Anywhere · VR/);assert.equal(await page.locator('#enterMR').isHidden(),true,'no immersive-ar on desktop');
+ u=await q('?place=demo&layers=fire,duct,plumbing');assert.equal(u.get('mode'),'ar');assert.equal(u.get('place'),'demo');assert.equal(u.get('sensors'),'demo');assert.equal(u.get('layers'),'fire,duct,plumbing');
  await page.waitForFunction(()=>{const i=window.xrInspection?.();return i?.mr?.phase&&i.sensors?.ready&&i.mr.phase==='demo';},null,{timeout:240000,polling:500});
  let i=await page.evaluate(()=>xrInspection());
  assert.equal(i.mr.phase,'demo');assert.equal(i.sensors.scene,'leak');assert.equal(i.mr.demo.sensorScene,'leak');assert.equal(i.mr.persisted,false);
@@ -463,7 +467,7 @@ async function mrSensorsSmoke(browser,base,now){
  // 2D buttons reflect the state; the scene picker re-places the demo around the new scene and updates the URL
  assert.equal(await page.locator('#chDemo').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('#chScene-leak').getAttribute('aria-pressed'),'true');
  const refLeak=i.mr.demo.reference.slice();
- await page.locator('#chScene-water').click();await page.waitForFunction(()=>xrInspection().sensors.scene==='water'&&xrInspection().sensors.ready,null,{timeout:240000});
+ await page.evaluate(()=>{document.getElementById('moreOpts').open=true;});await page.locator('#chScene-water').click();await page.waitForFunction(()=>xrInspection().sensors.scene==='water'&&xrInspection().sensors.ready,null,{timeout:240000});
  i=await page.evaluate(()=>xrInspection());assert.equal(i.mr.demo.sensorScene,'water');assert.notDeepEqual(i.mr.demo.reference,refLeak,'demo re-placed around the new scene');
  assert.deepEqual(i.mr.demo.floorPoint,W.floor,'same floor point and heading');assert.equal(new URL(page.url()).searchParams.get('scene'),'water');assert.equal(new URL(page.url()).searchParams.get('sensors'),'demo');
  // in-headset panel: scene button (index 18) cycles, mode button (16) switches
@@ -486,6 +490,6 @@ async function mrSensorsSmoke(browser,base,now){
  // explicit params beat the /mr defaults
  u=await q('?place=');assert.equal(u.get('place'),'');assert.equal(u.get('sensors'),'demo');await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area,null,{timeout:120000});assert.notEqual((await page.evaluate(()=>xrInspection())).mr.phase,'demo');
  assert.deepEqual(errors.filter(e=>!/favicon|Failed to fetch/.test(e)),[]);   // reload/navigation aborts layer fetches in flight; any other error fails (it aborts the layer fetches in flight)
- u=await q('?sensors=off');assert.equal(u.get('place'),'demo');assert.equal(u.get('sensors'),'off');
+ u=await q('?sensors=off');assert.equal(u.has('place'),false);assert.equal(u.get('sensors'),'off');
  await ctx.close();return out;
 }

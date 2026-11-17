@@ -11,7 +11,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 3;   // 3: cache refresh only (the file changed after v2 shipped without a bump)
+const API = 4;   // 4: /mr no longer defaults to place=demo (two-mode chooser); 3: cache refresh only
 const SCENES = ['leak', 'air', 'water', 'elec', 'rotating'];
 const LIVE_SCENE = 'live-test';   // ?sensors=live only; never part of the demo scene cycle
 const SCENE_NAMES = {leak: 'Leak', air: 'Air', water: 'Water', elec: 'Power', rotating: 'Rotating', 'live-test': 'Live test'};
@@ -43,11 +43,12 @@ function withState(search, {mode, sensors, scene, area} = {}) {
   if (area) p.set('area', area);
   return '?' + p.toString();
 }
-/* /mr defaults: demo placement with sensors, unless the incoming query already names place or sensors (even empty / "off"). */
+/* /mr defaults (Nov 17 2026): mode=ar and the demo sensors only. NO place default: /mr lands on the two-button chooser (At Grimes · MR / Anywhere · VR)
+   with nothing armed. An explicit ?place=demo (Demo here) or ?place= / ?place=grimes (landmark alignment) is passed through as before.
+   A parameter already in the query (even empty or "off") wins over the sensors default. */
 function mrDefaults(search) {
   const p = new URLSearchParams(search || '');
   const out = new URLSearchParams(); out.set('mode', 'ar');
-  if (!p.has('place')) out.set('place', 'demo');
   if (!p.has('sensors')) out.set('sensors', 'demo');
   for (const [k, v] of p) if (k !== 'mode') out.set(k, v);
   return '?' + out.toString();

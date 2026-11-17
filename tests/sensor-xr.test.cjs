@@ -19,14 +19,20 @@ test('state in the URL: other params kept, choices replaced', () => {
   assert.equal(SX.withState('?mode=ar&scene=leak', {scene: 'water', sensors: true}), '?mode=ar&scene=water&sensors=demo');
   assert.equal(SX.withState('?mode=ar', {scene: 'nope'}), '?mode=ar');
 });
-test('/mr defaults: demo + sensors unless the query says otherwise; extra params pass through', () => {
-  assert.equal(SX.mrDefaults(''), '?mode=ar&place=demo&sensors=demo');
-  assert.equal(SX.mrDefaults('?scene=air&radius=20'), '?mode=ar&place=demo&sensors=demo&scene=air&radius=20');
+test('/mr defaults: sensors only, nothing armed (no place); an explicit place and extra params pass through', () => {
+  assert.equal(SX.mrDefaults(''), '?mode=ar&sensors=demo');
+  assert.equal(SX.mrDefaults('?scene=air&radius=20'), '?mode=ar&sensors=demo&scene=air&radius=20');
   assert.equal(SX.mrDefaults('?place='), '?mode=ar&sensors=demo&place=');
-  assert.equal(SX.mrDefaults('?sensors=off'), '?mode=ar&place=demo&sensors=off');
+  assert.equal(SX.mrDefaults('?place=demo'), '?mode=ar&sensors=demo&place=demo', '/mr?place=demo still arms Demo here');
+  assert.equal(SX.mrDefaults('?sensors=off'), '?mode=ar&sensors=off');
   assert.equal(SX.mrDefaults('?place=demo&sensors=demo'), '?mode=ar&place=demo&sensors=demo');
+  assert.ok(!/place/.test(SX.mrDefaults('')), 'no place default');
   const html = read('mr/index.html');
-  assert.ok(html.includes('place=demo') && html.includes('sensors=demo') && html.includes('Tap here if it does not open'), 'fallback link kept, defaults named');
+  assert.ok(html.includes('sensors=demo') && html.includes('Tap here if it does not open'), 'fallback link kept, defaults named');
+  assert.ok(!/<noscript>[^]*place=demo/.test(html) && !/o\.set\('place'/.test(html), 'the redirect arms neither Demo here nor alignment');
+  const page = read('scan-xr.html');
+  assert.ok(/id="enterMR"[^>]*>\s*<span class="t">At Grimes · MR<\/span>/.test(page) && /id="enterVR"[^>]*>\s*<span class="t">Anywhere · VR<\/span>/.test(page), 'two named mode buttons');
+  assert.ok(/id="chDemo"[^>]*>Demo here[^<]*DEMO, not aligned, never saved/.test(page), 'Demo here kept under More options with its honest label');
 });
 test('/vr and /mr opened through the temporary public address hand over to the public site and keep the AI on the laptop', () => {
   const vm = require('node:vm'), XA = require('../twin/xr-ask.js');
@@ -36,7 +42,7 @@ test('/vr and /mr opened through the temporary public address hand over to the p
   let u = go('vr/index.html', T, '?code=ABC234'); assert.ok(u.startsWith(SITE), u);
   let q = new URLSearchParams(u.slice(SITE.length)); assert.deepEqual([q.get('ask'), q.get('code'), XA.serverOrigin(q.get('server'))], ['1', 'ABC234', 'https://' + T]);
   u = go('mr/index.html', T, '?code=ABC234&scene=air'); assert.ok(u.startsWith(SITE), u); q = new URLSearchParams(u.slice(SITE.length));
-  assert.deepEqual([q.get('mode'), q.get('place'), q.get('sensors'), q.get('scene'), q.get('ask'), XA.serverOrigin(q.get('server'))], ['ar', 'demo', 'demo', 'air', '1', 'https://' + T]);
+  assert.deepEqual([q.get('mode'), q.get('place'), q.get('sensors'), q.get('scene'), q.get('ask'), XA.serverOrigin(q.get('server'))], ['ar', null, 'demo', 'air', '1', 'https://' + T]);
   assert.equal(XA.parseParams(u.slice(u.indexOf('?'))).server, 'https://' + T, 'the page accepts what the redirect sends');
   assert.equal(go('vr/index.html', T, '?direct=1&ask=1'), '../scan-xr.html?direct=1&ask=1');
   assert.equal(go('vr/index.html', 'doe2park.github.io', '?ask=1'), '../scan-xr.html?ask=1');
@@ -81,8 +87,8 @@ test('page wiring: loadProgressText, versions, no real-reading claims', () => {
   assert.equal(X.loadProgressText('Duct', 30e6, 21.1e6), 'Duct · 30.0 MB loaded'); assert.equal(X.loadProgressText('X', 3e6), 'X · 3.0 MB loaded'); assert.equal(X.loadProgressText('X', NaN, 5), 'X · loading…');
   assert.ok(!/p\.total/.test(html), 'compressed Content-Length is never used as a denominator');
   for (const f of ['twin/sensor-xr.js', 'twin/sensor-demo.js', 'twin/sensors/feed.js']) assert.ok(html.includes(f + '?v='), f + ' loaded with ?v=');
-  assert.match(html, /globalThis\.SensorXR,SXOK=SX\?\.API===3/, 'stale-cache guard for the sensor helper');
-  assert.equal(SX.API, 3); assert.ok(html.includes('twin/sensor-xr.js?v=3') && html.includes('SX?.API===3'), 'page loads and checks the API 3 helper');
+  assert.match(html, /globalThis\.SensorXR,SXOK=SX\?\.API===4/, 'stale-cache guard for the sensor helper');
+  assert.equal(SX.API, 4); assert.ok(html.includes('twin/sensor-xr.js?v=4') && html.includes('SX?.API===4'), 'page loads and checks the API 4 helper');
   const menu = X.menuButtons('more', {layers: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(k => ({key: k, label: k})), sensorsLabel: 'Leak'});
   assert.equal(menu.length, X.menuLayout(X.MENU_PAGES.more).length); assert.equal(menu[14].id, 'sensors'); assert.equal(menu[14].value, 'Leak'); assert.equal(menu[14].tone, 'on');
 });

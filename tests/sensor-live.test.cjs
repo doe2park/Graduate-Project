@@ -116,7 +116,7 @@ test('XR page: ?sensors=live = the live-test scene with LIVE / STALE / NO DATA l
   assert.deepEqual(SX.parseParams('?mode=ar&sensors=live&feed=/api/sensors/latest.json'), {enabled: true, scene: 'live-test', live: true});
   assert.ok(!SX.SCENES.includes(SX.LIVE_SCENE), 'never in the demo scene cycle');
   assert.equal(SX.withState('?mode=ar&sensors=live&feed=%2Fapi%2Fsensors%2Flatest.json', {mode: 'demo', sensors: true, scene: 'live-test'}), '?mode=ar&sensors=live&feed=%2Fapi%2Fsensors%2Flatest.json&place=demo');
-  assert.equal(SX.mrDefaults('?sensors=live&feed=x.json'), '?mode=ar&place=demo&sensors=live&feed=x.json');
+  assert.equal(SX.mrDefaults('?sensors=live&feed=x.json'), '?mode=ar&sensors=live&feed=x.json');
   const s = LIVE.sensors[0], obs = {sensor_id: s.id, ts: iso(T - 3000), value: 0.42, unit: 'm/s2', quality: 'good', source: 'gateway'};
   const a = F.assess(obs, s, T), L = SX.liveCardLines({sensor: s, element: {name: 'Straight Rect_ duct'}, typeName: SD.TYPES[s.type], obs, a, valueText: F.formatValue(0.42, s.unit), age: F.ageText(a.ageS), series: [0.1, 0.4], alignText: 'DEMO placement'});
   assert.equal(L.badge, 'LIVE'); assert.equal(L.cls, 'live'); assert.equal(L.rows[0], '0.42 m/s² · LIVE · 3 s ago'); assert.equal(L.title, 'Vibration · test device'); assert.equal(L.rows[2], 'Phone test device · not calibrated');
