@@ -17,7 +17,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 4;   // 3: access code (code=, X-Ask-Code, refusalText) · 4: the Claude mark path, headerNote, upright settle
+const API = 5;   // 3: access code (code=, X-Ask-Code, refusalText) · 4: the Claude mark path, headerNote, upright settle · 5: pair once (X-Ask-Token, auto-connect)
 const CITE_RX = /\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g;
 const LEVELS = [
   {level: 1, id: 'q1', label: 'What is this?', hint: 'look up', question: 'What is this, and what room am I in?'},
@@ -40,10 +40,15 @@ function parseParams(search) {
 /* &code=… : the access code the laptop server prints at start (letters/digits, case-insensitive). Sent only to the ask server,
    as the X-Ask-Code header on ask / transcribe / speak. */
 function accessCode(search) { return String(new URLSearchParams(search || '').get('code') || '').replace(/[\s-]+/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32); }
-function askHeaders(code, extra = {}) { return code ? Object.assign({}, extra, {'X-Ask-Code': code}) : Object.assign({}, extra); }
+/* The code when there is one (a printed link or a typed code), else a paired device's token (X-Ask-Token, header only). */
+function askHeaders(code, extra = {}, token = null) {
+  if (code) return Object.assign({}, extra, {'X-Ask-Code': code});
+  return token && TOKEN_RX.test(token) ? Object.assign({}, extra, {'X-Ask-Token': token}) : Object.assign({}, extra);
+}
 /* 401 / 429 from the ask server -> the sentence the card shows (null for any other status). */
 function refusalText(status, body = {}) {
   const b = body || {};
+  if (status === 401 && b.reason === 'token_unknown') return 'This headset is no longer paired with the laptop. Type the code shown on the laptop in the Ask the twin box.';
   if (status === 401) return b.reason === 'code_wrong' ? 'Wrong access code: reopen this page with the link printed in the laptop terminal.'
     : 'Access code needed: open the link printed in the laptop terminal (it ends with &code=…).';
   if (status === 429) return b.error || ('Too many requests right now.' + (b.retry_after_s ? ' Try again in ' + b.retry_after_s + ' s.' : ''));
@@ -87,6 +92,95 @@ function endpointFrom(doc, nowMs) {
 }
 /* What the visitor typed -> the access code (letters and digits, upper case), or null. */
 function connectCode(raw) { const c = String(raw == null ? '' : raw).toUpperCase().replace(/[^A-Z0-9]/g, ''); return c.length >= 4 && c.length <= 32 ? c : null; }
+
+/* Pair once (2026-11-17). The first Connect with the code also asks the laptop for a device token (POST /api/pair); the page keeps
+   it in this browser's localStorage (PAIR_KEY) and later sends it as X-Ask-Token instead of a code. The laptop stores only its hash
+   (scripts/ask_twin/pairing.py). On later visits with no ask/server/code in the address, the page reads the announced address,
+   checks that the laptop answers and still knows the token, and turns Ask on with no typing. The token never goes into a URL.
+   "Forget this laptop" deletes it here and (if the laptop answers) there. */
+const PAIR_KEY = 'askTwin.pairing.v1', TOKEN_RX = /^[A-Za-z0-9_-]{32,128}$/, NET_MS = 8000;
+function loadPairing(storage) {
+  try { const p = JSON.parse(storage?.getItem(PAIR_KEY) || 'null'); return p && typeof p === 'object' && TOKEN_RX.test(p.token || '') ? {token: p.token, at: typeof p.at === 'string' ? p.at : null} : null; }
+  catch (e) { return null; }
+}
+function savePairing(storage, token, nowMs = Date.now()) {
+  if (!TOKEN_RX.test(token || '')) return false;
+  try { storage.setItem(PAIR_KEY, JSON.stringify({token, at: new Date(nowMs).toISOString()})); return loadPairing(storage)?.token === token; } catch (e) { return false; }
+}
+function forgetPairing(storage) { try { storage?.removeItem(PAIR_KEY); return true; } catch (e) { return false; } }
+/* 'url': the address says what to do (ask=1, server= or code= present; the stored token stands in for a missing code);
+   'auto': nothing in the address but this browser is paired -> find the laptop by itself; 'off': neither. */
+function connectPlan(search, pairing) {
+  const q = new URLSearchParams(search || '');
+  if (q.get('ask') === '1' || q.has('server') || q.has('code')) return 'url';
+  return pairing ? 'auto' : 'off';
+}
+/* The entry card's one state line. */
+function connectLine(state, {mode = '', paired = false} = {}) {
+  const m = String(mode || '').toUpperCase();
+  switch (state) {
+    case 'connecting': return {state, text: paired ? 'Connecting to the laptop…' : 'Looking for the laptop…'};
+    case 'connected': return {state, text: 'Connected' + (m ? ' · ' + m : '')};
+    case 'down': return {state, text: 'Laptop not running',
+      note: 'The laptop is not answering, so Ask the twin is off. Everything else on this page works. Start Ask on the laptop, then press Try again.'};
+    case 'unpaired': return {state, text: 'Not connected', note: 'The laptop no longer knows this headset. Type the code shown on the laptop and press Connect.'};
+    default: return {state: 'off', text: 'Not connected'};
+  }
+}
+/* fetch with a time limit (a dead tunnel address should not leave the card spinning). */
+async function fetchT(fetchFn, url, opts = {}, ms = NET_MS) {
+  const ac = typeof AbortController !== 'undefined' ? new AbortController() : null, t = ac ? setTimeout(() => ac.abort(), ms) : 0;
+  try { return await fetchFn(url, Object.assign({cache: 'no-store'}, opts, ac ? {signal: ac.signal} : {})); } finally { clearTimeout(t); }
+}
+/* The announced address (ENDPOINT, GitHub API first, then raw) -> is that laptop answering? -> {ok, server, health, stale} or
+   {ok:false, state:'down', why}. Never sends a code or token. */
+async function findLaptop(fetchFn, nowMs = Date.now()) {
+  let doc = null;
+  for (const [u, h] of [[ENDPOINT.api, {Accept: 'application/vnd.github.raw+json'}], [ENDPOINT.raw + '?t=' + nowMs, {}]]) {
+    try { const r = await fetchT(fetchFn, u, {headers: h}); if (r.ok) { doc = await r.json(); break; } } catch (e) { /* next source */ }
+  }
+  const e = endpointFrom(doc, nowMs);
+  if (!e.ok) return {ok: false, state: 'down', why: e.why};
+  try {
+    const r = await fetchT(fetchFn, e.server + '/api/health');
+    if (!r.ok) throw new Error('status ' + r.status);
+    return {ok: true, server: e.server, health: await r.json(), stale: e.stale};
+  } catch (err) {
+    return {ok: false, state: 'down', server: e.server, why: 'The laptop' + (e.stale ? ' has not announced a new address for a while and' : '') + ' does not answer.'};
+  }
+}
+/* Typed code -> device token from the laptop. {ok, token} · {ok:false, fallback:true} (older server or pairing off: use the code
+   for this visit only) · {ok:false, status, why}. */
+async function pairWithCode(fetchFn, server, code) {
+  let r, b = {};
+  try { r = await fetchT(fetchFn, apiUrl(server, 'pair'), {method: 'POST', headers: askHeaders(code, {'Content-Type': 'application/json'}), body: '{}'}); }
+  catch (e) { return {ok: false, status: 0, why: 'The laptop stopped answering. Press Connect again.'}; }
+  try { b = await r.json(); } catch (e) { b = {}; }
+  if (r.ok && TOKEN_RX.test(b.token || '')) return {ok: true, token: b.token, device: b.device || null};
+  if (r.status === 404 || r.status === 405 || (r.status === 400 && b.reason === 'pairing_off')) return {ok: false, fallback: true};
+  return {ok: false, status: r.status, why: refusalText(r.status, b) || ('Pairing failed (' + r.status + ').')};
+}
+/* Paired visit: find the laptop, then ask it whether it still knows this token. {ok, server, health} or {ok:false, state, why}. */
+async function autoConnect(fetchFn, token, nowMs = Date.now()) {
+  const f = await findLaptop(fetchFn, nowMs);
+  if (!f.ok) return f;
+  let r;
+  try { r = await fetchT(fetchFn, apiUrl(f.server, 'pair/check'), {method: 'POST', headers: askHeaders('', {'Content-Type': 'application/json'}, token), body: '{}'}); }
+  catch (e) { return {ok: false, state: 'down', server: f.server, why: 'The laptop does not answer.'}; }
+  if (r.ok) return {ok: true, server: f.server, health: f.health};
+  let b = {}; try { b = await r.json(); } catch (e) { b = {}; }
+  if (r.status === 401) return {ok: false, state: 'unpaired', server: f.server, reason: b.reason || null};
+  return {ok: false, state: 'down', server: f.server, why: refusalText(r.status, b) || 'The laptop answered with an error (' + r.status + ').'};
+}
+/* Forget this laptop: tell the laptop (best effort, token in the header), then delete the token here. */
+async function forgetLaptop(fetchFn, storage, server) {
+  const p = loadPairing(storage);
+  let told = false;
+  if (p && server) {
+    try { const r = await fetchT(fetchFn, apiUrl(server, 'pair/forget'), {method: 'POST', headers: askHeaders('', {'Content-Type': 'application/json'}, p.token), body: '{}'}, 4000); told = r.ok; } catch (e) { told = false; }
+  }
+  return {forgotten: forgetPairing(storage), told};
+}
 /* API URL: same origin (relative, as before) or the validated laptop origin. */
 function apiUrl(base, name) { return (base ? base + '/' : '') + 'api/' + name; }
 /* Health check failed: what the 2D box says, and (Method A) the one-tap link that makes the headset accept the laptop's
@@ -860,5 +954,6 @@ return {API, LEVELS, COLORS, BAR, CHIP, ANSWER_MORE, HONESTY, SYS, parseParams, 
   barRects, barHit, barButtons, chipModel, chipHit, answerHit, micPlan, ttsPlan, wrap, drawMark, drawStarburst, starburstRays, CLAUDE_COLOR, CARD_BG, MARK, drawPicto,
   headerWord, headerNote, CLAUDE_MARK_PATH, waitHeight, STEP_ICON, stepIcon, stepPhrase, stepsAdd, stepsFrom, waitLabel, WAIT, markPose, dotWave, revealPose, waitPulse, drawAnswer, drawBar, drawChip, drawMore,
   pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
-  serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
+  serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, PAIR_KEY, loadPairing, savePairing, forgetPairing, connectPlan, connectLine,
+  findLaptop, pairWithCode, autoConnect, forgetLaptop, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

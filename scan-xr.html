@@ -41,6 +41,11 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 #askBox .askHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}#askBox .askHead b{color:#fff}#askMode{color:#fcd34d}
 #askBox .askHead .b{margin-left:auto}#askNote{color:#8aa2b8}#askKeyNote{color:#fcd34d}#askTrustLink{color:#ffd479;font-weight:700}
 #askConnectWrap{margin-top:6px}#askConnectWrap>summary{font-weight:600;color:#9fb6cb}#askBox.bad #askConnectWrap>summary{display:none}
+#askBox .askConnect{margin-top:8px}#askBox .askConnect label{display:block;color:#fff;font-weight:700;font-size:14px}#askBox .askConnect[hidden]{display:none}
+#askBox .askConnectRow{display:flex;gap:8px;margin-top:6px}#askCode{flex:1;min-width:0;height:56px;padding:0 12px;border-radius:10px;border:2px solid #58708a;background:#0b1626;color:#fff;font:700 26px/1 ui-monospace,Menlo,monospace;letter-spacing:4px}
+#askCode:focus{outline:none;border-color:#D97757}#askConnectBtn{height:56px;padding:0 20px;font:700 18px/1 Arial,Helvetica,sans-serif;background:#D97757;border-color:#D97757;color:#fff}
+#askConnectNote{color:#fcd34d}#askConnectNote:empty{display:none}#askState{font-weight:700}#askBox[data-state=connected] #askState{color:#86efac}#askBox[data-state=down] #askState,#askBox[data-state=unpaired] #askState{color:#ffb38a}
+#askStateNote{color:#ffd2bf}#askAutoRetry{font-weight:700}
 #moreOpts{margin-top:12px;border-top:1px solid #1f2f42;padding-top:4px}
 #moreOpts>summary{cursor:pointer;list-style:none;color:#9fb6cb;font:600 13px/1 Arial,Helvetica,sans-serif;padding:8px 0}#moreOpts>summary::-webkit-details-marker{display:none}
 #moreOpts>summary::before{content:'▸ '}#moreOpts[open]>summary::before{content:'▾ '}
@@ -62,7 +67,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}.mode{min-height:84px}.mode .t{font-size:24px}.mode .s{font-size:13px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=9"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=4"></script><script src="twin/xr-ask.js?v=11"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=9"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=4"></script><script src="twin/xr-ask.js?v=12"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -1272,8 +1277,8 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
    (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
    and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
 var ASK=null;
-const XA=globalThis.XRAsk,XAOK=XA?.API===4,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
-ASK={on:!!XAP.enabled,base:XAP.server||null,code:XAP.code||'',prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
+const XA=globalThis.XRAsk,XAOK=XA?.API===5,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
+ASK={on:!!XAP.enabled,base:XAP.server||null,code:XAP.code||'',token:null,prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
  paths:[],vis:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
  hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0,more:false,details:false,wsteps:[],heard:false,tWait:0,markSettle:null,tReveal:null,layout:null};
 ASK.glow.name='ask: cited elements (render-only glow)';bimRoot.add(ASK.glow);
@@ -1305,7 +1310,11 @@ const askRing=new THREE.Mesh(new THREE.RingGeometry(.07,.095,40),new THREE.MeshB
 askRing.renderOrder=63;askRing.visible=false;askRing.frustumCulled=false;scene.add(askRing);
 const askApi=name=>XA.apiUrl(ASK.base,name);
 /* 401 / 429 (access code, rate limit, daily budget) -> the server's friendly sentence; else null. */
-async function askRefusal(res){let b={};try{b=await res.clone().json();}catch(e){}return XA.refusalText(res.status,b);}
+async function askRefusal(res){let b={};try{b=await res.clone().json();}catch(e){}
+ if(res.status===401&&b.reason==='token_unknown'&&ASK.token){XA.forgetPairing(askStore());ASK.token=null;}   // revoked on the laptop: forget it here too
+ return XA.refusalText(res.status,b);}
+/* localStorage, or null where the browser refuses it (private mode): pairing then lasts for this visit only. */
+function askStore(){try{return window.localStorage;}catch(e){return null;}}
 /* Earcons: short Web Audio tones (XA.EARCONS), no files. */
 function askEarcon(name){try{askUnlockAudio();const a=ASK.audio?.ctx,tones=XA.EARCONS[name];if(!a||!tones)return;const t0=a.currentTime+.01;
  for(const [f,st,d,g] of tones){const o=a.createOscillator(),v=a.createGain();o.type='sine';o.frequency.value=f;v.gain.setValueAtTime(0,t0+st);v.gain.linearRampToValueAtTime(g,t0+st+.012);v.gain.exponentialRampToValueAtTime(.0001,t0+st+d);o.connect(v);v.connect(a.destination);o.start(t0+st);o.stop(t0+st+d+.02);}}catch(e){}}
@@ -1418,7 +1427,7 @@ async function askQuestion(level,text,{heard=false}={}){if(!ASK.on)return null;i
  ASK.heard=!!heard;ASK.wsteps=[];ASK.tWait=performance.now();ASK.markSettle=null;ASK.tReveal=ASK.tWait;ASK.revealOpts={from:0,picture:false};askWaitGlow();askSync();askDraw();
  askEarcon('send');ASK.filler=setTimeout(()=>{if(epoch===ASK.epoch&&ASK.busy&&!ASK.saidAny)askSay('One moment.',epoch);},XA.FILLER_MS);
  const t0=performance.now();let spoke=false;
- try{const res=await fetch(askApi('ask'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'}),signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
+ try{const res=await fetch(askApi('ask'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'},ASK.token),signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
   if(!res.ok){const rt=await askRefusal(res);if(rt)throw new Error(rt);}
   if(!res.ok||!res.body)throw new Error('ask server '+res.status+(res.status===404||res.status===501?' · open this page from scripts/ask_twin_server.py':''));
   let fail=null;const sp=XA.createStream(ev=>{if(epoch!==ASK.epoch)return;
@@ -1449,7 +1458,7 @@ async function askPump(epoch){if(ASK.sqBusy)return;ASK.sqBusy=true;const gen=ASK
  try{while(ASK.sq.length&&epoch===ASK.epoch&&gen===ASK.sqGen){const t=ASK.sq.shift();if(!(await askSpeakOne(t,epoch)))break;}}
  finally{if(gen===ASK.sqGen){ASK.sqBusy=false;if(ASK.speech==='speaking')askSetSpeech('read',epoch);}}}
 async function askSpeakServer(text,epoch){askUnlockAudio();if(!ASK.audio)throw new Error('no Web Audio');
- const r=await fetch(askApi('speak'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'}),body:JSON.stringify({text})});if(!r.ok)throw new Error('speak '+r.status);
+ const r=await fetch(askApi('speak'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'},ASK.token),body:JSON.stringify({text})});if(!r.ok)throw new Error('speak '+r.status);
  const buf=await ASK.audio.ctx.decodeAudioData(await r.arrayBuffer());if(epoch!==ASK.epoch)return true;
  await new Promise(res=>{const src=ASK.audio.ctx.createBufferSource();src.buffer=buf;src.connect(ASK.audio.ctx.destination);src.onended=()=>{if(ASK.audio?.src===src)ASK.audio.src=null;res();};
   try{ASK.audio.src?.stop();}catch(e){}ASK.audio.src=src;src.start();askSetSpeech('speaking',epoch);ASK.speechEngine='laptop voice'+(ASK.health?.tts?.voice?' ('+ASK.health.tts.voice+')':'');});
@@ -1482,7 +1491,7 @@ async function askRecStop(discard=false){const r=ASK.rec;ASK.rec=null;clearTimeo
  const blob=new Blob(ASK.chunks,{type:r.mimeType||'audio/webm'});
  if(blob.size<1500||performance.now()-ASK.recT0<500){ASK.voice='ready';status('Too short: hold the trigger on the element while you talk');askVoiceUi();return;}
  ASK.voice='transcribing';askVoiceUi();
- try{const res=await fetch(askApi('transcribe'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':blob.type}),body:blob});if(!res.ok){const rt=await askRefusal(res);if(rt)throw new Error(rt);}const j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
+ try{const res=await fetch(askApi('transcribe'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':blob.type},ASK.token),body:blob});if(!res.ok){const rt=await askRefusal(res);if(rt)throw new Error(rt);}const j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
   ASK.voice='ready';askVoiceUi();if(j.text&&!j.no_speech){status('Heard: “'+j.text+'”');await askQuestion(null,j.text,{heard:true});}else{askEarcon('miss');status('Didn’t catch that · hold the trigger and speak, or use ⋯ for preset questions');}}
  catch(e){ASK.voice='ready';askVoiceUi();status('Speech-to-text failed ('+(e?.message||e)+') · use ⋯ for preset questions');}}
 /* A press on an Ask panel (controller select / desktop click): "⋯" (label or answer card) opens / closes the presets panel; a preset asks
@@ -1519,31 +1528,64 @@ function askHoldEnd(c){const u=c.userData;clearTimeout(u.askHoldT);const was=u.a
  if(was==='active'&&ASK.voice==='recording')askRecStop();}
 for(const c of controllers){c.addEventListener('selectstart',()=>askHoldStart(c));c.addEventListener('selectend',()=>askHoldEnd(c));}
 /* 2D page box: server status, and the two things that need a 2D click before entering the headset session (mic permission, audio unlock). */
-/* Connect with the code only: look up the laptop's current address (XA.ENDPOINT), check that it answers, then reopen this page
-   with &ask=1&server=…&code=…. Shown when Ask is off, and inside the Ask box for a new code or a restarted laptop. */
-function askConnectRow(){const d=document.createElement('div');d.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid #2a3b52';
- d.innerHTML='<label for="askCode" style="display:block;color:#fff;font-weight:700;font-size:13px">Connect with the code on the laptop</label><div style="display:flex;gap:6px;margin-top:6px"><input id="askCode" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="CODE" style="flex:1;min-width:0;height:44px;padding:0 10px;border-radius:8px;border:1px solid #58708a;background:#0b1626;color:#fff;font:700 20px/1 ui-monospace,Menlo,monospace;letter-spacing:3px;text-transform:uppercase"><button id="askConnectBtn" class="b" style="height:44px;padding:0 14px;font-weight:700">Connect</button></div><p id="askConnectNote" role="status" style="margin:6px 0 0;color:#fcd34d"></p>';return d;}
-async function askConnect(){const note=t=>{$('askConnectNote').textContent=t;},code=XA.connectCode($('askCode').value);
- if(!code)return note('Type the code shown on the laptop (letters and digits).');
- $('askConnectBtn').disabled=true;note('Looking for the laptop…');
- try{let doc=null;for(const [u,h] of [[XA.ENDPOINT.api,{Accept:'application/vnd.github.raw+json'}],[XA.ENDPOINT.raw+'?t='+Date.now(),{}]]){try{const r=await fetch(u,{headers:h,cache:'no-store'});if(r.ok){doc=await r.json();break;}}catch(e){}}
-  const e=XA.endpointFrom(doc,Date.now());if(!e.ok)return note(e.why);
-  try{const r=await fetch(e.server+'/api/health',{cache:'no-store'});if(!r.ok)throw Error('status '+r.status);}catch(err){return note('The laptop'+(e.stale?' has not announced a new address for a while and':'')+' does not answer. Start the server on the laptop again, then press Connect.');}
-  note('Connected · opening…');const u=new URLSearchParams(location.search);u.set('ask','1');u.set('server',e.server);u.set('code',code);location.search='?'+u.toString();}
- finally{$('askConnectBtn').disabled=false;}}
+/* Connect (2026-11-17, pair once): the visitor types only the code from the laptop screen (digits, a number pad on the headset keyboard).
+   The page looks up the laptop's current address (XA.ENDPOINT), checks that it answers, asks it for a device token (XA.pairWithCode),
+   keeps the token in localStorage and turns Ask on in place (no reload). Later visits connect by themselves (askAuto). One state line:
+   Not connected / Looking for the laptop… / Connected · LIVE|MOCK / Laptop not running. */
+function askConnectRow(){const d=document.createElement('div');d.className='askConnect';
+ d.innerHTML='<label for="askCode">Code shown on the laptop</label><div class="askConnectRow"><input id="askCode" type="text" inputmode="numeric" pattern="[0-9 ]*" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="1234 5678" aria-describedby="askConnectNote"><button id="askConnectBtn" class="b">Connect</button></div><p id="askConnectNote" role="status"></p>';return d;}
+function askConnectNote(t){const n=$('askConnectNote');if(n)n.textContent=t||'';}
+/* the one state line (#askState) and the box look: data-state off | connecting | connected | down | unpaired */
+function askStateSet(state,opts={}){const L=XA.connectLine(state,opts),b=$('askBox'),el=$('askState');if(b){b.dataset.state=L.state;b.classList.toggle('bad',L.state==='down'||L.state==='unpaired');}
+ if(el)el.textContent=L.text;const n=$('askStateNote');if(n){n.textContent=L.note||'';n.hidden=!L.note;}return L;}
+async function askConnect(){const code=XA.connectCode($('askCode').value);
+ if(!code)return askConnectNote('Type the code shown on the laptop (digits; the space does not matter).');
+ $('askConnectBtn').disabled=true;askConnectNote('');if(!ASK.on)askStateSet('connecting');
+ try{const f=await XA.findLaptop((u,o)=>fetch(u,o),Date.now());
+  if(!f.ok){if(!ASK.on)askStateSet('down');return askConnectNote(f.why+' Start Ask on the laptop, then press Connect.');}
+  const pr=await XA.pairWithCode((u,o)=>fetch(u,o),f.server,code);
+  if(pr.ok){const kept=XA.savePairing(askStore(),pr.token);askGoOn({server:f.server,token:pr.token,note:kept?'':'This browser cannot keep the pairing: next visit, type the code again.'});return;}
+  if(pr.fallback){askGoOn({server:f.server,code});return;}   // older laptop server: the code for this visit only
+  if(!ASK.on)askStateSet('off');askConnectNote(pr.why);}
+ finally{const b=$('askConnectBtn');if(b)b.disabled=false;}}
 function askConnectWire(){$('askConnectBtn').onclick=askConnect;$('askCode').addEventListener('keydown',e=>{if(e.key==='Enter')askConnect();});}
-/* Entry-card Ask box (2026-11-16, simpler entry page). Ask off (no &ask=1): one small "Ask the twin · connect with the laptop code"
-   line that opens the code row. Ask on and not connected: the box stands out (terracotta border, code row open, Retry / trust link).
-   Ask on and connected: one short line "Ask the twin · connected · LIVE|MOCK" + Allow mic (the mic needs a 2D click before entering);
-   Test voice, the voice choice, the full server line and the how-to sit under More options (#askMore). */
-function askConnectBox(){if(!XAOK||!XA.ENDPOINT||$('askBox'))return;const box=document.createElement('details');box.id='askBox';box.setAttribute('aria-label','Ask the twin');
- box.innerHTML='<summary>Ask the twin · connect with the laptop code</summary>';const row=askConnectRow();row.style.borderTop='0';row.style.paddingTop='0';box.appendChild(row);$('askSlot').appendChild(box);askConnectWire();}
-async function askBoot(){if(!ASK.on){askConnectBox();return;}
+/* "Forget this laptop" under More options (only when this browser is paired): deletes the token here and, if the laptop answers, there;
+   then reopens the page without Ask. */
+function askForgetUi(){const m=$('askMore');if(!m||$('askForgetBtn')||!XA.loadPairing(askStore()))return;const d=document.createElement('div');d.id='askForget';
+ d.innerHTML='<p class="help">This headset is paired with the laptop: it connects by itself when Ask runs there.</p><div class="row"><button id="askForgetBtn" class="b">Forget this laptop</button></div>';
+ if(!m.innerHTML.trim())m.innerHTML='<h3>Ask the twin</h3>';m.appendChild(d);
+ $('askForgetBtn').onclick=async()=>{$('askForgetBtn').disabled=true;await XA.forgetLaptop((u,o)=>fetch(u,o),askStore(),ASK.base);
+  const u=new URLSearchParams(location.search);for(const k of ['ask','server','code'])u.delete(k);location.search=u.toString()?'?'+u:'';};}
+/* Entry-card Ask box. Not connected (no &ask=1, not paired): one collapsed line that opens the code row. Paired: "Connecting to the
+   laptop…", then the connected box, or "Laptop not running" with Try again (Ask stays off; the rest of the page is unchanged).
+   Connected: one line "Ask the twin · Connected · LIVE|MOCK" + Allow mic; Test voice, the voice choice, the full server line, the
+   how-to and Forget this laptop sit under More options (#askMore). */
+function askOffBox(state='off',why=''){if(!XAOK||!XA.ENDPOINT)return;$('askBox')?.remove();const box=document.createElement('details');box.id='askBox';box.setAttribute('aria-label','Ask the twin');
+ box.innerHTML='<summary><b>Ask the twin</b> · <span id="askState"></span></summary><p id="askStateNote" hidden></p>';box.appendChild(askConnectRow());
+ if(state==='down'){const r=document.createElement('p');r.innerHTML='<button id="askAutoRetry" class="b">Try again</button>';box.insertBefore(r,box.querySelector('.askConnect'));box.querySelector('.askConnect').hidden=true;}
+ $('askSlot').appendChild(box);askConnectWire();askStateSet(state,{paired:!!XA.loadPairing(askStore())});box.open=state!=='off';if(why)askConnectNote(why);
+ if($('askAutoRetry'))$('askAutoRetry').onclick=()=>askAuto();askForgetUi();}
+/* Paired visit with nothing in the address: find the laptop, check the token, turn Ask on. */
+async function askAuto(){const p=XA.loadPairing(askStore());if(!p)return askOffBox('off');
+ askOffBox('connecting');$('askBox').querySelector('.askConnect').hidden=true;
+ const r=await XA.autoConnect((u,o)=>fetch(u,o),p.token,Date.now());ASK.autoResult={ok:r.ok,state:r.ok?'connected':r.state};
+ if(r.ok)return askGoOn({server:r.server,token:p.token});
+ if(r.state==='unpaired'){XA.forgetPairing(askStore());return askOffBox('unpaired');}
+ askOffBox('down');}
+/* Turn Ask on in place (no reload: the models stay loaded). */
+function askGoOn({server=null,code='',token=null,note=''}){ASK.on=true;ASK.base=server;ASK.code=code||'';ASK.token=code?null:token;$('askBox')?.remove();$('askMore').innerHTML='';askBootOn().then(()=>{if(note)askNote(note);});}
+async function askBoot(){if(!XAOK)return;const pairing=XA.loadPairing(askStore()),plan=XA.connectPlan(location.search,pairing);
+ if(ASK.on){if(!ASK.code&&pairing)ASK.token=pairing.token;return askBootOn();}   // the address says what to do; a stored token stands in for a missing code
+ if(plan==='auto')return askAuto();
+ askOffBox('off');}
+let askOnce=false;
+async function askBootOn(){
  const box=document.createElement('section');box.id='askBox';box.setAttribute('aria-label','Ask the twin');
- box.innerHTML='<div class="askHead"><b>Ask the twin</b><span id="askMode">connecting…</span><button id="askMicBtn" class="b">Allow mic</button></div><p id="askKeyNote" hidden></p><p id="askTrust" hidden><a id="askTrustLink" target="_blank" rel="noopener"></a></p><p id="askNote"></p><p><button id="askRetryBtn" class="b" style="display:none">Retry</button></p>';
- const conn=document.createElement('details');conn.id='askConnectWrap';conn.innerHTML='<summary>New code or restarted laptop</summary>';conn.appendChild(askConnectRow());box.appendChild(conn);$('askSlot').appendChild(box);askConnectWire();
+ box.innerHTML='<div class="askHead"><b>Ask the twin</b><span id="askMode"><span id="askState">Connecting to the laptop…</span></span><button id="askMicBtn" class="b">Allow mic</button></div><p id="askKeyNote" hidden></p><p id="askStateNote" hidden></p><p id="askTrust" hidden><a id="askTrustLink" target="_blank" rel="noopener"></a></p><p id="askNote"></p><p><button id="askRetryBtn" class="b" style="display:none">Retry</button></p>';
+ const conn=document.createElement('details');conn.id='askConnectWrap';conn.innerHTML='<summary>Connect again with a code</summary>';conn.appendChild(askConnectRow());box.appendChild(conn);$('askSlot').appendChild(box);askConnectWire();
  $('askMore').innerHTML='<h3>Ask the twin</h3><p id="askModeFull"></p><div class="row"><button id="askVoiceBtn" class="b">Test voice</button><button id="askPreferBtn" class="b"></button></div><p class="help">In the headset: point at a duct, pipe or light and <b>hold the trigger</b> while you speak, release to ask. A short press shows its label; ⋯ on the label has preset questions; B/Y or a press on empty space closes. Desktop: click, hold Space to speak, 1-4 presets, Esc closes. Before Enter MR/VR: Allow mic, then Test voice. Not headset-verified.</p>';
- addEventListener('pointerdown',askUnlockAudio,{capture:true});$('enterMR')?.addEventListener('click',askUnlockAudio,{capture:true});$('enterVR')?.addEventListener('click',askUnlockAudio,{capture:true});
+ askForgetUi();
+ if(!askOnce){askOnce=true;addEventListener('pointerdown',askUnlockAudio,{capture:true});$('enterMR')?.addEventListener('click',askUnlockAudio,{capture:true});$('enterVR')?.addEventListener('click',askUnlockAudio,{capture:true});}
  $('askMicBtn').onclick=()=>{askUnlockAudio();askOpenMic();};
  $('askVoiceBtn').onclick=()=>{askUnlockAudio();askSpeak('Ask the twin is ready.');};
  const prefer=()=>{$('askPreferBtn').textContent='Voice: '+(ASK.prefer==='browser'?'headset':'laptop');};prefer();
@@ -1551,25 +1593,25 @@ async function askBoot(){if(!ASK.on){askConnectBox();return;}
  $('askRetryBtn').onclick=()=>askHealth();
  await askHealth();}
 /* connected / not connected look of the entry-card box */
-function askBoxState(ok){const b=$('askBox'),c=$('askConnectWrap');if(!b)return;b.classList.toggle('bad',!ok);if(c)c.open=!ok;}
+function askBoxState(ok){const b=$('askBox'),c=$('askConnectWrap');if(!b)return;b.classList.toggle('bad',!ok);b.dataset.state=ok?'connected':'down';if(c)c.open=!ok;}
 /* Server status. Method A (&server=): a failed fetch is usually the not-yet-accepted certificate -> one-tap trust link + Retry. */
-async function askHealth(){const sameOrigin=!ASK.base;$('askRetryBtn').style.display='none';$('askTrust').hidden=true;$('askMode').textContent='connecting…';
- if(XAP.serverIgnored){ASK.healthError='server= ignored';$('askMode').textContent='server= ignored';askBoxState(false);askNote(XA.healthProblem({ignored:true}).text);askVoicePlan();askVoiceUi();return;}
+async function askHealth(){const sameOrigin=!ASK.base;$('askRetryBtn').style.display='none';$('askTrust').hidden=true;$('askState').textContent='Connecting to the laptop…';
+ if(XAP.serverIgnored){ASK.healthError='server= ignored';$('askState').textContent='server= ignored';askBoxState(false);askNote(XA.healthProblem({ignored:true}).text);askVoicePlan();askVoiceUi();return;}
  try{const r=await fetch(askApi('health'),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);ASK.health=await r.json();ASK.healthError=null;
-  const h=ASK.health;$('askMode').textContent='connected · '+(h.mode||'').toUpperCase();askBoxState(true);
+  const h=ASK.health;$('askState').textContent=XA.connectLine('connected',{mode:h.mode}).text;askBoxState(true);
   $('askModeFull').textContent=(h.mode||'').toUpperCase()+' · '+(h.mode==='live'?h.model:'scripted answers')+(ASK.base?' · laptop '+ASK.base.replace('https://',''):'')+' · voice in: '+(h.stt?.available?'laptop whisper':'off')+' · voice out: '+(h.tts?.available?'laptop'+(h.tts.voice?' ('+h.tts.voice+')':''):'headset');
-  const codeNote=h.access?.code_required&&!ASK.code?XA.refusalText(401,{reason:'code_required'}):'';
+  const codeNote=h.access?.code_required&&!ASK.code&&!ASK.token?XA.refusalText(401,{reason:'code_required'}):'';
   $('askKeyNote').hidden=!(h.note||codeNote);$('askKeyNote').textContent=[codeNote,h.note].filter(Boolean).join(' · ');askNote('');if(ASK.phase)ASK.dirty=true;}
  catch(e){ASK.health=null;ASK.healthError=String(e?.message||e);const p=XA.healthProblem({server:ASK.base,error:e?.name==='TypeError'?'network or certificate':ASK.healthError,sameOrigin});
-  $('askMode').textContent='not connected';$('askModeFull').textContent='server not reachable';askBoxState(false);askNote(p.text);$('askRetryBtn').style.display='';
+  $('askState').textContent=ASK.base&&!sameOrigin?XA.connectLine('down').text:'Not connected';$('askModeFull').textContent='server not reachable';askBoxState(false);askNote(p.text);$('askRetryBtn').style.display='';
   if(p.trustUrl){$('askTrust').hidden=false;$('askTrustLink').href=p.trustUrl;$('askTrustLink').textContent=p.trustLabel;}}
  askVoicePlan();askVoiceUi();}
-function askInspection(){if(!ASK?.on)return {on:false,available:XAOK};const w=new THREE.Vector3();
+function askInspection(){if(!ASK?.on)return {on:false,available:XAOK,state:$('askBox')?.dataset.state||null,stateText:$('askState')?.textContent||null,auto:ASK?.autoResult||null,paired:!!(XAOK&&XA.loadPairing(askStore()))};const w=new THREE.Vector3();
  return {on:true,health:ASK.health?{mode:ASK.health.mode,model:ASK.health.model,stt:!!ASK.health.stt?.available,tts:!!ASK.health.tts?.available}:null,healthError:ASK.healthError,
   el:ASK.el&&{id:ASK.el.id,layer:ASK.el.layer,bim:ASK.el.bim,sensor:ASK.el.sensor},phase:ASK.phase,busy:ASK.busy,question:ASK.question,level:ASK.level,steps:ASK.steps.slice(),error:ASK.error,answerMs:ASK.tAnswer,
   lead:ASK.model?.lead||null,primary:ASK.model?.primary||null,chips:ASK.model?.chips||[],visual:ASK.model?.visual||null,citations:(ASK.final?.citations||[]).map(c=>({id:c.id,verified:c.verified,layer:c.layer})),
   glow:ASK.glow.children.map(o=>({id:o.userData.id,kind:o.userData.kind})),run:ASK.run?{pieces:ASK.run.meshes.length,ids:ASK.run.ids.length}:null,speech:ASK.speech,speechPlan:ASK.speechPlan||null,speechEngine:ASK.speechEngine||null,
-  base:ASK.base,prefer:ASK.prefer,progress:ASK.progress,note:ASK.health?.note||null,ring:askRing.visible,
+  base:ASK.base,paired:!!ASK.token,codeUsed:!!ASK.code,prefer:ASK.prefer,progress:ASK.progress,note:ASK.health?.note||null,ring:askRing.visible,
   voice:ASK.voice,voicePlan:ASK.voicePlan||null,voiceNote:ASK.voiceNote,bar:askBar.mesh.visible?askButtons().map(b=>b.id):null,moreVisible:askBar.mesh.visible,chipVisible:askChip.mesh.visible,details:ASK.details,cardVisible:askCard.mesh.visible,infoCardVisible:card.mesh.visible,
   wait:{steps:ASK.wsteps.map(s=>({icon:s.icon,text:s.text,state:s.state,n:s.n})),heard:ASK.heard,settled:ASK.markSettle!=null,dots:askDots[0].visible,cover:askCover.visible,cardOpacity:askCard.mesh.material.opacity,markRot:+askMark.texture.rotation.toFixed(3)},
   tex:Object.fromEntries([['card',askCard],['chip',askChip],['bar',askBar],['info',card],['mark',askMark]].map(([k,v])=>[k,{w:v.canvas.width,h:v.canvas.height,k:v.k,aniso:v.texture.anisotropy}])),

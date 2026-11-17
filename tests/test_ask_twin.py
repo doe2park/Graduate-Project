@@ -833,12 +833,15 @@ class AccessCodeTests(unittest.TestCase):
         self.addCleanup(d.cleanup)
         return LIM.Limits('K7PX3M', LIM.Budget(Path(d.name), 1000, 50, persist=False), **kw)
 
-    def test_generated_code_is_short_and_unambiguous(self):
+    def test_generated_code_is_eight_digits(self):
         for _ in range(50):
             c = LIM.make_code()
-            self.assertEqual(len(c), 6)
-            self.assertFalse(set(c) & set('01OIL'))
-            self.assertTrue(set(c) <= set(LIM.ALPHABET))
+            self.assertEqual(len(c), 8)
+            self.assertTrue(c.isdigit())
+        self.assertEqual(LIM.show_code('48219067'), '4821 9067')
+        self.assertEqual(LIM.show_code('K7PX3M'), 'K7PX3M')
+        lim = LIM.Limits('48219067', LIM.Budget(Path('.'), 0, 0, persist=False))
+        self.assertIsNone(lim.admit('ask', '10.0.0.9', '4821 9067'))   # typed with the space shown in the banner
 
     def test_missing_wrong_right(self):
         lim = self.limits()
@@ -1076,6 +1079,276 @@ class LimitArgsTests(unittest.TestCase):
         t = S.idle_watch(types.SimpleNamespace(shutdown=stopped.set), lim, 0.001, log=lambda *a, **k: None, poll=0.01)
         self.assertTrue(stopped.wait(5))
         t.join(1)
+
+
+# ---------------------------------------------------------------- pair once (2026-11-17)
+from ask_twin import pairing as PR  # noqa: E402
+
+
+class PairingStoreTests(unittest.TestCase):
+    """scripts/ask_twin/pairing.py: issue / accept / reject / forget / clear, hashes only at rest, expiry, re-read on change."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.t = [1_800_000_000.0]
+        self.p = PR.Pairings(self.tmp.name, clock=lambda: self.t[0])
+
+    def test_issue_accept_reject(self):
+        tok, dev = self.p.issue('Quest Browser')
+        self.assertGreaterEqual(len(tok), 43)                      # 32 random bytes, url-safe
+        self.assertRegex(tok, PR.TOKEN_RX)
+        self.assertEqual(self.p.check(tok), dev)
+        self.assertIsNone(self.p.check(tok[:-1] + ('A' if tok[-1] != 'A' else 'B')))
+        self.assertIsNone(self.p.check(''))
+        self.assertIsNone(self.p.check(None))
+        self.assertIsNone(self.p.check('short'))
+        tok2, _ = self.p.issue('Chrome')
+        self.assertNotEqual(tok, tok2)
+        self.assertEqual(self.p.count(), 2)
+
+    def test_only_hashes_at_rest_private_file(self):
+        tok, dev = self.p.issue('Quest Browser')
+        f = Path(self.tmp.name) / PR.FILE_NAME
+        raw = f.read_text()
+        self.assertNotIn(tok, raw)
+        self.assertIn(PR.token_hash(tok), raw)
+        self.assertEqual(f.stat().st_mode & 0o777, 0o600)
+        listing = self.p.listing()
+        self.assertEqual([d['id'] for d in listing], [dev])
+        self.assertNotIn('sha256', json.dumps(listing))
+
+    def test_forget_and_clear_revoke(self):
+        a, _ = self.p.issue('a')
+        b, _ = self.p.issue('b')
+        self.assertTrue(self.p.forget(a))
+        self.assertFalse(self.p.forget(a))
+        self.assertIsNone(self.p.check(a))
+        self.assertIsNotNone(self.p.check(b))
+        self.assertEqual(self.p.clear(), 1)
+        self.assertIsNone(self.p.check(b))
+
+    def test_clear_from_another_process_reaches_a_running_server(self):
+        tok, _ = self.p.issue('a')
+        self.assertIsNotNone(self.p.check(tok))
+        PR.Pairings(self.tmp.name).clear()                          # e.g. ask_twin_server.py --forget-devices while it runs
+        self.assertIsNone(self.p.check(tok))
+
+    def test_idle_tokens_expire_and_use_keeps_them(self):
+        tok, _ = self.p.issue('a')
+        self.t[0] += 20 * 86400
+        self.assertIsNotNone(self.p.check(tok))                     # used: last_used moves forward
+        self.t[0] += 20 * 86400
+        self.assertIsNotNone(self.p.check(tok))
+        self.t[0] += 31 * 86400
+        self.assertIsNone(self.p.check(tok))
+        self.assertEqual(self.p.count(), 0)
+
+    def test_device_cap_drops_least_recently_used(self):
+        p = PR.Pairings(self.tmp.name, clock=lambda: self.t[0], max_devices=3)
+        toks = []
+        for i in range(4):
+            self.t[0] += 60
+            toks.append(p.issue(str(i))[0])
+        self.assertIsNone(p.check(toks[0]))
+        self.assertTrue(all(p.check(t) for t in toks[1:]))
+
+    def test_unreadable_file_fails_closed(self):
+        tok, _ = self.p.issue('a')
+        (Path(self.tmp.name) / PR.FILE_NAME).write_text('{not json')
+        self.assertIsNone(self.p.check(tok))
+
+    def test_label_from_user_agent(self):
+        self.assertEqual(PR.device_label('Mozilla/5.0 (X11; Linux x86_64; Quest 3) OculusBrowser/40.0 Chrome/130'), 'Quest Browser')
+        self.assertEqual(PR.device_label(None), 'browser')
+
+
+class PairingLimitTests(unittest.TestCase):
+    """A token counts as the code for asking (same rate and daily limits), never for pairing; wrong tokens are wrong codes."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.pairs = PR.Pairings(self.tmp.name)
+        self.token, _ = self.pairs.issue('t')
+
+    def limits(self, **kw):
+        return LIM.Limits('48219067', LIM.Budget(Path(self.tmp.name), 0, kw.pop('per_day', 0), persist=False), pairings=self.pairs, **kw)
+
+    def test_token_admits_and_counts_like_the_code(self):
+        lim = self.limits(per_minute=2, per_day=3)
+        self.assertIsNone(lim.admit('ask', 'tunnel', None, self.token))
+        self.assertIsNone(lim.admit('speech', 'tunnel', None, self.token))
+        self.assertIsNone(lim.admit('check', 'tunnel', None, self.token))
+        self.assertIsNone(lim.admit('ask', 'tunnel', None, self.token))
+        status, body, _ = lim.admit('ask', 'tunnel', None, self.token)
+        self.assertEqual((status, body['reason']), (429, 'rate_ip'))          # same per-minute limit
+        self.assertEqual(lim.budget.snapshot()['questions'], 2)
+        lim.asks = LIM.Window(0)
+        self.assertIsNone(lim.admit('ask', 'other', None, self.token))
+        status, body, _ = lim.admit('ask', 'other', None, self.token)
+        self.assertEqual((status, body['reason']), (429, 'rate_day'))         # same daily limit
+
+    def test_wrong_token_is_rejected_and_rate_limited_like_a_wrong_code(self):
+        lim = self.limits(bad_codes_per_minute=3)
+        for _ in range(3):
+            status, body, _ = lim.admit('ask', 'tunnel', None, 'x' * 43)
+            self.assertEqual((status, body['reason']), (401, 'token_unknown'))
+        status, body, _ = lim.admit('ask', 'tunnel', None, 'y' * 43)
+        self.assertEqual((status, body['reason']), (429, 'rate_bad_code'))
+        status, _, _ = lim.admit('ask', 'tunnel', '0000 0000')
+        self.assertEqual(status, 429)                                         # wrong codes share the window
+        self.assertIsNone(lim.admit('ask', 'tunnel', None, self.token))       # a valid token is never locked out
+
+    def test_whole_server_wrong_credential_cap(self):
+        lim = self.limits(bad_codes_per_minute=100, bad_codes_per_hour_all=5)
+        for i in range(5):
+            self.assertEqual(lim.admit('ask', f'10.0.0.{i}', '1111 1111')[0], 401)
+        self.assertEqual(lim.admit('ask', '10.0.0.99', '1111 1111')[1]['reason'], 'rate_bad_code')
+
+    def test_pairing_needs_the_code_not_a_token(self):
+        lim = self.limits()
+        status, body, _ = lim.admit('pair', 'tunnel', None, self.token)
+        self.assertEqual((status, body['reason']), (401, 'code_required'))
+        self.assertIsNone(lim.admit('pair', 'tunnel', '48219067'))
+        lim2 = self.limits(pairs_per_minute=1)
+        self.assertIsNone(lim2.admit('pair', 'tunnel', '48219067'))
+        self.assertEqual(lim2.admit('pair', 'tunnel', '48219067')[1]['reason'], 'rate_pair')
+
+    def test_no_code_server_ignores_pairing(self):
+        lim = LIM.Limits(None, LIM.Budget(Path('.'), 0, 0, persist=False), pairings=self.pairs)
+        self.assertIsNone(lim.pairings)
+        self.assertFalse(lim.public()['access']['pairing'])
+
+
+class PairingServerTests(unittest.TestCase):
+    """HTTP: /api/pair with the code -> token; X-Ask-Token works for ask (header only, never ?token=), check, forget; CORS;
+    the token is never logged and never in /api/health; --forget-devices / --list-devices."""
+    @classmethod
+    def setUpClass(cls):
+        import ask_twin_server as S
+        cls.S, cls.tmp = S, tempfile.TemporaryDirectory()
+        app = S.build_app(S.parse_args(['--mock', '--no-stt', '--no-tts', '--port', '0', '--code', '48219067', '--per-minute', '50',
+                                        '--usage-dir', cls.tmp.name]), log=lambda *a: None)
+        cls.app = app
+        cls.httpd = ThreadingHTTPServer(('127.0.0.1', 0), type('H', (S.Handler,), {'app': app}))
+        app.port = cls.httpd.server_address[1]
+        cls.base = f'http://127.0.0.1:{app.port}'
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.tmp.cleanup()
+
+    def post(self, path, headers=None, body=b'{}'):
+        return _req(self.base, path, 'POST', {'Content-Type': 'application/json', **(headers or {})}, body)
+
+    def pair(self):
+        import contextlib
+        import io
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code, _, body = self.post('/api/pair', {'X-Ask-Code': '4821 9067', 'User-Agent': 'OculusBrowser/40'})
+        self.assertEqual(code, 200)
+        tok = json.loads(body)['token']
+        self.assertNotIn(tok, err.getvalue())                                  # never logged
+        self.assertIn('paired a new device', err.getvalue())
+        return tok
+
+    def ask(self, headers, query=''):
+        return self.post('/api/ask' + query, headers, json.dumps({'question': 'What is this?', 'element_id': LIGHT}).encode())
+
+    def test_pair_then_ask_with_token(self):
+        tok = self.pair()
+        code, _, body = self.ask({'X-Ask-Token': tok})
+        self.assertEqual(code, 200)
+        self.assertIn('"type": "final"', body.decode())
+        import contextlib
+        import io
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(self.ask({}, '?token=' + tok)[0], 401)             # not accepted from a URL
+            self.ask({}, '?code=12345678')
+        self.assertNotIn(tok, err.getvalue())                                  # and a URL that carries one is logged redacted
+        self.assertNotIn('12345678', err.getvalue())
+        self.assertIn('token=…', err.getvalue())
+        self.assertEqual(self.post('/api/pair/check', {'X-Ask-Token': tok})[0], 200)
+        hl = _req(self.base, '/api/health')[2].decode()
+        self.assertNotIn(tok, hl)
+        self.assertTrue(json.loads(hl)['access']['pairing'])
+        stored = (Path(self.tmp.name) / PR.FILE_NAME).read_text()
+        self.assertNotIn(tok, stored)
+
+    def test_wrong_token_and_token_cannot_pair(self):
+        tok = self.pair()
+        code, _, body = self.post('/api/pair/check', {'X-Ask-Token': 'Z' * 43})
+        self.assertEqual((code, json.loads(body)['reason']), (401, 'token_unknown'))
+        code, _, body = self.post('/api/pair', {'X-Ask-Token': tok})
+        self.assertEqual((code, json.loads(body)['reason']), (401, 'code_required'))
+        self.assertEqual(self.post('/api/pair', {'X-Ask-Code': '00000000'})[0], 401)
+
+    def test_forget_from_the_page(self):
+        tok = self.pair()
+        code, _, body = self.post('/api/pair/forget', {'X-Ask-Token': tok})
+        self.assertEqual((code, json.loads(body)), (200, {'removed': True}))
+        self.assertEqual(json.loads(self.ask({'X-Ask-Token': tok})[2])['reason'], 'token_unknown')
+
+    def test_cors_allows_the_token_header_for_the_public_page_only(self):
+        pre = {'Origin': 'https://doe2park.github.io', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,x-ask-token'}
+        code, h, _ = _req(self.base, '/api/pair/check', 'OPTIONS', pre)
+        self.assertEqual(code, 204)
+        self.assertIn('X-Ask-Token', h['Access-Control-Allow-Headers'])
+        self.assertEqual(_req(self.base, '/api/pair', 'OPTIONS', dict(pre, Origin='https://evil.example'))[0], 403)
+        tok = self.pair()
+        self.assertEqual(self.post('/api/pair/check', {'X-Ask-Token': tok, 'Origin': 'https://evil.example'})[0], 403)
+
+    def test_cli_list_and_forget_devices(self):
+        self.pair()
+        out = []
+        args = self.S.parse_args(['--list-devices', '--usage-dir', self.tmp.name])
+        self.assertTrue(self.S.manage_devices(args, log=out.append))
+        self.assertIn('Quest Browser', '\n'.join(out))
+        out.clear()
+        self.assertTrue(self.S.manage_devices(self.S.parse_args(['--forget-devices', '--usage-dir', self.tmp.name]), log=out.append))
+        self.assertRegex(out[0], r'forgot \d+ paired device')
+        self.assertEqual(PR.Pairings(self.tmp.name).count(), 0)
+        self.assertFalse(self.S.manage_devices(self.S.parse_args([]), log=out.append))
+        with self.assertRaises(SystemExit):
+            self.S.manage_devices(self.S.parse_args(['--forget-devices', '--usage-dir', str(ROOT / 'work')]), log=out.append)
+
+    def test_no_pairing_flag(self):
+        app = self.S.build_app(self.S.parse_args(['--mock', '--no-stt', '--no-tts', '--no-pairing', '--usage-dir', self.tmp.name]), log=lambda *a: None)
+        self.assertIsNone(app.limits.pairings)
+
+
+class PublicScriptTests(unittest.TestCase):
+    """scripts/ask_twin_public.sh with stand-ins for cloudflared, git and the server (no tunnel, no push): the announcement
+    carries the address only, the code is 8 digits and goes only to the local server's --code."""
+    def test_announcement_never_carries_the_code(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        d = Path(tmp.name)
+        (d / 'bin').mkdir()
+        (d / 'bin' / 'cloudflared').write_text('#!/bin/sh\necho "INF |  https://calm-river-two-words.trycloudflare.com  |"\nexec sleep 30\n')
+        (d / 'bin' / 'git').write_text('#!/bin/sh\necho "git $*" >> "%s/git.log"\ncase "$1" in hash-object) cat >> "%s/blob.txt"; echo 1111111111111111111111111111111111111111;;\n'
+                                       '  mktree|commit-tree) echo 2222222222222222222222222222222222222222;; rev-parse) exit 1;; esac\nexit 0\n' % (d, d))
+        (d / 'server').write_text('#!/bin/sh\necho "$@" > "%s/server-args.txt"\n' % d)
+        for f in ('bin/cloudflared', 'bin/git', 'server'):
+            os.chmod(d / f, 0o755)
+        env = dict(os.environ, PATH=f'{d / "bin"}:/usr/bin:/bin', PYTHON=str(d / 'server'), PORT='8799', ASK_PUBLISH='1')
+        r = subprocess.run(['/bin/sh', str(ROOT / 'scripts/ask_twin_public.sh')], env=env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        args = (d / 'server-args.txt').read_text().split()
+        code = args[args.index('--code') + 1]
+        self.assertRegex(code, r'^\d{8}$')
+        self.assertIn('--no-tts', args)
+        self.assertEqual(args[args.index('--public-origin') + 1], 'https://calm-river-two-words.trycloudflare.com')
+        blob = json.loads((d / 'blob.txt').read_text())
+        self.assertEqual(set(blob), {'server', 'updated'})
+        self.assertEqual(blob['server'], 'https://calm-river-two-words.trycloudflare.com')
+        self.assertNotIn(code, (d / 'blob.txt').read_text() + (d / 'git.log').read_text())
+        self.assertIn('git push -q origin 2222222222222222222222222222222222222222:refs/heads/ask-endpoint', (d / 'git.log').read_text())
+        self.assertIn(f'{code[:4]} {code[4:]}', r.stdout)                          # banner shows the grouped code
+        self.assertIn('A paired headset connects by itself', r.stdout)
 
 
 class OffTopicMockTests(unittest.TestCase):

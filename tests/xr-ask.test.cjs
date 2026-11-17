@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=11"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=12"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -313,7 +313,7 @@ test('page: the waiting overlays animate per frame without redrawing the big car
 });
 
 test('access code (API 3+): code= from the URL, X-Ask-Code on ask/transcribe/speak, friendly 401/429', () => {
-  assert.equal(XA.API, 4);
+  assert.equal(XA.API, 5);
   assert.equal(XA.parseParams('?ask=1&server=https://192.168.1.20:8765&code=ab23cd').code, 'AB23CD');
   assert.equal(XA.parseParams('?ask=1').code, '');
   assert.equal(XA.accessCode('?code=k7-px 3m'), 'K7PX3M');
@@ -461,6 +461,150 @@ test('connect with the code only: the announced address must have the temporary-
   assert.equal(XA.connectCode(' q47-hwc '), 'Q47HWC'); assert.equal(XA.connectCode('abc'), null); assert.equal(XA.connectCode(''), null); assert.equal(XA.connectCode(null), null);
   assert.ok(XA.ENDPOINT.api.startsWith('https://api.github.com/repos/doe2park/Graduate-Project/') && XA.ENDPOINT.raw.includes('/ask-endpoint/ask-endpoint.json'));
   assert.ok(!/code/i.test(JSON.stringify(XA.ENDPOINT)), 'the endpoint file never carries the access code');
+});
+
+
+/* ---------------------------------------------------------------- pair once (API 5, 2026-11-17) */
+function memStore(init = {}) { const m = new Map(Object.entries(init)); return {getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), m}; }
+const TOK = 'q2Xh7_kP3vA9-ZbC4dE5fG6hJ7kL8mN9pQ1rS2tU3vW';   // 43 url-safe characters, the shape of secrets.token_urlsafe(32)
+const TUN = 'https://calm-river-two-words.trycloudflare.com';
+const NOW = Date.parse('2026-11-19T17:00:00Z');
+/* a fake network: the GitHub announcement + one laptop server; records every request */
+function fakeNet({announce = {server: TUN, updated: '2026-11-19T16:30:00Z'}, laptop = 'up', tokens = new Set([TOK]), code = '48219067', pairStatus = 200} = {}) {
+  const log = [];
+  const res = (status, body) => ({ok: status >= 200 && status < 300, status, json: async () => body});
+  const fetchFn = async (url, opts = {}) => {
+    const h = opts.headers || {};
+    log.push({url, method: opts.method || 'GET', headers: h, body: opts.body});
+    if (url.startsWith('https://api.github.com/') || url.startsWith('https://raw.githubusercontent.com/')) return announce ? res(200, announce) : res(404, {});
+    if (!url.startsWith(TUN)) throw new TypeError('unexpected host ' + url);
+    if (laptop === 'down') throw new TypeError('Failed to fetch');
+    const p = url.slice(TUN.length);
+    if (p === '/api/health') return res(200, {ok: true, mode: 'mock', access: {code_required: true, pairing: true}});
+    if (p === '/api/pair') {
+      if (pairStatus !== 200) return res(pairStatus, {});
+      return h['X-Ask-Code'] === code ? res(200, {token: TOK, device: 'ab12cd34'}) : res(401, {reason: h['X-Ask-Code'] ? 'code_wrong' : 'code_required'});
+    }
+    if (p === '/api/pair/check') return tokens.has(h['X-Ask-Token']) ? res(200, {ok: true}) : res(401, {reason: 'token_unknown'});
+    if (p === '/api/pair/forget') { const had = tokens.delete(h['X-Ask-Token']); return res(200, {removed: had}); }
+    return res(404, {});
+  };
+  return {fetchFn, log, tokens};
+}
+
+test('pairing storage: the token lives in localStorage only, survives bad data and refusing storage', () => {
+  const st = memStore();
+  assert.equal(XA.loadPairing(st), null);
+  assert.equal(XA.savePairing(st, TOK, NOW), true);
+  assert.deepEqual(XA.loadPairing(st), {token: TOK, at: '2026-11-19T17:00:00.000Z'});
+  assert.equal(XA.savePairing(st, 'short', NOW), false);
+  assert.equal(XA.forgetPairing(st), true);
+  assert.equal(XA.loadPairing(st), null);
+  assert.equal(XA.loadPairing(memStore({[XA.PAIR_KEY]: '{bad json'})), null);
+  assert.equal(XA.loadPairing(memStore({[XA.PAIR_KEY]: JSON.stringify({token: 'x y'})})), null);
+  const refusing = {getItem() { throw new Error('SecurityError'); }, setItem() { throw new Error('QuotaExceeded'); }, removeItem() { throw new Error('x'); }};
+  assert.equal(XA.loadPairing(refusing), null);
+  assert.equal(XA.savePairing(refusing, TOK), false);
+  assert.equal(XA.loadPairing(null), null);
+});
+
+test('pairing headers: the code wins; else the token in X-Ask-Token; a malformed token is never sent', () => {
+  assert.deepEqual(XA.askHeaders('48219067', {a: 1}, TOK), {a: 1, 'X-Ask-Code': '48219067'});
+  assert.deepEqual(XA.askHeaders('', {a: 1}, TOK), {a: 1, 'X-Ask-Token': TOK});
+  assert.deepEqual(XA.askHeaders('', {}, 'bad token'), {});
+  assert.match(XA.refusalText(401, {reason: 'token_unknown'}), /no longer paired/);
+});
+
+test('connect plan: the address decides; a paired browser with a bare address connects by itself', () => {
+  assert.equal(XA.connectPlan('', null), 'off');
+  assert.equal(XA.connectPlan('?mode=ar&sensors=demo', {token: TOK}), 'auto');
+  assert.equal(XA.connectPlan('?ask=1', {token: TOK}), 'url');
+  assert.equal(XA.connectPlan('?server=' + TUN, null), 'url');
+  assert.equal(XA.connectPlan('?code=48219067', {token: TOK}), 'url');
+  assert.deepEqual(XA.connectLine('connected', {mode: 'live'}), {state: 'connected', text: 'Connected · LIVE'});
+  assert.equal(XA.connectLine('connected', {mode: 'mock'}).text, 'Connected · MOCK');
+  assert.equal(XA.connectLine('connecting', {paired: true}).text, 'Connecting to the laptop…');
+  assert.equal(XA.connectLine('off').text, 'Not connected');
+  const down = XA.connectLine('down');
+  assert.equal(down.text, 'Laptop not running');
+  assert.match(down.note, /Everything else on this page works/);
+  assert.match(XA.connectLine('unpaired').note, /Type the code/);
+});
+
+test('first time: code -> announced address -> health -> /api/pair; the code goes only to the laptop, the token comes back', async () => {
+  const net = fakeNet();
+  const f = await XA.findLaptop(net.fetchFn, NOW);
+  assert.equal(f.ok, true);
+  assert.equal(f.server, TUN);
+  assert.equal(f.health.mode, 'mock');
+  const pr = await XA.pairWithCode(net.fetchFn, f.server, '48219067');
+  assert.deepEqual(pr, {ok: true, token: TOK, device: 'ab12cd34'});
+  const wrong = await XA.pairWithCode(net.fetchFn, f.server, '11112222');
+  assert.equal(wrong.ok, false);
+  assert.match(wrong.why, /Wrong access code/);
+  for (const r of net.log) {
+    assert.ok(!/48219067|11112222/.test(r.url), 'never in a URL: ' + r.url);
+    if (!r.url.startsWith(TUN)) assert.deepEqual(Object.keys(r.headers).filter(k => /ask/i.test(k)), [], 'GitHub never sees a code or token');
+  }
+  // older laptop server without /api/pair: use the code for this visit only
+  assert.deepEqual(await XA.pairWithCode(fakeNet({pairStatus: 404}).fetchFn, TUN, '48219067'), {ok: false, fallback: true});
+});
+
+test('later visit: auto-connect with the stored token (new address announced), no typing; token only in a header to the laptop', async () => {
+  const net = fakeNet({announce: {server: 'https://other-fresh-words.trycloudflare.com', updated: '2026-11-19T16:59:00Z'}});
+  // the announced laptop moved: the fake net only knows TUN, so this is unreachable
+  const away = await XA.autoConnect(net.fetchFn, TOK, NOW);
+  assert.deepEqual([away.ok, away.state], [false, 'down']);
+  const net2 = fakeNet();
+  const r = await XA.autoConnect(net2.fetchFn, TOK, NOW);
+  assert.equal(r.ok, true);
+  assert.equal(r.server, TUN);
+  const check = net2.log.find(x => x.url === TUN + '/api/pair/check');
+  assert.equal(check.headers['X-Ask-Token'], TOK);
+  assert.ok(net2.log.every(x => !x.url.includes(TOK)), 'the token is never in a URL');
+  assert.ok(net2.log.filter(x => !x.url.startsWith(TUN)).every(x => !JSON.stringify(x).includes(TOK)), 'GitHub never sees the token');
+});
+
+test('auto-connect states: laptop not running, nothing announced, revoked token', async () => {
+  const down = await XA.autoConnect(fakeNet({laptop: 'down'}).fetchFn, TOK, NOW);
+  assert.deepEqual([down.ok, down.state], [false, 'down']);
+  assert.match(down.why, /does not answer/);
+  const none = await XA.autoConnect(fakeNet({announce: null}).fetchFn, TOK, NOW);
+  assert.deepEqual([none.ok, none.state], [false, 'down']);
+  const stale = await XA.autoConnect(fakeNet({laptop: 'down', announce: {server: TUN, updated: '2026-11-17T00:00:00Z'}}).fetchFn, TOK, NOW);
+  assert.match(stale.why, /has not announced a new address/);
+  const revoked = await XA.autoConnect(fakeNet({tokens: new Set()}).fetchFn, TOK, NOW);
+  assert.deepEqual([revoked.ok, revoked.state, revoked.reason], [false, 'unpaired', 'token_unknown']);
+  const bad = await XA.autoConnect(fakeNet({announce: {server: 'https://evil.example'}}).fetchFn, TOK, NOW);
+  assert.deepEqual([bad.ok, bad.state], [false, 'down']);
+});
+
+test('forget this laptop: tells the laptop (token in a header) and deletes the token here, even when the laptop is away', async () => {
+  const st = memStore(), net = fakeNet();
+  XA.savePairing(st, TOK, NOW);
+  assert.deepEqual(await XA.forgetLaptop(net.fetchFn, st, TUN), {forgotten: true, told: true});
+  assert.equal(net.tokens.size, 0);
+  assert.equal(XA.loadPairing(st), null);
+  XA.savePairing(st, TOK, NOW);
+  assert.deepEqual(await XA.forgetLaptop(fakeNet({laptop: 'down'}).fetchFn, st, TUN), {forgotten: true, told: false});
+  assert.equal(XA.loadPairing(st), null);
+});
+
+test('page wiring: pair once, auto-connect in place, Forget under More options, never a token in the address', () => {
+  assert.ok(page.includes("XA.connectPlan(location.search,pairing)"));
+  assert.ok(page.includes("if(plan==='auto')return askAuto();"));
+  assert.ok(page.includes('XA.autoConnect((u,o)=>fetch(u,o),p.token,Date.now())'));
+  assert.ok(page.includes('XA.pairWithCode((u,o)=>fetch(u,o),f.server,code)') && page.includes('XA.savePairing(askStore(),pr.token)'));
+  assert.ok(page.includes('Forget this laptop') && page.includes("$('askMore')"));
+  assert.ok(page.includes('inputmode="numeric"'), 'the code field opens the number pad');
+  assert.ok(page.includes("if(r.state==='unpaired'){XA.forgetPairing(askStore());"));
+  assert.ok(page.includes("if(res.status===401&&b.reason==='token_unknown'&&ASK.token){XA.forgetPairing(askStore());ASK.token=null;}"));
+  // Ask stays off until the laptop answers: ASK.on is set only in askGoOn
+  assert.equal((page.match(/ASK\.on=true/g) || []).length, 1);
+  assert.ok(page.includes('function askGoOn({server=null,code=\'\',token=null,note=\'\'}){ASK.on=true;'));
+  // the token is never written into the address (no u.set('token'), no location with it)
+  assert.ok(!/set\('token'|token=\$\{|'&token='|\?token=/.test(page));
+  for (const name of ['ask', 'speak', 'transcribe']) assert.match(page, new RegExp(`fetch\\(askApi\\('${name}'\\),\\{method:'POST',headers:XA\\.askHeaders\\(ASK\\.code,\\{[^}]*\\},ASK\\.token\\)`), name);
 });
 
 test('an off-topic MOCK answer (no tools, no citations) builds a card', () => {

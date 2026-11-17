@@ -4,8 +4,12 @@ Sensible, not strict: the point is that the owner can let people try the twin du
 Wi-Fi using it and without a runaway bill. Everything is in memory except the daily usage counter, which is a small JSON
 file outside the repository (default ~/.config/ask-twin/usage-YYYY-MM-DD.json, local date) so a restart does not reset it.
 
-  access code   random 6 characters (no 0/O, 1/I/L) unless --code is given; --no-code turns it off (localhost only).
-                Compared case-insensitively in constant time. Wrong codes are rate limited per client IP.
+  access code   random 8 digits unless --code is given (letters allowed there); --no-code turns it off (localhost only).
+                Compared case-insensitively in constant time, spaces and dashes ignored. Digits only because a headset's
+                keyboard has a large number pad; 10^8 codes with at most 10 wrong tries a minute per client and 100 an hour
+                for the whole server (a tunnel makes every visitor one client) leaves ~2.4e-5 odds of a guess per day.
+  paired device a token issued by /api/pair after a correct code (scripts/ask_twin/pairing.py): accepted wherever the code
+                is, except for pairing another device; a wrong token counts as a wrong code.
   rate limits   per client IP: questions per minute; whole server: questions per day; speech endpoints per IP per minute.
   token budget  counted from each API response's usage: input + cache writes + output + cache reads / 10
                 (cache reads are billed at about a tenth of the input price). When today's count reaches the budget,
@@ -26,16 +30,22 @@ from collections import deque
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'   # no 0/O, 1/I/L: easy to read aloud and type on a headset
-CODE_LEN = 6
+ALPHABET = '0123456789'   # digits: the headset keyboard's number pad (2026-11-17); --code may still use letters
+CODE_LEN = 8
 CODE_RX = re.compile(r'^[A-Za-z0-9]{4,32}$')
 USAGE_KEYS = ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
 
-DEFAULTS = {'per_minute': 10, 'per_day': 300, 'daily_tokens': 2_000_000, 'speech_per_minute': 30, 'bad_codes_per_minute': 10}
+DEFAULTS = {'per_minute': 10, 'per_day': 300, 'daily_tokens': 2_000_000, 'speech_per_minute': 30, 'bad_codes_per_minute': 10,
+            'bad_codes_per_hour_all': 100, 'pairs_per_minute': 5}
 
 
 def make_code(n: int = CODE_LEN) -> str:
     return ''.join(secrets.choice(ALPHABET) for _ in range(n))
+
+
+def show_code(code: str) -> str:
+    """How the banner prints a code: an 8-digit code in two groups of four (typed with or without the space)."""
+    return f'{code[:4]} {code[4:]}' if code and len(code) == 8 and code.isdigit() else code
 
 
 def normalize_code(s) -> str:
@@ -167,30 +177,58 @@ class Limits:
 
     def __init__(self, code: str | None, budget: Budget, per_minute=DEFAULTS['per_minute'],
                  speech_per_minute=DEFAULTS['speech_per_minute'], bad_codes_per_minute=DEFAULTS['bad_codes_per_minute'],
-                 clock=time.monotonic):
+                 clock=time.monotonic, pairings=None, bad_codes_per_hour_all=DEFAULTS['bad_codes_per_hour_all'],
+                 pairs_per_minute=DEFAULTS['pairs_per_minute']):
         self.code, self.budget = (normalize_code(code) or None) if code else None, budget
+        self.pairings = pairings if self.code else None   # paired tokens only stand in for a code that is required
         self.per_minute = per_minute
         self.asks = Window(per_minute, 60, clock)
         self.speech = Window(speech_per_minute, 60, clock)
         self.bad = Window(bad_codes_per_minute, 60, clock)
+        self.bad_all = Window(bad_codes_per_hour_all, 3600, clock)   # whole server: behind a tunnel every visitor is one IP
+        self.pairs = Window(pairs_per_minute, 60, clock)
         self.last_question = time.monotonic()
 
     @property
     def code_required(self) -> bool:
         return bool(self.code)
 
-    def admit(self, kind: str, ip: str, given_code=None):
-        """kind: 'ask' (spends API credits) or 'speech' (local speech-to-text / text-to-speech)."""
+    def _bad(self, ip):
+        """Count one wrong code or token: per client and for the whole server. Seconds to wait, or 0."""
+        return self.bad.hit(ip) or self.bad_all.hit('all')
+
+    def credential(self, given_code=None, given_token=None, allow_token=True):
+        """'code', 'token' (a paired device) or None. No counting."""
+        if not self.code:
+            return 'open'
+        if given_code and code_matches(self.code, given_code):
+            return 'code'
+        if allow_token and given_token and self.pairings and self.pairings.check(given_token):
+            return 'token'
+        return None
+
+    def admit(self, kind: str, ip: str, given_code=None, given_token=None):
+        """kind: 'ask' (spends API credits), 'speech' (local speech-to-text / text-to-speech), 'pair' (code only: issue a device
+        token) or 'check' (a paired device or a code, nothing counted on success)."""
         if self.code:
-            if not given_code or not code_matches(self.code, given_code):
-                wait = self.bad.hit(ip)
+            if not self.credential(given_code, given_token, allow_token=kind != 'pair'):
+                wait = self._bad(ip)
                 if wait:
-                    return 429, {'error': f'Too many wrong access codes. Wait {wait} s, then use the link printed in the laptop terminal.',
+                    return 429, {'error': f'Too many wrong access codes. Wait {wait} s, then type the code shown on the laptop.',
                                  'reason': 'rate_bad_code', 'retry_after_s': wait}, wait
+                if given_token and not given_code and kind != 'pair':
+                    return 401, {'error': 'This headset is no longer paired with the laptop: type the code shown on the laptop.',
+                                 'reason': 'token_unknown'}, None
                 if not given_code:
-                    return 401, {'error': 'Access code needed: open the link printed in the laptop terminal (it ends with &code=...).',
-                                 'reason': 'code_required'}, None
-                return 401, {'error': 'Wrong access code: check the code printed in the laptop terminal.', 'reason': 'code_wrong'}, None
+                    return 401, {'error': 'Access code needed: type the code shown on the laptop.', 'reason': 'code_required'}, None
+                return 401, {'error': 'Wrong access code: check the code shown on the laptop.', 'reason': 'code_wrong'}, None
+        if kind == 'check':
+            return None
+        if kind == 'pair':
+            wait = self.pairs.hit(ip)
+            if wait:
+                return 429, {'error': f'Too many pairings. Try again in {wait} s.', 'reason': 'rate_pair', 'retry_after_s': wait}, wait
+            return None
         if kind == 'ask':
             refused = self.budget.check()
             if refused:
@@ -211,7 +249,7 @@ class Limits:
     def public(self) -> dict:
         """Numbers and flags only, for /api/health and the banner (never the code)."""
         u = self.budget.snapshot()
-        return {'access': {'code_required': self.code_required},
+        return {'access': {'code_required': self.code_required, 'pairing': bool(self.pairings)},
                 'limits': {'questions_per_minute_per_client': self.per_minute, 'questions_per_day': self.budget.per_day,
                            'daily_tokens': self.budget.daily_tokens},
                 'usage_today': {'date': u['date'], 'questions': u['questions'], 'budget_tokens': u['budget_tokens'],

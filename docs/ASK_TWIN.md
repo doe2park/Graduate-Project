@@ -76,7 +76,8 @@ Sensible defaults for demos: people can try it, strangers on the same Wi-Fi cann
 
 | What | Default | Flag |
 |---|---|---|
-| Access code (random 6 characters, no 0/O/1/I/L, case-insensitive) on `/api/ask`, `/api/transcribe`, `/api/speak` | a new code every start | `--code K7PX3M` (fixed), `--no-code` (localhost only; refused with `--lan`) |
+| Access code (random 8 digits since Nov 17 2026, shown `4821 9067`; spaces/dashes ignored) on `/api/ask`, `/api/transcribe`, `/api/speak`, `/api/pair` | a new code every start | `--code 48219067` (fixed; letters still accepted, but the headset field opens a number pad), `--no-code` (localhost only; refused with `--lan`) |
+| Paired devices (pair once, see *Pair once* below) | on; hashes in `~/.config/ask-twin/paired-devices.json` | `--no-pairing` (this run), `--list-devices`, `--forget-devices` |
 | Questions per minute, per client IP | 10 | `--per-minute N` (0 = off) |
 | Questions per day, whole server | 300 | `--per-day N` (0 = off) |
 | Daily token budget (live only) | 2,000,000 | `--daily-tokens N` (0 = off) |
@@ -86,7 +87,10 @@ Sensible defaults for demos: people can try it, strangers on the same Wi-Fi cann
 
 - **Code.** The page links printed at start carry `&code=…`; the laptop page and the headset page read it from their URL and send it
   as the `X-Ask-Code` header (`?code=` on the API also works, for curl). Without it the page says *Access code needed*, with a wrong one
-  *Wrong access code*. On the laptop page you can also type it into the box that appears. Wrong codes are limited to 10 a minute per IP.
+  *Wrong access code*. On the laptop page you can also type it into the box that appears. Wrong codes (and wrong device tokens) are limited
+  to 10 a minute per IP and 100 an hour for the whole server (through a tunnel every visitor is one IP). Why digits: the headset keyboard
+  has a number pad, and with 10^8 codes and at most 100 wrong tries an hour the odds of guessing one are about 2.4e-5 per day of running
+  (a fresh code each start). A request URL that carries `code=` or `token=` is logged with the value replaced by `…`.
   `/api/health` stays open but shows only flags and numbers (never the code).
 - **Rate limits** answer `429` with a short sentence and `Retry-After`; the voice endpoints have their own limit (30/min per IP).
 - **Budget.** Every API response's usage is added to `~/.config/ask-twin/usage-YYYY-MM-DD.json` (local date; a restart keeps it, a new
@@ -101,7 +105,7 @@ Start commands (the owner copies the printed links; nothing else to configure):
 
 ```bash
 python3 scripts/ask_twin_server.py --lan                      # live, Quest on the same Wi-Fi: random code, default limits
-python3 scripts/ask_twin_server.py --lan --code K7PX3M        # same code every time (e.g. printed on a demo card)
+python3 scripts/ask_twin_server.py --lan --code 48219067      # same code every time (e.g. printed on a demo card)
 python3 scripts/ask_twin_server.py --mock --lan               # try the whole flow without a key
 python3 scripts/ask_twin_server.py --no-code                  # laptop only, no code
 python3 scripts/ask_twin_server.py --lan --per-minute 20 --daily-tokens 5000000 --idle-minutes 240   # a long, busy demo
@@ -110,7 +114,8 @@ python3 scripts/ask_twin_server.py --lan --per-minute 20 --daily-tokens 5000000 
 The start banner looks like this (example addresses):
 
 ```
-[ask-twin] access code: K7PX3M   (the links below include it; people without it get "Access code needed")
+[ask-twin] access code: 4821 9067   (the links below include it; people without it get "Access code needed")
+[ask-twin] paired devices: 1 (they connect without the code; --forget-devices unpairs all)
 [ask-twin] laptop page:  https://192.168.68.52:8765/grimes-bim-viewer.html?ask=1&code=K7PX3M   (Ctrl+C to stop)
 [ask-twin] headset page: https://192.168.68.52:8765/mr/?ask=1&code=K7PX3M
 [ask-twin] public page + this laptop (Method A): https://doe2park.github.io/Graduate-Project/mr/?ask=1&server=https://192.168.68.52:8765&code=K7PX3M
@@ -150,6 +155,38 @@ address with a fresh access code; pages and API share that address, so a headset
 - Checked from a desktop browser through the tunnel (page load and one live answer); not yet tried on a Quest.
 
 **Fast links (2026-11-13).** Loading the models through the laptop address is slow (about 5 minutes for the headset page, measured from the Mac). The script therefore prints links that load the page from the public site and send only the AI calls to the laptop: `https://doe2park.github.io/Graduate-Project/vr/?ask=1&server=<address>&code=<code>` (same for `/mr/`). On a headset, type the short form `<address>/vr/?code=<code>`; it hands over to the fast link. `&direct=1` keeps everything on the laptop address. The PC page has no `&server=` option: on the laptop itself use `http://127.0.0.1:8765/scan-compare.html?...`. `--idle-minutes 0` keeps the server up for a field session.
+
+## Pair once: the headset connects by itself (Nov 17 2026)
+
+Checked with a desktop browser, mocked announcements and a mocked tunnel only (`tests/xr-ask-pairing-smoke.cjs`); **not tried on a
+Quest and not through a real tunnel**.
+
+**On the laptop (every session):** `scripts/ask_twin_public.sh --idle-minutes 0` (live) — or add `--mock` for scripted answers. It
+announces the new address on the `ask-endpoint` branch (never the code) and prints the code, e.g. `4821 9067`.
+
+**In the headset, the first time:** open `doe2park.github.io/Graduate-Project/vr/` (or `/mr/`). In the **Ask the twin** box type the
+code (number pad; the space does not matter) and press **Connect**. The line turns to *Connected · LIVE* (or *MOCK*). The laptop has
+now paired this headset.
+
+**Every later session:** start the script on the laptop, open the same page in the headset: the box says *Connecting to the laptop…*
+and then *Connected · LIVE* with no typing, even though the code and the address are new. If the laptop is not running, the box says
+*Laptop not running* with **Try again**, and the rest of the page works as without Ask.
+
+**Revoke:** on the laptop `python3 scripts/ask_twin_server.py --forget-devices` unpairs every device (a running server stops accepting
+them at once; `--list-devices` shows them). In the headset: **More options › Forget this laptop** deletes the token there and on the
+laptop. `--no-pairing` runs one session with the code only.
+
+What is stored and what crosses the network:
+- After a correct code, `POST /api/pair` returns a random 256-bit token. The page keeps it in its own `localStorage`
+  (`askTwin.pairing.v1`, per site: the public site, or one laptop address); the laptop keeps only its SHA-256 in
+  `~/.config/ask-twin/paired-devices.json` (mode 0600, outside the repo; `--usage-dir` moves it).
+- Later the page reads the announced address (GitHub, no secret sent), checks `/api/health`, then sends the token in the
+  `X-Ask-Token` header to `/api/pair/check` and with every question. Never in a URL, never logged, never on the `ask-endpoint` branch.
+- A token is accepted only where the code is (same origin allow-list, same per-minute, daily question and token limits), never to pair
+  another device. A wrong token counts as a wrong code; a revoked token is dropped by the page, which shows the code field again.
+- Tokens unused for 30 days expire; at most 20 devices are kept. Pairing also works in `--mock`, so a headset paired on the eve of a
+  demo connects to the live server the next day.
+- Links that carry `&code=` keep working as before and do not pair the device; only the Connect box pairs.
 
 ## How an answer is made
 
@@ -460,6 +497,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_ask_twin      # index, 
 node --test tests/xr-ask.test.cjs                                       # headset helpers: stream, card model, speech text, run path, bar hit, drawing, server= validation, progress, hold gate
 # Method A, desktop Chrome against the running --lan server (public origin served from this checkout by Playwright):
 PLAYWRIGHT_MODULE=/path/to/playwright-core FAKE_AUDIO=/abs/question.wav node tests/xr-ask-methoda-smoke.cjs https://<lan-ip>:8765
+PYTHON=~/.venvs/ask-twin/bin/python PLAYWRIGHT_MODULE=/path/to/playwright-core node tests/xr-ask-pairing-smoke.cjs   # pair once: starts and stops its own --mock --no-tts --no-stt server; muted Chrome; shots -> work/ask-twin/pairing-shots/
 node --test tests/ask-twin.test.cjs                                     # laptop panel: code= from the URL, X-Ask-Code header, 401/429 text
 node --test tests/ask-twin-overlay.test.cjs                             # scan-compare Overlay: ?ask=1 gate, lens target, box samples, turn pitch, hold
 python3 scripts/ask_twin_server.py --mock --no-code &                   # then the headless browser check (or keep the code and pass ASK_CODE=<code>):
@@ -475,6 +513,7 @@ The headless check loads three element layers under software WebGL and takes abo
 
 - `scripts/ask_twin_server.py` — server (static read-only: only files git does not ignore, exact case, no folder listings; restart after adding a file; + `/api/health`, `/api/ask` SSE, `/api/transcribe`, `/api/speak`)
 - `scripts/ask_twin/limits.py` — access code, rate limits, daily token budget (usage JSON outside the repo)
+- `scripts/ask_twin/pairing.py` — paired-device tokens (hashes only, outside the repo)
 - `scripts/ask_twin/index.py` — element box index; `tools.py` — read-only tools + schemas; `agent.py` — live and mock loops (+ `mock_route`); `speech.py` — short spoken version and `speak` events
 - `twin/ask-twin.js` — panel, citation chips, highlights, fly-to, push-to-talk, spoken reply
 - `twin/xr-ask.js` — headset helpers and canvas drawing (compact label, presets panel, visual answer card, pictograms); `scan-xr.html` `?ask=1` block wires it into the XR page

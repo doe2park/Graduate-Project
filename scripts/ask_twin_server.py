@@ -12,11 +12,15 @@ Serves this checkout read-only (GET/HEAD): only files git does not ignore, match
     POST /api/ask         {question, element_id?, point?, history?} -> text/event-stream of agent events
     POST /api/transcribe  raw audio body (webm/ogg/wav/mp4) -> {text} via local faster-whisper (optional)
     POST /api/speak       {text} -> audio/wav via macOS `say` (best installed English voice; --voice overrides)
+    POST /api/pair        with the access code -> {token}: this device connects later without the code (X-Ask-Token)
+    POST /api/pair/check  with X-Ask-Token -> 200 if the device is still paired, else 401
+    POST /api/pair/forget with X-Ask-Token -> this device's token is deleted on the laptop
 CORS: the API also answers the public GitHub Pages site (PUBLIC_ORIGINS, exact match) so the published /mr page can use
 this laptop for the AI calls only ("Method A", docs/ASK_TWIN.md); preflights, including Chrome's Private Network Access
 preflight, are answered for those origins only. Every other cross-origin request is refused as before.
 Limits (scripts/ask_twin/limits.py, docs/ASK_TWIN.md "Limits and access code"): POST /api/ask, /api/transcribe and /api/speak
-need the access code printed at start (header X-Ask-Code, or ?code=); questions are rate limited per client and per day, and
+need the access code printed at start (header X-Ask-Code, or ?code=) or a paired device's token (header X-Ask-Token only, never
+in a URL; scripts/ask_twin/pairing.py keeps only its hash in ~/.config/ask-twin/paired-devices.json); questions are rate limited per client and per day, and
 answers stop at a daily token budget counted from the API's own usage numbers. --idle-minutes stops an unused server.
 The API key is read only from ANTHROPIC_API_KEY (optionally loaded from an env file OUTSIDE the repo). It is never
 printed, logged, written or sent anywhere except to the Anthropic API.
@@ -48,13 +52,19 @@ MAX_BODY = 25 * 1024 * 1024
 ENTRY = '/grimes-bim-viewer.html?ask=1'
 # Pages allowed to call the API from another origin (exact scheme://host[:port]; no wildcards, no http).
 PUBLIC_ORIGINS = frozenset({'https://doe2park.github.io'})
-API_PATHS = frozenset({'/api/health', '/api/ask', '/api/transcribe', '/api/speak'})
+API_PATHS = frozenset({'/api/health', '/api/ask', '/api/transcribe', '/api/speak', '/api/pair', '/api/pair/check', '/api/pair/forget'})
+# POST endpoint -> what limits.admit() checks: ask spends credits, speech is local, pair needs the code itself (a token cannot
+# pair another device), check / forget only need a valid code or token.
+POST_KINDS = {'/api/ask': 'ask', '/api/transcribe': 'speech', '/api/speak': 'speech', '/api/pair': 'pair',
+              '/api/pair/check': 'check', '/api/pair/forget': 'check'}
 # Speech-to-text hints: the words people use about this building (faster-whisper initial_prompt and hotwords).
 STT_PROMPT = ('Questions about the Grimes building services: the duct, the diffuser, the VAV box, the damper, airflow, '
               'the sprinkler pipe, a valve, the ceiling tile, a light, what is above it, where the air comes from.')
 STT_HOTWORDS = 'Grimes duct diffuser VAV box damper airflow sprinkler pipe valve ceiling tile'
 XR_ENTRY = '/mr/?ask=1'   # the headset page: /mr -> scan-xr.html?mode=ar&place=demo&sensors=demo&ask=1
 CODE_HEADER = 'X-Ask-Code'
+SECRET_QS = re.compile(r'\b(code|token)=[^&\s"]*', re.I)
+TOKEN_HEADER = 'X-Ask-Token'   # a paired device's token: header only (never a query parameter, so never in a URL or a log)
 PUBLIC_MR = 'https://doe2park.github.io/Graduate-Project/mr/?ask=1'
 
 
@@ -320,7 +330,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         if self.app.verbose or not (200 <= getattr(self, '_status', 200) < 400):
-            sys.stderr.write('[ask-twin] %s - %s\n' % (self.address_string(), fmt % args))
+            line = SECRET_QS.sub(r'\1=…', fmt % args)   # a code or token in a request URL is never written to the log
+            sys.stderr.write('[ask-twin] %s - %s\n' % (self.address_string(), line))
 
     def send_response(self, code, message=None):
         self._status = code
@@ -357,7 +368,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(405, {'error': 'method not allowed'})
         self.send_response(204)
         self.send_header('Access-Control-Allow-Methods', 'GET, POST')
-        self.send_header('Access-Control-Allow-Headers', f'Content-Type, {CODE_HEADER}')
+        self.send_header('Access-Control-Allow-Headers', f'Content-Type, {CODE_HEADER}, {TOKEN_HEADER}')
         self.send_header('Access-Control-Max-Age', '600')
         if (self.headers.get('Access-Control-Request-Private-Network') or '').lower() == 'true':
             self.send_header('Access-Control-Allow-Private-Network', 'true')
@@ -430,9 +441,9 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if not self.app.origin_ok(self.headers.get('Origin'), self.headers.get('Host')):
             return self._json(403, {'error': 'cross-origin request refused'})
-        if path in ('/api/ask', '/api/transcribe', '/api/speak') and self.app.limits:
+        if path in POST_KINDS and self.app.limits:
             given = self.headers.get(CODE_HEADER) or (parse_qs(urlparse(self.path).query).get('code') or [None])[0]
-            refused = self.app.limits.admit('ask' if path == '/api/ask' else 'speech', self.client_address[0], given)
+            refused = self.app.limits.admit(POST_KINDS[path], self.client_address[0], given, self.headers.get(TOKEN_HEADER))
             if refused:
                 status, body, wait = refused
                 if body.get('reason') in ('budget', 'rate_day'):
@@ -449,6 +460,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._transcribe(self._body())
             if path == '/api/speak':
                 return self._speak(json.loads(self._body() or b'{}'))
+            if path.startswith('/api/pair'):
+                self._body()
+                return self._pair(path)
         except (ValueError, json.JSONDecodeError) as e:
             return self._json(400, {'error': str(e)[:200]})
         return self._json(404, {'error': 'unknown endpoint'})
@@ -490,6 +504,24 @@ class Handler(SimpleHTTPRequestHandler):
                 self.wfile.write(f'data: {json.dumps({"type": "error", "message": f"server error: {type(e).__name__}"})}\n\n'.encode())
             except OSError:
                 pass
+
+    def _pair(self, path):
+        """Pairing (scripts/ask_twin/pairing.py). The credential was checked by limits.admit() before this runs."""
+        from ask_twin.pairing import device_label
+        pairings = self.app.limits.pairings if self.app.limits else None
+        if not pairings:
+            return self._json(400, {'error': 'Pairing needs an access code (this server runs with --no-code).', 'reason': 'pairing_off'})
+        if path == '/api/pair':
+            token, dev = pairings.issue(device_label(self.headers.get('User-Agent')))
+            sys.stderr.write(f'[ask-twin] paired a new device {dev} ({device_label(self.headers.get("User-Agent"))}); '
+                             f'{pairings.count()} paired · --forget-devices removes them\n')
+            return self._json(200, {'token': token, 'device': dev})
+        if path == '/api/pair/forget':
+            removed = pairings.forget(self.headers.get(TOKEN_HEADER))
+            if removed:
+                sys.stderr.write('[ask-twin] a device forgot this laptop (its token is deleted)\n')
+            return self._json(200, {'removed': removed})
+        return self._json(200, {'ok': True, 'mode': self.app.mode})   # /api/pair/check
 
     def _speak(self, req):
         tts = self.app.tts
@@ -561,6 +593,7 @@ def build_app(args, log=print):
     sys.path.insert(0, str(ROOT / 'scripts'))
     from ask_twin.agent import DEFAULT_MODEL, LiveAgent, MockAgent
     from ask_twin.limits import Budget, Limits, make_code
+    from ask_twin.pairing import Pairings
     from ask_twin.tools import Twin
     note = None
     if not args.mock and not os.environ.get('ANTHROPIC_API_KEY'):
@@ -590,7 +623,9 @@ def build_app(args, log=print):
         pass
     # mock answers cost nothing: same code and rate-limit paths, counter kept in memory only (budget stays 0)
     budget = Budget(usage_dir, args.daily_tokens, args.per_day, persist=(mode == 'live'))
-    limits = Limits(None if args.no_code else (args.code or make_code()), budget, per_minute=args.per_minute)
+    # paired devices persist in mock mode too (pairing on the eve of a demo carries over to the live server)
+    limits = Limits(None if args.no_code else (args.code or make_code()), budget, per_minute=args.per_minute,
+                    pairings=None if args.no_pairing else Pairings(usage_dir))
     twin = Twin(log=log)
     if mode == 'live':
         client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'], max_retries=2, timeout=120)
@@ -636,7 +671,10 @@ def parse_args(argv=None):
     lim.add_argument('--daily-tokens', type=int, default=2_000_000, help='daily token budget, counted from API usage (default 2000000; 0 = no budget)')
     lim.add_argument('--max-tokens', type=int, default=4000, help='max_tokens per model round (default 4000)')
     lim.add_argument('--idle-minutes', type=float, default=120, help='stop after this many minutes without a question (default 120; 0 = never)')
-    lim.add_argument('--usage-dir', default=str(DEFAULT_ENV_FILE.parent), help='folder for usage-YYYY-MM-DD.json (outside the repo)')
+    lim.add_argument('--usage-dir', default=str(DEFAULT_ENV_FILE.parent), help='folder for usage-YYYY-MM-DD.json and paired-devices.json (outside the repo)')
+    lim.add_argument('--no-pairing', action='store_true', help='this run: only the access code works (paired devices are refused, none can be added)')
+    lim.add_argument('--list-devices', action='store_true', help='print the paired devices (id, label, dates) and exit')
+    lim.add_argument('--forget-devices', action='store_true', help='unpair every device (they must type the code again) and exit')
     ap.add_argument('--verbose', action='store_true')
     args = ap.parse_args(argv)
     if args.code is not None and not re.fullmatch(r'[A-Za-z0-9]{4,32}', args.code):
@@ -679,9 +717,35 @@ def idle_watch(httpd, limits, minutes, log=print, poll=30.0):
     return t
 
 
+def manage_devices(args, log=print) -> bool:
+    """--list-devices / --forget-devices: work on the paired-device file and return True (the server does not start)."""
+    if not (args.list_devices or args.forget_devices):
+        return False
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    from ask_twin.pairing import Pairings
+    folder = Path(args.usage_dir).expanduser()
+    try:
+        folder.resolve().relative_to(ROOT.resolve())
+        sys.exit(f'Refusing to keep paired devices inside the repository ({folder}).')
+    except ValueError:
+        pass
+    pairings = Pairings(folder)
+    if args.forget_devices:
+        n = pairings.clear()
+        log(f'[ask-twin] forgot {n} paired device{"s" if n != 1 else ""} ({pairings.path}); each must type the code again')
+    else:
+        rows = pairings.listing()
+        log(f'[ask-twin] {len(rows)} paired device{"s" if len(rows) != 1 else ""} ({pairings.path})')
+        for d in rows:
+            log(f'  {d["id"]}  {d["label"]:<16} paired {d["created"]} · last used {d["last_used"]}')
+    return True
+
+
 def main(argv=None):
     maybe_reexec_in_venv()
     args = parse_args(argv)
+    if manage_devices(args):
+        return
     app = build_app(args)
     Handler.app = app
     host, scheme = '127.0.0.1', 'http'
@@ -710,8 +774,13 @@ def main(argv=None):
     urls = page_urls(scheme, host, args.port, lim.code, args.lan)
     pub = lim.public()
     u, L = pub['usage_today'], pub['limits']
-    print(f'[ask-twin] access code: {lim.code}   (the links below include it; people without it get "Access code needed")' if lim.code
+    from ask_twin.limits import show_code
+    print(f'[ask-twin] access code: {show_code(lim.code)}   (the links below include it; people without it get "Access code needed")' if lim.code
           else '[ask-twin] access code: off (--no-code, localhost only)', flush=True)
+    if lim.pairings:
+        print(f'[ask-twin] paired devices: {lim.pairings.count()} (they connect without the code; --forget-devices unpairs all)', flush=True)
+    elif lim.code:
+        print('[ask-twin] paired devices: off for this run (--no-pairing)', flush=True)
     print(f'[ask-twin] laptop page:  {urls["laptop"]}   (Ctrl+C to stop)', flush=True)
     print(f'[ask-twin] headset page: {urls["headset"]}'
           + ('\n[ask-twin] self-signed dev certificate: accept the warning only for this address; same Wi-Fi required' if args.lan else ''), flush=True)
