@@ -67,7 +67,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}.mode{min-height:84px}.mode .t{font-size:24px}.mode .s{font-size:13px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=9"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=4"></script><script src="twin/xr-ask.js?v=12"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=10"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=5"></script><script src="twin/xr-ask.js?v=13"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -88,7 +88,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
  <button id="prev" class="b" aria-label="Previous captured position">&#8249;</button><select id="station" aria-label="Captured position"></select><button id="next" class="b" aria-label="Next captured position">&#8250;</button>
  <button id="styleLens" class="b" aria-pressed="true" title="Services only inside the flashlight cone">Lens</button><button id="styleAll" class="b" aria-pressed="false" title="All nearby services, semi-transparent">All</button>
  <label class="b" title="Service opacity">Opacity <input id="opacity" type="range" min="10" max="100" step="5" value="70"></label>
- <label class="b" title="Flashlight cone half-angle">Cone <input id="cone" type="range" min="4" max="30" step="1" value="12"></label>
+ <label class="b" title="Flashlight cone half-angle">Cone <input id="cone" type="range" min="4" max="30" step="1" value="15"></label>
  <button id="hires" class="b" aria-pressed="false" title="Full 4096×2048 photo instead of the 2048×1024 derivative">4K photo</button>
  <button id="fire" class="b" aria-pressed="false" title="Fire piping Level 1 chunks, ~42 MB">Fire piping</button>
  <button id="scene" class="b" aria-pressed="false" title="Scene: 360° photo or trained Gaussian splats (experimental appearance, not surveyed)">Gaussian</button>
@@ -128,7 +128,7 @@ import {applyElementQuality,metaForPruning,showFlagged,ELEMENT_QUALITY_PATH} fro
 const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
 /* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
    inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
-const XR_CORE_API=9,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
+const XR_CORE_API=10,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
 const T0=performance.now(),q=new URLSearchParams(location.search);
 const MODE_AR=q.get('mode')==='ar';   // mixed-reality passthrough mode (immersive-ar, manual alignment); default = the 360° photo VR overlay
 const MR_DEFAULT_LAYERS=['fire','duct','plumbing'];   // Quest 2 budget: fire piping, ducts, plumbing on; the rest toggle from the MR panel
@@ -188,10 +188,13 @@ let viewPos=[0,0,0];   // eye position in the scan frame: the station in Photo m
 // Full-view fade (child of the camera) for Gaussian jumps/teleports; the photo path keeps its own sphere/service fade.
 const fader=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0,depthTest:false,depthWrite:false,toneMapped:false}));
 fader.position.z=-.12;fader.renderOrder=100;fader.visible=false;fader.frustumCulled=false;camera.add(fader);
-const ring=new THREE.Mesh(new THREE.RingGeometry(.2,.26,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.9,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
-ring.renderOrder=57;ring.visible=false;ring.frustumCulled=false;scene.add(ring);
+/* Point-and-go landing spot (2026-11-17): a small soft floor disc (radial glow, no ring) instead of the old 0.26 m ring. */
+function glowTex(stops){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d'),gr=g.createRadialGradient(64,64,0,64,64,64);for(const [o,a] of stops)gr.addColorStop(o,'rgba(255,255,255,'+a+')');g.fillStyle=gr;g.fillRect(0,0,128,128);
+ const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
+const ring=new THREE.Mesh(new THREE.CircleGeometry(.24,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:glowTex([[0,.95],[.22,.85],[.45,.45],[1,0]]),color:0xffd479,transparent:true,opacity:.8,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
+ring.renderOrder=57;ring.visible=false;ring.frustumCulled=false;ring.name='aim: landing disc';scene.add(ring);
 /* ── X-ray flashlight shader ── one shared uniform set for every service batch. */
-const U={coneOrigin:{value:new THREE.Vector3()},coneDir:{value:new THREE.Vector3(0,0,-1)},cone2Origin:{value:new THREE.Vector3()},cone2Dir:{value:new THREE.Vector3(0,0,-1)},cone2On:{value:0},coneCos:{value:X.coneCos(12)},coneSoft:{value:.01},mode:{value:0},opacity:{value:.85},fade:{value:1},hard:{value:0},
+const U={coneOrigin:{value:new THREE.Vector3()},coneDir:{value:new THREE.Vector3(0,0,-1)},cone2Origin:{value:new THREE.Vector3()},cone2Dir:{value:new THREE.Vector3(0,0,-1)},cone2On:{value:0},coneCos:{value:X.coneCos(15)},coneSoft:{value:.01},mode:{value:0},opacity:{value:.85},fade:{value:1},hard:{value:0},
  outside:{value:0},fadeOn:{value:0},fadeRange:{value:new THREE.Vector2(1e7,2e7)}};   // MR only: lens floor outside the cone; distance fade (twin/overlay-visibility.js presets)
 const VERT=`varying vec3 vWorld;varying vec3 vCol;varying float vShade;
 void main(){vec4 p=vec4(position,1.);
@@ -233,9 +236,9 @@ function materialFor({isLine,instanced,side}){
  m.name='xr-overlay-'+key;materials.set(key,m);return m;
 }
 // Opacity is fixed (Lens 70 %, All 35 %); More ▸ Opacity cycles 50/70/90 % for Lens. hands: 'right' | 'both' flashlight controllers.
-const state={mode:q.get('style')==='all'?'all':'lens',opacity:{lens:X.DEFAULT_LENS_OPACITY,all:X.DEFAULT_ALL_OPACITY},coneDeg:12,hiRes:null,menu:false,page:'main',hands:q.get('hands')==='both'?'both':'right'};
+const state={mode:q.get('style')==='all'?'all':'lens',opacity:{lens:X.DEFAULT_LENS_OPACITY,all:X.DEFAULT_ALL_OPACITY},coneDeg:X.LENS_HALF_DEG||15,hiRes:null,menu:false,page:'main',hands:q.get('hands')==='both'?'both':'right'};
 function applyShaderState(){
- const o=state.opacity[state.mode];U.mode.value=state.mode==='all'?1:0;U.opacity.value=o;U.coneCos.value=X.coneCos(state.coneDeg);U.coneSoft.value=U.coneCos.value-X.coneCos(state.coneDeg+2);
+ const o=state.opacity[state.mode];U.mode.value=state.mode==='all'?1:0;U.opacity.value=o;U.coneCos.value=X.coneCos(state.coneDeg);U.coneSoft.value=X.lensSoft(state.coneDeg);   // Lens 15° + 3° soft edge (2026-11-17; was 12° + 2°)
  // Fully opaque lens: render opaque with a hard cone edge (no blending, no transparent sorting / overdraw). Not in Gaussian mode:
  // splats are a transparent, non-depth-tested pass, so services must stay in the transparent list after them (renderOrder -10).
  const opaque=state.mode==='lens'&&o>=.99&&gauss.scene!=='gaussian'&&!MODE_AR;U.hard.value=opaque?1:0;U.outside.value=MODE_AR&&state.mode==='lens'?.12:0;   // MR: faint context outside the cone (needs blending)
@@ -379,7 +382,7 @@ const fireOn=()=>!!layerState.fire&&layerState.fire.group.visible;
 const raycaster=new THREE.Raycaster();raycaster.params.Line.threshold=.04;
 /* ── Simulated sensors state (opt-in &sensors=demo; functions further down) ── pins/chips/DTS colouring live in a group under bimRoot,
    so VR photo registration, MR alignment and the Demo-here placement move them with the services. Illustrative: nothing is installed. */
-const SX=globalThis.SensorXR,SXOK=SX?.API===4,SXP=SXOK?SX.parseParams(location.search):{enabled:false,scene:'leak',live:false},SXN=SXOK?SX.SCENE_NAMES:{};
+const SX=globalThis.SensorXR,SXOK=SX?.API===5,SXP=SXOK?SX.parseParams(location.search):{enabled:false,scene:'leak',live:false},SXN=SXOK?SX.SCENE_NAMES:{};
 /* live test (?sensors=live&feed=<private-LAN or localhost URL>): temporary test devices with real gateway observations, labelled LIVE / STALE / NO DATA */
 const SENS={on:SXP.enabled,live:!!SXP.live,gw:null,hist:{},scene:SXP.scene,libs:null,cfg:null,all:[],feed:null,recs:new Map(),states:{},obs:{},center:null,ready:false,loading:false,epoch:0,picked:null,error:null,lastFeed:0,feeding:false,lastInv:0,pinTex:new Map(),ringTex:null,group:new THREE.Group()};
 SENS.group.name='sensors (simulated, illustrative)';SENS.group.visible=false;bimRoot.add(SENS.group);
@@ -387,12 +390,18 @@ function pickables(){const out=[];for(const st of Object.values(layerState))if(s
 let cardData=null,cardDataP=null;
 function loadCardData(){if(cardData&&Date.now()-cardData.at<60000)return Promise.resolve(cardData);return cardDataP=cardDataP||Promise.all([fetchJson('buildings/grimes/element-feeds.json').catch(()=>null),fetchJson('https://raw.githubusercontent.com/doe2park/Graduate-Project/data/data/building_data.json').catch(()=>null)]).then(([feeds,bd])=>{cardData={feeds,meters:bd?.meters||{},at:Date.now()};cardDataP=null;return cardData;});}
 loadCardData();
-const card=makeSurface(1024,560,.56,.306,60),marker=new THREE.Mesh(new THREE.SphereGeometry(.018,12,8),new THREE.MeshBasicMaterial({color:0xfbbf24,depthTest:false,depthWrite:false,transparent:true}));
+const CARD_WH=[.6,.375],card=makeSurface(1024,640,...CARD_WH,60),marker=new THREE.Mesh(new THREE.SphereGeometry(.018,12,8),new THREE.MeshBasicMaterial({color:0xfbbf24,depthTest:false,depthWrite:false,transparent:true}));
 marker.renderOrder=59;marker.visible=false;scene.add(card.mesh,marker);
-/* In-headset status line (the DOM pill is invisible in XR): head-locked, small, below the view centre, fades after 2.6 s. */
-const toast=makeSurface(1024,112,.42,.046,80);toast.mesh.position.set(0,-.2,-.75);camera.add(toast.mesh);let toastTimer=0;
-function xrToast(text){if(!renderer.xr.isPresenting)return;const {ctx,canvas,W,H}=toast;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.88)';ctx.beginPath();ctx.roundRect(2,2,W-4,H-4,50);ctx.fill();
- ctx.textAlign='center';ctx.fillStyle='#e8f1f8';fitText(ctx,String(text),W/2,72,W-60,44,'Arial');ctx.textAlign='left';toast.texture.needsUpdate=true;toast.mesh.visible=true;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast.mesh.visible=false;},2600);}
+/* In-headset status line (the DOM pill is invisible in XR): head-locked, below the view centre, fades after 2.6 s (3.6 s for two lines).
+   2026-11-17: a fixed 40 px font (1024 px = 0.42 m at ~0.78 m: 1° ≈ 33 px), wrapped to two lines with an ellipsis at the end
+   (X.toastLines), never shrunk. xrDebug.forceToast(true) draws it outside an XR session too (desktop screenshots). */
+const TOAST_FONT=40,TOAST_LINE=52;
+const toast=makeSurface(1024,170,.42,.0697,80);toast.mesh.position.set(0,-.2,-.75);camera.add(toast.mesh);let toastTimer=0,toastForce=false;
+function xrToast(text){if(!renderer.xr.isPresenting&&!toastForce)return;const {ctx,W,H}=toast;ctx.clearRect(0,0,W,H);ctx.font='500 '+TOAST_FONT+'px Arial';
+ const lines=X.toastLines?X.toastLines(String(text),t=>ctx.measureText(t).width,W-96):[String(text)],bh=lines.length*TOAST_LINE+40,top=(H-bh)/2;
+ ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(4,top,W-8,bh,Math.min(44,bh/2));ctx.fill();ctx.strokeStyle='rgba(226,232,240,.25)';ctx.lineWidth=2;ctx.stroke();
+ ctx.textAlign='center';ctx.fillStyle='#f1f5f9';lines.forEach((l,i)=>ctx.fillText(l,W/2,top+20+TOAST_LINE*(i+.5)+TOAST_FONT*.36,W-80));ctx.textAlign='left';
+ toast.texture.needsUpdate=true;toast.mesh.visible=true;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast.mesh.visible=false;invalidate();},lines.length>1?3600:2600);invalidate();}
 let picked=null,pickEpoch=0;
 /* Panels (2026-11-15, sharper): the canvas is k x the layout size (panelScale: 2 on Quest 3/3S and desktop, 1.5 on other headsets,
    ?panelres=1-3); the drawing code keeps layout units (W, H) through ctx.setTransform. Mipmaps + the GPU's maximum anisotropy for
@@ -404,18 +413,39 @@ function makeSurface(w,h,mw,mh,order){const k=panelScale(w,h),canvas=document.cr
 const TIER_COLOR={live:'#34d399',latest:'#94a3b8',mod:'#fbbf24',ctx:'#60a5fa',none:'#64748b'};
 function wrap(ctx,text,width,max=2){const words=String(text).split(' '),lines=[];let line='';for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width>width&&line){lines.push(line);line=w;if(lines.length===max)break;}else line=t;}if(lines.length<max&&line)lines.push(line);return lines;}
 /* shrink the font until the whole line fits: alignment caveats are never cut */
-function fitText(ctx,text,x,y,width,size,family){let s=size;do{ctx.font=s+'px '+family;}while(ctx.measureText(text).width>width&&--s>12);ctx.fillText(text,x,y,width);}
-function drawCard(lines){const {ctx,canvas,W,H}=card;ctx.clearRect(0,0,W,H);
- ctx.fillStyle='rgba(8,16,28,.94)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,28);ctx.fill();ctx.strokeStyle='rgba(253,181,21,.85)';ctx.lineWidth=4;ctx.stroke();
- ctx.fillStyle='#FDB515';ctx.fillRect(4,40,10,H-80);
- ctx.font='700 46px Arial';const bw=ctx.measureText(lines.badge).width+40;ctx.fillStyle=TIER_COLOR[lines.cls]||'#64748b';ctx.beginPath();ctx.roundRect(W-bw-34,34,bw,62,31);ctx.fill();ctx.fillStyle='#0b1020';ctx.fillText(lines.badge,W-bw-14,82);
- ctx.fillStyle='#fff';ctx.font='700 50px Arial';let y=88;for(const t of wrap(ctx,lines.title,W-bw-110,2)){ctx.fillText(t,44,y);y+=58;}
- ctx.font='34px Arial';ctx.fillStyle='#a9c1d6';if(lines.sub){ctx.fillText(wrap(ctx,lines.sub,W-90,1)[0]||'',44,y+4);y+=52;}
- ctx.font='600 40px Arial';ctx.fillStyle='#e8f1f8';for(const [k,r] of lines.rows.entries()){ctx.font=k?'32px Arial':'600 40px Arial';for(const t of wrap(ctx,r,W-90,k?2:1)){if(y>H-(lines.spark?200:120))break;ctx.fillText(t,44,y+10);y+=k?40:52;}}
- if(lines.spark){const sx=44,sw=W-90,sy=H-190,sh=58,mn=Math.min(...lines.spark),mx=Math.max(...lines.spark),sp=(mx-mn)||1;ctx.strokeStyle=lines.sparkColor||'#22d3ee';ctx.lineWidth=5;ctx.lineJoin='round';ctx.beginPath();
-  lines.spark.forEach((v,i)=>{const x=sx+sw*i/(lines.spark.length-1),y2=sy+sh-(v-mn)/sp*sh;i?ctx.lineTo(x,y2):ctx.moveTo(x,y2);});ctx.stroke();}
- ctx.fillStyle='#8aa2b8';fitText(ctx,lines.footer[0],44,H-70,W-90,28,'Arial');fitText(ctx,lines.footer[1],44,H-34,W-90,26,'Arial');
- card.texture.needsUpdate=true;}
+function fitText(ctx,text,x,y,width,size,family,min=12){let s=size;do{ctx.font=s+'px '+family;}while(ctx.measureText(text).width>width&&--s>min);ctx.fillText(text,x,y,width);}
+/* Info card (2026-11-17 tidy): a short human title (type, else the layer word), the long BIM family name on its own line wrapped to
+   two lines with the ellipsis at the end, system · level, then the reading rows and the two honesty lines (wrapped, never shrunk).
+   1024 px = 0.6 m at 1.4 m design distance (the card scales with distance), 1° ≈ 42 px: title 54, value 42, rows/name 34-36,
+   badge 40, footer 30 px (was 50 / 40 / 32-34 / 46 / 26-28 px on a 0.56 m card). */
+function drawCard(lines){const {ctx,W,H}=card;ctx.clearRect(0,0,W,H);const meas=t=>ctx.measureText(t).width,L=(t,w,n)=>X.toastLines?X.toastLines(t,meas,w,n):wrap(ctx,t,w,n);
+ ctx.font='700 40px Arial';const bw=ctx.measureText(lines.badge).width+40;ctx.fillStyle=TIER_COLOR[lines.cls]||'#64748b';ctx.beginPath();ctx.roundRect(W-bw-34,32,bw,58,29);ctx.fill();ctx.fillStyle='#0b1020';ctx.fillText(lines.badge,W-bw-14,75);
+ ctx.fillStyle='#fff';fitFont(ctx,lines.title,44,82,W-bw-100,54,'700',40);let y=82;
+ if(lines.name){ctx.font='34px Arial';ctx.fillStyle='#c9d8e6';for(const t of L(lines.name,W-90,2)){y+=44;ctx.fillText(t,44,y);}}
+ if(lines.sub){ctx.font='34px Arial';ctx.fillStyle='#a9c1d6';y+=46;ctx.fillText(L(lines.sub,W-90,1)[0]||'',44,y);}
+ y+=24;ctx.strokeStyle='rgba(226,232,240,.16)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(44,y);ctx.lineTo(W-44,y);ctx.stroke();
+ ctx.font='30px Arial';const f0=L(lines.footer[0]||'',W-90,2),f1=L(lines.footer[1]||'',W-90,1),foot=[...f0,...f1],footH=foot.length*38+18;
+ const sh=58,limit=H-30-footH-(lines.spark?sh+22:0);
+ for(const [k,r] of lines.rows.entries()){ctx.font=k?'36px Arial':'600 42px Arial';ctx.fillStyle=k?'#d5e3ef':'#ffffff';const lh=k?46:54;let stop=false;
+  for(const t of L(r,W-90,k?2:1)){if(y+lh>limit){stop=true;break;}y+=lh;ctx.fillText(t,44,y);}if(stop)break;}
+ if(lines.spark){const sx=44,sw=W-90,sy=y+22,mn=Math.min(...lines.spark),mx=Math.max(...lines.spark),sp=(mx-mn)||1;ctx.strokeStyle=lines.sparkColor||'#22d3ee';ctx.lineWidth=5;ctx.lineJoin='round';ctx.beginPath();
+  lines.spark.forEach((v,i)=>{const x=sx+sw*i/(lines.spark.length-1),y2=sy+sh-(v-mn)/sp*sh;i?ctx.lineTo(x,y2):ctx.moveTo(x,y2);});ctx.stroke();y=sy+sh;}
+ ctx.font='30px Arial';ctx.fillStyle='#9fb3c6';y+=18;foot.forEach((t,i)=>ctx.fillText(t,44,y+38*(i+1)-8,W-90));
+ // the card is only as tall as its content: crop the texture and the mesh height (card.f, kept by placeCardBeside / askPlace)
+ const used=Math.min(H,Math.round(y+foot.length*38+30)),f=used/H;
+ ctx.globalCompositeOperation='destination-over';ctx.fillStyle='rgba(8,16,28,.94)';ctx.beginPath();ctx.roundRect(4,4,W-8,used-8,28);ctx.fill();ctx.globalCompositeOperation='source-over';
+ ctx.strokeStyle='rgba(253,181,21,.85)';ctx.lineWidth=4;ctx.beginPath();ctx.roundRect(4,4,W-8,used-8,28);ctx.stroke();ctx.fillStyle='#FDB515';ctx.fillRect(4,40,10,used-80);
+ card.f=f;card.texture.repeat.set(1,f);card.texture.offset.set(0,1-f);if(card.mesh.visible)card.mesh.scale.y=card.mesh.scale.x*f;card.texture.needsUpdate=true;}
+/* The card beside the element (2026-11-17): same distance rule as before (70 % of the way, 0.8-1.8 m, scale distance/1.4), then moved
+   sideways toward the middle of the view by half its width + a 10 cm gap, so the highlight and the gold point stay in sight (it used to
+   sit on the ray, on top of the element). It faces the head with the view's up direction (no roll when looking up at the ceiling).
+   Ask mode keeps its own placement (askPlace, under the point). */
+const _side=new THREE.Vector3(),_fw=new THREE.Vector3(),_up=new THREE.Vector3(0,1,0);
+function placeCardBeside(point){camera.getWorldPosition(_head);const toHit=_v.copy(point).sub(_head),dist=clamp(toHit.length()*.7,.8,1.8),s=dist/1.4;toHit.normalize();
+ camera.getWorldDirection(_fw);const viewRight=new THREE.Vector3().crossVectors(_fw,_up);if(viewRight.lengthSq()<1e-6)viewRight.set(1,0,0);viewRight.normalize();
+ _side.crossVectors(toHit,_up);if(_side.lengthSq()<1e-4)_side.copy(viewRight);_side.normalize();const sign=toHit.dot(viewRight)>0?-1:1;
+ card.mesh.position.copy(_head).addScaledVector(toHit,dist).addScaledVector(_side,sign*(CARD_WH[0]/2+.1)*s);card.mesh.scale.set(s,s*(card.f||1),s);
+ card.mesh.up.set(0,1,0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));card.mesh.lookAt(_head);card.mesh.up.set(0,1,0);card.mesh.visible=true;}
 function hideCard(){if(ASK?.on)askClear();pickEpoch++;SENS.picked=null;if(picked){for(const st of Object.values(layerState))for(const m of st.meshes)highlight(THREE,m,picked.id,false);picked=null;}card.mesh.visible=false;marker.visible=false;invalidate();}
 const _head=new THREE.Vector3(),_v=new THREE.Vector3();
 async function pickAlong(origin,dir){
@@ -430,6 +460,7 @@ async function pickAlong(origin,dir){
  const tier=EC.elementFeedTier(id,info,data.feeds,data.meters),lines=X.cardLines(id,info,tier,MODE_AR?mrCardCapture():capture);drawCard(lines);
  camera.getWorldPosition(_head);const toHit=_v.copy(hit.point).sub(_head),dist=clamp(toHit.length()*.7,.8,1.8);
  card.mesh.position.copy(_head).addScaledVector(toHit.normalize(),dist);card.mesh.position.y-=.1*dist;card.mesh.scale.setScalar(dist/1.4);card.mesh.lookAt(_head);card.mesh.visible=true;
+ if(!ASK?.on)placeCardBeside(hit.point);
  marker.position.copy(hit.point);marker.visible=true;picked.tier=tier.tier;picked.lines=lines;invalidate();
  if(ASK?.on)askOnPick({id,layer,point:hit.point});   // ?ask=1 only: ask bar under the card
  return {id,layer,tier:tier.tier,lines,distance:hit.distance};
@@ -445,15 +476,24 @@ function sensorLibs(){if(!SXOK)return Promise.reject(new Error('twin/sensor-xr.j
   const reg=await fetchJson(SENS.live?globalThis.SensorDemo.LIVE_CONFIG_URL:'twin/sensors/registry.json'),v=globalThis.SensorDemo.validateConfig(reg);if(!v.sensors.length)throw new Error('sensor registry has no valid sensors');
   if(SENS.live)SENS.gw=globalThis.SensorFeed.liveFeedUrl(location.search,location.href);   // only this computer or a private-LAN address
   if(!v.ok)console.warn('[sensors] entries skipped:',v.errors);SENS.cfg=reg;SENS.all=v.sensors;SENS.feed=globalThis.SensorFeed.create(SENS.live?{registry:{...reg,sensors:v.sensors},gateway:SENS.gw}:{registry:{...reg,sensors:v.sensors}});})().catch(e=>{SENS.libs=null;throw e;});}
+/* Pins and chips (2026-11-17): the same dark rounded cards as the other panels. Pin = dark rounded square, type-coloured border and
+   icon; chip = "type · value" in white + a prominent amber SIMULATED pill (LIVE / STALE / NO DATA pills for a live test device). */
 function sensorPinTex(style){const key=style.icon+style.color;let t=SENS.pinTex.get(key);if(t)return t;
- const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.setTransform(2,0,0,2,0,0);g.fillStyle=style.color;g.beginPath();g.arc(64,64,58,0,7);g.fill();g.lineWidth=8;g.strokeStyle='#fff';g.stroke();
- g.save();g.translate(28,28);g.scale(3,3);g.lineWidth=2.2;g.lineCap=g.lineJoin='round';g.strokeStyle='#fff';try{g.stroke(new Path2D(style.icon));}catch(e){}g.restore();
+ const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.setTransform(2,0,0,2,0,0);g.fillStyle='rgba(8,16,28,.94)';g.beginPath();g.roundRect(8,8,112,112,26);g.fill();g.lineWidth=7;g.strokeStyle=style.color;g.stroke();
+ g.save();g.translate(28,28);g.scale(3,3);g.lineWidth=2.4;g.lineCap=g.lineJoin='round';g.strokeStyle=style.color;try{g.stroke(new Path2D(style.icon));}catch(e){}g.restore();
  t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=PANEL_MAX_ANISO;SENS.pinTex.set(key,t);return t;}
-function sensorRingTex(){if(SENS.ringTex)return SENS.ringTex;const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.strokeStyle='#ef4444';g.lineWidth=10;g.beginPath();g.arc(64,64,54,0,7);g.stroke();
+/* alert sensors: a soft red glow that pulses behind the pin (2026-11-17: no ring) */
+function sensorRingTex(){if(SENS.ringTex)return SENS.ringTex;const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d'),gr=g.createRadialGradient(64,64,10,64,64,64);
+ gr.addColorStop(0,'rgba(239,68,68,.75)');gr.addColorStop(.5,'rgba(239,68,68,.35)');gr.addColorStop(1,'rgba(239,68,68,0)');g.fillStyle=gr;g.fillRect(0,0,128,128);
  SENS.ringTex=new THREE.CanvasTexture(c);SENS.ringTex.colorSpace=THREE.SRGBColorSpace;return SENS.ringTex;}
 const sensorSprite=map=>new THREE.Sprite(new THREE.SpriteMaterial({map,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}));
-function sensorChip(r){const c=r.chipCv||(r.chipCv=Object.assign(document.createElement('canvas'),{width:1024,height:144})),g=c.getContext('2d');g.setTransform(2,0,0,2,0,0);g.clearRect(0,0,512,72);
- g.fillStyle='rgba(8,16,28,.88)';g.beginPath();g.roundRect(2,2,508,68,34);g.fill();g.strokeStyle='#FDB515';g.lineWidth=4;g.stroke();g.fillStyle='#f1f5f9';g.textAlign='center';fitText(g,r.chipText,256,50,470,36,'Arial');
+const SENS_CHIP=[560,84],SENS_TAG={SIM:['SIMULATED','#6a4a10','#fcd34d'],LIVE:['LIVE','#14532d','#86efac'],STALE:['STALE','#6a4a10','#fcd34d'],'NO DATA':['NO DATA','#334155','#e2e8f0'],SUSPECT:['CHECK','#6a4a10','#fcd34d']};
+function sensorChip(r){const [CW,CH]=SENS_CHIP,c=r.chipCv||(r.chipCv=Object.assign(document.createElement('canvas'),{width:CW*2,height:CH*2})),g=c.getContext('2d');g.setTransform(2,0,0,2,0,0);g.clearRect(0,0,CW,CH);
+ const parts=String(r.chipText).split(' · '),tag=parts.length>2?parts.pop():'',main=parts.join(' · '),tg=SENS_TAG[tag]||[tag,'#334155','#e2e8f0'];
+ g.fillStyle='rgba(8,16,28,.92)';g.beginPath();g.roundRect(2,2,CW-4,CH-4,(CH-4)/2);g.fill();g.strokeStyle='rgba(226,232,240,.35)';g.lineWidth=2.5;g.stroke();
+ g.font='800 26px Arial';const pw=tg[0]?g.measureText(tg[0]).width+28:0;
+ if(pw){g.fillStyle=tg[1];g.beginPath();g.roundRect(CW-pw-14,15,pw,CH-30,(CH-30)/2);g.fill();g.fillStyle=tg[2];g.textAlign='center';g.fillText(tg[0],CW-14-pw/2,CH/2+9);}
+ g.textAlign='left';g.fillStyle='#f1f5f9';fitFont(g,main,26,CH/2+13,CW-pw-56,38,'600',24);
  if(!r.chipTex){r.chipTex=new THREE.CanvasTexture(c);r.chipTex.colorSpace=THREE.SRGBColorSpace;r.chipTex.anisotropy=PANEL_MAX_ANISO;r.chip.material.map=r.chipTex;r.chip.material.needsUpdate=true;}else r.chipTex.needsUpdate=true;}
 const sensorValueText=s=>{const o=SENS.obs[s.id];return o&&o.quality!=='missing'&&o.value!=null?globalThis.SensorFeed.formatValue(o.value,s.unit):'—';};
 const sensorAssess=s=>globalThis.SensorFeed.assess(SENS.obs[s.id],s,Date.now(),SENS.feed?.staleAfter);   // live test: LIVE / STALE / NO DATA
@@ -499,7 +539,7 @@ async function sensorsSetScene(scene){
      SENS.group.add(r.pin,r.chip);SENS.recs.set(s.id,r);pts.push(point);SENS.states[s.id]={status:'attached',layer:s.anchor.layer,element:s.anchor.id};}}}
   if(!SENS.recs.size)throw new Error('none of the '+SXN[scene]+' sensors could be placed ('+Object.values(SENS.states).map(x=>x.reason).join('; ')+')');
   SENS.center=SX.clusterCenter(pts);SENS.ready=true;SENS.group.visible=true;await sensorsFeed();
-  status(SENS.live?'Live test · '+SENS.recs.size+' temporary test device'+(SENS.recs.size>1?'s':'')+' · '+(SENS.gw?.error||'gateway feed'):'Demo sensors · '+SXN[scene]+' · '+SENS.recs.size+' simulated sensors · illustrative, not installed',false);
+  status(SENS.live?'Live test · '+SENS.recs.size+' temporary test device'+(SENS.recs.size>1?'s':'')+' · '+(SENS.gw?.error||'gateway feed'):'Demo sensors · '+SXN[scene]+' · '+SENS.recs.size+' SIMULATED · not installed',false);
   if(MODE_AR)mrSensorsChanged();
  }catch(e){if(epoch!==SENS.epoch)return;SENS.error=String(e.message||e);console.error('[sensors]',e);status((SENS.live?'Live test unavailable · ':'Demo sensors unavailable · ')+SENS.error);}
  finally{if(epoch===SENS.epoch){SENS.loading=false;if(state.menu)drawMenu();if(MODE_AR)mrRefresh();invalidate();}}}
@@ -525,8 +565,8 @@ function sensorsTick(){if(!sensorsActive())return;const now=performance.now();ca
   if(r.mesh)r.mesh.visible=on;_sw.fromArray(r.point).applyMatrix4(bimRoot.matrixWorld);const d=_sw.distanceTo(_head),sz=SX.pinSize(d),show=on&&d<60;
   r.pin.visible=show;r.chip.visible=show&&d<16&&(!focus||SENS.picked===r.s.id);if(r.ring)r.ring.visible=show;if(!show)continue;
   r.pin.position.fromArray(r.point);r.pin.scale.setScalar(sz);
-  r.chip.scale.set(sz*4.6,sz*.65,1);r.chip.position.set(r.point[0],r.point[1]+sz*1.05,r.point[2]);r.d=d;
-  if(r.ring){const ph=reduce?.4:(now%1800)/1800;r.ring.position.fromArray(r.point);r.ring.scale.setScalar(sz*(1.4+ph*3.2));r.ring.material.opacity=.95*(1-ph);if(!reduce)pulse=true;}}
+  r.chip.scale.set(sz*4.2,sz*4.2*SENS_CHIP[1]/SENS_CHIP[0],1);r.chip.position.set(r.point[0],r.point[1]+sz*.95,r.point[2]);r.d=d;
+  if(r.ring){const ph=reduce?.4:(now%1800)/1800;r.ring.position.fromArray(r.point);r.ring.scale.setScalar(sz*(1.6+ph*1.4));r.ring.material.opacity=.9*(1-.7*ph);if(!reduce)pulse=true;}}
  if(now-SENS.lastFeed>(SENS.live?2500:20000)&&!SENS.feeding)sensorsFeed();
  if(pulse&&now-SENS.lastInv>120){SENS.lastInv=now;invalidate();}}
 function sensorsPins(){const out=[];for(const [id,r] of SENS.recs){if(!r.pin.visible)continue;_sw.fromArray(r.point).applyMatrix4(bimRoot.matrixWorld);out.push({id,p:_sw.toArray(),r:SX.pinSize(r.d??5)*.75});}return out;}
@@ -541,38 +581,54 @@ function sensorsShowCard(sp){hideCard();const r=SENS.recs.get(sp.id);if(!r)retur
  const s=r.s,lines=sensorsCardLines(r);
  drawCard(lines);camera.getWorldPosition(_head);const w=new THREE.Vector3().fromArray(sp.point),toHit=_v.copy(w).sub(_head),dist=clamp(toHit.length()*.7,.8,1.8);
  card.mesh.position.copy(_head).addScaledVector(toHit.normalize(),dist);card.mesh.position.y-=.1*dist;card.mesh.scale.setScalar(dist/1.4);card.mesh.lookAt(_head);card.mesh.visible=true;
+ if(!ASK?.on)placeCardBeside(w);
  marker.position.copy(w);marker.visible=true;SENS.picked=s.id;if(ASK?.on)askOnPick({id:s.anchor.id,layer:s.anchor.layer,point:w,sensor:s.id});invalidate();return {sensor:s.id,simulated:!SENS.live,lines,distance:sp.distance};}
 function sensorsInspection(){return {enabled:SENS.on,live:SENS.live,feed:SENS.gw,scene:SENS.scene,ready:SENS.ready,loading:SENS.loading,error:SENS.error,center:SENS.center,card:SENS.picked,scenes:SXOK?SX.SCENES:[],
  states:SENS.states,dtsMeshes:[...SENS.recs.values()].filter(r=>r.mesh).length,rings:[...SENS.recs.values()].filter(r=>r.ring).length,drawables:SENS.group.children.length,
  sensors:[...SENS.recs.values()].map(r=>({id:r.s.id,type:r.s.type,layer:r.s.anchor.layer,element:r.s.anchor.id,point:r.point,pinVisible:r.pin.visible,chip:r.chipText,simulated:SENS.obs[r.s.id]?.simulated===true,source:SENS.obs[r.s.id]?.source??null,obs:SENS.obs[r.s.id]??null}))};}
-/* ── XR menu panel (2026-10-22 redesign after the first headset test) ── at most 5 large buttons (Capture, Lens/All, Photo/Gaussian,
-   Recenter, More ▸); More holds Flashlight hands, Opacity, Photo 2K/4K, Exit VR and the layer toggles. ~0.8 m in front, slightly below
-   eye height, facing the head; it rides with the rig (jumps, snap turns). B/Y opens/closes; it also closes 1.5 s after every ray left it.
-   Buttons are hit by id (X.menuButtons/menuLayout); a click acts only on the button the ray highlights. */
+/* ── XR menu panel (2026-10-22 redesign after the first headset test; 2026-11-17 sub-pages) ── main = 4 large buttons (Lens/All,
+   Recenter, Exit VR, More ▸); More ▸ is a hub of named sub-pages (Layers, View, Status) + Demo sensors, each with ◂ Back in the
+   bottom-right slot; page map and button models in twin/xr-core.js menuButtons / menuPaths. ~0.8 m in front, slightly below eye
+   height, facing the head; it rides with the rig (jumps, snap turns). B/Y opens/closes; it also closes 1.5 s after every ray left it.
+   Buttons are hit by id (X.menuButtons/pageLayout); a click acts only on the button the ray highlights.
+   Text (layout px on a 1280 px = 0.64 m canvas seen at 0.8 m, 1° = 28 px): info lines 36-38 px, button labels 40-48 px, values 30-34 px. */
 const MENU_W=.64,MENU_H=.4,MENU_DIST=.8,MENU_DROP=.15,MENU_AWAY_MS=1500;
 const menu=makeSurface(1280,800,MENU_W,MENU_H,70);scene.add(menu.mesh);
-const tag=makeSurface(1024,200,.6,.117,65);scene.add(tag.mesh);
+const tag=makeSurface(1024,230,.6,.135,65);scene.add(tag.mesh);
 const menuHover=new Set();let menuSeen=false,menuAway=0;
 const layerOn=k=>!!layerState[k]&&layerState[k].group.visible&&!layerState[k].error;
-function menuModel(){return {buttons:X.menuButtons(state.page,{captureLabel:capture?capture.label.replace(/, \d{4}$/,''):'May 6',mode:state.mode,scene:gauss.scene,gaussianAvailable:capture?!!gaussianSource():undefined,gaussianLoading:gauss.loading,
- hands:state.hands,opacity:state.opacity.lens,hiRes:state.hiRes,sensorsLabel:SENS.on?(SENS.loading?'loading…':SXN[SENS.scene]):'off',layers:OVERLAY_LAYER_KEYS.map(k=>({key:k,label:LAYERS[k].label,on:layerOn(k),loading:!!layerState[k]?.loading}))}),rects:X.menuLayout(X.MENU_PAGES[state.page])};}
-const TONE={on:'#14532d',exit:'#7a2633',nav:'#24425f','':'#123a5c'};
-function fitFont(ctx,text,x,y,width,size,weight){let s=size;do{ctx.font=weight+' '+s+'px Arial';}while(ctx.measureText(text).width>width&&--s>12);ctx.fillText(text,x,y);}
-function drawMenu(){const {ctx,canvas,W,H}=menu,{buttons,rects}=menuModel(),more=state.page==='more';ctx.clearRect(0,0,W,H);
+const alignShort=()=>capture?.provisional?'PROVISIONAL alignment':'registered, not surveyed';
+function menuModel(){const page=X.MENU_PAGES[state.page]?state.page:'main';
+ return {page,buttons:X.menuButtons(page,{captureLabel:capture?capture.label.replace(/, \d{4}$/,''):'May 6',mode:state.mode,scene:gauss.scene,gaussianAvailable:capture?!!gaussianSource():undefined,gaussianLoading:gauss.loading,
+ hands:state.hands,opacity:state.opacity.lens,hiRes:state.hiRes,sensorsLabel:SENS.on?(SENS.loading?'loading…':SXN[SENS.scene]):'off',qualityReduced:guard.level>0,qualityLabel:FG.levels[guard.level]?.label,
+ layers:OVERLAY_LAYER_KEYS.map(k=>({key:k,label:LAYERS[k].label,on:layerOn(k),loading:!!layerState[k]?.loading}))}),rects:X.pageLayout(page)};}
+/* The info line(s) under the header. main: where you are + the honesty line (+ one short quality line only when the frame guard
+   lowered it); every sub-page: at most one short line. Diagnostics live on Status. */
+function menuInfo(page){const g=gauss.scene==='gaussian',prov=!!capture?.provisional;
+ if(page==='main')return [[`${capture?.label||''} · ${g?(gauss.fallback?'360 photo here (no Gaussian)':'Gaussian 3D · experimental, not surveyed'):'capture '+(active+1)+' of '+stations.length}`,g?'#ffd9a0':'#e8f1f8'],
+  [`${alignShort()} · Design (BIM) positions`,prov?'#ffb4a8':'#ffe495'],...(guard.level?[['Quality lowered (slow frames) · More ▸ Status','#ffb4a8']]:[])];
+ if(page==='more')return [['Left stick ↑ hold: aim · release: go · Trigger: info card','#cfe3f5']];
+ if(page==='layers')return [['Layers load when first shown · may stutter briefly','#9fb6cb']];
+ if(page==='view')return [[`${capture?.label||''} · ${alignShort()}`,prov?'#ffb4a8':'#ffe495']];
+ return [];}
+/* Status page rows: diagnostics and the controls help that used to crowd the More page. */
+function menuStatusRows(){const fr=guard.n?Math.round(1000/guard.ema)+' frames/s':'not measured yet',L=FG.levels[guard.level]?.label||'full';
+ return [['Services',`Level ${[...P.levels].join('+')} within ${P.radius} m`],['Frame rate',fr+' · quality '+L+(guard.level?' (lowered)':'')],
+  ['Move','Left stick ↑ hold: aim · release: go · ←→: turn 30°'],['Flashlight',`Right hand · right stick ↑↓: width (${state.coneDeg}°)`],['Buttons','Trigger: info card · A/X: Lens/All · B/Y: menu']];}
+const TONE={on:'#14532d',exit:'#7a2633',nav:'#24425f',warn:'#6a4a10','':'#123a5c'};
+function fitFont(ctx,text,x,y,width,size,weight,min=12){let s=size;do{ctx.font=weight+' '+s+'px Arial';}while(ctx.measureText(text).width>width&&--s>min);ctx.fillText(text,x,y,width);}
+const MENU_FONT={main:[48,34],more:[44,32],view:[44,32],layers:[40,30],status:[42,30]};
+function drawMenu(){const {ctx,W,H}=menu,{page,buttons,rects}=menuModel();ctx.clearRect(0,0,W,H);
  ctx.fillStyle='rgba(8,16,28,.95)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,36);ctx.fill();ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,92);ctx.fillStyle='#FDB515';ctx.fillRect(4,92,W-8,6);
- ctx.fillStyle='#fff';fitFont(ctx,more?'More · settings and layers':'Grimes L1 · Scan↔BIM',36,64,W-300,48,'700');ctx.fillStyle='#9fb6cb';ctx.textAlign='right';ctx.font='600 30px Arial';ctx.fillText('B/Y closes',W-36,62);ctx.textAlign='left';
- // main (2026-11-16 demo trim): where you are + the honesty line (+ the frame guard only when it lowered the quality); the controls hint lives on More
- const rows=more?[['Left stick ↑ hold: aim · release: go · ←→ turn 30° · Right hand: flashlight, trigger = info card · A/X Lens/All','#cfe3f5'],
-   [`Opacity Lens ${Math.round(state.opacity.lens*100)} % / All ${Math.round(state.opacity.all*100)} % · right stick ↑↓ flashlight width (${state.coneDeg}°) · layers load on demand (may stutter)`,'#9fb6cb'],[`Services: Level ${[...P.levels].join('+')} within ${P.radius} m · ${guardText()}`,guard.level?'#ffb4a8':'#9fb6cb']]
-  :[[`${capture?.label||''} · capture ${active+1}/${stations.length}${gauss.scene==='gaussian'&&gauss.fallback?' · '+X.gaussianOutsideNote():gauss.scene==='gaussian'&&gauss.label?' · '+gauss.label:''}`,gauss.scene==='gaussian'?'#ffd9a0':'#e8f1f8'],
-   [`Alignment: ${capture?.alignmentText||''} · Design (BIM) positions`,capture?.provisional?'#ffb4a8':'#ffe495'],
-   ...(guard.level?[[`Slow frames · ${guardText()}`,'#ffb4a8']]:[])];
- let y=150;for(const [t,c] of rows){ctx.fillStyle=c;fitText(ctx,t,36,y,W-72,32,'Arial');y+=56;}
+ ctx.fillStyle='#fff';fitFont(ctx,X.MENU_TITLES[page]||'More',36,64,W-320,48,'700',36);ctx.fillStyle='#9fb6cb';ctx.textAlign='right';ctx.font='600 32px Arial';ctx.fillText('B/Y closes',W-36,62);ctx.textAlign='left';
+ let y=152;for(const [t,c] of menuInfo(page)){ctx.fillStyle=c;fitText(ctx,t,36,y,W-72,page==='main'?38:36,'Arial',30);y+=54;}
+ if(page==='status'){y=158;for(const [k,v] of menuStatusRows()){ctx.fillStyle='#8aa2b8';ctx.font='600 30px Arial';ctx.fillText(k.toUpperCase(),36,y);ctx.fillStyle='#e8f1f8';fitText(ctx,v,290,y,W-326,36,'Arial',28);y+=86;}}
+ const [big,small]=MENU_FONT[page]||MENU_FONT.main;
  buttons.forEach((b,i)=>{const r=rects[i];if(!r)return;const hov=menuHover.has(i),g=hov?8:0,x=r.x*W-g,yy=r.y*H-g,w=r.w*W+2*g,h=r.h*H+2*g;
-  ctx.fillStyle=hov?'#FDB515':TONE[b.tone]||TONE[''];ctx.beginPath();ctx.roundRect(x,yy,w,h,24);ctx.fill();ctx.strokeStyle=hov?'#ffffff':'#5d82a3';ctx.lineWidth=hov?7:3;ctx.stroke();
-  ctx.textAlign='center';ctx.fillStyle=hov?'#0b1020':'#ffffff';const big=more?34:46,small=more?26:32;
-  if(b.value){fitFont(ctx,b.label,x+w/2,yy+h/2-small*.25,w-28,big,'700');ctx.fillStyle=hov?'#0b1020':'#cfe3f5';fitFont(ctx,b.value,x+w/2,yy+h/2+small*1.15,w-28,small,'500');}
-  else fitFont(ctx,b.label,x+w/2,yy+h/2+big*.35,w-28,big,'700');
+  ctx.fillStyle=hov?'#FDB515':TONE[b.tone]||TONE[''];ctx.beginPath();ctx.roundRect(x,yy,w,h,24);ctx.fill();ctx.strokeStyle=hov?'#ffffff':b.tone==='warn'?'#fbbf24':'#5d82a3';ctx.lineWidth=hov?7:3;ctx.stroke();
+  ctx.textAlign='center';ctx.fillStyle=hov?'#0b1020':'#ffffff';
+  if(b.value){fitFont(ctx,b.label,x+w/2,yy+h/2-small*.2,w-32,big,'700',big-8);ctx.fillStyle=hov?'#0b1020':b.tone==='warn'?'#fde68a':'#cfe3f5';fitFont(ctx,b.value,x+w/2,yy+h/2+small*1.25,w-32,small,'500',small-6);}
+  else fitFont(ctx,b.label,x+w/2,yy+h/2+big*.35,w-32,big,'700',big-8);
   ctx.textAlign='left';});
  menu.texture.needsUpdate=true;invalidate();}
 /* World placement in front of the head, then parented to the rig so it follows station jumps, teleports and snap turns. */
@@ -580,10 +636,14 @@ function placeInFront(mesh,dist,drop){scene.attach(mesh);camera.getWorldPosition
  mesh.position.copy(_head).addScaledVector(f,dist);mesh.position.y-=drop;mesh.lookAt(_head);rig.attach(mesh);}
 function setMenu(on){state.menu=on;menuHover.clear();menuSeen=false;menuAway=0;if(on){state.page='main';drawMenu();placeInFront(menu.mesh,MENU_DIST,MENU_DROP);}menu.mesh.visible=on;invalidate();}
 function menuAutoClose(){if(!state.menu)return;const now=performance.now(),on=controllers.some(c=>c.userData.hover?.panel==='menu');if(on){menuSeen=true;menuAway=now;}else if(menuSeen&&now-menuAway>MENU_AWAY_MS)setMenu(false);}
-function placeTag(){const {ctx,canvas,W,H}=tag,g=gauss.scene==='gaussian';ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,W-4,(g?150:104)-4,40);ctx.fill();ctx.textAlign='center';
- ctx.fillStyle=capture.provisional?'#ffb4a8':'#ffe495';fitText(ctx,capture.label+' · '+(capture.provisional?'PROVISIONAL alignment':'registered, not surveyed')+' · B/Y menu',W/2,g?56:66,W-60,40,'Arial');
- if(g){ctx.fillStyle='#ffd9a0';const zn=gauss.zones&&gauss.manifest?.zone?(gauss.manifest.zone.name||gauss.manifest.zone.id)+' · ':'';fitText(ctx,gauss.fallback?X.gaussianOutsideNote():'Gaussian · '+zn+'experimental appearance, not surveyed geometry',W/2,108,W-60,34,'Arial');}
- // 2026-11-16: no controls hint on the floor tag any more (it is on the menu's More page); the tag is the honesty line + "B/Y menu"
+/* Floor tag (what the headset shows on entry): the honesty line, then "B/Y: menu" (and the Gaussian caveat in Gaussian mode).
+   1024 px = 0.6 m seen at ~1.5 m (1° = 45 px): 46 px honesty line, 38 px second lines. */
+function placeTag(){const {ctx,W,H}=tag,g=gauss.scene==='gaussian';ctx.clearRect(0,0,W,H);
+ const lines=[[capture.label+' · '+alignShort(),capture.provisional?'#ffb4a8':'#ffe495',46,'600']];
+ if(g){const zn=gauss.zones&&gauss.manifest?.zone?(gauss.manifest.zone.name||gauss.manifest.zone.id)+' · ':'';lines.push([gauss.fallback?X.gaussianOutsideNote():'Gaussian · '+zn+'experimental appearance, not surveyed','#ffd9a0',38,'500']);}
+ lines.push(['B/Y: menu','#cfe3f5',38,'500']);
+ const hh=26+lines.reduce((a,l)=>a+l[2]*1.4,0);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,W-4,Math.min(H-4,hh),36);ctx.fill();ctx.textAlign='center';
+ let y=14;for(const [t,c,sz,wt] of lines){y+=sz*1.4;ctx.fillStyle=c;fitFont(ctx,t,W/2,y-sz*.42,W-56,sz,wt,28);}
  ctx.textAlign='left';tag.texture.needsUpdate=true;placeInFront(tag.mesh,1.3,.75);tag.mesh.visible=true;}
 function setLayer(k,on){if(!LAYERS[k])return;const st=layerState[k];if(on&&layerMissing(k)){loadLayer(k);status(LAYERS[k].label+' loading'+(xrSession?' · frames may stutter':''));}else if(st)st.group.visible=on;
  if(k==='fire')$('fire').setAttribute('aria-pressed',String(on));if(state.menu)drawMenu();invalidate();}
@@ -591,11 +651,11 @@ function setHands(h){state.hands=h==='both'?'both':'right';if(state.hands==='rig
 /* id ('capture', 'style', …) or a button index on the current page; returns the id that acted. */
 async function menuAction(k){const {buttons}=menuModel(),id=(typeof k==='number'?buttons[k]:buttons.find(b=>b.id===k)||{id:k})?.id;if(!id)return null;
  menuHover.clear();
- if(id==='capture'){const nx=X.nextCapture(capture.date,availableCaptures);if(nx===capture.date)status('Only '+capture.label+' is listed in the headset (registered) · add &captures=all to the link for the provisional captures');else await switchCapture(nx);}
+ if(id==='capture'){const nx=X.nextCapture(capture.date,availableCaptures);if(nx===capture.date)status('Only '+capture.label.replace(/, \d{4}$/,'')+' is listed here (registered) · &captures=all lists the rest');else await switchCapture(nx);}
  else if(id==='style')setStyle(state.mode==='lens'?'all':'lens');
  else if(id==='scene')await setScene(X.toggleScene(gauss.scene));
  else if(id==='recenter'){await recenter();if(state.menu)placeInFront(menu.mesh,MENU_DIST,MENU_DROP);}
- else if(id==='more')state.page='more';else if(id==='back')state.page='main';
+ else if(X.menuTarget(id))state.page=X.menuTarget(id);else if(id==='back')state.page=X.menuBack(state.page);
  else if(id==='hands')setHands(state.hands==='both'?'right':'both');
  else if(id==='opacity'){state.opacity.lens=X.nextLensOpacity(state.opacity.lens);applyShaderState();}
  else if(id==='hires'){if(gauss.scene!=='gaussian')setHiRes(!state.hiRes);}
@@ -721,7 +781,7 @@ async function setScene(want,{boot=false}={}){
   if(load){const Z=gauss.zones,bootDefault=boot&&!q.get('station'),r=X.gaussianZoneFor(Z.zones,stations,viewPos,{current:gauss.zoneId});
    const zid=bootDefault?Z.defaultZone:r.zone,zone=Z.zones.find(e=>e.id===zid)||Z.zones[0];load=zoneSource(zone.id);
    if(!bootDefault&&r.outside){const own=stations.map((s,i)=>i).filter(i=>zone.stations.includes(stations[i].id));zoneJump=X.nearestStation(stations,viewPos,own).index;
-    status('Capture '+(active+1)+' is outside published Gaussian zones '+X.zoneShortNames(Z.zones)+' · moving to the nearest capture in '+zone.name,true);}}
+    status('Capture '+(active+1)+' is outside Gaussian zones '+X.zoneShortNames(Z.zones)+' · moving into '+zone.name,true);}}
  }
  const ok=load?await loadGaussian(load):false;
  if(!ok){if(gauss.scene!=='gaussian')return gauss.scene;hideGaussian();applyShaderState();await openStation(active,{instant:true,force:true});updateAlign();status('Gaussian unavailable · '+(gauss.error||'load failed')+' · staying in Photo');return 'photo';}
@@ -745,7 +805,7 @@ async function teleportTo(t){
  busyStation=true;
  try{await fade(0,120);hideCard();if(gauss.fallback)leaveFallback();viewPos=t.landing;active=t.nearest;placeRig();stationBim=X.applyReg(reg,viewPos);updateRadius();gauss.teleports++;
   $('station').value=String(active);$('prev').disabled=active===0;$('next').disabled=active===stations.length-1;
-  if(xrSession)placeTag();status('Teleported · nearest capture '+(active+1)+'/'+stations.length+' · '+gauss.label);await fade(1,180);}
+  if(xrSession)placeTag();status('Teleported · nearest capture '+(active+1)+' of '+stations.length);/* the Gaussian caveat stays on the floor tag */await fade(1,180);}
  finally{busyStation=false;invalidate();if(state.menu)drawMenu();}
  if(gauss.zones)syncZone();
  return t;}
@@ -765,26 +825,30 @@ async function goAim(t,c){if(!t?.ok){status(t?.reason||'No target');return false
  if(c)buzz(c,.5,40);
  if(t.kind==='point')return !!(await teleportTo(t))?.ok;
  await openStation(t.index);return active===t.index;}
-const AIM_DOTS=28,_m4=new THREE.Matrix4(),_p=new THREE.Vector3();
-const aimDots=new THREE.InstancedMesh(new THREE.SphereGeometry(.014,8,6),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.95,depthTest:false,depthWrite:false,toneMapped:false}),AIM_DOTS);
+/* Aim preview (2026-11-17 calmer): a dotted arc of small dots starting 0.45 m out from the hand, a soft floor disc where you land,
+   a thin light line rising from it (fades upward) and the label on that line at 1.1 m above the floor (below eye height, so it no
+   longer sits among ceiling services and sensor pins). The label is 900 px = 0.54 m at 1.8 m (1° ≈ 52 px): 52 px bold. */
+const AIM_DOTS=24,AIM_START=.45,_m4=new THREE.Matrix4(),_p=new THREE.Vector3();
+const aimDots=new THREE.InstancedMesh(new THREE.SphereGeometry(.008,8,6),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.75,depthTest:false,depthWrite:false,toneMapped:false}),AIM_DOTS);
 aimDots.renderOrder=58;aimDots.frustumCulled=false;aimDots.visible=false;scene.add(aimDots);
-const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,1,16,1,true).translate(0,.5,0),new THREE.MeshBasicMaterial({color:0xffd479,transparent:true,opacity:.4,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
-pillar.renderOrder=57;pillar.visible=false;pillar.frustumCulled=false;scene.add(pillar);
-const aimTag=makeSurface(768,120,.46,.072,66);aimTag.text=null;scene.add(aimTag.mesh);
-function drawAimTag(text,ok){const {ctx,canvas,W,H}=aimTag;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(2,2,W-4,H-4,56);ctx.fill();
- ctx.strokeStyle=ok?'#FDB515':'#e2725b';ctx.lineWidth=5;ctx.stroke();ctx.textAlign='center';ctx.fillStyle=ok?'#ffffff':'#ffb4a8';fitFont(ctx,text,W/2,H/2+15,W-50,42,'700');ctx.textAlign='left';aimTag.texture.needsUpdate=true;}
+const beamTex=(()=>{const c=document.createElement('canvas');c.width=4;c.height=64;const g=c.getContext('2d'),gr=g.createLinearGradient(0,64,0,0);gr.addColorStop(0,'#fff');gr.addColorStop(1,'#000');g.fillStyle=gr;g.fillRect(0,0,4,64);return new THREE.CanvasTexture(c);})();
+const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,1,10,1,true).translate(0,.5,0),new THREE.MeshBasicMaterial({color:0xffd479,alphaMap:beamTex,transparent:true,opacity:.7,depthTest:false,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
+pillar.renderOrder=57;pillar.visible=false;pillar.frustumCulled=false;pillar.name='aim: light line';scene.add(pillar);
+const AIM_LABEL_H=1.1;
+const aimTag=makeSurface(900,132,.54,.0792,66);aimTag.text=null;scene.add(aimTag.mesh);
+function drawAimTag(text,ok){const {ctx,W,H}=aimTag;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(3,3,W-6,H-6,(H-6)/2);ctx.fill();
+ ctx.strokeStyle=ok?'rgba(253,181,21,.9)':'#e2725b';ctx.lineWidth=4;ctx.stroke();ctx.textAlign='center';ctx.fillStyle=ok?'#ffffff':'#ffb4a8';fitFont(ctx,text,W/2,H/2+18,W-60,52,'700',36);ctx.textAlign='left';aimTag.texture.needsUpdate=true;}
 function showAim(o,d,t){
  if(!t){hideAim();return;}
  const color=t.ok?0xffd479:0xe2725b,text=X.targetLabel(t,t.kind==='station'&&t.ok?'Capture '+(t.index+1):'');
  if(text!==aimTag.text){drawAimTag(text,t.ok);aimTag.text=text;}
  let labelAt;
- if(t.point){const pts=X.arcPoints(o.toArray(),t.point,AIM_DOTS);for(let k=0;k<AIM_DOTS;k++){_m4.makeTranslation(pts[k][0],pts[k][1],pts[k][2]);aimDots.setMatrixAt(k,_m4);}
+ if(t.point){const a0=o.clone().addScaledVector(d,AIM_START),pts=X.arcPoints(a0.toArray(),t.point,AIM_DOTS);for(let k=0;k<AIM_DOTS;k++){_m4.makeTranslation(pts[k][0],pts[k][1],pts[k][2]);aimDots.setMatrixAt(k,_m4);}
   aimDots.instanceMatrix.needsUpdate=true;aimDots.material.color.set(color);aimDots.visible=true;ring.position.fromArray(t.point);ring.material.color.set(color);ring.visible=true;
-  if(t.ok&&t.kind==='station'){const s=stations[t.index].position;pillar.position.set(s[0],t.point[1],s[2]);pillar.scale.set(1,Math.max(.1,s[1]-t.point[1]),1);pillar.visible=true;labelAt=_p.set(s[0],s[1]+.35,s[2]);}
-  else{pillar.visible=false;labelAt=_p.set(t.point[0],t.point[1]+EYE_H+.3,t.point[2]);}}
+  pillar.position.fromArray(t.point);pillar.scale.set(1,AIM_LABEL_H,1);pillar.material.color.set(color);pillar.visible=!!t.ok;labelAt=_p.set(t.point[0],t.point[1]+AIM_LABEL_H+.06,t.point[2]);}
  else{aimDots.visible=false;ring.visible=false;pillar.visible=false;labelAt=_p.copy(o).addScaledVector(d,2.5);}
  camera.getWorldPosition(_head);const dist=_head.distanceTo(labelAt);aimTag.mesh.position.copy(labelAt);aimTag.mesh.scale.setScalar(clamp(dist/1.8,.5,9));aimTag.mesh.lookAt(_head);aimTag.mesh.visible=true;
- if(t.point)ring.scale.setScalar(clamp(_head.distanceTo(ring.position)/4,1,4));invalidate();}
+ if(t.point)ring.scale.setScalar(clamp(_head.distanceTo(ring.position)/5,1,2.2));invalidate();}
 function hideAim(){aimDots.visible=false;ring.visible=false;pillar.visible=false;aimTag.mesh.visible=false;invalidate();}
 /* ── Desktop input (testing without a headset): drag look, wheel zoom, click = trigger, mouse = flashlight, WASD walk ── */
 const ndc=new THREE.Vector2();let drag=null,pointerInside=false;
@@ -872,7 +936,7 @@ function onSelect(c){const u=c.userData;if(ASK?.on&&askHoldSwallow(c))return;ray
  if(u.aiming)return;
  const k=controllers.indexOf(c),R=curRoles.move>=0||curRoles.lens.length?curRoles:roles();
  if(R.lens.includes(k))pickAlong(o,d).then(r=>{if(r)buzz(c,.4,25);});
- else status('Info card: right trigger · both-hand flashlight: menu ▸ More ▸ Flashlight');}
+ else status('Info card: right trigger · two flashlights: More ▸ View');}
 /* B / Y ("back"): the topmost thing closes first (X.backAction): an open menu / MR panel, then the picked element with its label, answer
    and lit parts, and only then does the menu open. The info card and the answer need no Close button. Escape closes the same way on the desktop but never opens the menu. */
 function xrBack(){const menuOpen=MODE_AR?!!mr.panel:!!state.menu,pk=!!(picked||SENS.picked||ASK?.el);
@@ -1277,7 +1341,7 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
    (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
    and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
 var ASK=null;
-const XA=globalThis.XRAsk,XAOK=XA?.API===5,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
+const XA=globalThis.XRAsk,XAOK=XA?.API===6,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
 ASK={on:!!XAP.enabled,base:XAP.server||null,code:XAP.code||'',token:null,prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
  paths:[],vis:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
  hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0,more:false,details:false,wsteps:[],heard:false,tWait:0,markSettle:null,tReveal:null,layout:null};
@@ -1334,7 +1398,7 @@ function askPlace(){const a=ASK.anchor;if(!a)return;const up=new THREE.Vector3(0
  const put=(m,h)=>{m.position.copy(top).addScaledVector(up,-(h/2)*s);m.quaternion.copy(a.q);m.scale.setScalar(s);top.addScaledVector(up,-h*s-gap);};
  const cardTop=top.clone();put(cardOn?askCard.mesh:askChip.mesh,cardOn?ASK_WH.card[1]*askF():ASK_WH.chip[1]);if(cardOn)askCard.mesh.scale.y=s*askF();
  if(ASK.more)put(askBar.mesh,ASK_WH.bar[1]);
- if(!cardOn&&ASK.details)put(card.mesh,.306);
+ if(!cardOn&&ASK.details){put(card.mesh,CARD_WH[1]*(card.f||1));card.mesh.scale.y=card.mesh.scale.x*(card.f||1);}
  if(ASK.el){askLine.geometry.setFromPoints([cardTop,ASK.el.world]);askLine.visible=cardOn;}}
 function askButtons(){return XA.barButtons({busy:ASK.busy,details:ASK.details});}
 /* voice state changed: the label's hint line (and the presets panel when open) */
@@ -1492,7 +1556,7 @@ async function askRecStop(discard=false){const r=ASK.rec;ASK.rec=null;clearTimeo
  if(blob.size<1500||performance.now()-ASK.recT0<500){ASK.voice='ready';status('Too short: hold the trigger on the element while you talk');askVoiceUi();return;}
  ASK.voice='transcribing';askVoiceUi();
  try{const res=await fetch(askApi('transcribe'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':blob.type},ASK.token),body:blob});if(!res.ok){const rt=await askRefusal(res);if(rt)throw new Error(rt);}const j=await res.json();if(!res.ok)throw new Error(j.error||res.status);
-  ASK.voice='ready';askVoiceUi();if(j.text&&!j.no_speech){status('Heard: “'+j.text+'”');await askQuestion(null,j.text,{heard:true});}else{askEarcon('miss');status('Didn’t catch that · hold the trigger and speak, or use ⋯ for preset questions');}}
+  ASK.voice='ready';askVoiceUi();if(j.text&&!j.no_speech){status('Heard: “'+j.text+'”');await askQuestion(null,j.text,{heard:true});}else{askEarcon('miss');status('Didn’t catch that · hold the trigger and speak, or ⋯ for questions');}}
  catch(e){ASK.voice='ready';askVoiceUi();status('Speech-to-text failed ('+(e?.message||e)+') · use ⋯ for preset questions');}}
 /* A press on an Ask panel (controller select / desktop click): "⋯" (label or answer card) opens / closes the presets panel; a preset asks
    (and folds the panel away); Details shows / hides the full element card; Close = dismiss. The label and card bodies do nothing on a
@@ -1625,7 +1689,7 @@ function xrFrameSafe(){try{if(MODE_AR){if(BD.state!=='off'&&BD.state!=='idle')mr
  catch(e){xrFrameErrors++;const m=String(e?.message||e);if(m!==lastXrFrameError){lastXrFrameError=m;console.error('XR frame error (rendering continues):',e);try{status('XR controls error · '+m);}catch(_){}}}}
 /* Frame guard (X.frameGuardStep): watches the XR frame interval and lowers the quality when it stays slow. &guard=0 turns it off. */
 let guardWasXr=false,guardT=0;const GUARD_ON=q.get('guard')!=='0'&&!!X?.frameGuardStep;
-function guardApply(announce){updateRadius();const L=FG.levels[guard.level];if(announce)status('Slow frames · quality lowered to "'+L.label+'" · '+guardText());if(state.menu)drawMenu();}
+function guardApply(announce){updateRadius();const L=FG.levels[guard.level];if(announce)status('Slow frames · quality lowered to '+L.label);if(state.menu)drawMenu();}
 function guardFrame(t){const xr=renderer.xr.isPresenting;
  if(xr!==guardWasXr){guardWasXr=xr;guardT=0;const had=guard.level;guard=guardNew();if(had)guardApply(false);}
  if(!xr||!GUARD_ON)return;const dt=guardT?t-guardT:0;guardT=t;
@@ -1670,7 +1734,14 @@ function askTargetWorld(i){const at=(m,W,H,u,v)=>{if(!m.visible)return null;m.up
  if(typeof i==='number'){const r=XA.barRects()[i];return r?at(askBar.mesh,...ASK_WH.bar,r.x+r.w/2,1-(r.y+r.h/2)):null;}
  if(i==='more')return askChip.mesh.visible?at(askChip.mesh,...ASK_WH.chip,(1+XA.CHIP.moreX)/2,.5):at(askCard.mesh,...ASK_WH.card,(1+XA.ANSWER_MORE.x0)/2,1-XA.ANSWER_MORE.y1/2/askF());
  if(i==='chip')return at(askChip.mesh,...ASK_WH.chip,.4,.5);if(i==='card')return at(askCard.mesh,...ASK_WH.card,.5,.5);return null;}
-window.xrDebug={renderNow(){renderer.render(scene,camera);const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};return lastInfo;},
+window.xrDebug={
+ // desktop screenshots of the in-headset panels (2026-11-17): forceToast(true) lets the head-locked toast draw outside an XR session;
+ // surfaces() hands out the panel meshes for projection; placeTag / status / menuModel / menuPage drive them without a headset.
+ forceToast:on=>{toastForce=!!on;if(!on)toast.mesh.visible=false;invalidate();return toastForce;},
+ surfaces:()=>({menu:menu.mesh,tag:tag.mesh,toast:toast.mesh,card:card.mesh,aimTag:aimTag.mesh,aimDisc:ring,aimLine:pillar,askChip:askChip.mesh,askCard:askCard.mesh,askBar:askBar.mesh,camera,
+  canvases:Object.fromEntries([['menu',menu],['tag',tag],['toast',toast],['card',card],['aimTag',aimTag],['askCard',askCard],['askChip',askChip]].map(([k,v])=>[k,{layout:[v.W,v.H],pixels:[v.canvas.width,v.canvas.height]}]))}),
+ placeTag:()=>placeTag(),status:(t,sticky=false,quiet=false)=>status(t,sticky,quiet),menuModel:()=>{const m=menuModel();return {page:m.page,buttons:m.buttons};},menuPage:p=>{state.page=X.MENU_PAGES[p]?p:'main';if(state.menu)drawMenu();return state.page;},
+ renderNow(){renderer.render(scene,camera);const r=renderer.info.render;lastInfo={calls:r.calls,triangles:r.triangles,lines:r.lines,points:r.points};return lastInfo;},
  openStation:i=>openStation(i),mr:{demo:(pt,hy)=>mrPlaceDemo(pt,'debug',hy),beginDemo:()=>mrBeginDemo(),simulate:o=>mrSimulate(o),button:i=>{if(mr.page==='simple')mr.page='main';return mrButton(i);},panelWorld:()=>mrPanel.mesh.visible?mrPanel.mesh.getWorldPosition(new THREE.Vector3()).toArray():null,simpleButton:id=>{mr.page='simple';const i=mrSimpleButtons().findIndex(b=>b.id===id);return i<0?null:mrButton(i);},moreIndex:()=>11,panel:on=>mrSetPanel(on),range:k=>mrApplyRange(k),startAlign:id=>mrStartAlign(id),capture:p=>mrCapture(p,'debug'),skip:()=>mrSkip(),solve:()=>mrSolveNow(),accept:()=>mrAccept(),nudge:(k,d)=>mrNudge(k,d),nextCheck:()=>mrNextCheck(),check:p=>mrCheck(p,'debug'),toggleLayer:k=>mrToggleLayer(k),forget:()=>mrForget(),restoreWith:ss=>mrRestoreOrAlign(ss),anchorPose:(p,o)=>mrApplyAnchorPose(p,o),useGrimes:id=>mrUseGrimes(id)},walk:(x,z)=>walk(new THREE.Vector3(x,0,z)),setStyle,switchCapture,setMenu,menuAction,setScene,recenter,syncZone,
  // straight-down teleport onto scan-frame floor point (x, z) through the normal preview + teleport path (desktop test aid)
  teleportAt:(x,z)=>teleportTo(teleportPreview(new THREE.Vector3(x,viewPos[1],z),new THREE.Vector3(0,-1,0))),

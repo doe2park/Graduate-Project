@@ -17,7 +17,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 5;   // 3: access code (code=, X-Ask-Code, refusalText) · 4: the Claude mark path, headerNote, upright settle · 5: pair once (X-Ask-Token, auto-connect)
+const API = 6;   // 6: larger answer / waiting-card text (2026-11-17) · 3: access code (code=, X-Ask-Code, refusalText) · 4: the Claude mark path, headerNote, upright settle · 5: pair once (X-Ask-Token, auto-connect)
 const CITE_RX = /\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g;
 const LEVELS = [
   {level: 1, id: 'q1', label: 'What is this?', hint: 'look up', question: 'What is this, and what room am I in?'},
@@ -733,16 +733,16 @@ function drawLookup(ctx, v, x, y, w, h) {
   tile(ctx, x, y, 290, h, col); drawPicto(ctx, v.element.picto, x + 145, y + h * .44, 150, col);
   ctx.textAlign = 'center'; ctx.fillStyle = '#e2e8f0'; fit(ctx, shortName(v.element), x + 145, y + h - 26, 260, 28, '600'); ctx.textAlign = 'left';
   let ry = y + 10; const rx = x + 330, rw = w - 330;
-  const row = (k, val) => { ctx.font = '600 22px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(k.toUpperCase(), rx, ry + 22); ctx.fillStyle = '#fff'; fit(ctx, val, rx, ry + 70, rw, 44, '700'); ry += 96; };
+  const row = (k, val) => { ctx.font = '600 26px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(k.toUpperCase(), rx, ry + 22); ctx.fillStyle = '#fff'; fit(ctx, val, rx, ry + 70, rw, 44, '700'); ry += 96; };
   if (v.size) row('Size', v.size);
   if (v.level) row('Level', v.level);
   if (v.room) {
-    ctx.font = '600 22px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText('ROOM', rx, ry + 22);
+    ctx.font = '600 26px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText('ROOM', rx, ry + 22);
     ctx.fillStyle = '#fff'; fit(ctx, v.room.name, rx, ry + 64, rw, 38, '700');
     let dx = rx; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(dx + 10, ry + 94, 9, 0, Math.PI * 2); ctx.fillStyle = i < v.room.dots ? '#fbbf24' : 'rgba(255,255,255,.18)'; ctx.fill(); dx += 26; }
-    ctx.font = '600 24px Arial'; ctx.fillStyle = '#fde68a'; ctx.fillText(v.room.word, dx + 8, ry + 102); const ww = ctx.measureText(v.room.word).width;
-    ctx.font = '22px Arial'; ctx.fillStyle = '#a9c1d6'; fit(ctx, '· ' + v.room.basis, dx + 18 + ww, ry + 102, rw - (dx + 18 + ww - rx), 22);
-  } else if (!v.size && !v.level) { ctx.font = '26px Arial'; ctx.fillStyle = '#a9c1d6'; ctx.fillText('No size or room in the model record', rx, ry + 40); }
+    ctx.font = '600 28px Arial'; ctx.fillStyle = '#fde68a'; ctx.fillText(v.room.word, dx + 8, ry + 102); const ww = ctx.measureText(v.room.word).width;
+    ctx.font = '26px Arial'; ctx.fillStyle = '#a9c1d6'; fit(ctx, '· ' + v.room.basis, dx + 18 + ww, ry + 102, rw - (dx + 18 + ww - rx), 26);
+  } else if (!v.size && !v.level) { ctx.font = '30px Arial'; ctx.fillStyle = '#a9c1d6'; ctx.fillText('No size or room in the model record', rx, ry + 42); }
 }
 function drawNear(ctx, v, x, y, w, h) {
   const gw = Math.round(w * .6), axX = x + 92, base = y + h - 54, top = y + 26;
@@ -750,11 +750,11 @@ function drawNear(ctx, v, x, y, w, h) {
   const above = v.marks.filter(m => m.above), maxDy = Math.max(.5, ...above.map(m => m.dy)), span = Math.min(4, Math.ceil(maxDy * 1.25 / .5) * .5);
   const Y = d => base - (Math.min(d, span) / span) * (base - top);
   ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(axX, base); ctx.lineTo(axX, top - 6); ctx.stroke();
-  ctx.font = '600 20px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.textAlign = 'right';
+  ctx.font = '600 24px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.textAlign = 'right';
   for (const d of [0, span / 2, span]) { const yy = Y(d); ctx.fillText(d ? '+' + mFmt(d) : '0', axX - 12, yy + 7); ctx.beginPath(); ctx.moveTo(axX - 6, yy); ctx.lineTo(axX + 6, yy); ctx.stroke(); }
   ctx.textAlign = 'left';
   // the selected element at height 0
-  drawPicto(ctx, v.self.picto, axX + 46, base + 22, 40, '#ffffff'); ctx.font = '600 22px Arial'; ctx.fillStyle = '#fff'; fit(ctx, 'this ' + v.self.label.toLowerCase(), axX + 78, base + 30, gw - 190, 22, '600');
+  drawPicto(ctx, v.self.picto, axX + 46, base + 22, 40, '#ffffff'); ctx.font = '600 26px Arial'; ctx.fillStyle = '#fff'; fit(ctx, 'this ' + v.self.label.toLowerCase(), axX + 78, base + 30, gw - 190, 26, '600');
   // markers, labels pushed apart (min 48 px) with a leader to the true height
   const ms = above.slice().sort((a, b) => a.dy - b.dy); let last = base - 10; const lab = [];
   for (const m of ms) { let ly = Math.min(Y(m.dy), last - 48); ly = Math.max(ly, top + 8); lab.push([m, ly]); last = ly; }
@@ -762,19 +762,19 @@ function drawNear(ctx, v, x, y, w, h) {
     const col = sysColor(m.layer), yy = Y(m.dy);
     ctx.strokeStyle = col; ctx.lineWidth = m.cited ? 4 : 2; ctx.beginPath(); ctx.moveTo(axX - 8, yy); ctx.lineTo(axX + 24, yy); ctx.lineTo(axX + 40, ly); ctx.stroke();
     drawPicto(ctx, m.picto, axX + 70, ly, 40, col);
-    ctx.font = '700 26px Arial'; ctx.fillStyle = '#fff'; const t = '+' + mFmt(m.dy); ctx.fillText(t, axX + 100, ly + 9); const tw = ctx.measureText(t).width;
+    ctx.font = '700 30px Arial'; ctx.fillStyle = '#fff'; const t = '+' + mFmt(m.dy); ctx.fillText(t, axX + 100, ly + 9); const tw = ctx.measureText(t).width;
     ctx.fillStyle = m.cited ? '#e2e8f0' : '#a9c1d6'; fit(ctx, m.label.toLowerCase() + (m.dh >= .3 ? ' · ' + mFmt(m.dh) + ' aside' : ''), axX + 110 + tw, ly + 9, gw - (axX - x) - 130 - tw, 24, m.cited ? '600' : '');
   }
   const beside = v.marks.filter(m => !m.above).slice(0, 2);
-  if (beside.length) { ctx.font = '22px Arial'; ctx.fillStyle = '#a9c1d6'; fit(ctx, 'beside: ' + beside.map(m => m.label.toLowerCase() + ' ' + mFmt(m.dh)).join(', '), x + 20, y + h - 12, gw - 40, 22); }
+  if (beside.length) { ctx.font = '26px Arial'; ctx.fillStyle = '#a9c1d6'; fit(ctx, 'beside: ' + beside.map(m => m.label.toLowerCase() + ' ' + mFmt(m.dh)).join(', '), x + 20, y + h - 12, gw - 40, 26); }
   // counts by system
   const cx = x + gw + 24, cw = w - gw - 24; tile(ctx, cx, y, cw, h, '#64748b');
-  ctx.font = '600 22px Arial'; ctx.fillStyle = '#8aa2b8'; fit(ctx, `${v.total} ITEMS WITHIN ${v.radius || 2} M` + (v.aboveOnly ? ' ABOVE' : ''), cx + 18, y + 38, cw - 36, 22, '600');
+  ctx.font = '600 26px Arial'; ctx.fillStyle = '#8aa2b8'; fit(ctx, `${v.total} ITEMS WITHIN ${v.radius || 2} M` + (v.aboveOnly ? ' ABOVE' : ''), cx + 18, y + 38, cw - 36, 26, '600');
   const maxN = Math.max(1, ...v.counts.map(c => c.n)); let yy = y + 66;
   for (const c of v.counts) {
     const col = sysColor(c.layer); drawPicto(ctx, c.picto, cx + 38, yy + 22, 34, col);
-    ctx.font = '600 22px Arial'; ctx.fillStyle = '#e2e8f0'; fit(ctx, c.word, cx + 66, yy + 16, cw - 140, 22, '600');
-    ctx.textAlign = 'right'; ctx.font = '700 24px Arial'; ctx.fillStyle = '#fff'; ctx.fillText(String(c.n), cx + cw - 16, yy + 18); ctx.textAlign = 'left';
+    ctx.font = '600 26px Arial'; ctx.fillStyle = '#e2e8f0'; fit(ctx, c.word, cx + 66, yy + 16, cw - 140, 26, '600');
+    ctx.textAlign = 'right'; ctx.font = '700 28px Arial'; ctx.fillStyle = '#fff'; ctx.fillText(String(c.n), cx + cw - 16, yy + 18); ctx.textAlign = 'left';
     ctx.fillStyle = col; ctx.globalAlpha = .75; rr(ctx, cx + 66, yy + 26, Math.max(6, (cw - 90) * c.n / maxN), 10, 5); ctx.fill(); ctx.globalAlpha = 1;
     yy += 58; if (yy > y + h - 40) break;
   }
@@ -792,18 +792,18 @@ function drawTrace(ctx, v, x, y, w, h) {
   for (let i = 0; i < n; i++) { ctx.globalAlpha = .35 + .55 * (i / (n - 1)); rr(ctx, x0 + i * seg + 4, midY - 12, seg - 8, 24, 6); ctx.fill(); }
   ctx.globalAlpha = 1; ctx.textAlign = 'center';
   ctx.font = '700 40px Arial'; ctx.fillStyle = '#fff'; ctx.fillText(v.hops != null ? String(v.hops) : '?', (x0 + x1) / 2, midY - 34);
-  ctx.font = '600 24px Arial'; ctx.fillStyle = '#bae6fd'; ctx.fillText(v.pieceWord + ' along the run', (x0 + x1) / 2, midY + 50);
+  ctx.font = '600 28px Arial'; ctx.fillStyle = '#bae6fd'; ctx.fillText(v.pieceWord + ' along the run', (x0 + x1) / 2, midY + 50);
   ctx.textAlign = 'left';
-  ctx.font = '22px Arial'; ctx.fillStyle = '#a9c1d6';
+  ctx.font = '26px Arial'; ctx.fillStyle = '#a9c1d6';
   const note = 'Lit up in the room · found from touching pieces, no flow direction in the model';
   ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x + 20, y + h - 18); ctx.lineTo(x + 60, y + h - 18); ctx.stroke();
-  fit(ctx, note, x + 74, y + h - 10, w - 90, 22);
+  fit(ctx, note, x + 74, y + h - 10, w - 90, 26);
 }
 function drawItems(ctx, v, x, y, w, h) {
   const items = v.items || []; if (!items.length) return false;
   const tw = Math.min(220, (w - 20 * (items.length - 1)) / items.length);
   items.forEach((it, i) => { const tx = x + i * (tw + 20), col = sysColor(it.layer); tile(ctx, tx, y, tw, h, col); drawPicto(ctx, it.picto, tx + tw / 2, y + h * .42, Math.min(110, tw * .55), col);
-    ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; fit(ctx, it.label, tx + tw / 2, y + h - 52, tw - 20, 26, '600'); ctx.fillStyle = '#8aa2b8'; fit(ctx, '#' + it.id, tx + tw / 2, y + h - 18, tw - 20, 20, ''); ctx.textAlign = 'left'; });
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; fit(ctx, it.label, tx + tw / 2, y + h - 52, tw - 20, 26, '600'); ctx.fillStyle = '#8aa2b8'; fit(ctx, '#' + it.id, tx + tw / 2, y + h - 18, tw - 20, 24, ''); ctx.textAlign = 'left'; });
   return true;
 }
 /* The answer card. view: {phase: 'thinking'|'answer'|'error', model (cardModel; model.visual from answerVisual),
@@ -813,9 +813,9 @@ function drawItems(ctx, v, x, y, w, h) {
    picture: {x, y, w, h} | null, h}. h: the height actually used. The waiting card is compact (h < H: the page shows only the top
    h of the canvas, so a two-step wait is not a mostly empty panel); the answer and error cards use the full H. */
 function waitHeight(ctx, W, H, question, nSteps) {
-  ctx.font = 'italic 27px Arial';
-  const q = question ? 50 + wrap(ctx, '“' + question + '”', W - 80, 2).length * 35 + 58 : 0;
-  return Math.min(H, Math.max(360, Math.round(92 + q + (nSteps ? 44 + nSteps * 70 : 70) + 70)));
+  ctx.font = 'italic 31px Arial';
+  const q = question ? 54 + wrap(ctx, '“' + question + '”', W - 80, 2).length * 40 + 58 : 0;
+  return Math.min(H, Math.max(380, Math.round(92 + q + (nSteps ? 48 + nSteps * 74 : 74) + 74)));
 }
 const CARD_BG = 'rgba(10,16,24,.97)', MARK = {x: 64, y: 50, r: 30};
 /* The header word (2026-11-16): the mark + "Claude" as on the earlier Claude-badge card, in LIVE and in MOCK. Honesty stays in the mode
@@ -836,62 +836,62 @@ function drawAnswer(ctx, W, H, view) {
   ctx.font = '600 30px Arial'; ctx.fillStyle = '#f1f5f9'; ctx.fillText(brand, pad + 66, 60);
   let hx = pad + 66 + ctx.measureText(brand).width + 10;
   if (mode) { ctx.fillStyle = '#7f94a8'; ctx.fillText('·', hx, 60); hx += ctx.measureText('·').width + 10; }
-  if (mode) hx += pill(ctx, hx, 33, mode, {h: 34, size: 21, weight: '700', fill: mode === 'LIVE' ? '#14532d' : '#6a4a10', color: mode === 'LIVE' ? '#86efac' : '#fcd34d'}) + 12;
+  if (mode) hx += pill(ctx, hx, 31, mode, {h: 38, size: 24, weight: '700', fill: mode === 'LIVE' ? '#14532d' : '#6a4a10', color: mode === 'LIVE' ? '#86efac' : '#fcd34d'}) + 12;
   const note = headerNote(mode);
-  if (note) { ctx.font = '500 20px Arial'; ctx.fillStyle = '#fcd34d'; ctx.fillText(note, hx, 58, Math.max(60, W * ANSWER_MORE.x0 - 150 - hx)); }
+  if (note) { ctx.font = '500 24px Arial'; ctx.fillStyle = '#fcd34d'; ctx.fillText(note, hx, 58, Math.max(60, W * ANSWER_MORE.x0 - 150 - hx)); }
   const mx = W * ANSWER_MORE.x0 + (W - W * ANSWER_MORE.x0) / 2 - 6;
   drawMore(ctx, mx, 48, 30, !!view.hoverMore);
   let rx = mx - 46;
   if (view.speech === 'speaking') { drawSpeaker(ctx, rx - 30, 48, 30, '#fde68a'); rx -= 46; }
-  if (view.phase === 'answer' || view.phase === 'error') { ctx.textAlign = 'right'; ctx.font = '500 21px Arial'; ctx.fillStyle = '#7f94a8'; ctx.fillText('B/Y closes', rx, 56); ctx.textAlign = 'left'; }
+  if (view.phase === 'answer' || view.phase === 'error') { ctx.textAlign = 'right'; ctx.font = '500 24px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText('B/Y closes', rx, 57); ctx.textAlign = 'left'; }
   let y = 96;
   if (view.phase === 'thinking' && m.question) {   // what was heard (voice) or asked (preset), small, at the top
-    ctx.font = '600 20px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(heard ? 'HEARD' : 'ASKED', pad, y + 14);
-    ctx.font = 'italic 27px Arial'; ctx.fillStyle = '#cfe3f5'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y + 50); y += 35; }
+    ctx.font = '600 24px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(heard ? 'HEARD' : 'ASKED', pad, y + 16);
+    ctx.font = 'italic 31px Arial'; ctx.fillStyle = '#cfe3f5'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y + 54); y += 40; }
     y += 40; ctx.strokeStyle = 'rgba(226,232,240,.14)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke(); y += 18;
   } else if (view.phase === 'error' || !v) {
-    if (m.question) { ctx.font = 'italic 28px Arial'; ctx.fillStyle = '#a9c1d6'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y + 20); y += 36; } y += 14; }
+    if (m.question) { ctx.font = 'italic 31px Arial'; ctx.fillStyle = '#a9c1d6'; for (const t of wrap(ctx, '“' + m.question + '”', W - 2 * pad, 2)) { ctx.fillText(t, pad, y + 22); y += 40; } y += 14; }
   }
   if (view.phase === 'thinking') {
     const steps = wsteps;
     ctx.fillStyle = steps.length ? '#8aa2b8' : '#e8f1f8';
-    if (steps.length) { ctx.font = '600 20px Arial'; ctx.fillText(waitLabel({heard}).toUpperCase(), pad, y + 24); y += 44; }
-    else { fit(ctx, waitLabel({heard}), pad, y + 44, W - 2 * pad, 38, '700'); y += 70; }
+    if (steps.length) { ctx.font = '600 24px Arial'; ctx.fillText(waitLabel({heard}).toUpperCase(), pad, y + 26); y += 48; }
+    else { fit(ctx, waitLabel({heard}), pad, y + 46, W - 2 * pad, 40, '700'); y += 74; }
     for (const st of steps) {
       const cur = st.state === 'current', my = y + 32;
       if (cur) layout.indicator = {x: pad + 20, y: my}; else drawPicto(ctx, 'tick', pad + 20, my, 30, '#34d399');
       drawPicto(ctx, st.icon || 'twin', pad + 82, my, 42, cur ? '#ffffff' : '#9fb6cb');
       const t = (cur ? st.text : doneText(st.text)) + (st.n > 1 ? ' ×' + st.n : '');
-      ctx.fillStyle = cur ? '#ffffff' : '#9fb6cb'; fit(ctx, t, pad + 124, my + (cur ? 11 : 10), W - 2 * pad - 130, cur ? 32 : 28, cur ? '700' : '500');
-      y += 70;
+      ctx.fillStyle = cur ? '#ffffff' : '#b4c7d8'; fit(ctx, t, pad + 124, my + (cur ? 12 : 11), W - 2 * pad - 130, cur ? 36 : 32, cur ? '700' : '500');
+      y += 74;
     }
   } else if (view.phase === 'error') {
     ctx.font = '700 38px Arial'; ctx.fillStyle = '#ffb4a8'; ctx.fillText('Could not answer', pad, y + 20); y += 66;
-    ctx.font = '30px Arial'; ctx.fillStyle = '#e8f1f8'; for (const t of wrap(ctx, view.error || '', W - 2 * pad, 4)) { ctx.fillText(t, pad, y); y += 40; }
+    ctx.font = '34px Arial'; ctx.fillStyle = '#e8f1f8'; for (const t of wrap(ctx, view.error || '', W - 2 * pad, 4)) { ctx.fillText(t, pad, y); y += 44; }
   } else if (v) {
     // headline
     ctx.fillStyle = '#ffffff'; fit(ctx, v.headline || m.lead || '', pad, y + 50, W - 2 * pad, 56, '700'); y += 78;
     // the picture
-    const bh = 330, by = y;
+    const bh = 300, by = y;
     const drawn = v.kind === 'lookup' ? (drawLookup(ctx, v, pad, by, W - 2 * pad, bh), true) : v.kind === 'near' ? (drawNear(ctx, v, pad, by, W - 2 * pad, bh), true)
       : v.kind === 'trace' ? (drawTrace(ctx, v, pad, by, W - 2 * pad, bh), true) : drawItems(ctx, v, pad, by, W - 2 * pad, 250);
     if (drawn) layout.picture = {x: pad - 6, y: by - 6, w: W - 2 * pad + 12, h: (v.kind === 'text' ? 250 : bh) + 12};
     y = drawn ? by + (v.kind === 'text' ? 250 : bh) + 14 : y;
     // caption (the sentence answer, 1-2 lines)
-    ctx.font = '27px Arial'; ctx.fillStyle = '#c3d3e2';
-    for (const t of wrap(ctx, v.caption || '', W - 2 * pad, drawn ? 2 : 6)) { ctx.fillText(t, pad, y + 24); y += 34; }
+    ctx.font = '33px Arial'; ctx.fillStyle = '#d5e3ef';
+    for (const t of wrap(ctx, v.caption || '', W - 2 * pad, drawn ? 2 : 6)) { ctx.fillText(t, pad, y + 30); y += 41; }
     // bottom rows: check on site, then the evidence ids (with the verification count)
     const ry = H - 172;
-    pill(ctx, pad, ry, '      ' + v.check, {h: 48, size: 26, fill: 'rgba(251,191,36,.16)', stroke: '#fbbf24', color: '#fde68a', weight: '700', maxW: W - 2 * pad});
-    drawPicto(ctx, 'check', pad + 28, ry + 24, 28, '#fbbf24');
+    pill(ctx, pad, ry, '      ' + v.check, {h: 52, size: 29, fill: 'rgba(251,191,36,.16)', stroke: '#fbbf24', color: '#fde68a', weight: '700', maxW: W - 2 * pad});
+    drawPicto(ctx, 'check', pad + 28, ry + 26, 30, '#fbbf24');
     let cx = pad; const ey = H - 106;
     const evl = 'EVIDENCE' + (m.verified ? ' ' + m.verified.n + '/' + m.verified.of + ' VERIFIED' : '');   // the verification count rides on the evidence row
-    ctx.font = '600 21px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(evl, cx, ey + 25); cx += ctx.measureText(evl).width + 14;
+    ctx.font = '600 25px Arial'; ctx.fillStyle = '#8aa2b8'; ctx.fillText(evl, cx, ey + 29); cx += ctx.measureText(evl).width + 14;
     for (const c of m.chips || []) {
       const col = !c.verified ? '#ef4444' : c.primary ? hex(COLORS.primary) : hex(COLORS.other);
-      ctx.font = '600 22px Arial'; const t = '#' + c.id + ' ' + shortName(c).toLowerCase(), wNeed = Math.min(ctx.measureText(t).width + 26, 270); if (cx + wNeed > W - pad) break;
-      const w = pill(ctx, cx, ey, t, {h: 36, size: 22, fill: 'rgba(255,255,255,.06)', stroke: col, color: c.verified ? '#f1f5f9' : '#fca5a5', maxW: 270});
-      if (!c.verified) { ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 8, ey + 18); ctx.lineTo(cx + w - 8, ey + 18); ctx.stroke(); }
+      ctx.font = '600 25px Arial'; const t = '#' + c.id + ' ' + shortName(c).toLowerCase(), wNeed = Math.min(ctx.measureText(t).width + 26, 300); if (cx + wNeed > W - pad) break;
+      const w = pill(ctx, cx, ey, t, {h: 40, size: 25, fill: 'rgba(255,255,255,.06)', stroke: col, color: c.verified ? '#f1f5f9' : '#fca5a5', maxW: 300});
+      if (!c.verified) { ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 8, ey + 20); ctx.lineTo(cx + w - 8, ey + 20); ctx.stroke(); }
       cx += w + 8;
     }
   } else {
@@ -903,10 +903,10 @@ function drawAnswer(ctx, W, H, view) {
   }
   // ONE small honesty line (mode + provenance); the stats line only when there are no evidence chips to carry it
   const f = (m.footer && m.footer.length ? m.footer : view.footer) || [];
-  if (view.runNote && !(v && v.kind === 'trace') && view.phase === 'answer') { ctx.fillStyle = '#9fe7f5'; fit(ctx, view.runNote, pad, H - 52, W - 2 * pad, 21); }
-  ctx.fillStyle = '#7f94a8';
+  if (view.runNote && !(v && v.kind === 'trace') && view.phase === 'answer') { ctx.fillStyle = '#9fe7f5'; fit(ctx, view.runNote, pad, H - 54, W - 2 * pad, 23); }
+  ctx.fillStyle = '#8aa2b8';
   const foot = [f[0], m.stats && view.phase === 'answer' && !(v && (m.chips || []).length) ? m.stats : '', f[1]].filter(Boolean).join(' · ');
-  if (foot) fit(ctx, foot, pad, HH - 20, W - 2 * pad, 21, '500');
+  if (foot) fit(ctx, foot, pad, HH - 18, W - 2 * pad, 24, '500');
   return layout;
 }
 /* The ask bar (buttons). hover: Set of button indices under a ray. */
@@ -945,7 +945,7 @@ function drawChip(ctx, W, H, model, hover = false) {
   let hx = 40;
   if (rec) { ctx.beginPath(); ctx.arc(hx + 9, 106, 9, 0, Math.PI * 2); ctx.fillStyle = '#fb7185'; ctx.fill(); hx += 28; }
   ctx.fillStyle = rec ? '#fecdd3' : h.tone === 'hint' ? '#fde68a' : '#a9c1d6'; fit(ctx, h.text, hx, 116, mx - hx - 16, 31, '600');
-  ctx.fillStyle = '#7f94a8'; fit(ctx, m.honesty || '', 40, 156, mx - 56, 22, '500');
+  ctx.fillStyle = '#8aa2b8'; fit(ctx, m.honesty || '', 40, 157, mx - 56, 24, '500');
   ctx.strokeStyle = 'rgba(226,232,240,.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mx, 26); ctx.lineTo(mx, H - 26); ctx.stroke();
   drawMore(ctx, mx + (W - mx) / 2 - 2, H / 2, 40, hover);
 }

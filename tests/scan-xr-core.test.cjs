@@ -121,36 +121,80 @@ test('flashlight cone: inside, soft edge, outside, behind; Lens vs All alpha', (
   assert.equal(X.cellKey(-.1, 6.1, 6), '-1,1');
 });
 
-test('XR menu (2026-11-16 demo trim): main page = 4 large buttons, More holds Capture, Photo/Gaussian, settings + 8 layers; every centre hits its own index, gaps miss', () => {
+test('XR menu (2026-11-17 sub-pages): main = 4 large buttons; More = named sub-pages, at most 6 buttons a page (Layers: 8 + Back); every old function within two presses', () => {
   for (const [page, rows] of Object.entries(X.MENU_PAGES)) {
-    const rects = X.menuLayout(rows), n = rows.reduce((a, b) => a + b, 0);
+    const area = X.menuArea(page), rects = X.pageLayout(page), n = rows.reduce((a, b) => a + b, 0);
     assert.equal(rects.length, n);
     rects.forEach((r, i) => assert.equal(X.layoutHit(rects, r.x + r.w / 2, 1 - (r.y + r.h / 2)), i, page + ' ' + i));
     assert.equal(X.layoutHit(rects, .5, .9), -1, 'header'); assert.equal(X.layoutHit(rects, .01, .2), -1, 'margin');
-    const a = rects[0], b = rects[1]; assert.equal(X.layoutHit(rects, (a.x + a.w + b.x) / 2, 1 - (a.y + a.h / 2)), -1, 'gap');
-    for (const r of rects) assert.ok(r.x >= 0 && r.y >= X.MENU_AREA.top - 1e-12 && r.x + r.w <= 1 && r.y + r.h <= 1);
+    if (rects.length > 1) { const a = rects[0], b = rects[1]; assert.equal(X.layoutHit(rects, (a.x + a.w + b.x) / 2, 1 - (a.y + a.h / 2)), -1, 'gap'); }
+    for (const r of rects) assert.ok(r.x >= 0 && r.y >= area.top - 1e-12 && r.x + r.w <= 1 && r.y + r.h <= 1);
+    // the info line(s) above the buttons: main keeps 3 lines (y ≈ 0.19-0.33), sub-pages one (y ≈ 0.19)
+    assert.ok(area.top >= .25 - 1e-12, page + ' leaves room for its info line');
   }
-  const main = X.menuButtons('main', {captureLabel: 'Sep 17', mode: 'lens', scene: 'photo', gaussianAvailable: false});
-  assert.ok(main.length === 4 && main.length === X.menuLayout(X.MENU_PAGES.main).length);
+  const layers = ['equipment', 'lighting', 'conduit', 'duct', 'hydronic', 'plumbing', 'lifesafety', 'fire'].map((key, i) => ({key, label: key, on: i < 7, loading: false}));
+  const st = {captureLabel: 'Sep 17', mode: 'lens', scene: 'photo', gaussianAvailable: false, hands: 'both', opacity: .7, hiRes: false, layers};
+  const main = X.menuButtons('main', st);
+  assert.ok(main.length === 4 && main.length === X.pageLayout('main').length);
   assert.deepEqual(main.map(b => b.id), ['style', 'recenter', 'exit', 'more']);
   assert.equal(main[0].value, 'Lens'); assert.equal(main[2].tone, 'exit');
   assert.ok(!main.some(b => /opacity/i.test(b.label + b.value)), 'opacity is not on the main page');
-  // main buttons are big: at the 0.64 m panel width each is wider than 0.18 m and taller than 0.09 m (0.40 m panel height)
-  for (const r of X.menuLayout(X.MENU_PAGES.main)) { assert.ok(r.w * .64 > .18, 'width ' + r.w * .64); assert.ok(r.h * .4 > .09, 'height ' + r.h * .4); }
-  const layers = ['equipment', 'lighting', 'conduit', 'duct', 'hydronic', 'plumbing', 'lifesafety', 'fire'].map((key, i) => ({key, label: key, on: i < 7, loading: false}));
-  const more = X.menuButtons('more', {hands: 'both', opacity: .7, hiRes: false, scene: 'photo', layers});
-  assert.equal(more.length, X.menuLayout(X.MENU_PAGES.more).length);
-  assert.deepEqual(more.slice(0, 6).map(b => b.id), ['back', 'capture', 'scene', 'hands', 'opacity', 'hires']);
-  // nothing was removed in the trim: every action of the old two pages is still on one of them
-  const all = new Set([...main, ...more].map(b => b.id));
-  for (const id of ['capture', 'style', 'scene', 'recenter', 'more', 'back', 'hands', 'opacity', 'hires', 'exit', 'sensors']) assert.ok(all.has(id), id);
-  const more2 = X.menuButtons('more', {captureLabel: 'Sep 17', scene: 'photo', gaussianAvailable: false, layers});
-  assert.equal(more2[1].value, 'Sep 17'); assert.match(more2[2].value, /no Gaussian/);
-  assert.equal(more[14].id, 'sensors'); assert.equal(more[14].value, 'off'); assert.equal(more[3].value, 'both hands'); assert.equal(more[4].value, '70%'); assert.equal(more[13].id, 'layer:fire'); assert.equal(more[13].value, 'off');
-  assert.equal(X.menuButtons('more', {scene: 'gaussian', layers}).find(b => b.id === 'hires').value, 'n/a');
-  // fixed opacity defaults, More ▸ Opacity cycles 50/70/90 %
+  for (const r of X.pageLayout('main')) { assert.ok(r.w * .64 > .18, 'width ' + r.w * .64); assert.ok(r.h * .4 > .09, 'height ' + r.h * .4); }
+  // every page: button count fits its layout; at most 6 buttons except the layers page (8 toggles + Back and nothing else)
+  for (const page of Object.keys(X.MENU_PAGES)) {
+    const b = X.menuButtons(page, st);
+    assert.ok(b.length <= X.pageLayout(page).length, page + ' fits');
+    if (page === 'layers') { assert.equal(b.length, 9); assert.ok(b.slice(0, 8).every(x => x.id.startsWith('layer:'))); assert.equal(b[8].id, 'back'); }
+    else assert.ok(b.length <= X.MENU_MAX_BUTTONS, page + ' has ' + b.length + ' buttons');
+    if (page !== 'main') { assert.equal(b[b.length - 1].id, 'back', page + ': Back last'); const r = X.pageLayout(page)[b.length - 1]; assert.ok(r.x + r.w > .9 && r.y + r.h > .9, page + ': Back bottom-right'); }
+    assert.equal(new Set(b.map(x => x.id)).size, b.length, page + ': unique ids');
+  }
+  // nothing was removed: every action of the old main + More pages is reachable within two presses from main (More, then a sub-page)
+  const paths = X.menuPaths(st);
+  for (const id of ['style', 'recenter', 'exit', 'capture', 'scene', 'hands', 'opacity', 'hires', 'sensors', ...layers.map(l => 'layer:' + l.key)]) {
+    assert.ok(paths[id], id + ' reachable'); assert.ok(paths[id].path.length <= 2, id + ' in ' + paths[id].path.length + ' presses');
+  }
+  assert.deepEqual(paths.capture.path, ['more', 'page:view']); assert.deepEqual(paths['layer:fire'].path, ['more', 'page:layers']); assert.deepEqual(paths.sensors.path, ['more']);
+  // navigation: Back leads one level up; the hub's Back returns to main
+  assert.equal(X.menuTarget('more'), 'more'); assert.equal(X.menuTarget('page:layers'), 'layers'); assert.equal(X.menuTarget('page:nope'), null); assert.equal(X.menuTarget('capture'), null);
+  assert.equal(X.menuBack('layers'), 'more'); assert.equal(X.menuBack('view'), 'more'); assert.equal(X.menuBack('status'), 'more'); assert.equal(X.menuBack('more'), 'main');
+  // plain words: the scene switch is "Background" (360 photo / Gaussian 3D), the resolution is "Photo detail"; no two labels alike
+  const view = X.menuButtons('view', st), by = id => view.find(b => b.id === id);
+  assert.equal(by('scene').label, 'Background'); assert.equal(by('scene').value, '360 photo only'); assert.equal(by('hires').label, 'Photo detail'); assert.equal(by('hires').value, '2K');
+  assert.equal(by('capture').value, 'Sep 17'); assert.equal(by('hands').value, 'both hands'); assert.equal(by('opacity').value, '70%');
+  assert.ok(!view.some(b => /\//.test(b.label)), 'no "A / B" labels on View');
+  assert.equal(X.menuButtons('view', {...st, scene: 'gaussian'}).find(b => b.id === 'hires').value, 'n/a in 3D');
+  assert.equal(X.menuButtons('view', {...st, scene: 'gaussian', gaussianAvailable: true}).find(b => b.id === 'scene').value, 'Gaussian 3D');
+  const lay = X.menuButtons('layers', st); assert.equal(lay[7].id, 'layer:fire'); assert.equal(lay[7].value, 'off'); assert.equal(lay[0].tone, 'on');
+  const more = X.menuButtons('more', st); assert.deepEqual(more.map(b => b.id), ['page:layers', 'page:view', 'sensors', 'page:status', 'back']);
+  assert.equal(more[0].value, '7 of 8 on'); assert.equal(more[2].value, 'off');
+  // diagnostics: the hub's Status button only turns amber when the frame guard lowered the quality
+  assert.equal(more[3].tone, 'nav'); const red = X.menuButtons('more', {...st, qualityReduced: true, qualityLabel: 'low'})[3]; assert.equal(red.tone, 'warn'); assert.equal(red.value, 'quality low');
+  assert.ok(Object.keys(X.MENU_PAGES).every(p => X.MENU_TITLES[p]), 'every page has a title');
+  // fixed opacity defaults, View ▸ Lens opacity cycles 50/70/90 %
   assert.equal(X.DEFAULT_LENS_OPACITY, .7); assert.equal(X.DEFAULT_ALL_OPACITY, .35);
   assert.equal(X.nextLensOpacity(.7), .9); assert.equal(X.nextLensOpacity(.9), .5); assert.equal(X.nextLensOpacity(.5), .7); assert.equal(X.nextLensOpacity(.33), .5);
+});
+
+test('Lens (2026-11-17): 15° half-angle (was 12°, +25 %) with a 3° soft edge; the page starts at it and the shader uses lensSoft', () => {
+  assert.equal(X.LENS_HALF_DEG, 15); assert.equal(X.LENS_SOFT_DEG, 3);
+  assert.ok(X.LENS_HALF_DEG / 12 >= 1.2 && X.LENS_HALF_DEG / 12 <= 1.3);
+  const cos = X.coneCos(15), soft = X.lensSoft(15), D = Math.PI / 180, dir = [0, 0, -1], at = deg => [Math.sin(deg * D), 0, -Math.cos(deg * D)];
+  assert.ok(Math.abs(soft - (Math.cos(15 * D) - Math.cos(18 * D))) < 1e-12);
+  assert.equal(X.coneWeight([0, 0, 0], dir, cos, soft, at(14.9)), 1, 'full inside 15°');
+  const mid = X.coneWeight([0, 0, 0], dir, cos, soft, at(16.5)); assert.ok(mid > .2 && mid < .8, 'soft edge ' + mid);
+  assert.equal(X.coneWeight([0, 0, 0], dir, cos, soft, at(18.1)), 0, 'gone past 18°');
+  const html = read('scan-xr.html');
+  assert.ok(html.includes('coneDeg:X.LENS_HALF_DEG||15') && html.includes('U.coneSoft.value=X.lensSoft(state.coneDeg)') && html.includes('id="cone" type="range" min="4" max="30" step="1" value="15"'));
+});
+
+test('toast lines: fixed font, at most two lines, ellipsis at the end', () => {
+  const m = t => t.length * 10;
+  assert.deepEqual(X.toastLines('Teleported', m, 300), ['Teleported']);
+  const two = X.toastLines('aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk', m, 150);
+  assert.equal(two.length, 2); assert.ok(two.every(l => m(l) <= 150)); assert.match(two[1], /…$/);
+  assert.deepEqual(X.toastLines('aaaa bbbb cccc', m, 150), ['aaaa bbbb cccc']);
+  assert.equal(X.toastLines('x'.repeat(40), m, 150, 1)[0].slice(-1), '…');
 });
 
 test('controller roles: LEFT moves, RIGHT is the flashlight; both-hands adds the left cone; a lone controller does both', () => {
@@ -249,7 +293,12 @@ test('info card keeps the ElementCards honesty ladder (CONTEXT is a building met
   const ctx = X.cardLines('138752', ctxMeta, EC.elementFeedTier('138752', ctxMeta, null, meters), may);
   assert.equal(ctx.badge, 'CONTEXT'); assert.ok(ctx.rows.some(r => /not this element/.test(r))); assert.ok(!ctx.rows.some(r => /LIVE/.test(r)));
   assert.match(ctx.footer[1], /Design \(BIM\) position/); assert.match(ctx.footer[0], /registered.*not surveyed/); assert.match(ctx.footer[1], /equipment · id 138752/);
-  assert.equal(ctx.sub, 'Transformer · Electrical · LEVEL 01');
+  // 2026-11-17: short human title (type first), the long family name on its own line, then system · level
+  assert.equal(ctx.title, 'Transformer'); assert.equal(ctx.name, 'RT_EQ_Transformer'); assert.equal(ctx.sub, 'Electrical · Level 1');
+  const fam = X.cardLines('419162', {name: 'Charlotte No-Hub Coupling - Charlotte No-Hub Coupling 4 inch', type: 'Coupling', system: 'P-PIPE', level: 'LEVEL 01', layer: 'plumbing'}, {tier: 'NONE', label: 'NO FEED', valueText: 'No feed yet'}, may);
+  assert.equal(fam.title, 'Coupling'); assert.match(fam.name, /^Charlotte No-Hub Coupling/); assert.equal(fam.sub, 'P-PIPE · Level 1');
+  assert.equal(X.cardLines('5', {name: 'Duct', type: 'Duct', layer: 'duct'}, {tier: 'NONE', label: 'NO FEED'}, may).name, '', 'no repeated name');
+  assert.equal(X.cardLines('6', {layer: 'lighting'}, {tier: 'NONE', label: 'NO FEED'}, may).title, 'Lighting', 'layer word when there is no type');
   const none = X.cardLines('9', {name: 'Duct', layer: 'duct'}, EC.elementFeedTier('9', {name: 'Duct', layer: 'duct'}, null, {}), sep);
   assert.equal(none.badge, 'NO FEED'); assert.ok(none.rows.includes('No feed yet')); assert.match(none.footer[0], /^Sep 17, 2026 · PROVISIONAL alignment \(not surveyed\)$/);
   const offline = X.cardLines('1', ctxMeta, EC.elementFeedTier('1', ctxMeta, null, {}), may);

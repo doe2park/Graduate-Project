@@ -71,7 +71,7 @@ test('pin picking and sizing', () => {
   assert.equal(SX.pickPin([0, 0, 0], [0.5, 0, -1], pins, 20), null); assert.equal(SX.pickPin([0, 0, 0], [2, 0, -3], pins, 20).id, 'c');
   const two = [{id: 'p', p: [0.05, 0, -10], r: .5}, {id: 'q', p: [-0.3, 0, -10], r: .5}];
   assert.equal(SX.pickPin([0, 0, 0], [0, 0, -1], two, 20).id, 'p', 'overlapping pins: closest to the ray axis');
-  assert.ok(SX.pinSize(0.1) === 0.12 && SX.pinSize(100) === 0.6 && SX.pinSize(5) === 0.3);
+  assert.ok(SX.pinSize(0.1) === 0.15 && SX.pinSize(100) === 1.2 && Math.abs(SX.pinSize(8) - 0.6) < 1e-12);
 });
 test('card and chip never present a simulated value as real', () => {
   const s = registry.sensors.find(x => x.id === 'leak-dts'), obs = SF.simulate(s, Date.parse('2026-10-30T20:00:00Z'));
@@ -85,14 +85,14 @@ test('card and chip never present a simulated value as real', () => {
 });
 test('page wiring: loadProgressText, versions, no real-reading claims', () => {
   const html = read('scan-xr.html');
-  assert.equal(X.API, 9); assert.ok(html.includes('twin/xr-core.js?v=9') && html.includes('XR_CORE_API=9,'));
+  assert.equal(X.API, 10); assert.ok(html.includes('twin/xr-core.js?v=10') && html.includes('XR_CORE_API=10,'));
   assert.equal(X.loadProgressText('Fire piping', 21.8e6, 2.0e6), 'Fire piping · 21.8 MB loaded', 'loaded > total is never a fraction');
   assert.equal(X.loadProgressText('Fire', 5e6, 24.2e6), 'Fire · 5.0 / 24.2 MB'); assert.equal(X.loadProgressText('Duct', 21.11e6, 21.1e6), 'Duct · 21.1 / 21.1 MB');
   assert.equal(X.loadProgressText('Duct', 30e6, 21.1e6), 'Duct · 30.0 MB loaded'); assert.equal(X.loadProgressText('X', 3e6), 'X · 3.0 MB loaded'); assert.equal(X.loadProgressText('X', NaN, 5), 'X · loading…');
   assert.ok(!/p\.total/.test(html), 'compressed Content-Length is never used as a denominator');
   for (const f of ['twin/sensor-xr.js', 'twin/sensor-demo.js', 'twin/sensors/feed.js']) assert.ok(html.includes(f + '?v='), f + ' loaded with ?v=');
-  assert.match(html, /globalThis\.SensorXR,SXOK=SX\?\.API===4/, 'stale-cache guard for the sensor helper');
-  assert.equal(SX.API, 4); assert.ok(html.includes('twin/sensor-xr.js?v=4') && html.includes('SX?.API===4'), 'page loads and checks the API 4 helper');
+  assert.match(html, /globalThis\.SensorXR,SXOK=SX\?\.API===5/, 'stale-cache guard for the sensor helper');
+  assert.equal(SX.API, 5); assert.ok(html.includes('twin/sensor-xr.js?v=5') && html.includes('SX?.API===5'), 'page loads and checks the API 5 helper');
   const menu = X.menuButtons('more', {layers: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(k => ({key: k, label: k})), sensorsLabel: 'Leak'});
-  assert.equal(menu.length, X.menuLayout(X.MENU_PAGES.more).length); assert.equal(menu[14].id, 'sensors'); assert.equal(menu[14].value, 'Leak'); assert.equal(menu[14].tone, 'on');
+  const sb = menu.find(b => b.id === 'sensors'); assert.ok(menu.length <= X.pageLayout('more').length); assert.equal(sb.value, 'Leak'); assert.equal(sb.tone, 'on');
 });

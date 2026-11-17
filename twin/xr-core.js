@@ -136,13 +136,28 @@ function withinRadius(center, sphereCenter, sphereRadius, radius) {
 }
 function cellKey(x, z, size) { return Math.floor(x / size) + ',' + Math.floor(z / size); }
 
-/* ── XR menu panel (2026-10-22 redesign after the first headset test; 2026-11-16 demo trim) ──
-   Few, large buttons. Pages: 'main' = 4 buttons for a walk-around demo (Lens/All, Recenter, Exit VR, More), 'more' = everything else:
-   Capture, Photo/Gaussian, flashlight hands, opacity, photo resolution, the 8 layer toggles and demo sensors (nothing was removed).
-   Layout = rows of button counts inside the lower part of the canvas (fractions, y down). Buttons carry stable ids, so the
-   page dispatches by id, never by a grid index. */
-const MENU_PAGES = {main: [2, 2], more: [5, 5, 5]};
+/* ── XR menu panel (2026-10-22 redesign after the first headset test; 2026-11-16 demo trim; 2026-11-17 sub-pages) ──
+   Few, large buttons. 'main' = 4 buttons for a walk-around demo (Lens/All, Recenter, Exit VR, More). More is a hub of named
+   sub-pages, so no page shows more than MENU_MAX_BUTTONS (6) buttons, except 'layers' (the 8 layer toggles + Back, nothing else):
+     more   : Layers ▸, View ▸, Demo sensors, Status ▸, ◂ Back
+     layers : the 8 service layers + ◂ Back
+     view   : Capture date, Background (360 photo / Gaussian 3D), Photo detail (2K / 4K), Flashlight hands, Lens opacity, ◂ Back
+     status : read-only help + frame rate / quality rows, ◂ Back
+   Nothing was removed: every old function is on a page reached from main in at most two presses (More, then the sub-page).
+   Back always sits in the bottom-right slot (where More sits on main). Layout = rows of button counts inside the page's area
+   (fractions, y down). Buttons carry stable ids, so the page dispatches by id, never by a grid index. */
+const MENU_PAGES = {main: [2, 2], more: [3, 2], layers: [3, 3, 3], view: [3, 3], status: [1]};
 const MENU_AREA = {left: .03, right: .97, top: .4, bottom: .965, gap: .022};
+const MENU_AREAS = {main: MENU_AREA, more: {...MENU_AREA, top: .25}, layers: {...MENU_AREA, top: .25}, view: {...MENU_AREA, top: .25},
+  status: {...MENU_AREA, left: .69, top: .8}};
+const MENU_PARENT = {more: 'main', layers: 'more', view: 'more', status: 'more'};
+const MENU_MAX_BUTTONS = 6;
+const MENU_TITLES = {main: 'Grimes L1 · Scan↔BIM', more: 'More', layers: 'More · Layers', view: 'More · View', status: 'More · Help and status'};
+function menuArea(page) { return MENU_AREAS[page] || MENU_AREA; }
+/* where ◂ Back leads from a page (main has no Back) */
+function menuBack(page) { return MENU_PARENT[page] || 'main'; }
+/* the page a navigation button opens, or null when the id is an action */
+function menuTarget(id) { return id === 'more' ? 'more' : typeof id === 'string' && id.startsWith('page:') && MENU_PARENT[id.slice(5)] ? id.slice(5) : null; }
 function menuLayout(rows, area = MENU_AREA) {
   const out = [], n = rows.length, h = (area.bottom - area.top - area.gap * (n - 1)) / n;
   rows.forEach((count, r) => {
@@ -151,32 +166,63 @@ function menuLayout(rows, area = MENU_AREA) {
   });
   return out;
 }
+function pageLayout(page) { return menuLayout(MENU_PAGES[page] || MENU_PAGES.main, menuArea(page)); }
 /* (u, v) are plane UVs (v up, Three.js PlaneGeometry convention). Returns the button index or -1 (gap, header, margin). */
 function layoutHit(rects, u, v) {
   const x = u, y = 1 - v;
   for (let i = 0; i < rects.length; i++) { const r = rects[i]; if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i; }
   return -1;
 }
-/* Button models from a plain state snapshot (no DOM): {id, label, value, tone}. tone: 'on' (active toggle), 'exit', 'nav' or ''. */
+/* Button models from a plain state snapshot (no DOM): {id, label, value, tone}. tone: 'on' (active toggle), 'exit', 'nav', 'warn' or ''. */
 const LENS_OPACITIES = [.5, .7, .9];
 const DEFAULT_LENS_OPACITY = .7, DEFAULT_ALL_OPACITY = .35;
 function nextLensOpacity(v) { const i = LENS_OPACITIES.findIndex(o => Math.abs(o - v) < .01); return LENS_OPACITIES[(i + 1) % LENS_OPACITIES.length]; }
+const BACK = {id: 'back', label: '◂ Back', value: '', tone: 'nav'};
+/* Plain words for the scene switch (it was "Photo / Gaussian", easily confused with the "Photo" 2K/4K resolution button). */
+function backgroundValue(s) { return s.gaussianLoading ? 'loading…' : s.scene === 'gaussian' ? 'Gaussian 3D' : s.gaussianAvailable === false ? '360 photo only' : '360 photo'; }
 function menuButtons(page, s = {}) {
+  const layers = (s.layers || []).slice(0, 8);
+  if (page === 'layers') return [...layers.map(l => ({id: 'layer:' + l.key, label: l.label, value: l.loading ? 'loading…' : l.on ? 'on' : 'off', tone: l.on ? 'on' : ''})), BACK];
+  if (page === 'view') return [
+    {id: 'capture', label: 'Capture date', value: s.captureLabel || 'May 6', tone: ''},
+    {id: 'scene', label: 'Background', value: backgroundValue(s), tone: s.scene === 'gaussian' ? 'on' : ''},
+    {id: 'hires', label: 'Photo detail', value: s.scene === 'gaussian' ? 'n/a in 3D' : s.hiRes ? '4K' : '2K', tone: s.hiRes && s.scene !== 'gaussian' ? 'on' : ''},
+    {id: 'hands', label: 'Flashlight', value: s.hands === 'both' ? 'both hands' : 'right hand', tone: s.hands === 'both' ? 'on' : ''},
+    {id: 'opacity', label: 'Lens opacity', value: Math.round((s.opacity ?? DEFAULT_LENS_OPACITY) * 100) + '%', tone: ''},
+    BACK];
+  if (page === 'status') return [BACK];
   if (page === 'more') {
-    const layers = (s.layers || []).slice(0, 8).map(l => ({id: 'layer:' + l.key, label: l.label, value: l.loading ? 'loading…' : l.on ? 'on' : 'off', tone: l.on ? 'on' : ''}));
-    return [{id: 'back', label: '◂ Back', value: '', tone: 'nav'},
-      {id: 'capture', label: 'Capture', value: s.captureLabel || 'May 6', tone: ''},
-      {id: 'scene', label: 'Photo / Gaussian', value: s.gaussianLoading ? 'loading…' : s.scene === 'gaussian' ? 'Gaussian' : s.gaussianAvailable === false ? 'Photo (no Gaussian)' : 'Photo', tone: s.scene === 'gaussian' ? 'on' : ''},
-      {id: 'hands', label: 'Flashlight', value: s.hands === 'both' ? 'both hands' : 'right hand', tone: s.hands === 'both' ? 'on' : ''},
-      {id: 'opacity', label: 'Opacity', value: Math.round((s.opacity ?? DEFAULT_LENS_OPACITY) * 100) + '%', tone: ''},
-      {id: 'hires', label: 'Photo', value: s.scene === 'gaussian' ? 'n/a' : s.hiRes ? '4K' : '2K', tone: s.hiRes ? 'on' : ''}, ...layers,
-      {id: 'sensors', label: 'Demo sensors', value: s.sensorsLabel || 'off', tone: s.sensorsLabel && s.sensorsLabel !== 'off' ? 'on' : ''}];
+    const on = layers.filter(l => l.on).length, reduced = !!s.qualityReduced;
+    return [{id: 'page:layers', label: 'Layers ▸', value: layers.length ? on + ' of ' + layers.length + ' on' : '', tone: 'nav'},
+      {id: 'page:view', label: 'View ▸', value: (s.captureLabel || 'May 6') + ' · ' + (s.scene === 'gaussian' ? 'Gaussian' : 'photo'), tone: 'nav'},
+      {id: 'sensors', label: 'Demo sensors', value: s.sensorsLabel || 'off', tone: s.sensorsLabel && s.sensorsLabel !== 'off' ? 'on' : ''},
+      {id: 'page:status', label: 'Status ▸', value: reduced ? 'quality ' + (s.qualityLabel || 'reduced') : 'help · frame rate', tone: reduced ? 'warn' : 'nav'},
+      BACK];
   }
   return [{id: 'style', label: 'Lens / All', value: s.mode === 'all' ? 'All' : 'Lens', tone: s.mode === 'all' ? 'on' : ''},
     {id: 'recenter', label: 'Recenter', value: 'nearest capture', tone: ''},
     {id: 'exit', label: 'Exit VR', value: '', tone: 'exit'},
-    {id: 'more', label: 'More ▸', value: 'capture · layers · settings', tone: 'nav'}];
+    {id: 'more', label: 'More ▸', value: 'layers · view · status', tone: 'nav'}];
 }
+/* Every action id and the shortest press path from main (navigation presses only; tests: everything within two). */
+function menuPaths(s = {}) {
+  const out = {}, queue = [['main', []]], seen = new Set();
+  while (queue.length) {
+    const [page, path] = queue.shift(); if (seen.has(page)) continue; seen.add(page);
+    for (const b of menuButtons(page, s)) {
+      const to = menuTarget(b.id);
+      if (to) queue.push([to, path.concat(b.id)]);
+      else if (b.id !== 'back' && !(b.id in out)) out[b.id] = {page, path};
+    }
+  }
+  return out;
+}
+
+/* ── Lens (the X-ray window around the flashlight ray) ── half-angle 15° (2026-11-17, was 12°: +25 %), and a 3° soft edge outside it
+   (was 2°), so it reads as a lens, not a hard disc. One value for the photo VR page and the MR page (both use state.coneDeg);
+   the web overlay (scan-compare CSS lens, 22 % of the shorter side) is a different control and is unchanged. */
+const LENS_HALF_DEG = 15, LENS_SOFT_DEG = 3;
+function lensSoft(halfDeg, softDeg = LENS_SOFT_DEG) { return coneCos(halfDeg) - coneCos(halfDeg + softDeg); }
 
 /* Download progress text that can never show loaded > total. GitHub Pages serves GLBs gzip-compressed: the progress event's total is the
    compressed Content-Length while loaded counts decompressed bytes (it once read "21.8 / 2.0 MB"). So the total is NOT trusted;
@@ -286,19 +332,47 @@ function targetLabel(t, stationName) {
 }
 
 /* ── Info card text ── tier comes from ElementCards.elementFeedTier (same honesty ladder as the web overlay).
-   CONTEXT is a building/feeder meter total, never the element's own reading; NO FEED stays "No feed yet". */
+   CONTEXT is a building/feeder meter total, never the element's own reading; NO FEED stays "No feed yet".
+   2026-11-17: a short human title first (the element type, else the layer's word), the long BIM family name on its own line
+   (the page wraps it to two lines, ellipsis at the end), then system · level. */
 function clip(s, n) { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+const LAYER_WORDS = {equipment: 'Equipment', lighting: 'Lighting', conduit: 'Conduit', duct: 'Ductwork', hydronic: 'Mech piping', plumbing: 'Plumbing', lifesafety: 'Life safety', fire: 'Fire piping'};
+function levelWord(level) { const m = /^LEVEL\s*0*(\d+)$/i.exec(String(level || '').trim()); return m ? 'Level ' + m[1] : String(level || ''); }
 function cardLines(id, meta, tier, capture) {
-  const title = clip(meta?.name || meta?.type || 'Element', 44);
-  const sub = [meta?.type, meta?.system, meta?.level].filter(Boolean).join(' · ');
+  const type = String(meta?.type || '').trim(), name = String(meta?.name || '').trim();
+  const title = clip(type || LAYER_WORDS[meta?.layer] || name || 'Element', 44);
+  const longName = name && name !== title ? clip(name, 160) : '';
+  const sub = [meta?.system, levelWord(meta?.level)].filter(Boolean).join(' · ');
   const rows = [tier.valueText, tier.detailText, tier.sourceText].filter(Boolean).map(s => clip(s, 70));
   if (tier.tier === 'CONTEXT' && !rows.some(r => /not this element/i.test(r))) rows.push('Building meter total · not this element’s own reading');
-  // The alignment caveat is never truncated (the page shrinks the font to fit instead).
+  // The alignment caveat is never truncated (the page wraps it instead).
   const footer = [
     (capture?.label ? capture.label + ' · ' : '') + (capture?.alignmentText || ''),
     clip('Design (BIM) position · ' + (meta?.layer ? meta.layer + ' · ' : '') + 'id ' + id, 80),
   ];
-  return {title, sub: clip(sub, 70), badge: tier.label, tier: tier.tier, cls: tier.cls, rows, footer};
+  return {title, name: longName, sub: clip(sub, 70), badge: tier.label, tier: tier.tier, cls: tier.cls, rows, footer};
+}
+
+/* ── Head-locked toast ── fixed font, at most two lines, ellipsis at the end of the second (2026-11-17: long notes used to shrink
+   until unreadable). measure(text) -> width in the same units as width. */
+function toastLines(text, measure, width, max = 2) {
+  const words = String(text ?? '').split(/\s+/).filter(Boolean), lines = [];
+  let line = '', i = 0;
+  for (; i < words.length; i++) {
+    const t = line ? line + ' ' + words[i] : words[i];
+    if (measure(t) <= width || !line) { line = t; continue; }
+    lines.push(line); line = words[i];
+    if (lines.length === max) { line = ''; break; }
+  }
+  if (line) lines.push(line);
+  const cut = i < words.length || lines.length > max;
+  const out = lines.slice(0, max);
+  if (cut || measure(out[out.length - 1] || '') > width) {
+    let last = out[out.length - 1] || '';
+    while (last && measure(last + '…') > width) last = last.slice(0, -1);
+    out[out.length - 1] = last.replace(/[\s·,]+$/, '') + '…';
+  }
+  return out;
 }
 
 /* ── Gaussian scene mode (2026-10-19; Oct 18 zones 2026-11-07) ──
@@ -538,12 +612,12 @@ function backAction({menuOpen = false, picked = false} = {}) { return menuOpen ?
 
 /* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
    Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
-const API = 9;   // 7: frame guard, headsetCaptures · 8: panelPixelScale, backAction · 9: 4-button demo menu (Capture, Photo/Gaussian moved to More)
+const API = 10;   // 7: frame guard, headsetCaptures · 8: panelPixelScale, backAction · 9: 4-button demo menu · 10: More sub-pages (menuPaths, menuArea, pageLayout), lens 15°, cardLines name, toastLines
 
 return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, PANEL_RES_MIN, PANEL_RES_MAX, panelPixelScale, backAction, FRAME_GUARD, frameGuardInit, frameGuardStep, frameGuardText, headsetCaptures, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,
-  chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines,
-  loadProgressText, MENU_PAGES, MENU_AREA, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,
+  chooseNeighbor, stickStep, snapTurn, rigForStation, withinRadius, cellKey, cardLines, levelWord, toastLines, LENS_HALF_DEG, LENS_SOFT_DEG, lensSoft,
+  loadProgressText, MENU_PAGES, MENU_AREA, MENU_AREAS, MENU_PARENT, MENU_MAX_BUTTONS, MENU_TITLES, menuArea, menuBack, menuTarget, pageLayout, menuPaths, menuLayout, layoutHit, menuButtons, LENS_OPACITIES, DEFAULT_LENS_OPACITY, DEFAULT_ALL_OPACITY, nextLensOpacity,
   controllerRoles, stickIntent, aimUpdate, stepConeHalf, routeDistances, stationTarget, arcPoints, targetLabel,
   PUBLISHED_GAUSSIANS, SCENES, sceneRequest, isDevHost, gaussianOverride, SPLAT_BUDGET, gaussianAsset, gaussianFor, publishedGaussianText, resolveScene, toggleScene,
   dateLabel, gaussianLabel, gaussianStations, gaussianZoneIndex, zoneShortNames, zoneCoreDistance, ZONE_HYSTERESIS, gaussianZoneFor, zoneStationIndices, GAUSSIAN_FALLBACK_NOTE, gaussianOutsideNote,

@@ -11,7 +11,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 4;   // 4: /mr no longer defaults to place=demo (two-mode chooser); 3: cache refresh only
+const API = 5;   // 5: larger pins (pinSize 2026-11-17); 4: /mr no longer defaults to place=demo (two-mode chooser); 3: cache refresh only
 const SCENES = ['leak', 'air', 'water', 'elec', 'rotating'];
 const LIVE_SCENE = 'live-test';   // ?sensors=live only; never part of the demo scene cycle
 const SCENE_NAMES = {leak: 'Leak', air: 'Air', water: 'Water', elec: 'Power', rotating: 'Rotating', 'live-test': 'Live test'};
@@ -68,8 +68,9 @@ function demoArea(area, center) {
     points: [{id: 'S', kind: 'xz', label: 'sensor cluster centre', bim: [center[0], area.floorY, center[2]]}]};
 }
 
-/* Pin size in world metres for a viewing distance (keeps a roughly constant angular size, bounded for very near / far pins). */
-function pinSize(dist) { return Math.min(0.6, Math.max(0.12, (finite(dist) ? dist : 3) * 0.06)); }
+/* Pin size in world metres for a viewing distance: a roughly constant ~4.3° (0.075 rad), bounded for very near / far pins.
+   2026-11-17: was 0.06 x distance, 0.12-0.6 m, so pins past 10 m shrank to a few pixels in the headset. */
+function pinSize(dist) { return Math.min(1.2, Math.max(0.15, (finite(dist) ? dist : 3) * 0.075)); }
 /* Pin hit by a ray (closest to the ray axis, ties: nearer): pins [{id, p:[x,y,z], r}] (world). Returns {id, distance, point} or null. */
 function pickPin(origin, dir, pins, far) {
   let best = null;

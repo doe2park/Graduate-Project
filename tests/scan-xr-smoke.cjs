@@ -1,8 +1,11 @@
 /* scan-xr.html desktop smoke (non-XR) + measurements. One headless Chrome run against the real served assets.
    PLAYWRIGHT_MODULE=/path/to/playwright(-core) CHROME_EXECUTABLE=... node tests/scan-xr-smoke.cjs
    Optional: VIEWER_BASE_URL (default: starts python3 -m http.server on 127.0.0.1:<free port>), XR_SMOKE_LAYERS
-   (comma list; default = page default: seven Level-1 service layers, fire off), VALIDATION_OUTPUT (screenshots + JSON).
+   (comma list; default = page default: seven Level-1 service layers, fire off), VALIDATION_OUTPUT (screenshots + JSON),
+   XR_SMOKE_NO_OCT18=1 (never request the Oct 18 capture; the capture cycle is then May → Sep → May).
    Meter data is a deterministic route fixture. Headless desktop numbers are NOT Quest frame rates. */
+const SILENT=`(()=>{try{const s={speak(){},cancel(){},pause(){},resume(){},getVoices:()=>[],speaking:false,pending:false,onvoiceschanged:null,addEventListener(){},removeEventListener(){}};Object.defineProperty(window,'speechSynthesis',{value:s,configurable:true});}catch(e){}
+ try{HTMLMediaElement.prototype.play=function(){return Promise.resolve();};}catch(e){}try{delete window.AudioContext;delete window.webkitAudioContext;window.AudioContext=undefined;window.webkitAudioContext=undefined;}catch(e){}})();`;
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),net=require('node:net'),{spawn}=require('node:child_process');
 const ROOT=path.join(__dirname,'..'),OUT=process.env.VALIDATION_OUTPUT||path.join(os.tmpdir(),'grimes-validation','scan-xr');fs.mkdirSync(OUT,{recursive:true});
@@ -11,7 +14,9 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
  let server=null,base=process.env.VIEWER_BASE_URL;
  if(!base){const port=await freePort();server=spawn('python3',['-m','http.server',String(port),'--bind','127.0.0.1'],{cwd:ROOT,stdio:'ignore'});base='http://127.0.0.1:'+port;
   for(let i=0;i<50;i++){try{await fetch(base+'/scan-xr.html');break;}catch{await new Promise(r=>setTimeout(r,100));}}}
- const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--enable-webgl','--ignore-gpu-blocklist','--use-angle=metal','--enable-precise-memory-info']});
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--mute-audio','--enable-webgl','--ignore-gpu-blocklist','--use-angle=metal','--enable-precise-memory-info']});
+ // silent (2026-11-17): --mute-audio + every page stubs speechSynthesis, media play() and AudioContext (macOS speech bypasses --mute-audio)
+ {const _np=browser.newPage.bind(browser),_nc=browser.newContext.bind(browser);const noOct18=u=>String(u).includes('2026-10-18');browser.newPage=async o=>{const p=await _np(o);await p.addInitScript(SILENT);if(process.env.XR_SMOKE_NO_OCT18==='1')await p.route(noOct18,r=>r.abort());return p;};browser.newContext=async o=>{const c=await _nc(o);await c.addInitScript(SILENT);if(process.env.XR_SMOKE_NO_OCT18==='1')await c.route(noOct18,r=>r.abort());return c;};}
  const report={};
  try{
   const page=await browser.newPage({viewport:{width:1280,height:800}}),errors=[];
@@ -20,6 +25,8 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   await page.route('**/raw.githubusercontent.com/**/building_data.json',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({meters:{76:{latest:{kw:120.5,t:now}},77:{latest:{kw:40.2,t:now}},3:{latest:{kw:12,t:now}}}})}));
   const layers=process.env.XR_SMOKE_LAYERS?'&layers='+process.env.XR_SMOKE_LAYERS:'';
   await page.addInitScript(()=>{window.__status=[];addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('status');new MutationObserver(()=>window.__status.push(el.textContent)).observe(el,{childList:true,characterData:true,subtree:true});});});
+  // XR_SMOKE_NO_OCT18=1: never request the Oct 18 capture (its manifest HEAD fails, so the page drops it from the cycle)
+  const noOct=process.env.XR_SMOKE_NO_OCT18==='1';   // the route itself is set on every page / context at creation (top of the file)
   const t0=Date.now();await page.goto(base+'/scan-xr.html?captures=all'+layers);
   await page.waitForFunction(()=>window.xrInspection?.().ready,null,{timeout:60000});
   const first=await page.evaluate(()=>xrInspection());
@@ -73,14 +80,15 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   const sepReg=JSON.parse(fs.readFileSync(path.join(ROOT,'scan-assets/captures/2026-09-17/registration.json')));assert.ok(Math.abs(sep.bimRoot.rotationY+sepReg.rotationYDegrees*Math.PI/180)<1e-12);
   await page.evaluate(()=>xrDebug.setStyle('all'));await page.waitForTimeout(150);await page.screenshot({path:path.join(OUT,'scan-xr-sep-all.png')});await page.evaluate(()=>xrDebug.setStyle('lens'));
   report.sep={station:sep.station.id,visibleBatches:sep.totals.visibleDrawCalls};
-  // Oct 18: the menu Capture button cycles May → Sep → Oct; provisional, its own registration and photos
-  await page.evaluate(()=>xrDebug.menuAction('capture'));await page.waitForFunction(()=>xrInspection().capture.date==='2026-10-18'&&xrInspection().ready);
+  // Oct 18: the menu Capture button cycles May → Sep → Oct; provisional, its own registration and photos (skipped with XR_SMOKE_NO_OCT18=1)
+  if(!noOct){await page.evaluate(()=>xrDebug.menuAction('capture'));await page.waitForFunction(()=>xrInspection().capture.date==='2026-10-18'&&xrInspection().ready);
   const oct=await page.evaluate(()=>xrInspection());assert.equal(oct.capture.provisional,true);assert.match(await page.locator('#align').textContent(),/Oct 18, 2026 · PROVISIONAL/);
   oct.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-oct.camera.world[k])<1e-6,'eye on the Oct station'));
   const octReg=JSON.parse(fs.readFileSync(path.join(ROOT,'scan-assets/captures/2026-10-18/registration.json')));assert.equal(octReg.status,'project-frame-provisional');assert.ok(Math.abs(oct.bimRoot.rotationY+octReg.rotationYDegrees*Math.PI/180)<1e-12);
   assert.ok(oct.texture&&oct.texture.width>=2048,'Oct photo loaded');
   await page.evaluate(()=>xrDebug.setStyle('all'));await page.waitForTimeout(150);await page.screenshot({path:path.join(OUT,'scan-xr-oct-all.png')});await page.evaluate(()=>xrDebug.setStyle('lens'));
-  report.oct={station:oct.station.id,visibleBatches:oct.totals.visibleDrawCalls};
+  report.oct={station:oct.station.id,visibleBatches:oct.totals.visibleDrawCalls};}
+  else report.oct='skipped (XR_SMOKE_NO_OCT18=1)';
   await page.evaluate(()=>xrDebug.menuAction('capture'));await page.waitForFunction(()=>xrInspection().capture.date==='2026-05-06'&&xrInspection().ready);
   // XR menu (2026-10-22): 5 large buttons ~0.8 m away; the ray highlights a button, a click acts on that button only; More page
   report.menu=await menuSmoke(page);
@@ -89,7 +97,7 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no horizontal overflow at 390 px');
   await page.screenshot({path:path.join(OUT,'scan-xr-390.png')});
   assert.ok(await page.evaluate(()=>{const a=document.getElementById('align');return a.scrollWidth<=a.clientWidth+1&&/not surveyed\)/.test(a.textContent);}),'alignment caveat is not clipped at 390 px');
-  assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);
+  assert.deepEqual(errors.filter(e=>!/favicon/.test(e)&&!(process.env.XR_SMOKE_NO_OCT18==='1'&&/net::ERR_FAILED/.test(e))),[]);
   if(process.env.XR_SMOKE_GAUSSIAN!=='0')report.gaussian=await gaussianSmoke(browser,base,now);
   if(process.env.XR_SMOKE_OCT==='1')report.gaussianOct=await gaussianSmoke(browser,base,now,'work/gaussian/2026-10-18/l1-a/20261019T074640Z/package/viewer.json');
   if(process.env.XR_SMOKE_MR!=='0')report.mr=await mrSmoke(browser,base,now);
@@ -142,16 +150,24 @@ async function menuSmoke(page){
  const hd=await page.evaluate(()=>{const [x,y]=xrDebug.menuButtonNdc('style');return [x,y+.25];});const hr=await page.evaluate(([x,y])=>xrDebug.hoverNdc(x,y),hd);
  assert.ok(hr&&hr.button===-1,'header hit, no button');const before=(await page.evaluate(()=>xrInspection())).capture.date;assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),hd)).menu,null);assert.equal((await page.evaluate(()=>xrInspection())).capture.date,before);
  await page.evaluate(()=>xrDebug.hoverNdc(5,5));assert.deepEqual((await page.evaluate(()=>xrInspection())).menu.hover,[],'hover cleared off the panel');
- // More page: flashlight hands, fixed opacity cycle, layer toggles, back, exit
+ // More (2026-11-17): a hub of sub-pages (Layers, View, Status) + Demo sensors; each page ≤ 6 buttons except Layers (8 + Back); Back goes one level up
  const mp=await page.evaluate(()=>xrDebug.menuButtonNdc('more'));assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),mp)).menu,'more');
- mi=(await page.evaluate(()=>xrInspection())).menu;assert.equal(mi.page,'more');assert.deepEqual(mi.buttons.slice(0,6),['back','capture','scene','hands','opacity','hires']);assert.equal(mi.buttons.filter(b=>b.startsWith('layer:')).length,8);
+ const pageIs=async(p,ids)=>{const m=(await page.evaluate(()=>xrInspection())).menu;assert.equal(m.page,p);if(ids)assert.deepEqual(m.buttons,ids);return m;};
+ mi=await pageIs('more',['page:layers','page:view','sensors','page:status','back']);
  await page.waitForTimeout(100);await page.screenshot({path:path.join(OUT,'scan-xr-menu-more.png')});
- const c=(await page.evaluate(()=>xrInspection())).controls;assert.equal(c.hands,'right');assert.equal(c.lensOpacity,.7);assert.equal(c.allOpacity,.35);
- await page.evaluate(()=>xrDebug.menuAction('hands'));assert.equal((await page.evaluate(()=>xrInspection())).controls.hands,'both');await page.evaluate(()=>xrDebug.menuAction('hands'));
- for(const want of [.9,.5,.7]){await page.evaluate(()=>xrDebug.menuAction('opacity'));assert.equal((await page.evaluate(()=>xrInspection())).controls.lensOpacity,want);}
+ const lp=await page.evaluate(()=>xrDebug.menuButtonNdc('page:layers'));assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),lp)).menu,'page:layers');
+ const lm=await pageIs('layers');assert.equal(lm.buttons.length,9);assert.equal(lm.buttons.filter(b=>b.startsWith('layer:')).length,8);assert.equal(lm.buttons[8],'back');
  const key=Object.keys((await page.evaluate(()=>xrInspection())).layers)[0];
  await page.evaluate(k=>xrDebug.menuAction('layer:'+k),key);assert.equal((await page.evaluate(()=>xrInspection())).layers[key].visible,false);
  await page.evaluate(k=>xrDebug.menuAction('layer:'+k),key);assert.equal((await page.evaluate(()=>xrInspection())).layers[key].visible,true);
+ const bk=await page.evaluate(()=>xrDebug.menuButtonNdc('back'));assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),bk)).menu,'back');await pageIs('more');
+ await page.evaluate(()=>xrDebug.menuAction('page:view'));await pageIs('view',['capture','scene','hires','hands','opacity','back']);
+ const c=(await page.evaluate(()=>xrInspection())).controls;assert.equal(c.hands,'right');assert.equal(c.lensOpacity,.7);assert.equal(c.allOpacity,.35);
+ await page.evaluate(()=>xrDebug.menuAction('hands'));assert.equal((await page.evaluate(()=>xrInspection())).controls.hands,'both');await page.evaluate(()=>xrDebug.menuAction('hands'));
+ for(const want of [.9,.5,.7]){await page.evaluate(()=>xrDebug.menuAction('opacity'));assert.equal((await page.evaluate(()=>xrInspection())).controls.lensOpacity,want);}
+ await page.evaluate(()=>xrDebug.menuAction('back'));await pageIs('more');
+ await page.evaluate(()=>xrDebug.menuAction('page:status'));await pageIs('status',['back']);
+ await page.evaluate(()=>xrDebug.menuAction('back'));await pageIs('more');
  await page.evaluate(()=>xrDebug.menuAction('back'));assert.equal((await page.evaluate(()=>xrInspection())).menu.page,'main');
  await page.evaluate(()=>xrDebug.menuAction('exit'));assert.equal((await page.evaluate(()=>xrInspection())).menu.open,false,'Exit outside VR closes the menu');
  await page.evaluate(()=>xrDebug.setStyle('all'));   // the next check expects All (as the old menu test left it)
@@ -214,7 +230,7 @@ async function gaussianSmoke(browser,base,now,override){
  await page.evaluate(()=>xrDebug.switchCapture('2026-09-17'));await page.waitForFunction(()=>xrInspection().capture.date==='2026-09-17'&&xrInspection().ready&&xrInspection().texture,null,{timeout:30000});
  const sep=await page.evaluate(()=>xrInspection());assert.equal(sep.scene.mode,'photo');assert.equal(sep.scene.available,false);assert.match(await page.locator('#status').textContent(),/No Gaussian scene for Sep 17, 2026 · staying in Photo/);
  assert.equal(sep.scene.splats,0,'previous capture splats disposed');
- assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);
+ assert.deepEqual(errors.filter(e=>!/favicon/.test(e)&&!(process.env.XR_SMOKE_NO_OCT18==='1'&&/net::ERR_FAILED/.test(e))),[]);
  await page.close();return out;
 }
 /* MR passthrough mode (?mode=ar) on a desktop without immersive-ar: the page must explain, load only services (no photo),
@@ -310,7 +326,7 @@ async function mrSmoke(browser,base,now){
  i=await page.evaluate(()=>xrInspection());assert.match(i.mr.note,/saved alignment of this area exists .*no anchor/);
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(200);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'MR: no horizontal overflow at 390 px');await page.screenshot({path:path.join(OUT,'scan-xr-mr-390.png')});
- assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);
+ assert.deepEqual(errors.filter(e=>!/favicon/.test(e)&&!(process.env.XR_SMOKE_NO_OCT18==='1'&&/net::ERR_FAILED/.test(e))),[]);
  out.heapMB=i.heapMB;await ctx.close();return out;
 }
 
@@ -345,7 +361,7 @@ async function mrBackdropSmoke(browser,base,now){
   const st=await canvasStats(page,clip);out.pixels=st;assert.ok(st.mean>25&&st.std>12&&st.darkFraction<.5,'photo backdrop is not black: '+JSON.stringify(st));
   assert.equal(await page.locator('#mrBackdropNote').textContent(),'Desktop preview: May 6 photo as background · in Quest the real room shows instead');
   await page.screenshot({path:path.join(OUT,'mr-desktop-backdrop.png')});
-  assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);await ctx.close();}
+  assert.deepEqual(errors.filter(e=>!/favicon/.test(e)&&!(process.env.XR_SMOKE_NO_OCT18==='1'&&/net::ERR_FAILED/.test(e))),[]);await ctx.close();}
  // 2) photo unavailable -> dark gradient + floor grid, not pure black
  {const {ctx,page,errors}=await mk(p=>p.route('**/scan-assets/panoramas/mobile/**',r=>r.abort()));
   await page.goto(base+'/scan-xr.html?mode=ar&place=demo&sensors=demo&layers=duct,plumbing');
@@ -392,7 +408,7 @@ async function mrBackdropSmoke(browser,base,now){
   // demo never touches or reads the records
   const before=await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/2'));await page.evaluate(()=>xrDebug.mr.beginDemo());assert.equal(await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/2')),before);
   assert.deepEqual((await page.evaluate(()=>xrInspection())).mr.sessionInit.requiredFeatures,['local-floor']);assert.ok((await page.evaluate(()=>xrInspection())).mr.sessionInit.optionalFeatures.includes('anchors'));
-  assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);await ctx.close();}
+  assert.deepEqual(errors.filter(e=>!/favicon/.test(e)&&!(process.env.XR_SMOKE_NO_OCT18==='1'&&/net::ERR_FAILED/.test(e))),[]);await ctx.close();}
  return out;
 }
 
@@ -432,7 +448,7 @@ async function sensorsVrSmoke(browser,base,now){
  // no sensors without the opt-in: no request for the sensor files at all
  const p2=await ctx.newPage(),reqs=[];p2.on('request',r=>reqs.push(r.url()));await p2.goto(base+'/scan-xr.html?layers=equipment');await p2.waitForFunction(()=>xrInspection?.().ready,null,{timeout:120000});
  assert.deepEqual(reqs.filter(u=>/sensors\/|sensor-demo|feed\.js/.test(u)),[],'no sensor files without sensors=demo');assert.equal((await p2.evaluate(()=>xrInspection())).sensors.enabled,false);
- assert.deepEqual(errors.filter(e=>!/favicon/.test(e)),[]);await ctx.close();return out;
+ assert.deepEqual(errors.filter(e=>!/favicon/.test(e)&&!(process.env.XR_SMOKE_NO_OCT18==='1'&&/net::ERR_FAILED/.test(e))),[]);await ctx.close();return out;
 }
 /* /mr default (demo placement + simulated sensors), the 2D choice buttons and the saved-alignment rule, on a desktop without immersive-ar. */
 async function mrSensorsSmoke(browser,base,now){

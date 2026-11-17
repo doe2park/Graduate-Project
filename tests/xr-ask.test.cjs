@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=12"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=13"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -313,7 +313,7 @@ test('page: the waiting overlays animate per frame without redrawing the big car
 });
 
 test('access code (API 3+): code= from the URL, X-Ask-Code on ask/transcribe/speak, friendly 401/429', () => {
-  assert.equal(XA.API, 5);
+  assert.equal(XA.API, 6);
   assert.equal(XA.parseParams('?ask=1&server=https://192.168.1.20:8765&code=ab23cd').code, 'AB23CD');
   assert.equal(XA.parseParams('?ask=1').code, '');
   assert.equal(XA.accessCode('?code=k7-px 3m'), 'K7PX3M');
