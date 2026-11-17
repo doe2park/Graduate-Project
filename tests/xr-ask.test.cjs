@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=10"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=11"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -163,7 +163,8 @@ test('canvas drawing: answer card (thinking / answer / error) and bar draw witho
   for (const view of [{phase: 'thinking', model: {question: 'q', level: 3}, wait: {steps}}, {phase: 'answer', model: m, speech: 'speaking', runNote: 'Lit run: 11 pieces'}, {phase: 'error', model: {}, error: 'server 404'}]) {
     const ctx = fakeCtx(); XA.drawAnswer(ctx, 1024, 800, view), live = fakeCtx(); XA.drawAnswer(live, 1024, 800, {...view, modeLabel: 'LIVE'});
     assert.ok(live.calls.includes('Claude') && live.calls.includes('LIVE'), view.phase); assert.ok(!ctx.calls.includes('AI answer'), view.phase);
-    assert.ok(!ctx.calls.includes('Claude') || m.mode === 'live', 'Claude is named only on live answers');
+    // 2026-11-16: the mark + "Claude" head both modes (the user asked for the Claude badge as before); honesty = the MOCK pill + "scripted, not a Claude answer" right beside it
+    if (m.mode !== 'live' && ctx.calls.includes('Claude')) assert.ok(ctx.calls.includes('MOCK') && ctx.calls.includes('scripted, not a Claude answer'), 'a non-live card naming Claude always shows MOCK + scripted');
     if (view.phase === 'answer') { assert.ok(ctx.calls.some(t => t.startsWith('#400766'))); assert.ok(ctx.calls.includes('B/Y closes')); assert.ok(!ctx.calls.includes('READ ALOUD'));
       const foot = ctx.calls.filter(t => /SIMULATED/.test(t)); assert.equal(foot.length, 1, 'one honesty line'); assert.match(foot[0], /^MOCK · scripted · 1 lookups · 3\/4 cited IDs verified · Design BIM/); }   // no picture card: the counts stay in the footer
     if (view.phase === 'thinking') { assert.ok(ctx.calls.includes('Following the duct…')); assert.ok(!ctx.calls.some(t => /connected_run/.test(t)), 'no tool names on the card'); }
@@ -249,7 +250,8 @@ test('waiting steps: one line per tool from the stream events, pictogram per too
   assert.deepEqual(par.map(x => [x.text, x.n, x.state]), [['Looking it up…', 2, 'current']]);
   const pre = XA.stepsFrom([{type: 'text', text: 'Let me check.'}, {type: 'tool', name: 'room_of', input: {}}]);
   assert.deepEqual(pre.map(x => x.key), ['room_of']);
-  assert.deepEqual(['LIVE', 'MOCK', ''].map(XA.headerWord), ['Claude', 'Scripted answer', 'Answer']);
+  assert.deepEqual(['LIVE', 'MOCK', ''].map(XA.headerWord), ['Claude', 'Claude', 'Answer']);
+  assert.deepEqual(['LIVE', 'MOCK', ''].map(XA.headerNote), ['', 'scripted, not a Claude answer', '']);
   assert.equal(XA.waitLabel({heard: true}), 'Listening done · thinking'); assert.equal(XA.waitLabel({}), 'Thinking');
   // drawing: the current step leaves a slot for the animated dots (indicator), finished steps get the drawn tick, phrases lose "…"
   const ctx = fakeCtx(), lay = XA.drawAnswer(ctx, 1024, 800, {phase: 'thinking', model: {question: 'Where does the air from this vent come from?'}, wait: {steps: XA.stepsFrom(evs.slice(0, 3), el), heard: true}, markLayer: true});
@@ -266,9 +268,11 @@ test('waiting animation timing: mark spins + breathes, settles on the answer, do
   assert.equal(a.rot, 0); assert.ok(Math.abs(b.rot - Math.PI / 2) < 1e-9); assert.ok(a.moving && b.moving);
   for (let t = 0; t < 4000; t += 97) { const p = XA.markPose(t); assert.ok(p.scale >= .93 && p.scale <= 1.07 && p.opacity >= .82 && p.opacity <= 1); }
   const settleAt = 3000, mid = XA.markPose(settleAt + XA.WAIT.settleMs / 2, {settleAt}), end = XA.markPose(settleAt + XA.WAIT.settleMs + 1, {settleAt});
-  const step = 2 * Math.PI / 12, start = XA.markPose(settleAt).rot;
-  assert.ok(mid.moving && mid.rot >= start); assert.equal(end.moving, false); assert.equal(end.scale, 1); assert.equal(end.opacity, 1);
-  assert.ok(Math.abs(end.rot / step - Math.round(end.rot / step)) < 1e-9, 'stops on a ray step'); assert.ok(end.rot - start < step + 1e-9, 'never more than one ray step');
+  const turn = 2 * Math.PI, start = XA.markPose(settleAt).rot;
+  assert.ok(mid.moving && Math.min(start, end.rot) <= mid.rot && mid.rot <= Math.max(start, end.rot)); assert.equal(end.moving, false); assert.equal(end.scale, 1); assert.equal(end.opacity, 1);
+  // the Claude mark is not symmetric: it comes to rest upright (a whole turn), never more than half a turn from where it was
+  assert.ok(Math.abs(end.rot / turn - Math.round(end.rot / turn)) < 1e-9, 'stops upright'); assert.ok(Math.abs(end.rot - start) <= Math.PI + 1e-9, 'at most half a turn');
+  for (const sa of [500, 2000, 3300, 5000, 7000]) { const e = XA.markPose(sa + XA.WAIT.settleMs + 1, {settleAt: sa}); assert.ok(Math.abs(e.rot / turn - Math.round(e.rot / turn)) < 1e-9 && Math.abs(e.rot - XA.markPose(sa).rot) <= Math.PI + 1e-9, String(sa)); }
   assert.deepEqual(XA.markPose(5000, {settleAt: 4000}), XA.markPose(9000, {settleAt: 4000}), 'settled = still');
   assert.deepEqual(XA.markPose(1234, {reduced: true}), {rot: 0, scale: 1, opacity: 1, moving: false});
   const w = XA.dotWave(200); assert.equal(w.length, 3); assert.ok(w.every(d => d.a >= .3 && d.a <= 1 && d.dy <= 0));
@@ -287,6 +291,13 @@ test('waiting animation timing: mark spins + breathes, settles on the answer, do
   assert.deepEqual(XA.waitPulse(10, {reduced: true}), XA.waitPulse(700, {reduced: true}));
   // the mark: 12 round rays in Claude terracotta, drawn in code
   assert.equal(XA.starburstRays().length, 12); assert.equal(XA.CLAUDE_COLOR, '#D97757');
+  // 2026-11-16: the Claude spark as one filled path (24 x 24 box), drawn in code; the laptop panel draws the very same path
+  assert.match(XA.CLAUDE_MARK_PATH, /^M[\d.\s,a-zA-Z-]+z$/); assert.ok(XA.CLAUDE_MARK_PATH.length > 1200);
+  const pc = require('fs').readFileSync(require('path').join(__dirname, '..', 'twin', 'ask-twin.js'), 'utf8');
+  assert.ok(pc.includes("const CLAUDE_MARK_PATH = '" + XA.CLAUDE_MARK_PATH + "';"), 'twin/ask-twin.js carries the same mark');
+  const filled = []; const pctx = new Proxy({fill: p => filled.push(p), save() {}, restore() {}, translate() {}, rotate() {}, scale() {}}, {get: (o, k) => k in o ? o[k] : () => {}, set: (o, k, v) => { o[k] = v; return true; }});
+  global.Path2D = function (d) { this.d = d; }; try { XA.drawStarburst(pctx, 48, 48, 44); } finally { delete global.Path2D; }
+  assert.equal(filled.length, 1); assert.equal(filled[0].d, XA.CLAUDE_MARK_PATH); assert.equal(pctx.fillStyle, '#D97757');
   const ctx = fakeCtx(); XA.drawStarburst(ctx, 48, 48, 44); XA.drawStarburst(ctx, 48, 48, 44, '#fff', 1);
 });
 
@@ -301,8 +312,8 @@ test('page: the waiting overlays animate per frame without redrawing the big car
   assert.ok(page.includes('askWaitGlowOff();ASK.wsteps=XA.stepsAdd(ASK.wsteps,{type:\'final\'}).steps'));
 });
 
-test('access code (API 3): code= from the URL, X-Ask-Code on ask/transcribe/speak, friendly 401/429', () => {
-  assert.equal(XA.API, 3);
+test('access code (API 3+): code= from the URL, X-Ask-Code on ask/transcribe/speak, friendly 401/429', () => {
+  assert.equal(XA.API, 4);
   assert.equal(XA.parseParams('?ask=1&server=https://192.168.1.20:8765&code=ab23cd').code, 'AB23CD');
   assert.equal(XA.parseParams('?ask=1').code, '');
   assert.equal(XA.accessCode('?code=k7-px 3m'), 'K7PX3M');
@@ -433,7 +444,7 @@ test('visual cards draw without throwing for every kind, with headline, check ch
     assert.ok(ctx.calls.includes(m.visual.headline), m.visual.kind); assert.ok(ctx.calls.some(t => t.includes(m.visual.check)), m.visual.kind);
     assert.ok(ctx.calls.some(t => /^#\d/.test(t)), m.visual.kind); assert.ok(ctx.calls.some(t => /SIMULATED/.test(t)), m.visual.kind);
     assert.ok(ctx.calls.some(t => /^EVIDENCE \d+\/\d+ VERIFIED$/.test(t)), m.visual.kind); assert.equal(ctx.calls.filter(t => /SIMULATED/.test(t)).length, 1, 'one honesty line');
-    assert.ok(!ctx.calls.some(t => /Claude/.test(t)) || m.mode === 'live', m.visual.kind);
+    if (m.mode !== 'live' && ctx.calls.some(t => /Claude/.test(t))) assert.ok(ctx.calls.includes('MOCK') && ctx.calls.includes('scripted, not a Claude answer'), m.visual.kind);
   }
   assert.ok(page.includes('if(ev.visual&&typeof ev.visual===\'object\')ASK.vis.push(ev.visual);'));
   assert.ok(page.includes('visuals:ASK.vis,selected:'));

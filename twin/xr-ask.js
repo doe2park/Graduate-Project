@@ -17,7 +17,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 3;   // 3: access code (code=, X-Ask-Code, refusalText)
+const API = 4;   // 3: access code (code=, X-Ask-Code, refusalText) · 4: the Claude mark path, headerNote, upright settle
 const CITE_RX = /\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g;
 const LEVELS = [
   {level: 1, id: 'q1', label: 'What is this?', hint: 'look up', question: 'What is this, and what room am I in?'},
@@ -266,7 +266,7 @@ const doneText = t => String(t || '').replace(/…$/, '');
 
 /* Animation timing (pure, ms). Everything that moves per frame is a small separate mesh over the card (mark, three dots, the
    picture cover) or a uniform (element pulse), so the big card canvas is redrawn only on step changes and on the answer. */
-const WAIT = {spinMs: 6400, breatheMs: 1800, settleMs: 420, dotMs: 1050, revealMs: 200, pictureDelayMs: 120, pictureMs: 240, pulseMs: 1500};
+const WAIT = {spinMs: 6400, breatheMs: 1800, settleMs: 600, dotMs: 1050, revealMs: 200, pictureDelayMs: 120, pictureMs: 240, pulseMs: 1500};
 const clamp01 = x => Math.max(0, Math.min(1, x)), easeOut = x => 1 - Math.pow(1 - clamp01(x), 3);
 const RAYS = 12;
 /* the mark's rays: n round-capped strokes, evenly spaced, lengths varied in a fixed pattern (drawn in code, not a logo file) */
@@ -275,13 +275,14 @@ function starburstRays(n = RAYS) {
   return Array.from({length: n}, (_, i) => ({a: -Math.PI / 2 + i * 2 * Math.PI / n + (i % 2 ? .05 : -.03), len: L[i % L.length], w: i % 3 === 0 ? .2 : .17}));
 }
 /* mark pose at time t (ms since waiting began). settleAt: t when the answer arrived (null = still waiting). While waiting: slow
-   rotation + gentle breathing (scale, opacity). After the answer it eases to the next ray-step angle within settleMs and stops. */
-function markPose(t, {settleAt = null, reduced = false, rays = RAYS} = {}) {
+   rotation + gentle breathing (scale, opacity). After the answer it eases back upright (the nearest whole turn, at most half a turn,
+   within settleMs) and stops: the Claude mark is not symmetric, so it must come to rest the right way up. */
+function markPose(t, {settleAt = null, reduced = false} = {}) {
   if (reduced) return {rot: 0, scale: 1, opacity: 1, moving: false};
   const spin = tt => 2 * Math.PI * tt / WAIT.spinMs, breathe = tt => Math.sin(2 * Math.PI * tt / WAIT.breatheMs);
   const wait = tt => ({rot: spin(tt), scale: 1 + .07 * breathe(tt), opacity: .82 + .18 * (.5 + .5 * breathe(tt))});
   if (settleAt == null || t < settleAt) return Object.assign(wait(Math.max(0, t)), {moving: true});
-  const from = wait(settleAt), stepA = 2 * Math.PI / rays, to = Math.ceil(from.rot / stepA + 1e-6) * stepA, k = easeOut((t - settleAt) / WAIT.settleMs);
+  const from = wait(settleAt), turn = 2 * Math.PI, to = Math.round(from.rot / turn) * turn, k = easeOut((t - settleAt) / WAIT.settleMs);
   const moving = t - settleAt < WAIT.settleMs;
   return {rot: from.rot + (to - from.rot) * k, scale: from.scale + (1 - from.scale) * k, opacity: from.opacity + (1 - from.opacity) * k, moving};
 }
@@ -564,9 +565,19 @@ function answerVisual({visuals = [], citations = [], primary = null, selected = 
   return out;
 }
 
-/* Claude-style starburst: radiating round-capped rays in Claude terracotta, drawn in code (no logo file). rot in radians. */
+/* The Claude mark (2026-11-16, "like before"): the Claude spark, irregular rounded rays in Claude terracotta, drawn in code as one
+   filled path in a 24 x 24 box (no image file is loaded). It is drawn about the box centre (12, 12) and scaled so the farthest ray tip
+   (13.2 units from the centre) stays inside radius r at any rotation (the waiting mark spins). Without Path2D (Node tests) the older
+   stroked starburst stands in. rot in radians. */
 const CLAUDE_COLOR = '#D97757';
+const CLAUDE_MARK_PATH = 'M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.704.231-.243 1.908-1.312-.006.006z';
+const CLAUDE_MARK_REACH = 13.2;
 function drawStarburst(ctx, cx, cy, r, color = CLAUDE_COLOR, rot = 0) {
+  if (typeof Path2D === 'function') {
+    const k = r / CLAUDE_MARK_REACH;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(k, k); ctx.translate(-12, -12); ctx.fillStyle = color; ctx.fill(new Path2D(CLAUDE_MARK_PATH)); ctx.restore();
+    return;
+  }
   ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.strokeStyle = color; ctx.lineCap = 'round';
   for (const ray of starburstRays()) {
     ctx.lineWidth = r * ray.w; ctx.beginPath(); ctx.moveTo(Math.cos(ray.a) * r * .12, Math.sin(ray.a) * r * .12);
@@ -713,8 +724,11 @@ function waitHeight(ctx, W, H, question, nSteps) {
   return Math.min(H, Math.max(360, Math.round(92 + q + (nSteps ? 44 + nSteps * 70 : 70) + 70)));
 }
 const CARD_BG = 'rgba(10,16,24,.97)', MARK = {x: 64, y: 50, r: 30};
-/* the header word: "Claude" only when Claude answers (LIVE); scripted answers (MOCK) never carry the name */
-function headerWord(mode) { return mode === 'LIVE' ? 'Claude' : mode === 'MOCK' ? 'Scripted answer' : 'Answer'; }
+/* The header word (2026-11-16): the mark + "Claude" as on the earlier Claude-badge card, in LIVE and in MOCK. Honesty stays in the mode
+   pill right next to it: LIVE (green) only when Claude answered; MOCK (amber) + "scripted" (headerNote) on scripted answers, and the
+   footer still starts "MOCK · scripted". No mode (no server answer yet): "Answer". */
+function headerWord(mode) { return mode === 'LIVE' || mode === 'MOCK' ? 'Claude' : 'Answer'; }
+function headerNote(mode) { return mode === 'MOCK' ? 'scripted, not a Claude answer' : ''; }
 function drawAnswer(ctx, W, H, view) {
   const m = view.model || {}, pad = 40, v = m.visual || null, wait = view.wait || {}, heard = !!wait.heard, wsteps = (wait.steps || []).slice(-5);
   const HH = view.phase === 'thinking' ? waitHeight(ctx, W, H, m.question, wsteps.length) : H;
@@ -729,6 +743,8 @@ function drawAnswer(ctx, W, H, view) {
   let hx = pad + 66 + ctx.measureText(brand).width + 10;
   if (mode) { ctx.fillStyle = '#7f94a8'; ctx.fillText('·', hx, 60); hx += ctx.measureText('·').width + 10; }
   if (mode) hx += pill(ctx, hx, 33, mode, {h: 34, size: 21, weight: '700', fill: mode === 'LIVE' ? '#14532d' : '#6a4a10', color: mode === 'LIVE' ? '#86efac' : '#fcd34d'}) + 12;
+  const note = headerNote(mode);
+  if (note) { ctx.font = '500 20px Arial'; ctx.fillStyle = '#fcd34d'; ctx.fillText(note, hx, 58, Math.max(60, W * ANSWER_MORE.x0 - 150 - hx)); }
   const mx = W * ANSWER_MORE.x0 + (W - W * ANSWER_MORE.x0) / 2 - 6;
   drawMore(ctx, mx, 48, 30, !!view.hoverMore);
   let rx = mx - 46;
@@ -842,7 +858,7 @@ function drawChip(ctx, W, H, model, hover = false) {
 
 return {API, LEVELS, COLORS, BAR, CHIP, ANSWER_MORE, HONESTY, SYS, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
   barRects, barHit, barButtons, chipModel, chipHit, answerHit, micPlan, ttsPlan, wrap, drawMark, drawStarburst, starburstRays, CLAUDE_COLOR, CARD_BG, MARK, drawPicto,
-  headerWord, waitHeight, STEP_ICON, stepIcon, stepPhrase, stepsAdd, stepsFrom, waitLabel, WAIT, markPose, dotWave, revealPose, waitPulse, drawAnswer, drawBar, drawChip, drawMore,
+  headerWord, headerNote, CLAUDE_MARK_PATH, waitHeight, STEP_ICON, stepIcon, stepPhrase, stepsAdd, stepsFrom, waitLabel, WAIT, markPose, dotWave, revealPose, waitPulse, drawAnswer, drawBar, drawChip, drawMore,
   pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
   serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

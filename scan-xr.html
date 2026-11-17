@@ -52,7 +52,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}#enterMR{min-height:72px;font-size:28px}}
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=9"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=10"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=9"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=3"></script><script src="twin/xr-ask.js?v=11"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -1251,7 +1251,7 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
    (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
    and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
 var ASK=null;
-const XA=globalThis.XRAsk,XAOK=XA?.API===3,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
+const XA=globalThis.XRAsk,XAOK=XA?.API===4,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
 ASK={on:!!XAP.enabled,base:XAP.server||null,code:XAP.code||'',prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
  paths:[],vis:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
  hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0,more:false,details:false,wsteps:[],heard:false,tWait:0,markSettle:null,tReveal:null,layout:null};

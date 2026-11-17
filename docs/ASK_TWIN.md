@@ -356,7 +356,10 @@ MR/VR page (`scan-xr.html`, the page behind `/mr`) in mock mode; nothing below i
    (nearby in 3D), `3 · What feeds it?` (trace a system), `4 · Why is it warm?` (reason across sources), **Details**, **Close**.
 2. Hold the trigger on the element (or its label), say the question, release; or press a preset.
 3. The answer comes back as a world-locked card just under the element (visual card since Nov 9, 2026; not
-   headset-verified): a small neutral spark mark + *AI answer* and LIVE/MOCK, one large headline, then a picture chosen
+   headset-verified): the Claude mark (the terracotta `#D97757` Claude spark, drawn in code from one path in a 24 × 24 box,
+   no image file; Nov 16 2026) + **Claude** and the mode pill: **LIVE** (green) only when Claude answered; on scripted
+   answers the amber **MOCK** pill + *scripted, not a Claude answer* sits right beside the name and the footer starts
+   *MOCK · scripted*. While waiting the same mark spins and breathes, then comes to rest upright. One large headline, then a picture chosen
    by the tool that answered, built from the structured tool results (`visual` on each server `tool` event,
    `scripts/ask_twin/agent.py` `tool_visual`), never by parsing the prose:
    - look up (`room_of` / `get_element`): element pictogram, size, level and a room chip with how sure the room is
