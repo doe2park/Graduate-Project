@@ -44,6 +44,7 @@ Rules:
 4. Use the numbers the tools give (vertical_gap_m, horizontal_gap_m). Describe direction as above / below / beside plus horizontal distance; do not use compass directions (north is not verified in this frame).
 5. Any sensor value must be called simulated (e.g. "a simulated demo sensor reads 8.8 degC above normal").
 6. Be honest about how sure you are, in plain words: sure only when geometry and a sensor signal agree; "probably" when one strong water/air source is directly above; "possibly ..., check on site" when it rests on proximity or name heuristics alone.
+7. A question unrelated to this building or the twin (small talk, general knowledge): do not refuse and call no tools. Say in a few words that it is not about Grimes, then answer briefly in one or two sentences. For live information you cannot look up here (weather, news, scores, prices, the time or date), say in one sentence that you cannot check that here. Never invent or stretch building facts to make such a question fit. Same plain-text rules, and no Evidence line.
 
 Who reads the answer: facilities staff, students and visitors, most of them not engineers. It is shown on a card and read
 aloud, so write the way you would explain it to a colleague standing next to you.
@@ -396,6 +397,10 @@ def _water_score(el):
 # Mock mode routes a question (typed, a preset, or a speech-to-text transcript) by keywords to a scripted, tool-grounded
 # answer. Order matters: the first match wins. Anything else gets the generic description of the element and its neighbours.
 MOCK_ROUTES = (
+    # not about the building (checked first, so "why is the sky blue" is not a comfort question): no tools, a short scripted reply
+    ('offtopic', re.compile(r"\bweather\b|\bforecast\b|\bnews\b|\bheadlines?\b|\bjoke\b|\bhow are you\b|\bwho are you\b|\bwho won\b|"
+                            r"\bwhat time is it\b|\bwhat(?:'s| is) the (?:time|date)\b|\btoday'?s date\b|\bcapital of\b|\bsky blue\b|\bstock (?:price|market)\b|"
+                            r"\bscore\b|\brecipe\b|\bpoem\b|^(?:hi|hello|hey)\b(?!.*\b(?:duct|pipe|light|vav|valve|this)\b)")),
     ('leak', re.compile(r'leak|stain|drip|wet|water damage|moist|mold|mould|puddle')),
     ('valve', re.compile(r'valve|shut ?off|isolat')),
     ('comfort', re.compile(r'\bwarm|\bhot\b|\bcold\b|stuffy|comfort|too (warm|hot|cold)|\bwhy\b|temperature|\bheat')),
@@ -454,13 +459,28 @@ class MockAgent:
         elif point:
             ref = {'point': list(point)}
         route = mock_route(question)
-        if ref is None:
+        if route == 'offtopic':
+            text = self.offtopic(question)
+        elif ref is None:
             text = '**Answer:** Select an element in the viewer first (click it), then ask again. *(mock mode)*'
         else:
             text = yield from getattr(self, '_' + route)(ref, used, grounded)
         yield from self._stream(text)
         yield {'type': 'final', 'answer': text, 'citations': verify_citations(self.twin, text, grounded), 'tools_used': used,
                'mode': 'mock', 'model': 'mock (scripted, tool-grounded)', 'seconds': round(time.time() - t0, 1)}
+
+    LIVE_INFO_RX = re.compile(r'weather|forecast|news|headline|who won|score|stock|time is it|the time|the date|today')
+
+    @classmethod
+    def offtopic(cls, question):
+        """Scripted stand-in for SYSTEM_PROMPT rule 7 (a question not about the building): no tools, no citations, MOCK-labelled."""
+        q = ' '.join(str(question or '').lower().split())
+        if cls.LIVE_INFO_RX.search(q):
+            body = "That's not about Grimes, and I can't check live information like that here."
+        else:
+            body = ("That's not about Grimes. Scripted mock answers cannot answer general questions; "
+                    'with a key on the laptop, Claude would answer in a sentence or two.')
+        return f'**Answer:** {body} *(mock mode: scripted, no twin tools used)*'
 
     @staticmethod
     def _d(el):

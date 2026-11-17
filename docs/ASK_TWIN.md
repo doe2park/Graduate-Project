@@ -379,6 +379,8 @@ MR/VR page (`scan-xr.html`, the page behind `/mr`) in mock mode; nothing below i
    has one, else the browser voice if `speechSynthesis` has one (2.5 s start watchdog), else the card says *text only*.
 
 Mock mode routes any question (typed, preset or spoken) by keywords (`mock_route` in `agent.py`): leak/stain → leak,
+weather/news/joke/time/capital of/hi → *not about Grimes* (no tools; checked first; mirrors rule 7 of the system prompt, which tells
+live Claude to say in a few words that a question is not about Grimes and answer briefly, or say it cannot check live information),
 valve/shut off → valve, warm/hot/cold/why → comfort (level 4), feed/come from/where does the air/which VAV → feed (level 3),
 above/over the ceiling/plenum → above (level 2), what is this/what room → look up (level 1), anything else → a description.
 The mock answers for the four levels are scripted from real tool runs (`MockAgent._lookup`, `_above`, `_feed`,

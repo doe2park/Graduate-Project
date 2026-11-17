@@ -1076,3 +1076,37 @@ class LimitArgsTests(unittest.TestCase):
         t = S.idle_watch(types.SimpleNamespace(shutdown=stopped.set), lim, 0.001, log=lambda *a, **k: None, poll=0.01)
         self.assertTrue(stopped.wait(5))
         t.join(1)
+
+
+class OffTopicMockTests(unittest.TestCase):
+    """Rule 7 of the system prompt, and its scripted stand-in in --mock."""
+    def test_prompt_rule_is_one_stable_block(self):
+        self.assertIn('7. A question unrelated to this building or the twin', A.SYSTEM_PROMPT)
+        self.assertIn('not about Grimes', A.SYSTEM_PROMPT)
+        self.assertIn('cannot check that here', A.SYSTEM_PROMPT)
+        self.assertNotRegex(A.SYSTEM_PROMPT, r'\{[a-z_]+\}|20\d\d-\d\d-\d\d')   # no per-request text (prompt caching)
+
+    def test_routes(self):
+        for q in ('What is the weather today?', 'tell me a joke', 'Why is the sky blue?', 'what time is it', 'hi there', 'What is the capital of France?'):
+            self.assertEqual(A.mock_route(q), 'offtopic', q)
+        for q in ('Why is it warm in here?', 'hello, what is this duct?', 'Which VAV box feeds this?', 'What is above this ceiling tile?'):
+            self.assertNotEqual(A.mock_route(q), 'offtopic', q)
+
+    def test_scripted_reply_uses_no_tools_and_is_labelled_mock(self):
+        for q, live in (('What is the weather like today?', True), ('Tell me a joke', False)):
+            evs = list(A.MockAgent(twin(), delay=0).ask(q, LIGHT, LIGHT_POINT))
+            self.assertFalse([e for e in evs if e['type'] == 'tool'])
+            fin = evs[-1]
+            self.assertEqual((fin['type'], fin['mode'], fin['tools_used'], fin['citations']), ('final', 'mock', [], []))
+            self.assertIn("not about Grimes", fin['answer'])
+            self.assertIn('mock mode', fin['answer'])
+            self.assertEqual("can't check live information" in fin['answer'], live)
+            self.assertNotIn('[[', fin['answer'])
+        # works without a selected element too
+        self.assertEqual(list(A.MockAgent(twin(), delay=0).ask('how are you'))[-1]['tools_used'], [])
+
+    def test_through_the_server_with_speech(self):
+        from ask_twin.speech import with_speech
+        evs = list(with_speech(A.MockAgent(twin(), delay=0).ask('What is the weather?', LIGHT), lambda c: None, LIGHT))
+        self.assertEqual(evs[-1]['type'], 'final')
+        self.assertTrue(any(e['type'] == 'speak' for e in evs) or evs[-1].get('spoken'))

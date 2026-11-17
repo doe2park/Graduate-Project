@@ -462,3 +462,11 @@ test('connect with the code only: the announced address must have the temporary-
   assert.ok(XA.ENDPOINT.api.startsWith('https://api.github.com/repos/doe2park/Graduate-Project/') && XA.ENDPOINT.raw.includes('/ask-endpoint/ask-endpoint.json'));
   assert.ok(!/code/i.test(JSON.stringify(XA.ENDPOINT)), 'the endpoint file never carries the access code');
 });
+
+test('an off-topic MOCK answer (no tools, no citations) builds a card', () => {
+  const answer = "**Answer:** That's not about Grimes, and I can't check live information like that here. *(mock mode: scripted, no twin tools used)*";
+  const m = XA.cardModel({question: 'What is the weather?', answer, final: {type: 'final', answer, citations: [], tools_used: [], mode: 'mock'}, level: null});
+  assert.match(m.lead, /not about Grimes/);
+  assert.ok(!/mock mode/.test(m.lead));
+  assert.equal(m.primary, null);
+});
