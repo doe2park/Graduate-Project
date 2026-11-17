@@ -237,7 +237,7 @@ async function mrSmoke(browser,base,now){
  assert.equal(i.mr.phase,'capture');assert.equal(i.mr.current,'A');assert.equal(i.mr.bimVisible,false,'services hidden until aligned');
  for(const [k,l] of Object.entries(i.layers)){assert.equal(l.error,null,k);assert.ok(l.elements>0,k);assert.equal(l.unidentifiedObjects||0,0,k);}
  assert.deepEqual(Object.keys(i.layers).sort(),[...layers].sort());
- assert.equal(await page.locator('#enterMR').isHidden(),true,'no Enter MR without immersive-ar');assert.equal(await page.locator('#enterVR').isHidden(),true);
+ assert.equal(await page.locator('#enterMR').isHidden(),true,'no Enter MR without immersive-ar');assert.equal(await page.locator('#enterDemo').isHidden(),true,'no demo button without immersive-ar');assert.equal(await page.locator('#enterVR').isHidden(),true);
  assert.match(await page.locator('#xrNote').textContent(),/Desktop MR simulation/);assert.equal(await page.evaluate(()=>document.getElementById('mr').hidden),false,'MR panel present (under More options)');
  assert.match(await page.locator('#align').textContent(),/MR passthrough · .* · manual alignment, not surveyed · not aligned yet/);
  assert.equal(i.mr.rangeKey,'room');assert.deepEqual(i.mr.fade,{on:1,range:[8,14]});assert.equal(i.mr.outside,.12,'Lens: faint outside the cone');

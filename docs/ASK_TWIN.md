@@ -314,7 +314,7 @@ the public page is unchanged.
   headset-verified):** the 2D page the Quest browser shows before entering is one card at the top left:
   - two equal big buttons (Nov 17 2026; nothing pre-armed): **At Grimes · MR** (shown only where the browser offers `immersive-ar`) and
     **Anywhere · VR** (the 360° photo walk; on the MR page a link to the photo page with `&chosen=1`, MR-only keys dropped, `ask`, `code`,
-    `capture`, `sensors` kept, where one big **Enter VR** follows). *Demo here* moved under **More options**; VR stays reachable because it is the only way to stand
+    `capture`, `sensors` kept, where one big **Enter VR** follows), plus a smaller outlined **This room · MR demo** (Demo here, 1 tap: arms it and starts the session; DEMO, not aligned, never saved); VR stays reachable because it is the only way to stand
     inside the real Grimes photos off site, and it is the mode the Ask slide recording shows;
   - one status line (the last message, full text on hover) and, on a desktop, one note line;
   - the **Ask the twin** box: without `&ask=1` a single collapsed line *Ask the twin · connect with the laptop code* that
@@ -399,7 +399,7 @@ The mock answers for the four levels are scripted from real tool runs (`MockAgen
    No certificate is installed anywhere and no system setting changes.
 4. Wait for *Services ready*. In the **Ask the twin** box (top right): press **Allow mic** (allow the microphone
    prompt), then **Test voice** (you should hear "Ask the twin is ready"; this also unlocks sound).
-5. Press **At Grimes · MR** (alignment), or open **More options** → *Demo here* and then the big button (or open `/mr?place=demo`): point at the
+5. Press **At Grimes · MR** (alignment), or **This room · MR demo** (also `/mr?place=demo`): point at the
    floor, trigger, the Grimes services appear at real scale (DEMO, not aligned). Hold the trigger on a duct or diffuser overhead and ask (or trigger → **⋯** → `3`).
 6. Ctrl+C on the Mac stops the server.
 

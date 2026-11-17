@@ -32,6 +32,10 @@ test('/mr defaults: sensors only, nothing armed (no place); an explicit place an
   assert.ok(!/<noscript>[^]*place=demo/.test(html) && !/o\.set\('place'/.test(html), 'the redirect arms neither Demo here nor alignment');
   const page = read('scan-xr.html');
   assert.ok(/id="enterMR"[^>]*>\s*<span class="t">At Grimes · MR<\/span>/.test(page) && /id="enterVR"[^>]*>\s*<span class="t">Anywhere · VR<\/span>/.test(page), 'two named mode buttons');
+  assert.ok(/id="enterDemo"[^>]*>\s*<span class="t">This room · MR demo<\/span>\s*<span class="s">[^<]*DEMO, not aligned, never saved/.test(page), 'third, smaller entry button with the honest label');
+  assert.ok(page.indexOf('id="toVR"') < page.indexOf('id="enterDemo"') && page.indexOf('id="enterMR"') < page.indexOf('id="toVR"'), 'demo button sits under the two big ones');
+  assert.ok(/\$\('enterDemo'\)\.onclick=\(\)=>\{[^]*?mrSetMode\('demo'\);return startMR\(\);/.test(page), 'the demo tap arms Demo here and starts the session in the same gesture');
+  assert.ok(/\$\('enterMR'\)\.onclick=\(\)=>\{[^]*?mrSetMode\('align'\);return startMR\(\);/.test(page), 'At Grimes never starts an earlier-armed demo');
   assert.ok(/id="chDemo"[^>]*>Demo here[^<]*DEMO, not aligned, never saved/.test(page), 'Demo here kept under More options with its honest label');
 });
 test('/vr and /mr opened through the temporary public address hand over to the public site and keep the AI on the laptop', () => {

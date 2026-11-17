@@ -25,10 +25,13 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 .mode .t{font:700 28px/1.1 Arial,Helvetica,sans-serif}.mode .s{font:500 14px/1.3 Arial,Helvetica,sans-serif;color:#e6f1ec}
 #enterMR{background:#15803d;border:2px solid #4ade80}#enterMR:hover{background:#16a34a}
 #enterVR,#toVR{background:#1d4ed8;border:2px solid #60a5fa}#enterVR:hover,#toVR:hover{background:#2563eb}
-#entry[data-layout=mr] #toVR,#entry[data-layout=vr] #enterMR{display:inline-block;width:auto;min-height:0;padding:4px 0;background:none;border:0;border-radius:0;color:#9fd0ff;text-decoration:underline;text-underline-offset:3px;text-align:left;-webkit-backdrop-filter:none;backdrop-filter:none}
-#entry[data-layout=mr] #toVR .t,#entry[data-layout=vr] #enterMR .t{font:600 14px/1.3 Arial,Helvetica,sans-serif}
-#entry[data-layout=mr] #toVR .s,#entry[data-layout=vr] #enterMR .s{display:none}
-#entry[data-layout=mr] #toVR:hover,#entry[data-layout=vr] #enterMR:hover{background:none;color:#cfe8ff}
+#modes #enterDemo{min-height:48px;gap:2px;padding:6px 12px;background:transparent;border:2px solid #7f93a8;color:#e8f1f8}#enterDemo:hover{background:rgba(127,147,168,.18)}
+#enterDemo .t{font:700 17px/1.2 Arial,Helvetica,sans-serif}#enterDemo .s{font:500 12px/1.3 Arial,Helvetica,sans-serif;color:#b9c9d8}
+#entry[data-layout=mr] #enterDemo{display:none}
+#entry[data-layout=mr] #toVR,#entry[data-layout=vr] #enterMR,#entry[data-layout=vr] #enterDemo{display:inline-block;width:auto;min-height:0;padding:4px 0;background:none;border:0;border-radius:0;color:#9fd0ff;text-decoration:underline;text-underline-offset:3px;text-align:left;-webkit-backdrop-filter:none;backdrop-filter:none}
+#entry[data-layout=mr] #toVR .t,#entry[data-layout=vr] #enterMR .t,#entry[data-layout=vr] #enterDemo .t{font:600 14px/1.3 Arial,Helvetica,sans-serif}
+#entry[data-layout=mr] #toVR .s,#entry[data-layout=vr] #enterMR .s,#entry[data-layout=vr] #enterDemo .s{display:none}
+#entry[data-layout=mr] #toVR:hover,#entry[data-layout=vr] #enterMR:hover,#entry[data-layout=vr] #enterDemo:hover{background:none;color:#cfe8ff}
 #entryLine{margin:10px 0 0}#status{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e8f1f8}
 #xrNote{margin:4px 0 0;color:#8aa2b8;font:400 12px/1.35 Arial,Helvetica,sans-serif}#xrNote:empty{display:none}
 #askSlot:empty{display:none}#askSlot{margin-top:10px}
@@ -69,6 +72,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
  <button id="enterMR" class="b mode" hidden title="Mixed reality at Grimes: BIM services over the passthrough, manual alignment (not surveyed)"><span class="t">At Grimes · MR</span><span class="s">In the building. BIM over the real room; align once.</span></button>
  <button id="enterVR" class="b mode" hidden title="Virtual reality anywhere: stand inside the captured 360° photos of Grimes with the BIM services"><span class="t">Anywhere · VR</span><span class="s">Any room. Stand inside the Grimes 360° photos with the BIM.</span></button>
  <a id="toVR" class="b mode" href="scan-xr.html?sensors=demo&amp;chosen=1" hidden title="Virtual reality anywhere: opens the 360° photo page, then one tap on Enter VR"><span class="t">Anywhere · VR</span><span class="s">Any room. Stand inside the Grimes 360° photos with the BIM.</span></a>
+ <button id="enterDemo" class="b mode" hidden title="Demo here: the Grimes BIM at real scale over the room you stand in. DEMO, not aligned to this building, never saved. Point at the floor, pull the trigger."><span class="t">This room · MR demo</span><span class="s">Any room. Grimes BIM at real scale here. DEMO, not aligned, never saved.</span></button>
  </div>
  <p id="entryLine"><span id="status" role="status">Loading…</span></p>
  <p id="xrNote" role="note"></p>
@@ -871,12 +875,12 @@ function xrBack(){const menuOpen=MODE_AR?!!mr.panel:!!state.menu,pk=!!(picked||S
  if(a==='close-menu'){if(MODE_AR)mrSetPanel(false);else setMenu(false);}else if(a==='dismiss')hideCard();else{if(MODE_AR)mrSetPanel(true);else setMenu(true);}return a;}
 function snapBy(a){camera.getWorldPosition(_head);const r=X.snapTurn(rig.position.toArray(),rig.rotation.y,_head.toArray(),a);rig.position.fromArray(r.position);rig.rotation.y=r.yaw;rig.updateMatrixWorld(true);gauss.pendingSort=true;invalidate();}
 async function detectXR(){
- if(!CORE_OK){$('enterVR').hidden=true;$('enterMR').hidden=true;$('xrNote').textContent='Page files out of sync (an older cached twin/xr-core.js) · reload the page before entering VR';console.error('scan-xr: twin/xr-core.js API '+X?.API+', page expects '+XR_CORE_API);return false;}
+ if(!CORE_OK){$('enterVR').hidden=true;$('enterMR').hidden=true;$('enterDemo').hidden=true;$('xrNote').textContent='Page files out of sync (an older cached twin/xr-core.js) · reload the page before entering VR';console.error('scan-xr: twin/xr-core.js API '+X?.API+', page expects '+XR_CORE_API);return false;}
  if(!navigator.xr||!isSecureContext){if(MODE_AR){$('xrNote').textContent='Desktop MR simulation · passthrough needs Quest Browser over HTTPS (immersive-ar), see docs/QUEST_XR_OVERLAY.md';return false;}$('xrNote').textContent=isSecureContext?'Desktop preview · WebXR not available in this browser':'Desktop preview · open over HTTPS in Quest Browser for VR (see docs/QUEST_XR_OVERLAY.md)';return false;}
  xrSupported=await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);xrARSupported=await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
- if(MODE_AR){$('enterVR').hidden=true;$('enterMR').hidden=!xrARSupported;$('xrNote').textContent=xrARSupported?'':'Desktop MR simulation · this browser offers no immersive-ar (passthrough) session · use Quest Browser';return xrSupported;}
+ if(MODE_AR){$('enterVR').hidden=true;$('enterMR').hidden=!xrARSupported;$('enterDemo').hidden=!xrARSupported;$('xrNote').textContent=xrARSupported?'':'Desktop MR simulation · this browser offers no immersive-ar (passthrough) session · use Quest Browser';return xrSupported;}
  // entry card: two equal big buttons (At Grimes · MR / Anywhere · VR); here Anywhere · VR starts the session directly
- $('enterVR').hidden=!xrSupported;$('enterMR').hidden=!xrARSupported;$('xrNote').textContent=xrSupported?'':'Desktop preview · no immersive-vr device detected · open this page in the Quest browser to enter';return xrSupported;}
+ $('enterVR').hidden=!xrSupported;$('enterMR').hidden=!xrARSupported;$('enterDemo').hidden=!xrARSupported;$('xrNote').textContent=xrSupported?'':'Desktop preview · no immersive-vr device detected · open this page in the Quest browser to enter';return xrSupported;}
 const setT=(id,t)=>{const e=$(id).querySelector('.t');if(e)e.textContent=t;};
 const VR_LABEL=document.getElementById('enterVR')?.querySelector('.t')?.textContent||'Anywhere · VR',MR_LABEL=document.getElementById('enterMR')?.querySelector('.t')?.textContent||'At Grimes · MR';
 /* Which buttons are big: both (nothing chosen yet), or this page's own (an explicit ?place=, or arriving from the other mode's button with &chosen=1). */
@@ -1191,7 +1195,7 @@ function mrOnSessionEnd(){xrSession=null;mr.restore=null;if(mrDemoOn()){mr.demo=
  setT('enterMR',MR_LABEL);mr.note='MR session ended · the alignment belonged to that session';mrRefresh();}
 /* Only local-floor is required; 'anchors' (persistent anchors, per origin) is optional so a refusal never blocks MR. */
 const MR_SESSION_INIT={requiredFeatures:['local-floor'],optionalFeatures:['hit-test','anchors','plane-detection','mesh-detection','dom-overlay']};
-$('enterMR').onclick=async()=>{if(xrSession)return xrSession.end();if(!mr.area){status('Landmarks not loaded yet');return;}try{
+const startMR=async()=>{if(xrSession)return xrSession.end();if(!mr.area){status('Landmarks not loaded yet');return;}try{
  renderer.xr.setReferenceSpaceType('local-floor');renderer.xr.setFramebufferScaleFactor(P.xrScale);
  const session=await navigator.xr.requestSession('immersive-ar',{...MR_SESSION_INIT,domOverlay:{root:$('mr')}});
  await renderer.xr.setSession(session);renderer.xr.setFoveation(P.foveation);xrSession=session;
@@ -1199,6 +1203,10 @@ $('enterMR').onclick=async()=>{if(xrSession)return xrSession.end();if(!mr.area){
  rig.position.set(0,0,0);rig.rotation.set(0,0,0);camera.position.set(0,0,0);camera.quaternion.identity();hideCard();coneFromView();
  session.addEventListener('end',mrOnSessionEnd);setT('enterMR','Exit MR');mrOnSessionStart(session);
 }catch(e){console.error(e);renderer.xr.setReferenceSpaceType('local');status('Could not start MR: '+(e.message||e));}};
+$('enterMR').onclick=()=>{if(!xrSession&&$('entry').dataset.layout==='pair'&&mrModeIsDemo()&&mr.ready)mrSetMode('align');return startMR();};   // chooser: At Grimes · MR never starts a demo armed earlier
+/* This room · MR demo: arms Demo here and starts the passthrough session in the same tap (WebXR needs the gesture). On the VR page it opens the MR page armed. */
+$('enterDemo').onclick=()=>{if(!MODE_AR){const u=new URLSearchParams(location.search);u.set('mode','ar');u.set('place','demo');u.set('chosen','1');location.search='?'+u;return;}
+ if(!mr.ready||!mr.area){status('Landmarks not loaded yet');return;}mrSetMode('demo');return startMR();};
 /* 2D page panel (desktop / before entering) */
 const MR_LAB_TEXT=document.getElementById('mrLab')?.textContent||'';
 function mrRender2D(){const box=$('mr');if(!box||box.hidden||!mr.area)return;
@@ -1207,7 +1215,7 @@ function mrRender2D(){const box=$('mr');if(!box||box.hidden||!mr.area)return;
  $('mrLab').textContent=mrDemoOn()?mrDemoText()+' · Design (BIM) positions':MR_LAB_TEXT;$('mrLab').classList.toggle('prov',mrDemoOn());
  $('mrDemo').setAttribute('aria-pressed',String(mrDemoOn()||mr.demoWanted));
  const demoM=mrModeIsDemo(),pr=(id,on)=>$(id).setAttribute('aria-pressed',String(!!on));
- {if(!xrSession)setT('enterMR',demoM?'Demo here · MR':MR_LABEL);const sub=$('enterMR').querySelector('.s');if(sub)sub.textContent=demoM?'DEMO here: BIM at real scale in this room. Not aligned, never saved.':'In the building. BIM over the real room; align once.';}   // Demo here (More options) keeps its honest label on the big button
+ {const solo=$('entry').dataset.layout!=='pair';if(!xrSession)setT('enterMR',demoM&&solo?'Demo here · MR':MR_LABEL);const sub=$('enterMR').querySelector('.s');if(sub)sub.textContent=demoM&&solo?'DEMO here: BIM at real scale in this room. Not aligned, never saved.':'In the building. BIM over the real room; align once.';}   // Demo here (More options) keeps its honest label on the big button
  pr('chDemo',demoM&&SENS.on);pr('chFoyer',!demoM&&mr.area.id==='l1-auditorium-foyer');pr('chEast',!demoM&&mr.area.id==='l1-east-entrance');pr('chSens',SENS.on);
  $('chSens').textContent='Sensors: '+(SENS.loading?'loading…':SENS.on?(SENS.live?'ON (live test)':'ON (simulated)'):'OFF')+' · tap to switch';
  for(const b of document.querySelectorAll('#mrChoices [data-scene]'))pr(b.id,SENS.on&&SENS.scene===b.dataset.scene);
