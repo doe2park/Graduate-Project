@@ -44,8 +44,8 @@ class CommittedOverlayTests(unittest.TestCase):
         text = (ROOT / eq.OUT).read_text()
         self.assertEqual(text, eq.render(eq.build(log=lambda *_: None)), 'run python3 scripts/build_element_quality.py')
         data = json.loads(text)
-        self.assertEqual(data['summary']['elements'], 66620)
-        self.assertEqual(data['summary']['annotation'], 2690)
+        self.assertEqual(data['summary']['elements'], 66620+2944)
+        self.assertEqual(data['summary']['annotation'], 2690+50)
         self.assertEqual(data['summary']['noGeometry'], 243)
         self.assertEqual(set(data['layers']), set(eq.BUILDING_LAYERS))
 

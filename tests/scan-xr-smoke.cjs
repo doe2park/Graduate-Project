@@ -68,7 +68,7 @@ const freePort=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.
   // neighbour navigation along the recorded route
   const m=JSON.parse(fs.readFileSync(path.join(ROOT,'scan-assets/panoramas/manifest.json')));const i0=loaded.station.index,s0=m.stations[i0],n=m.stations[s0.neighbors[0]];
   await page.evaluate(([x,z])=>xrDebug.walk(x,z),[n.position[0]-s0.position[0],n.position[2]-s0.position[2]]);
-  await page.waitForFunction(i=>xrInspection().station.index!==i&&!document.getElementById('status').textContent.startsWith('Loading'),i0,{timeout:30000});
+  await page.waitForFunction(i=>xrInspection().station.index!==i&&!xrInspection().transitioning&&!document.getElementById('status').textContent.startsWith('Loading'),i0,{timeout:30000});
   const moved=await page.evaluate(()=>xrInspection());assert.ok(s0.neighbors.includes(moved.station.index),'moved to a recorded neighbour');
   moved.station.positionScan.forEach((v,k)=>assert.ok(Math.abs(v-moved.camera.world[k])<1e-6));assert.equal(moved.card,null,'card cleared on jump');
   report.pointAndGo=await pointAndGoSmoke(page,m);
@@ -289,7 +289,7 @@ async function mrSmoke(browser,base,now){
  // world panel (what the headset shows) and its buttons
  await page.evaluate(()=>{xrDebug.look(0,0);xrDebug.mr.panel(true);});await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-panel.png')});
  await page.evaluate(()=>xrDebug.mr.button(9));assert.equal((await page.evaluate(()=>xrInspection())).mr.rangeKey,'all');await page.evaluate(()=>xrDebug.mr.button(9));
- await page.evaluate(()=>xrDebug.mr.button(11));assert.equal((await page.evaluate(()=>xrInspection())).mr.page,'layers');await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-layers.png')});await page.evaluate(()=>xrDebug.mr.button(14));
+ await page.evaluate(()=>xrDebug.mr.button(11));assert.equal((await page.evaluate(()=>xrInspection())).mr.page,'layers');await page.waitForTimeout(250);await page.screenshot({path:path.join(OUT,'scan-xr-mr-layers.png')});await page.evaluate(()=>xrDebug.mr.button(8));
  // Demo here: Grimes services at real scale in any room. Not an alignment: labelled DEMO, no RMS, no checks, never saved; a landmark alignment replaces it.
  {const savedBefore=await page.evaluate(()=>localStorage.getItem('grimes-mr-alignment/2')),checksBefore=await page.evaluate(()=>localStorage.getItem('grimes-mr-checks/1'));
   await page.evaluate(()=>xrDebug.mr.panel(true));
@@ -456,7 +456,10 @@ async function mrSensorsSmoke(browser,base,now){
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await page.route('**/raw.githubusercontent.com/**/building_data.json',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({meters:{76:{latest:{kw:120.5,t:now}}}})}));
  // plain /mr: the short address opens the two-mode chooser with sensors and NOTHING armed (no place); /mr?place=demo arms Demo here; an explicit param wins; extra params pass through
- const q=async s=>{await page.goto(base+'/mr/'+s);await page.waitForURL(/scan-xr\.html/);return new URL(page.url()).searchParams;};
+ // Finish background loads before leaving a document: otherwise navigation aborts are
+ // recorded as layer failures by Chromium (the wording varies by browser version).
+ const settled=async()=>{if(await page.evaluate(()=>!!window.xrInspection))await page.waitForFunction(()=>{const i=xrInspection();return !i.transitioning&&!i.sensors.loading&&Object.values(i.layers).every(l=>!l.loading);},null,{timeout:240000});};
+ const q=async s=>{await settled();await page.goto(base+'/mr/'+s);await page.waitForURL(/scan-xr\.html/);return new URL(page.url()).searchParams;};
  let u=await q('?layers=duct');assert.equal(u.get('mode'),'ar');assert.equal(u.has('place'),false,'/mr arms neither Demo here nor alignment');assert.equal(u.get('sensors'),'demo');
  await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area,null,{timeout:120000});
  assert.equal(await page.evaluate(()=>xrInspection().mr.demoWanted),false);assert.equal(await page.locator('#entry').getAttribute('data-layout'),'pair');
@@ -502,7 +505,7 @@ async function mrSensorsSmoke(browser,base,now){
  // sensors toggle off/on
  await page.locator('#chSens').click();await page.waitForFunction(()=>xrInspection().sensors.enabled===false,null,{timeout:20000});assert.equal(new URL(page.url()).searchParams.get('sensors'),'off');assert.match(await page.locator('#chSens').textContent(),/OFF/);
  // reload keeps the choice
- await page.reload();await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area==='l1-east-entrance',null,{timeout:120000});assert.equal((await page.evaluate(()=>xrInspection())).sensors.enabled,false);
+ await settled();await page.reload();await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area==='l1-east-entrance',null,{timeout:120000});assert.equal((await page.evaluate(()=>xrInspection())).sensors.enabled,false);
  // explicit params beat the /mr defaults
  u=await q('?place=');assert.equal(u.get('place'),'');assert.equal(u.get('sensors'),'demo');await page.waitForFunction(()=>window.xrInspection?.()?.mr?.area,null,{timeout:120000});assert.notEqual((await page.evaluate(()=>xrInspection())).mr.phase,'demo');
  assert.deepEqual(errors.filter(e=>!/favicon|Failed to fetch/.test(e)),[]);   // reload/navigation aborts layer fetches in flight; any other error fails (it aborts the layer fetches in flight)

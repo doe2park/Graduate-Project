@@ -2,7 +2,7 @@
 
 **Yoonsung Chung · UC Berkeley Civil & Environmental Engineering**
 
-Advisor: Prof. Kenichi Soga · Research status updated November 10, 2026
+Advisor: Prof. Kenichi Soga · Research status updated November 18, 2026
 
 A research prototype linking **captured site appearance, BIM objects and operational data**, with explicit labels for measured, modelled and inferred information.
 
@@ -25,7 +25,7 @@ No installation is required. Open a live page, rather than its HTML source on Gi
 | Quest VR overlay | [Open VR](https://doe2park.github.io/Graduate-Project/vr/) · [Send to Quest](https://www.oculus.com/open_url/?url=https%3A%2F%2Fdoe2park.github.io%2FGraduate-Project%2Fvr%2F) | [HTML](scan-xr.html) · [Guide](docs/QUEST_XR_OVERLAY.md) | Stand inside a captured 360° photo in a Quest headset with Level 1 BIM services overlaid (controller lens, element cards, station jumps); desktop-tested, headset testing pending |
 | Design vs actual | [Open performance](https://doe2park.github.io/Graduate-Project/grimes-performance.html) | [HTML](grimes-performance.html) | Examine LEED design context against available operating evidence |
 
-**Latest BIM workspace:** [Grimes BIM Explorer](https://doe2park.github.io/Graduate-Project/grimes-bim-explorer.html) runs directly on GitHub Pages. No Python server or application installation is required. Desktop defaults to all ten source layers (66,620 identities); narrow screens start with a smaller regional package and can switch to the whole building. The explorer shows source BIM properties; use the existing element BIM viewer for labelled operating-data context. [Usage and development guide](docs/BIM_EXPLORER.md).
+**Latest BIM workspace:** [Grimes BIM Explorer](https://doe2park.github.io/Graduate-Project/grimes-bim-explorer.html) runs directly on GitHub Pages. No Python server or application installation is required. Desktop defaults to all ten source layers (69,564 identities); narrow screens start with a smaller regional package and can switch to the whole building. The explorer shows source BIM properties; use the existing element BIM viewer for labelled operating-data context. [Usage and development guide](docs/BIM_EXPLORER.md).
 
 **Suggested tour:** campus map → energy dashboard / weekly history → BIM object selection → Scan ↔ BIM → performance. The scan comparison does not require a Cupix login.
 
@@ -33,11 +33,13 @@ No installation is required. Open a live page, rather than its HTML source on Gi
 
 | Area | Current status | Evidence boundary |
 |---|---|---|
-| Element BIM | Ten layers, 66,620 source identities; 62,870 drawn by default after known non-part objects are hidden ([quality overlay](docs/ELEMENT_QUALITY.md)); filtering, picking and runtime batching | Design properties do not prove installed condition or sensor coverage |
+| Element BIM | Ten layers, 69,564 source identities; 65,680 identities retained by the default visibility rules (243 lack drawable geometry) after known non-part objects are hidden ([quality overlay](docs/ELEMENT_QUALITY.md)); filtering, picking and runtime batching | Design properties do not prove installed condition or sensor coverage |
 | Operating data | Scheduled BMO collection and archived observations | Not a direct BAS/BACnet connection or continuous verified meter history |
 | Public scan comparison | October 18 capture is the default (Level 1, plus Level 2 and Level 3 photo packages); September 17 and the May 6 baseline remain selectable | September and October alignments are provisional; photo transitions are not measured parallax |
 | Gaussian reconstruction | Two distinct research tracks: exported poses and independent raw-video SfM. Published scenes: May 6, and October 18 Level 1 zones A, C and D | Experimental appearance, not surveyed geometry; October 18 zone B and all other trained scenes remain local |
 | Research evaluation | Task-based comparison proposed | No completed user study or demonstrated improvement in decision accuracy yet |
+
+**November 18 source recovery:** 2,944 authentic Level 2 duct identities were recovered from a long MD02 filename alias that the old extraction rule skipped. Original GLBs and original sidecars remain unchanged; the viewers load a byte-preserving additive duct asset. Another 495 eligible IDs are absent from the archived deduplicated geometry, so this is partial source recovery, not complete as-built verification. [Recovery and verification](docs/DUCT_SOURCE_RECOVERY.md).
 
 ## Architecture and data honesty
 

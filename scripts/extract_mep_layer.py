@@ -34,7 +34,7 @@ from extract_layer import read_glb, write_glb, subset_from_source
 
 # layer -> source-file rule (regex on source_file; ENG_R22.rvt splits by name)
 SRC = {
-    "duct":     (r"^MD\d+\.dwg$", r"duct|flex drop|damper|tap|transition"),
+    "duct":     (r"^(?:MD\d+|UCBBE-FMB-MD_.*-3D View - MD\d+ EXPORT)\.dwg$", r"duct|flex drop|damper|tap|transition"),
     "hydronic": (r"FMB-MP\.dwg$", r"pipe|coupling|valve|hanger|sprink"),
     "plumbing": (r"FMB-PL\.dwg$", None),
     "fire":     (r"FP\.DWG$",     None),
@@ -84,6 +84,8 @@ def type_of(name, cad_layer):
 
 def level_of(src):
     m = re.match(r"^(?:MD)?(\d\d)", src or "")
+    if not m:
+        m = re.search(r" - MD(\d\d) EXPORT\.dwg$", src or "", re.I)
     return LEVEL.get(m.group(1)) if m else None
 
 

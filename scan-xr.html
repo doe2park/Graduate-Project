@@ -66,13 +66,28 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 #station{max-width:118px}
 #stats{position:fixed;right:8px;bottom:8px;z-index:5;margin:0;padding:8px 10px;max-width:min(420px,calc(100% - 16px));max-height:46vh;overflow:auto;border-radius:8px;background:rgba(5,10,18,.88);border:1px solid var(--bd);font:500 11px/1.35 ui-monospace,Menlo,monospace;color:#cfe3f5;white-space:pre}#stats[hidden]{display:none}
 @media(max-width:640px){.b input[type=range]{width:64px}.mode{min-height:84px}.mode .t{font-size:24px}.mode .s{font-size:13px}}
+
+/* Touch preview: retain every control, but let the model use the phone screen. */
+#entryHeader{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+#entryHeader #entryKicker{flex:1;min-width:0;margin:0}
+#entryToggle{flex:none;min-width:64px;min-height:44px;padding:0 10px;border:1px solid #58708a;border-radius:9px;background:#13263b;color:#e8f1f8;font:600 13px Arial;cursor:pointer}
+#entryToggle:focus-visible{outline:3px solid #FDB515;outline-offset:3px}
+#entry.compact{width:auto;max-width:calc(100% - 24px)}
+#entry.compact #entryHeader{margin:0}
+#entry.compact #entryControls{display:none}
+@media(pointer:coarse),(max-width:640px){
+ .b,#bar select,#mr select{min-height:44px;height:44px;min-width:44px}
+ #moreOpts>summary,#askBox summary{min-height:44px;display:flex;align-items:center}
+ .b input[type=range]{height:40px}
+}
 </style>
 <script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=10"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=5"></script><script src="twin/xr-ask.js?v=13"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
 <section id="entry" aria-label="Start" data-layout="pair">
- <p id="entryKicker">Grimes digital twin · Level 1 building services</p>
+ <div id="entryHeader"><p id="entryKicker">Grimes digital twin · Level 1 building services</p><button id="entryToggle" type="button" aria-expanded="true" aria-controls="entryControls" aria-label="Hide controls to inspect the model">Hide</button></div>
+ <div id="entryControls">
  <div id="modes" role="group" aria-label="Choose a mode">
  <button id="enterMR" class="b mode" hidden title="Mixed reality at Grimes: BIM services over the passthrough, manual alignment (not surveyed)"><span class="t">At Grimes · MR</span><span class="s">In the building. BIM over the real room; align once.</span></button>
  <button id="enterVR" class="b mode" hidden title="Virtual reality anywhere: stand inside the captured 360° photos of Grimes with the BIM services"><span class="t">Anywhere · VR</span><span class="s">Any room. Stand inside the Grimes 360° photos with the BIM.</span></button>
@@ -117,6 +132,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
 </section>
  </details>
  <p id="align" role="note"></p>
+ </div>
 </section>
 <pre id="stats" hidden aria-label="Render statistics"></pre>
 <script type="module">
@@ -126,6 +142,10 @@ import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
 import {buildSpatialTier,bindElementSourceIds,releaseSource,resolveHit,highlight,applyRadius,pruneGlbToLevels} from './twin/xr-spatial-tier.mjs?v=2';   // ?v: a cached older copy lacks pruneGlbToLevels and the import would fail
 import {applyElementQuality,metaForPruning,showFlagged,ELEMENT_QUALITY_PATH} from './twin/element-quality.mjs?v=1';
 const X=globalThis.ScanXRCore,EC=globalThis.ElementCards,MR=globalThis.MRAlign,OV=globalThis.OverlayVisibility,$=id=>document.getElementById(id);
+$('entryToggle').onclick=()=>{const collapsed=$('entry').classList.toggle('compact'),b=$('entryToggle');
+ b.setAttribute('aria-expanded',String(!collapsed));b.textContent=collapsed?'Controls':'Hide';
+ b.setAttribute('aria-label',collapsed?'Show model controls':'Hide controls to inspect the model');};
+
 /* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
    inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
 const XR_CORE_API=10,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
@@ -137,7 +157,7 @@ const LAYERS={
  equipment:{glb:'buildings/grimes/grimes-equipment.glb',json:'buildings/grimes/elements.json',label:'Equipment',mb:1.5},
  lighting:{glb:'buildings/grimes/grimes-lighting.glb',json:'buildings/grimes/lighting.elements.json',label:'Lighting',mb:2.3},
  conduit:{glb:'buildings/grimes/grimes-conduit.glb',json:'buildings/grimes/conduit.elements.json',label:'Conduit',mb:11.0},
- duct:{glb:'buildings/grimes/grimes-duct.glb',json:'buildings/grimes/duct.elements.json',label:'Ductwork',mb:21.1},
+ duct:{glb:'buildings/grimes/grimes-duct-restored.glb',json:'buildings/grimes/duct-restored.elements.json',label:'Ductwork',mb:24.5},
  hydronic:{glb:'buildings/grimes/grimes-hydronic.glb',json:'buildings/grimes/hydronic.elements.json',label:'Mech piping',mb:20.4},
  plumbing:{glb:'buildings/grimes/grimes-plumbing.glb',json:'buildings/grimes/plumbing.elements.json',label:'Plumbing',mb:20.9},
  lifesafety:{glb:'buildings/grimes/grimes-lifesafety.glb',json:'buildings/grimes/lifesafety.elements.json',label:'Life safety',mb:.5},
@@ -292,6 +312,11 @@ async function openStation(index,{instant=false,initialLook=false,force=false}={
    tex=await texLoader.loadAsync(photoURL(s));tex.colorSpace=THREE.SRGBColorSpace;
    if(epoch!==captureEpoch||(gauss.scene==='gaussian')!==gMode){tex.dispose();return;}}
   if(doFade)await fade(0,140);
+  // Capture/scene selection can change during the fade, after texture loading was validated.
+  // Never pair the old station/photo with the new registration; release the uninstalled texture.
+  if(epoch!==captureEpoch||(gauss.scene==='gaussian')!==gMode){
+   if(tex)tex.dispose();U.fade.value=1;sphereMat.color.setScalar(1);fader.visible=false;return;
+  }
   hideCard();
   if(tex){const old=sphereMat.map;sphereMat.map=tex;sphereMat.needsUpdate=true;if(old)old.dispose();}
   active=i;viewPos=s.position.slice();sphere.position.fromArray(s.position);sphere.quaternion.fromArray(X.stationQuaternion(s.e57Quaternion,0));sphere.visible=usePhoto&&!!sphereMat.map;
@@ -397,7 +422,13 @@ marker.renderOrder=59;marker.visible=false;scene.add(card.mesh,marker);
    (X.toastLines), never shrunk. xrDebug.forceToast(true) draws it outside an XR session too (desktop screenshots). */
 const TOAST_FONT=40,TOAST_LINE=52;
 const toast=makeSurface(1024,170,.42,.0697,80);toast.mesh.position.set(0,-.2,-.75);camera.add(toast.mesh);let toastTimer=0,toastForce=false;
-function xrToast(text){if(!renderer.xr.isPresenting&&!toastForce)return;const {ctx,W,H}=toast;ctx.clearRect(0,0,W,H);ctx.font='500 '+TOAST_FONT+'px Arial';
+// Keep feedback next to the active world-space panel, never over its controls.
+function dockToast(){const panel=MODE_AR?(mr.panel?mrPanel.mesh:null):(state.menu?menu.mesh:null),parent=panel||camera;
+ if(toast.mesh.parent!==parent)parent.add(toast.mesh);toast.mesh.rotation.set(0,0,0);
+ const scale=panel&&MODE_AR?1.25:1;toast.mesh.scale.setScalar(scale);
+ toast.mesh.position.set(0,panel?(MODE_AR?.5625/2:MENU_H/2)+.0697*scale/2+.025:-.2,panel?.015:-.75);
+}
+function xrToast(text){if(!renderer.xr.isPresenting&&!toastForce)return;dockToast();const {ctx,W,H}=toast;ctx.clearRect(0,0,W,H);ctx.font='500 '+TOAST_FONT+'px Arial';
  const lines=X.toastLines?X.toastLines(String(text),t=>ctx.measureText(t).width,W-96):[String(text)],bh=lines.length*TOAST_LINE+40,top=(H-bh)/2;
  ctx.fillStyle='rgba(8,16,28,.9)';ctx.beginPath();ctx.roundRect(4,top,W-8,bh,Math.min(44,bh/2));ctx.fill();ctx.strokeStyle='rgba(226,232,240,.25)';ctx.lineWidth=2;ctx.stroke();
  ctx.textAlign='center';ctx.fillStyle='#f1f5f9';lines.forEach((l,i)=>ctx.fillText(l,W/2,top+20+TOAST_LINE*(i+.5)+TOAST_FONT*.36,W-80));ctx.textAlign='left';
@@ -634,7 +665,7 @@ function drawMenu(){const {ctx,W,H}=menu,{page,buttons,rects}=menuModel();ctx.cl
 /* World placement in front of the head, then parented to the rig so it follows station jumps, teleports and snap turns. */
 function placeInFront(mesh,dist,drop){scene.attach(mesh);camera.getWorldPosition(_head);const f=camera.getWorldDirection(_v);f.y=0;if(f.lengthSq()<1e-6)f.set(0,0,-1);f.normalize();
  mesh.position.copy(_head).addScaledVector(f,dist);mesh.position.y-=drop;mesh.lookAt(_head);rig.attach(mesh);}
-function setMenu(on){state.menu=on;menuHover.clear();menuSeen=false;menuAway=0;if(on){state.page='main';drawMenu();placeInFront(menu.mesh,MENU_DIST,MENU_DROP);}menu.mesh.visible=on;invalidate();}
+function setMenu(on){state.menu=on;menuHover.clear();menuSeen=false;menuAway=0;if(on){state.page='main';drawMenu();placeInFront(menu.mesh,MENU_DIST,MENU_DROP);}menu.mesh.visible=on;dockToast();invalidate();}
 function menuAutoClose(){if(!state.menu)return;const now=performance.now(),on=controllers.some(c=>c.userData.hover?.panel==='menu');if(on){menuSeen=true;menuAway=now;}else if(menuSeen&&now-menuAway>MENU_AWAY_MS)setMenu(false);}
 /* Floor tag (what the headset shows on entry): the honesty line, then "B/Y: menu" (and the Gaussian caveat in Gaussian mode).
    1024 px = 0.6 m seen at ~1.5 m (1° = 45 px): 46 px honesty line, 38 px second lines. */
@@ -1124,19 +1155,20 @@ async function mrBackdropApply({aim=true,look=null,pitchOverride=null}={}){
    Pages (2026-11-16 demo trim): 'simple' (what B/Y opens) = six big buttons for the mode you are in; More ▸ = 'main', the full
    grid below (index-dispatched, unchanged, slot 19 = Back); 'layers'. Nothing was removed: every action is still on 'main'. */
 const MR_SIMPLE={cols:3,rows:2,left:.025,right:.975,top:.5,bottom:.97,gap:.02};
-const mrLayout=()=>mr.page==='simple'?MR_SIMPLE:MR.PANEL;
+const MR_LAYERS={cols:3,rows:3,left:.025,right:.975,top:.28,bottom:.97,gap:.02};
+const mrLayout=()=>mr.page==='simple'?MR_SIMPLE:mr.page==='layers'?MR_LAYERS:MR.PANEL;
 function mrSimpleButtons(){const sty={id:'style',label:`Style: ${state.mode==='lens'?'Lens':'All'}`,act:10},close={id:'close',label:'Close',act:14},more={id:'more',label:'More ▸'};
  if(mrModeIsDemo())return [{id:'replace',label:mr.demoPending?'Place: aim + trigger':mr.demo?'Re-place demo':'Place demo',act:15},{id:'sensors',label:`Sensors: ${SENS.loading?'…':SENS.on?'on':'off'}`,act:17},
   {id:'scene',label:SENS.on?`Scene: ${SXN[SENS.scene]} ▸`:'Scene: off',act:18},sty,close,more];
  return [{id:'realign',label:mr.session?'Restart align':'Re-align',act:4},{id:'accept',label:'Accept + save',act:5},{id:'skip',label:'Skip point',act:1},sty,close,more];}
-function mrButtons(){if(mr.page==='simple')return mrSimpleButtons().map(b=>b.label);if(mr.page==='layers')return [...OVERLAY_LAYER_KEYS.map(k=>`${LAYERS[k].label}: ${layerState[k]?.loading?'…':mrLayerOn(k)?'on':'off'}`),'','','','','','','◂ Back'];
+function mrButtons(){if(mr.page==='simple')return mrSimpleButtons().map(b=>b.label);if(mr.page==='layers')return [...OVERLAY_LAYER_KEYS.map(k=>`${LAYERS[k].label}: ${layerState[k]?.loading?'…':mrLayerOn(k)?'on':'off'}`),'◂ Back'];
  const s=mr.session;return ['Capture: trigger','Skip point','Redo last','Solve now',s?'Restart align':'Re-align','Accept + save',`Nudge: ${mr.nudge?'on':'off'}`,`Step: ${mr.step==='fine'?'1 cm · 0.25°':'5 cm · 1°'}`,
   mrDemoOn()?'Check: off (demo)':mr.checkIdx>=0?`Check: ${mr.area.checks[mr.checkIdx].id} ▸`:'Check points',`Range: ${OV.preset(mr.rangeKey).label}`,`Style: ${state.mode==='lens'?'Lens':'All'}`,'Layers ▸',`Area: ${mr.area?.id.replace(/^l1-/,'')||'-'}`,'Forget saved','Close',mr.demoPending?'Demo: aim + trigger':mr.demo?'Demo: re-place':'Demo here',
   mrModeIsDemo()?'Mode: Demo ⇄':'Mode: Grimes ⇄',`Sensors: ${SENS.loading?'…':SENS.on?'on':'off'}`,SENS.on?`Scene: ${SXN[SENS.scene]} ▸`:'Scene: off','◂ Back'];}
 async function mrButton(i){
  if(mr.page==='simple'){const b=mrSimpleButtons()[i];if(!b)return;if(b.id==='more'){mr.page='main';mrRefresh();return;}i=b.act;}
  else if(mr.page==='main'&&i===19){mr.page='simple';mrRefresh();return;}
- if(mr.page==='layers'){if(i<OVERLAY_LAYER_KEYS.length)mrToggleLayer(OVERLAY_LAYER_KEYS[i]);else if(i===14)mr.page='main';mrRefresh();return;}
+ if(mr.page==='layers'){if(i<OVERLAY_LAYER_KEYS.length)mrToggleLayer(OVERLAY_LAYER_KEYS[i]);else if(i===OVERLAY_LAYER_KEYS.length)mr.page='main';mrRefresh();return;}
  if(i===0){mrSetPanel(false);mr.note='Panel hidden · put the gold ball on the point and pull the trigger (B/Y brings the panel back)';}   // never capture at the panel itself
  else if(i===1)mrSkip();else if(i===2)mrRedo();else if(i===3)mrSolveNow();else if(i===4)mrStartAlign();
  else if(i===5)mrAccept();else if(i===6)mr.nudge=!mr.nudge;else if(i===7)mr.step=mr.step==='fine'?'coarse':'fine';else if(i===8)mrNextCheck();
@@ -1145,7 +1177,7 @@ async function mrButton(i){
  else if(i===13)mrForget();else if(i===14){mrSetPanel(false);return;}else if(i===15){mrBeginDemo();mrSyncUrl();return;}
  else if(i===16){mrSetMode(mrModeIsDemo()?'align':'demo');return;}else if(i===17){mrChoose('sensors');return;}else if(i===18){if(SENS.on)sensorsNextScene().then(()=>{mrSyncUrl();mrRefresh();});else mrChoose('sensors');return;}
  mrRefresh();}
-function mrSetPanel(on){mr.panel=on;if(on){mr.page='simple';mrDrawPanel();placeInFront(mrPanel.mesh,1.0,.22);}mrPanel.mesh.visible=on;invalidate();}
+function mrSetPanel(on){mr.panel=on;if(on){mr.page='simple';mrDrawPanel();placeInFront(mrPanel.mesh,1.0,.22);}mrPanel.mesh.visible=on;dockToast();invalidate();}
 function mrDrawMap(ctx,x0,y0,w,h){const a=mr.area;if(!a)return;const pts=a.points.filter(p=>p.kind!=='y'),all=[...pts.map(p=>p.bim),...a.checks.map(c=>c.bim)];
  const xs=all.map(p=>p[0]),zs=all.map(p=>p[2]),mnx=Math.min(...xs),mxx=Math.max(...xs),mnz=Math.min(...zs),mxz=Math.max(...zs),sc=Math.min((w-60)/Math.max(.5,mxx-mnx),(h-60)/Math.max(.5,mxz-mnz));
  const P2=p=>[x0+30+(p[0]-mnx)*sc+((w-60)-(mxx-mnx)*sc)/2,y0+30+(p[2]-mnz)*sc+((h-60)-(mxz-mnz)*sc)/2];
@@ -1154,7 +1186,23 @@ function mrDrawMap(ctx,x0,y0,w,h){const a=mr.area;if(!a)return;const pts=a.point
  const cur=mr.session?MR.currentPoint(a,mr.session):null;
  for(const c of a.checks){const [x,y]=P2(c.bim);ctx.fillStyle=mr.checkIdx>=0&&a.checks[mr.checkIdx]===c?'#fbbf24':'#64748b';ctx.fillRect(x-6,y-6,12,12);ctx.fillText(c.id,x+9,y+7);}
  for(const p of pts){const [x,y]=P2(p.bim),done=mr.session?.captures[p.id],sk=mr.session?.skipped[p.id];ctx.beginPath();ctx.arc(x,y,cur===p?15:10,0,7);ctx.fillStyle=cur===p?'#FDB515':done?'#34d399':sk?'#7a2633':'#5d82a3';ctx.fill();ctx.fillStyle='#fff';ctx.font='700 26px Arial';ctx.fillText(p.id,x+16,y-10);}}
-function mrDrawPanel(){const {ctx,canvas,W,H}=mrPanel;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.93)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,30);ctx.fill();
+/* The eight disciplines get a dedicated 3×3 grid: readable system names, separate
+   state labels and one Back target. The advanced alignment grid remains intact. */
+function mrDrawLayerPanel(){const {ctx,W,H}=mrPanel;ctx.clearRect(0,0,W,H);
+ ctx.fillStyle='rgba(8,16,28,.95)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,30);ctx.fill();
+ ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,80);ctx.fillStyle='#FDB515';ctx.fillRect(4,80,W-8,5);
+ ctx.fillStyle='#fff';ctx.font='700 40px Arial';ctx.fillText('Grimes MR · Layers',30,58);
+ ctx.textAlign='right';ctx.fillStyle='#b7c9da';ctx.font='28px Arial';ctx.fillText('B/Y closes',W-30,56);ctx.textAlign='left';
+ ctx.fillStyle='#ffb4a8';fitText(ctx,mrDemoOn()?'DEMO placement · not aligned to this building':MR.LABEL,30,130,W-60,30,'Arial',28);
+ ctx.fillStyle='#cfe3f5';ctx.font='30px Arial';ctx.fillText(`${OVERLAY_LAYER_KEYS.filter(mrLayerOn).length} of ${OVERLAY_LAYER_KEYS.length} on · Design (BIM) positions`,30,174);
+ [...OVERLAY_LAYER_KEYS,null].forEach((key,i)=>{const r=MR.gridRect(MR_LAYERS,i),hov=mrHover.has(i),g=hov?6:0,x=r.x*W-g,y=r.y*H-g,w=r.w*W+2*g,h=r.h*H+2*g;
+  const st=key&&layerState[key],on=key&&mrLayerOn(key),label=key?LAYERS[key].label:'◂ Back',value=!key?'':st?.error?'Retry load':st?.loading?'Loading…':on?'ON':'OFF';
+  ctx.fillStyle=hov?'#FDB515':!key?'#24425f':on?'#14532d':'#123047';ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.fill();
+  ctx.strokeStyle=hov?'#fff':st?.error?'#fbbf24':on?'#4ade80':'#5d82a3';ctx.lineWidth=hov?6:2;ctx.stroke();ctx.textAlign='center';
+  ctx.fillStyle=hov?'#0b1020':'#fff';fitFont(ctx,label,x+w/2,y+h*(key?.44:.58),w-28,38,'700',32);
+  if(value){ctx.fillStyle=hov?'#0b1020':st?.error?'#fde68a':on?'#bbf7d0':'#b7c9da';ctx.font='600 28px Arial';ctx.fillText(value,x+w/2,y+h*.76,w-28);}ctx.textAlign='left';
+ });mrPanel.texture.needsUpdate=true;invalidate();}
+function mrDrawPanel(){if(mr.page==='layers')return mrDrawLayerPanel();const {ctx,canvas,W,H}=mrPanel;ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(8,16,28,.93)';ctx.beginPath();ctx.roundRect(4,4,W-8,H-8,30);ctx.fill();
  ctx.fillStyle='#003262';ctx.fillRect(4,4,W-8,80);ctx.fillStyle='#FDB515';ctx.fillRect(4,80,W-8,5);ctx.fillStyle='#fff';ctx.font='700 40px Arial';ctx.fillText('Grimes MR · BIM services in passthrough',30,58);
  const simple=mr.page==='simple',top=H*mrLayout().top,tw=simple&&mrDemoOn()?W-60:W*.6;let y=128;ctx.fillStyle='#ffb4a8';
  if(mrDemoOn()){ctx.font='700 27px Arial';for(const t of wrap(ctx,mrDemoText(),tw-20,3)){ctx.fillText(t,30,y);y+=33;}y+=8;}else{fitText(ctx,mrShort()+' · '+MR.LABEL,30,y,tw-20,28,'Arial');y+=44;}
@@ -1714,7 +1762,7 @@ let lastIdleCone='';function coneFromViewIfIdle(){const s=camera.quaternion.toAr
 function totals(){const o={drawCalls:0,visibleDrawCalls:0,triangles:0,visibleTriangles:0,elements:0};for(const st of Object.values(layerState)){for(const m of st.meshes){const tri=m.userData.isLine?0:(m.geometry.index?m.geometry.index.count/3:m.geometry.attributes.position.count/3)*(m.isInstancedMesh?m.count:1);o.drawCalls++;o.triangles+=tri;if(m.visible&&st.group.visible){o.visibleDrawCalls++;o.visibleTriangles+=tri;}}o.elements+=st.stats.elements||0;}return o;}
 function xrLayerSize(){try{const l=xrSession?.renderState?.baseLayer;return l?{width:l.framebufferWidth,height:l.framebufferHeight,antialias:!!l.antialias}:null;}catch(e){return null;}}
 function inspection(){const heap=performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576):null;
- return {ready:active>=0&&!gauss.loading,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},availableCaptures,station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
+ return {ready:active>=0&&!gauss.loading,transitioning:busyStation,capture:capture&&{date:capture.date,provisional:capture.provisional,alignmentText:capture.alignmentText},availableCaptures,station:{index:active,id:stations[active]?.id??null,count:stations.length,positionScan:stations[active]?.position??null,positionBim:stationBim},
   style:state.mode,opacity:state.opacity[state.mode],coneDeg:state.coneDeg,radius:P.radius,levels:[...P.levels],hiRes:state.hiRes,texture:sphereMat.map?.image?{width:sphereMat.map.image.width,height:sphereMat.map.image.height}:null,
   layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{loaded:s.loaded,loading:s.loading,error:s.error||null,visible:s.group.visible,loadMs:s.loadMs??null,...s.stats,visibleBatches:s.meshes.filter(m=>m.visible).length}])),
   totals:totals(),lastRender:{...lastInfo},renderCount,heapMB:heap,timing:{...timing},xr:{supported:xrSupported,presenting:renderer.xr.isPresenting,framebufferScale:P.xrScale,foveation:P.foveation,device:XQ.device,scaleSource:XQ.scaleSource,foveationSource:XQ.foveationSource,antialias:!!renderer.getContext().getContextAttributes()?.antialias,layerSize:xrLayerSize(),coreInSync:CORE_OK,coreApi:X?.API??null,guard:{on:GUARD_ON,level:guard.level,label:FG.levels[guard.level].label,fps:guard.n?Math.round(1000/guard.ema):null,error:guard.error||null},frameErrors:xrFrameErrors,lastFrameError:lastXrFrameError},

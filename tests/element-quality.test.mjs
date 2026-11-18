@@ -66,11 +66,11 @@ test('the committed overlay matches the sidecars it describes', () => {
   }
   const s = overlay.summary;
   assert.deepEqual({elements: s.elements, annotation: s.annotation, reference: s.reference, duplicate: s.duplicate, noGeometry: s.noGeometry, aggregate: s.aggregate, storey: s.storey}, total);
-  assert.equal(s.elements, 66620, 'source identities are not removed'); assert.equal(s.hidden, s.annotation + s.reference + s.duplicate); assert.equal(s.shownByDefault, s.elements - s.hidden);
+  assert.equal(s.elements, 66620+2944, 'source identities are not removed'); assert.equal(s.hidden, s.annotation + s.reference + s.duplicate); assert.equal(s.shownByDefault, s.elements - s.hidden);
 });
 
 test('real duct layer: annotation copies and layout points are cut before decode', () => {
-  const meta = json('buildings/grimes/duct.elements.json').elements, bytes = fs.readFileSync(new URL('buildings/grimes/grimes-duct.glb', root));
+  const meta = json('buildings/grimes/duct-restored.elements.json').elements, bytes = fs.readFileSync(new URL('buildings/grimes/grimes-duct-restored.glb', root));
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), levels = new Set(['L1']);
   const before = pruneGlbToLevels(buffer, meta, levels);
   const r = Q.applyElementQuality(meta, overlay, 'duct'), after = pruneGlbToLevels(buffer, Q.metaForPruning(meta, r.hidden), levels);

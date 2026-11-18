@@ -29,3 +29,7 @@ The UI shows source BIM properties and no verified element-level live feed. This
 Original source files, copyright and third-party notices remain applicable. See the repository `LICENSE.md`, `bim-explorer-assets/THREE-LICENSE.txt`, and the Draco license/readme. Draco files are copied byte-for-byte from the existing workshop vendor distribution; the supplemental upstream license copy was obtained from the Draco 1.5.7 license URL, without claiming an independently verified decoder binary version.
 
 For public provenance, `regional/provenance.json` replaces the original machine-specific repository and renderer paths with the public repository URL and repository-relative `grimes-bim-viewer.html`. These two metadata-only adaptations do not change geometry, IDs, source hashes or the recorded transform.
+
+## November 18 source recovery
+
+The catalogue now selects the additive `grimes-duct-restored.glb` and matching sidecar. These retain the original duct geometry byte-verbatim and add 2,944 verified original-source MD02 identities. Full inventory: 69,564 source identities. The archived source still lacks 495 eligible MD02 IDs; no geometry was invented. See `docs/DUCT_SOURCE_RECOVERY.md`. Original duct files remain available unchanged.

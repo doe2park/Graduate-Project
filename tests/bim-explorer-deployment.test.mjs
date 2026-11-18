@@ -57,7 +57,7 @@ test('all regional geometry files retain audited byte lengths and counts',()=>{
 });
 test('existing full-building catalog preserves identities and triangle counts',()=>{
   const c=JSON.parse(fs.readFileSync(path.join(root,'bim-explorer-assets/source-catalog.json')));
-  assert.equal(c.objects,66620);assert.equal(c.triangles,48728223);assert.equal(c.segments,385803);
+  assert.equal(c.objects,66620+2944);assert.equal(c.triangles,48728223+87266);assert.equal(c.segments,385803+489);
   assert.equal(c.layers.length,10);
   for(const layer of c.layers){assert.match(layer.metadataSHA256,/^[a-f0-9]{64}$/);for(const part of layer.parts){assert.match(part.sha256,/^[a-f0-9]{64}$/);assert.ok(part.path.startsWith('buildings/grimes/'));}}
 });

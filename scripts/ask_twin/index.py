@@ -28,7 +28,7 @@ BUILDING_LAYERS = {
     'lifesafety': ('buildings/grimes/grimes-lifesafety.glb', 'buildings/grimes/lifesafety.elements.json'),
     'structural': ('buildings/grimes/grimes-structural.glb', 'buildings/grimes/structural.elements.json'),
     'conduit': ('buildings/grimes/grimes-conduit.glb', 'buildings/grimes/conduit.elements.json'),
-    'duct': ('buildings/grimes/grimes-duct.glb', 'buildings/grimes/duct.elements.json'),
+    'duct': ('buildings/grimes/grimes-duct-restored.glb', 'buildings/grimes/duct-restored.elements.json'),
     'hydronic': ('buildings/grimes/grimes-hydronic.glb', 'buildings/grimes/hydronic.elements.json'),
     'plumbing': ('buildings/grimes/grimes-plumbing.glb', 'buildings/grimes/plumbing.elements.json'),
     'fire': ('buildings/grimes/grimes-fire.glb', 'buildings/grimes/fire.elements.json'),

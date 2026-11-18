@@ -17,7 +17,7 @@ The base URL chooses a regional example on narrow screens. The model selector ca
 
 | Mode | URL parameter | Contents |
 |---|---|---|
-| Whole building | `?model=full` | Ten layers and 66,620 source identities; 3,750 non-part objects start hidden ([ELEMENT_QUALITY.md](ELEMENT_QUALITY.md), `&flagged=1` shows them) |
+| Whole building | `?model=full` | Ten layers and 69,564 source identities; 3,884 non-part objects start hidden ([ELEMENT_QUALITY.md](ELEMENT_QUALITY.md), `&flagged=1` shows them) |
 | Regional example | `?model=regional` | Partial Level 1 area: 492 objects across eight systems |
 | Conduit example | `?model=conduit` | 24-object GLB/JSON teaching package |
 
@@ -25,7 +25,7 @@ The base URL chooses a regional example on narrow screens. The model selector ca
 
 The generated `grimes-bim-explorer.html` contains the application code and CSS. Three.js and its addons are pinned to 0.169.0 and loaded from a CDN. Draco decoders and small examples live in `bim-explorer-assets/`; the whole building uses the existing GLB and JSON files in `buildings/grimes/`.
 
-The hosting adaptation does not simplify, re-encode or rename the source geometry. Original source IDs continue to bind objects to their sidecars. Source-file hashes, byte lengths and object counts are checked during loading. The full catalog describes 48,728,223 triangle instances and 385,803 line segments; these are inventory counts, not a measured frame rate.
+The hosting adaptation does not simplify, re-encode or rename the source geometry. The November 18 additive MD02 recovery retains every original duct identity and compressed buffer, adding 2,944 original-source Level 2 identities while 495 eligible identities remain unavailable in the archived source. Original source files remain unchanged; see [recovery evidence](DUCT_SOURCE_RECOVERY.md). Original source IDs continue to bind objects to their sidecars. Source-file hashes, byte lengths and object counts are checked during loading. The full catalog describes 48,815,489 triangle instances and 386,292 line segments; these are inventory counts, not a measured frame rate.
 
 This page displays BIM design properties. It does not establish an element's actual installed state or attach a verified live sensor feed. The existing [element viewer](https://doe2park.github.io/Graduate-Project/grimes-bim-viewer.html) contains separately labelled operating-data context. Publishing this explorer does not validate Quest performance, physical AR alignment or scan registration.
 

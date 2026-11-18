@@ -2,6 +2,8 @@
 
 **Updated November 10, 2026. Public, sanitized continuation guide.**
 
+**November 18 addendum (supersedes the older current-inventory claims below):** the active local source inventory is 69,564 identities, including 2,944 MD02 alias-recovered Level 2 duct identities; 65,680 identities pass the default quality filter, including 243 without drawable geometry. Full geometry totals are 48,815,489 triangle instances and 386,292 line segments. The recovered source is partial: 495 eligible MD02 IDs are still absent from the archived deduplicated GLB. Do not read the dated tables below as the latest inventory. Original assets remain unchanged; loaders now use `grimes-duct-restored.glb` and `duct-restored.elements.json`. See [the verified recovery method](DUCT_SOURCE_RECOVERY.md). This local change is not a claim that public deployment has been updated.
+
 Read [AGENTS.md](../AGENTS.md) first, then this document, [README.md](../README.md), and the instructions for the component you will change. This is project context, not authorization for a deployment or an unrelated rewrite.
 
 This version intentionally excludes workstation paths, private document links, unpublished home imagery, internal server addresses, account information and credentials. All source paths below are repository-relative unless explicitly described as local-only work.
