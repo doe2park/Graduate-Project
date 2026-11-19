@@ -81,7 +81,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
  .b input[type=range]{height:40px}
 }
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=10"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=5"></script><script src="twin/xr-ask.js?v=14"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=10"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=5"></script><script src="twin/xr-ask.js?v=15"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -1645,17 +1645,19 @@ for(const c of controllers){c.addEventListener('selectstart',()=>askHoldStart(c)
    keeps the token in localStorage and turns Ask on in place (no reload). Later visits connect by themselves (askAuto). One state line:
    Not connected / Looking for the laptop… / Connected · LIVE|MOCK / Laptop not running. */
 function askConnectRow(){const d=document.createElement('div');d.className='askConnect';
- d.innerHTML='<label for="askCode">Code shown on the laptop</label><div class="askConnectRow"><input id="askCode" type="text" inputmode="numeric" pattern="[0-9 ]*" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="1234 5678" aria-describedby="askConnectNote"><button id="askConnectBtn" class="b">Connect</button></div><p id="askConnectNote" role="status"></p>';return d;}
+ d.innerHTML='<label for="askCode">Press Connect, then Allow on the Mac (or type the laptop code)</label><div class="askConnectRow"><input id="askCode" type="text" inputmode="numeric" pattern="[0-9 ]*" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="1234 5678" aria-describedby="askConnectNote"><button id="askConnectBtn" class="b">Connect</button></div><p id="askConnectNote" role="status"></p>';return d;}
 function askConnectNote(t){const n=$('askConnectNote');if(n)n.textContent=t||'';}
 /* the one state line (#askState) and the box look: data-state off | connecting | connected | down | unpaired */
 function askStateSet(state,opts={}){const L=XA.connectLine(state,opts),b=$('askBox'),el=$('askState');if(b){b.dataset.state=L.state;b.classList.toggle('bad',L.state==='down'||L.state==='unpaired');}
  if(el)el.textContent=L.text;const n=$('askStateNote');if(n){n.textContent=L.note||'';n.hidden=!L.note;}return L;}
-async function askConnect(){const code=XA.connectCode($('askCode').value);
- if(!code)return askConnectNote('Type the code shown on the laptop (digits; the space does not matter).');
+async function askConnect(){const code=XA.connectCode($('askCode').value),byAllow=!code&&!!XA.pairByApproval;
+ if(!code&&!byAllow)return askConnectNote('Type the code shown on the laptop (digits; the space does not matter).');
  $('askConnectBtn').disabled=true;askConnectNote('');if(!ASK.on)askStateSet('connecting');
  try{const f=await XA.findLaptop((u,o)=>fetch(u,o),Date.now());
   if(!f.ok){if(!ASK.on)askStateSet('down');return askConnectNote(f.why+' Start Ask on the laptop, then press Connect.');}
-  const pr=await XA.pairWithCode((u,o)=>fetch(u,o),f.server,code);
+  if(byAllow)askConnectNote('Now press Allow in the window on the Mac…');   // no code typed: the laptop's owner allows this device once
+  let pr=byAllow?await XA.pairByApproval((u,o)=>fetch(u,o),f.server):await XA.pairWithCode((u,o)=>fetch(u,o),f.server,code);
+  if(byAllow&&pr.fallback)pr={ok:false,why:'This laptop needs the code: type the code shown on the laptop, then press Connect.'};
   if(pr.ok){const kept=XA.savePairing(askStore(),pr.token);askGoOn({server:f.server,token:pr.token,note:kept?'':'This browser cannot keep the pairing: next visit, type the code again.'});return;}
   if(pr.fallback){askGoOn({server:f.server,code});return;}   // older laptop server: the code for this visit only
   if(!ASK.on)askStateSet('off');askConnectNote(pr.why);}
@@ -1888,5 +1890,29 @@ setInterval(updateStats,1000);
  await loadLayers(P.layers);
  if(SENS.on)await sensorsSetScene(SENS.scene);
 })();
+/* ── Headset self-report (2026-11-19) ── a real headset cannot be inspected from the laptop, and the emulated one does not show device-only
+   failures (black view, far model). On a WebXR device, when the Ask laptop answers, the page posts a small JSON of what it sees to
+   POST /api/diag (laptop only, never the public site): frame errors, loaded layers, rig / head / photo-sphere state. No audio, no images. */
+const DIAG={server:null,sent:0,errs:[],ctxLost:0,busy:false};
+addEventListener('error',e=>{if(DIAG.errs.length<12)DIAG.errs.push(String(e.message||e).slice(0,200)+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno);});
+addEventListener('unhandledrejection',e=>{if(DIAG.errs.length<12)DIAG.errs.push('rejection '+String(e.reason?.message||e.reason).slice(0,200));});
+cvs.addEventListener('webglcontextlost',()=>{DIAG.ctxLost++;diagSend('context-lost');});
+function diagDoc(tag){const v3=o=>{try{return o.toArray().map(n=>+n.toFixed(2));}catch(e){return null;}};let ins={};
+ try{const x=xrInspection();ins={timing:x.timing,totals:x.totals,levels:x.levels,texture:x.texture,xr:x.xr,scene:x.scene?.mode,heapMB:x.heapMB,renderCount:x.renderCount,lastRender:x.lastRender};}catch(e){ins={inspectError:String(e?.message||e)};}
+ let head=null,headLocal=null;try{camera.updateMatrixWorld(true);head=v3(camera.getWorldPosition(new THREE.Vector3()));headLocal=v3(camera.position);}catch(e){}
+ const q2=new URLSearchParams(location.search);for(const k of ['code','server'])q2.delete(k);
+ return {tag,ms:Math.round(performance.now()),page:location.pathname.split('/').pop()+'?'+q2,modeAR:MODE_AR,presenting:renderer.xr.isPresenting,status:$('status')?.textContent?.slice(0,160),
+  capture:capture?.date||null,active,stations:stations.length,viewPos:viewPos.map(n=>+n.toFixed(2)),rig:v3(rig.position),rigYaw:+rig.rotation.y.toFixed(3),head,headLocal,
+  bimRoot:v3(bimRoot.position),sphere:{visible:sphere.visible,opacity:sphereMat.opacity,transparent:sphereMat.transparent,map:sphereMat.map?.image?[sphereMat.map.image.width,sphereMat.map.image.height]:null,pos:v3(sphere.position)},
+  layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{meshes:s.meshes?.length||0,visible:!!s.group?.visible}])),wanted:P.layers,
+  frameErrors:xrFrameErrors,lastFrameError:lastXrFrameError,errs:DIAG.errs,ctxLost:DIAG.ctxLost,glLost:renderer.getContext().isContextLost(),maxTex:renderer.capabilities.maxTextureSize,
+  mr:MODE_AR?{demo:mr.demo?{method:mr.demo.method,floorPoint:mr.demo.floorPoint,headingDeg:mr.demo.headingDeg}:null,note:String(mr.note||'').slice(0,120),fit:!!mr.fit}:null,ask:ASK?{on:ASK.on,base:!!ASK.base}:null,...ins};}
+async function diagSend(tag){if(DIAG.busy||DIAG.sent>=40||!XAOK||!(xrSupported||xrARSupported||q.get('diag')==='1'))return;DIAG.busy=true;
+ try{if(!DIAG.server){DIAG.server=ASK?.base||null;if(!DIAG.server&&XA.ENDPOINT){const f=await XA.findLaptop((u,o)=>fetch(u,o),Date.now());if(f.ok)DIAG.server=f.server;}}
+  if(DIAG.server){DIAG.sent++;await fetch(XA.apiUrl(DIAG.server,'diag'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(diagDoc(tag)),keepalive:true}).catch(()=>{});}}
+ catch(e){}finally{DIAG.busy=false;}}
+renderer.xr.addEventListener('sessionstart',()=>{diagSend('session-start');for(const s of [2,6,15,40,90])setTimeout(()=>{if(renderer.xr.isPresenting)diagSend('in-session+'+s+'s');},s*1000);});
+renderer.xr.addEventListener('sessionend',()=>diagSend('session-end'));
+setTimeout(()=>diagSend('page+6s'),6000);setTimeout(()=>diagSend('page+30s'),30000);
 </script><script>/* /mr: open photo VR inside Grimes with the same demo-sensor scene (no typing on the headset) */(function(){for(const a of [document.getElementById('chVR'),document.getElementById('toVR')]){if(!a)continue;a.addEventListener('click',()=>{const q=new URLSearchParams(location.search),o=new URLSearchParams(q);for(const k of ['mode','place','area','scene','chosen'])o.delete(k);   /* MR-only keys go; ask, code, capture and the rest stay */if(q.get('sensors')!=='off')o.set('sensors','demo');const sc=q.get('scene');if(sc&&/^[a-z0-9-]{1,30}$/.test(sc))o.set('scene',sc);o.set('chosen','1');   /* the landing page then shows one big Enter VR */a.href='scan-xr.html'+(o.toString()?'?'+o:'');});}})();</script>
 </body></html>

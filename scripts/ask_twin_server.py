@@ -52,7 +52,8 @@ MAX_BODY = 25 * 1024 * 1024
 ENTRY = '/grimes-bim-viewer.html?ask=1'
 # Pages allowed to call the API from another origin (exact scheme://host[:port]; no wildcards, no http).
 PUBLIC_ORIGINS = frozenset({'https://doe2park.github.io'})
-API_PATHS = frozenset({'/api/health', '/api/ask', '/api/transcribe', '/api/speak', '/api/pair', '/api/pair/check', '/api/pair/forget'})
+API_PATHS = frozenset({'/api/health', '/api/ask', '/api/transcribe', '/api/speak', '/api/pair', '/api/pair/check', '/api/pair/forget',
+                       '/api/pair/request', '/api/diag'})
 # POST endpoint -> what limits.admit() checks: ask spends credits, speech is local, pair needs the code itself (a token cannot
 # pair another device), check / forget only need a valid code or token.
 POST_KINDS = {'/api/ask': 'ask', '/api/transcribe': 'speech', '/api/speak': 'speech', '/api/pair': 'pair',
@@ -63,6 +64,39 @@ STT_PROMPT = ('Questions about the Grimes building services: the duct, the diffu
 STT_HOTWORDS = 'Grimes duct diffuser VAV box damper airflow sprinkler pipe valve ceiling tile'
 XR_ENTRY = '/mr/?ask=1'   # the headset page: /mr -> scan-xr.html?mode=ar&place=demo&sensors=demo&ask=1
 CODE_HEADER = 'X-Ask-Code'
+
+APPROVE_LOCK = threading.Lock()   # one "Allow this device?" dialog at a time (POST /api/pair/request)
+
+
+class _Window:
+    """At most `limit` hits per `seconds` (the diagnostics log; no per-client state needed)."""
+
+    def __init__(self, limit, seconds):
+        self.limit, self.seconds, self.hits, self.lock = limit, seconds, [], threading.Lock()
+
+    def hit(self, _key=None) -> bool:
+        with self.lock:
+            now = time.monotonic()
+            self.hits = [h for h in self.hits if now - h < self.seconds]
+            if len(self.hits) >= self.limit:
+                return True
+            self.hits.append(now)
+            return False
+
+
+DIAG_WINDOW = _Window(120, 60)
+
+
+def mac_approve(label: str, timeout_s: int = 45) -> bool:
+    """A silent macOS dialog: Allow / Deny (Deny is the default button; no answer in timeout_s = Deny)."""
+    text = f'Ask the twin: a {label} wants to connect to this Mac. Allow it? It then connects by itself every time.'
+    script = (f'display dialog {json.dumps(text)} with title "Ask the twin" buttons {{"Deny", "Allow"}} '
+              f'default button "Deny" giving up after {int(timeout_s)}')
+    try:
+        out = subprocess.run(['osascript', '-e', script], capture_output=True, text=True, timeout=timeout_s + 10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return 'button returned:Allow' in out
 SECRET_QS = re.compile(r'\b(code|token)=[^&\s"]*', re.I)
 TOKEN_HEADER = 'X-Ask-Token'   # a paired device's token: header only (never a query parameter, so never in a URL or a log)
 PUBLIC_MR = 'https://doe2park.github.io/Graduate-Project/mr/?ask=1'
@@ -460,6 +494,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._transcribe(self._body())
             if path == '/api/speak':
                 return self._speak(json.loads(self._body() or b'{}'))
+            if path == '/api/pair/request':
+                self._body()
+                return self._pair_request()
+            if path == '/api/diag':
+                return self._diag(self._body())
             if path.startswith('/api/pair'):
                 self._body()
                 return self._pair(path)
@@ -504,6 +543,59 @@ class Handler(SimpleHTTPRequestHandler):
                 self.wfile.write(f'data: {json.dumps({"type": "error", "message": f"server error: {type(e).__name__}"})}\n\n'.encode())
             except OSError:
                 pass
+
+    def _pair_request(self):
+        """Pair with no typing (2026-11-19): the device asks, a dialog on this Mac asks the owner, Allow issues the same device token
+        as POST /api/pair. No credential is sent, so the owner's click is the check: one dialog at a time, rate limited per client,
+        Deny / no answer in 45 s refuses. Only with --approve-pairing; origins are checked like every other POST."""
+        from ask_twin.pairing import device_label
+        lim = self.app.limits
+        pairings = lim.pairings if lim else None
+        if not pairings or not getattr(self.app, 'approve_pairing', False):
+            return self._json(400, {'error': 'This laptop pairs with the code only.', 'reason': 'approval_off'})
+        wait = lim.pairs.hit(self.client_address[0])
+        if wait:
+            return self._json(429, {'error': f'Too many pairing requests. Try again in {wait} s.', 'reason': 'rate_pair', 'retry_after_s': wait}, wait)
+        label = device_label(self.headers.get('User-Agent'))
+        if not APPROVE_LOCK.acquire(blocking=False):
+            return self._json(429, {'error': 'Another device is waiting for Allow on the laptop. Try again in a moment.', 'reason': 'approval_busy', 'retry_after_s': 10}, 10)
+        try:
+            sys.stderr.write(f'[ask-twin] pairing request from a {label}: waiting for Allow on this Mac\n')
+            allowed = self.app.approver(label)
+        finally:
+            APPROVE_LOCK.release()
+        if not allowed:
+            sys.stderr.write('[ask-twin] pairing request not allowed\n')
+            return self._json(403, {'error': 'Not allowed on the laptop. Press Connect again, then Allow on the Mac.', 'reason': 'approval_denied'})
+        token, dev = pairings.issue(label)
+        sys.stderr.write(f'[ask-twin] paired a new device {dev} ({label}) by Allow on this Mac; {pairings.count()} paired\n')
+        return self._json(200, {'token': token, 'device': dev})
+
+    def _diag(self, body):
+        """Headset self-report (2026-11-19): what the XR page sees (frame errors, loaded layers, rig, texture), appended to
+        diag-YYYY-MM-DD.jsonl next to the usage files. No credential: small JSON only, rate limited, the file is capped."""
+        lim = self.app.limits
+        folder = lim.pairings.folder if lim and lim.pairings else None
+        if folder is None:
+            return self._json(404, {'error': 'unknown endpoint'})
+        if len(body) > 24_000 or DIAG_WINDOW.hit('all'):
+            return self._json(429, {'error': 'too much'})
+        try:
+            doc = json.loads(body or b'{}')
+        except json.JSONDecodeError:
+            return self._json(400, {'error': 'bad json'})
+        if not isinstance(doc, dict):
+            return self._json(400, {'error': 'bad json'})
+        path = Path(folder) / f'diag-{time.strftime("%Y-%m-%d")}.jsonl'
+        try:
+            if path.exists() and path.stat().st_size > 4_000_000:
+                return self._json(429, {'error': 'log full'})
+            with open(path, 'a') as f:
+                f.write(json.dumps({'t': time.strftime('%H:%M:%S'), 'ua': (self.headers.get('User-Agent') or '')[:160], 'd': doc}) + '\n')
+        except OSError:
+            return self._json(500, {'error': 'not stored'})
+        sys.stderr.write(f'[ask-twin] diag: {str(doc.get("tag"))[:40]}\n')
+        return self._json(200, {'ok': True})
 
     def _pair(self, path):
         """Pairing (scripts/ask_twin/pairing.py). The credential was checked by limits.admit() before this runs."""
@@ -558,6 +650,7 @@ class App:
         self.agent, self.mode, self.model, self.twin, self.stt, self.port, self.verbose, self.lan = agent, mode, model, twin, stt, port, verbose, lan
         self.public_origin = public_origin   # one extra exact origin: the https address of a tunnel in front of this server
         self.tts, self.note, self.limits = tts, None, limits
+        self.approve_pairing, self.approver = False, mac_approve   # --approve-pairing: POST /api/pair/request asks on this Mac
 
     def cors_ok(self, origin, host):
         """Exact allow-list: this server's own origin, localhost/127.0.0.1 on this port, or a PUBLIC_ORIGINS entry."""
@@ -641,6 +734,7 @@ def build_app(args, log=print):
         if args.no_code:
             ap.error('--public-origin needs an access code (remove --no-code)')
     app = App(agent, mode, model, twin, stt, args.port, args.verbose, args.lan, tts=TTS(not args.no_tts, voice=args.voice), limits=limits, public_origin=args.public_origin)
+    app.approve_pairing = bool(getattr(args, 'approve_pairing', False)) and bool(limits and limits.pairings)
     app.note = note
     app.mock_pace = args.mock_pace if mode == 'mock' else 0
     return app
@@ -672,6 +766,7 @@ def parse_args(argv=None):
     lim.add_argument('--max-tokens', type=int, default=4000, help='max_tokens per model round (default 4000)')
     lim.add_argument('--idle-minutes', type=float, default=120, help='stop after this many minutes without a question (default 120; 0 = never)')
     lim.add_argument('--usage-dir', default=str(DEFAULT_ENV_FILE.parent), help='folder for usage-YYYY-MM-DD.json and paired-devices.json (outside the repo)')
+    lim.add_argument('--approve-pairing', action='store_true', help='a device may ask to pair with no code: a dialog on this Mac asks Allow / Deny (macOS; needs an access code and pairing on)')
     lim.add_argument('--no-pairing', action='store_true', help='this run: only the access code works (paired devices are refused, none can be added)')
     lim.add_argument('--list-devices', action='store_true', help='print the paired devices (id, label, dates) and exit')
     lim.add_argument('--forget-devices', action='store_true', help='unpair every device (they must type the code again) and exit')

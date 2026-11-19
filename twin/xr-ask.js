@@ -160,6 +160,17 @@ async function pairWithCode(fetchFn, server, code) {
   if (r.status === 404 || r.status === 405 || (r.status === 400 && b.reason === 'pairing_off')) return {ok: false, fallback: true};
   return {ok: false, status: r.status, why: refusalText(r.status, b) || ('Pairing failed (' + r.status + ').')};
 }
+/* No typing (2026-11-19): ask the laptop to pair; its owner presses Allow in a dialog on the Mac (POST /api/pair/request, up to ~45 s).
+   {ok, token} · {ok:false, fallback:true} (older server / approval off: the code is needed) · {ok:false, status, why}. */
+async function pairByApproval(fetchFn, server) {
+  let r, b = {};
+  try { r = await fetchT(fetchFn, apiUrl(server, 'pair/request'), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}, 60000); }
+  catch (e) { return {ok: false, status: 0, why: 'No answer from the laptop. Press Connect again, then Allow on the Mac.'}; }
+  try { b = await r.json(); } catch (e) { b = {}; }
+  if (r.ok && TOKEN_RX.test(b.token || '')) return {ok: true, token: b.token, device: b.device || null};
+  if (r.status === 404 || r.status === 405 || (r.status === 400 && (b.reason === 'approval_off' || b.reason === 'pairing_off'))) return {ok: false, fallback: true};
+  return {ok: false, status: r.status, why: b.error || ('Pairing failed (' + r.status + ').')};
+}
 /* Paired visit: find the laptop, then ask it whether it still knows this token. {ok, server, health} or {ok:false, state, why}. */
 async function autoConnect(fetchFn, token, nowMs = Date.now()) {
   const f = await findLaptop(fetchFn, nowMs);
@@ -942,5 +953,5 @@ return {API, LEVELS, COLORS, BAR, CHIP, ANSWER_MORE, HONESTY, SYS, parseParams, 
   headerWord, headerNote, CLAUDE_MARK_PATH, waitHeight, STEP_ICON, stepIcon, stepPhrase, stepsAdd, stepsFrom, waitLabel, WAIT, markPose, dotWave, revealPose, waitPulse, drawAnswer, drawBar, drawChip, drawMore,
   pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
   serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, PAIR_KEY, loadPairing, savePairing, forgetPairing, connectPlan, connectLine,
-  findLaptop, pairWithCode, autoConnect, forgetLaptop, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
+  findLaptop, pairWithCode, pairByApproval, autoConnect, forgetLaptop, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

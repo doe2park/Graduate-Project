@@ -56,4 +56,5 @@ echo "[ask-twin public] PC on this laptop:  http://127.0.0.1:$PORT/scan-compare.
 echo "[ask-twin public] Everything through this address (slow: about 95 MB of models pass through the laptop; use it for local edits not yet on the site):"
 echo "[ask-twin public]   $URL/vr/?direct=1&ask=1&code=$CODE   $URL/mr/?direct=1&ask=1&code=$CODE   $URL/scan-compare.html?view=overlay&style=lens&capture=2026-05-06&ask=1&code=$CODE"
 cd "$ROOT"
-"$PYTHON" scripts/ask_twin_server.py --no-tts --port "$PORT" --code "$CODE" --public-origin "$URL" "$@"
+# --approve-pairing: a headset pairs with no typing (Connect on the headset, Allow in the dialog on this Mac).
+"$PYTHON" scripts/ask_twin_server.py --no-tts --port "$PORT" --code "$CODE" --public-origin "$URL" --approve-pairing "$@"
