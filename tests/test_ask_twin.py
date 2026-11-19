@@ -149,6 +149,167 @@ class ToolTests(unittest.TestCase):
             self.assertTrue(hasattr(twin(), t['name']))
 
 
+BOX_TWIN = None
+
+
+def box_twin():
+    """The same data with no mesh graph: connected_run falls back to the bounding-box test."""
+    global BOX_TWIN
+    if BOX_TWIN is None:
+        t = twin()
+        BOX_TWIN = T.Twin(index=t.index, registry=t.registry, log=lambda *a: None, mesh={})
+    return BOX_TWIN
+
+
+def _tube(x0, x1, axis=0, r=0.1, c=(0.0, 0.0, 0.0), n=8):
+    """Open tube (no end caps) along one axis, vertices only on its two end rings, like a fabrication duct part."""
+    import math
+    o = [i for i in range(3) if i != axis]
+    verts, tris = [], []
+    for s in (x0, x1):
+        for k in range(n):
+            a = 2 * math.pi * k / n
+            p = [0.0, 0.0, 0.0]
+            p[axis], p[o[0]], p[o[1]] = s, r * math.cos(a), r * math.sin(a)
+            verts.append([p[i] + c[i] for i in range(3)])
+    for k in range(n):
+        a, b = k, (k + 1) % n
+        tris += [[a, b, n + a], [b, n + b, n + a]]
+    return verts, tris
+
+
+def _write_dump(path, parts):
+    """Synthetic decode_layer_mesh.mjs dump: {id: (verts, tris)}."""
+    import struct
+    ids = sorted(parts)
+    vo, to, P, Tr = [0], [0], [], []
+    for e in ids:
+        v, t = parts[e]
+        P += [x for p in v for x in p]
+        Tr += [x for f in t for x in f]
+        vo.append(vo[-1] + len(v))
+        to.append(to[-1] + len(t))
+    head = json.dumps({'ids': ids, 'vOff': vo, 'tOff': to, 'nVerts': vo[-1], 'nTris': to[-1]}).encode()
+    head += b' ' * ((4 - (4 + len(head)) % 4) % 4)
+    Path(path).write_bytes(struct.pack('<I', len(head)) + head + struct.pack(f'<{len(P)}f', *P) + struct.pack(f'<{len(Tr)}I', *Tr))
+
+
+class MeshContactCriterionTests(unittest.TestCase):
+    """The end-face contact test on synthetic parts (no GLB needed)."""
+
+    def setUp(self):
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest('numpy not installed (the builder needs it; the server does not)')
+        from ask_twin import mesh_graph as mg
+        self.mg = mg
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        parts = {
+            'a': _tube(0.0, 1.0),                                   # straight duct along x
+            'b': _tube(1.0, 2.0),                                   # next piece, end ring on a's end ring
+            'g': _tube(2.0095, 3.0),                                # 9.5 mm joint gap (rectangular connector in the model)
+            'far': _tube(3.03, 4.0),                                # 30 mm short of g: not linked
+            'cross': _tube(-1.0, 1.0, axis=2, r=0.05, c=(0.5, 0.152, 0.0)),   # passes 2 mm over a mid-span, ends far away
+            'tap': _tube(0.1, 0.5, axis=1, r=0.04, c=(1.5, 0.0, 0.0)),        # branch whose end ring sits on b's surface
+        }
+        self.dump = Path(self.tmp.name) / 'syn.bin'
+        _write_dump(self.dump, parts)
+        self.M = mg.LayerMesh(self.dump)
+
+    def linked(self, a, b):
+        i, j = self.M.pos[a], self.M.pos[b]
+        args = 0.012, 3, 0.02
+        return self.mg.contact(self.M, i, j, *args)[0] or self.mg.contact(self.M, j, i, *args)[0]
+
+    def test_end_to_end_and_joint_gap_link(self):
+        self.assertTrue(self.linked('a', 'b'))
+        self.assertTrue(self.linked('b', 'g'))     # 9.5 mm gap is inside the 12 mm threshold
+        self.assertFalse(self.linked('g', 'far'))
+
+    def test_crossing_run_is_not_linked_although_boxes_touch(self):
+        i, j = self.M.pos['a'], self.M.pos['cross']
+        self.assertLessEqual(self.M.gap(i, j), 0.03)  # the old box test joins them
+        self.assertFalse(self.linked('a', 'cross'))
+
+    def test_tap_on_the_side_of_a_main_links_one_sided(self):
+        i, j = self.M.pos['tap'], self.M.pos['b']
+        self.assertTrue(self.mg.contact(self.M, i, j, 0.012, 3, 0.02)[0])
+        self.assertFalse(self.mg.contact(self.M, j, i, 0.012, 3, 0.02)[0])   # b has no vertex there
+
+    def test_load_graph_skips_a_stale_layer(self):
+        glb = Path(self.tmp.name) / 'x.glb'
+        glb.write_bytes(b'0123456789')
+        g = {'schema': self.mg.SCHEMA, 'date': '2026-11-19', 'layers': {
+            'duct': {'glb': 'x.glb', 'glb_bytes': 10, 'edges': [['a', 'b'], ['b', 'c']]},
+            'fire': {'glb': 'x.glb', 'glb_bytes': 11, 'edges': [['a', 'b']]}}}
+        p = Path(self.tmp.name) / 'g.json'
+        p.write_text(json.dumps(g))
+        out = self.mg.load_graph(p, root=Path(self.tmp.name), log=lambda *a: None)
+        self.assertEqual(sorted(out), ['duct'])
+        self.assertEqual(out['duct']['component']['a'], out['duct']['component']['c'])
+        self.assertEqual(self.mg.load_graph(Path(self.tmp.name) / 'missing.json'), {})
+
+
+DIFFUSER_B, ELBOW_B, BEND, SKIN, BOX_NC, BOX_COIL = '388369', '400850', '401475', '401442', '396070', '400766'
+
+
+class MeshRunTests(unittest.TestCase):
+    """connected_run on the real Grimes duct layer with the mesh-contact graph (work/ask-twin/mesh-graph.json)."""
+
+    def setUp(self):
+        if not twin().mesh.get('duct'):
+            self.skipTest('no duct mesh graph: python3 scripts/ask_twin/mesh_graph.py --layers duct')
+        self.G = twin().mesh['duct']
+
+    def test_box_joined_diffuser_and_elbow_do_not_meet_in_the_mesh(self):
+        # the owner's complaint: the box test put supply diffuser 388369 four pieces from VAV box 396070 through elbow
+        # 400850, whose box is 2.3 cm away but whose surface is ~9 cm away
+        self.assertIn(ELBOW_B, box_twin()._box_neighbours(DIFFUSER_B))
+        old = box_twin().connected_run(DIFFUSER_B, max_elements=250)
+        self.assertEqual(old['evidence_basis'], 'bounding-box')
+        self.assertEqual((old['notable_on_run'][0]['id'], old['notable_on_run'][0]['path_ids'][1]), (BOX_NC, ELBOW_B))
+        self.assertNotIn(ELBOW_B, self.G['adj'].get(DIFFUSER_B, ()))
+        r = twin().connected_run(DIFFUSER_B, max_elements=250)
+        self.assertEqual(r['evidence_basis'], 'mesh-contact')
+        self.assertIn('Not a verified', r['evidence'])
+        self.assertIn(ELBOW_B, [x['id'] for x in r['mesh_check']['box_test_neighbours_not_touching']])
+        for n in r['notable_on_run']:
+            self.assertNotIn(ELBOW_B, n['path_ids'][:3])
+        self.assertTrue(r['mesh_check']['outlet_meets_duct'])
+        lead = r['notable_on_run'][0]
+        self.assertEqual(lead['id'], BOX_COIL)
+        self.assertGreater(lead['hops'], old['notable_on_run'][0]['hops'])
+
+    def test_real_chain_every_step_is_a_mesh_edge(self):
+        r = twin().connected_run(BEND, max_elements=250)
+        lead = r['notable_on_run'][0]
+        self.assertEqual((lead['id'], lead['hops']), (BOX_COIL, 5))
+        p = lead['path_ids']
+        self.assertEqual((p[0], p[-1], len(p)), (BEND, BOX_COIL, 6))
+        for a, b in zip(p, p[1:]):
+            self.assertIn(b, self.G['adj'][a])
+        self.assertFalse(r['mesh_check']['start_isolated'])
+
+    def test_insulation_skin_follows_the_part_it_wraps(self):
+        r = twin().connected_run(SKIN, max_elements=250)
+        self.assertEqual(r['start']['id'], SKIN)
+        self.assertEqual(r['start_followed']['id'], self.G['skin_host'][SKIN])
+        lead = r['notable_on_run'][0]
+        self.assertEqual(lead['id'], BOX_NC)
+        self.assertEqual(lead['path_ids'][:2], [SKIN, self.G['skin_host'][SKIN]])
+        self.assertEqual(lead['hops'], len(lead['path_ids']) - 1)
+
+    def test_layers_without_a_graph_and_hangers_use_the_box_test(self):
+        conduit = next(e for e, l in twin().layer.items() if l == 'conduit')
+        self.assertEqual(twin().connected_run(conduit)['evidence_basis'], 'bounding-box')
+        hanger = next(iter(e for e in self.G['excluded'] if e in twin().box))
+        r = twin().connected_run(hanger)
+        self.assertEqual(r['evidence_basis'], 'bounding-box')
+        self.assertIn('hanger', r['evidence_note'])
+
+
 class CitationTests(unittest.TestCase):
     def test_only_tool_returned_ids_are_verified(self):
         c = A.verify_citations(twin(), 'see [[278123]] and [[12442]] and [[999999999]] and [[278123]]', {'278123'})
@@ -196,7 +357,13 @@ class MockAgentTests(unittest.TestCase):
         self.assertEqual((path[0], path[-1]), (diffuser, lead))   # the run the headset lights up, start -> cited box
         # the box itself (Price SDV5), not its two 'Coil Kit Supply/Return' pipe connection kits that touch it one step earlier
         self.assertEqual(lead, '400766')
-        self.assertEqual(len(path), 12)   # 11 steps: diffuser, 10 duct pieces, box
+        # with the mesh-contact graph: 18 steps (diffuser, 12 unnamed polyface pieces of its neck/flex run, branch, tap,
+        # main, transition, box); the box test gave 11 steps through pieces that do not all meet in the mesh
+        mesh = twin().mesh.get('duct')
+        self.assertEqual(len(path), 19 if mesh else 12)
+        for a, b in zip(path, path[1:]):
+            if mesh:
+                self.assertIn(b, mesh['adj'].get(a, ()))
         self.assertNotIn('383845', f['answer']); self.assertNotIn('383987', f['answer'])
         self.assertIn('reheat-coil pipe connection kit', T.Twin.service_hint(twin(), '383845')['service'])
         evs, f = self.ask('This room is warm from 9 to 5 every weekday. What is the likely cause, and where do I check first?', diffuser)

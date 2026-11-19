@@ -4,7 +4,7 @@ Every function is pure over loaded data (sidecars, the derived box index, the se
 Nothing here writes files or calls the network. Each result says what kind of evidence it is:
   - "design BIM"  : sidecar fields of the original model (identity, type, CAD layer, level, design parameters)
   - "geometry"    : distances/directions computed from element bounding boxes in the viewer frame
-  - "inferred"    : heuristics (room from nearby labelled equipment, service from family names, box adjacency)
+  - "inferred"    : heuristics (room from nearby labelled equipment, service from family names, mesh-contact or box adjacency)
   - "demo-sim"    : simulated demo sensors (twin/sensors/registry.json); no sensor is installed in Grimes
 """
 from __future__ import annotations
@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import index as ix
+from . import mesh_graph as mg
 
 ROOT = ix.ROOT
 # Slab tops in the element (viewer) frame, metres: measured from the floor slabs and from Revit "elevation from level"
@@ -90,9 +91,11 @@ def _fetch_json(url: str, timeout: float = 8.0):
 class Twin:
     """Loaded twin data + spatial grid. Construct once per server."""
 
-    def __init__(self, root: Path = ROOT, index: dict | None = None, registry: dict | None = None, log=print):
+    def __init__(self, root: Path = ROOT, index: dict | None = None, registry: dict | None = None, log=print, mesh: dict | None = None):
         self.root = root
         self.index = index or ix.load_index(root, log=log)
+        # mesh-contact connection graph per layer (scripts/ask_twin/mesh_graph.py); {} -> connected_run uses the box test
+        self.mesh = mesh if mesh is not None else mg.load_graph(root / 'work' / 'ask-twin' / 'mesh-graph.json', root=root, log=log)
         self.meta: dict = {}
         self.box: dict = {}
         self.layer: dict = {}
@@ -446,29 +449,60 @@ class Twin:
                 'elements': [self.summary(e, ref) for _, e in hits[:limit]],
                 'evidence': 'design BIM names/types (+ inferred service hint)'}
 
+    def _box_neighbours(self, eid, tolerance_m=0.03):
+        """Same-layer run parts whose bounding boxes are within tolerance_m (the fallback adjacency)."""
+        b, layer = self.box[eid], self.layer[eid]
+        out = []
+        for nb in self._candidates(b, tolerance_m):
+            if nb == eid or self.layer[nb] != layer:
+                continue
+            if NOT_RUN.search(self.meta[nb].get('name', '') + ' ' + str(self.meta[nb].get('type', ''))):
+                continue
+            if ix.box_gap(b, self.box[nb]) <= tolerance_m:
+                out.append(nb)
+        return out
+
+    def _is_outlet(self, eid):
+        m = self.meta.get(eid, {})
+        hint = self.service_hint(eid)
+        return m.get('system') == 'M-HVAC-CDFF' or m.get('type') == 'M-HVAC-CDFF' or bool(hint and hint['service'] == 'air outlet')
+
     def connected_run(self, element_id, max_elements=150, tolerance_m=0.03):
+        """Breadth-first run from an element over same-layer parts. Uses the mesh-contact graph (parts whose end faces
+        actually meet, scripts/ask_twin/mesh_graph.py) when one exists for the layer, else touching bounding boxes."""
         eid0 = str(element_id)
         if eid0 not in self.box:
             return {'error': f'unknown element id {eid0}'}
         layer = self.layer[eid0]
         max_elements = max(10, min(int(max_elements), 400))
+        G = self.mesh.get(layer)
+        fallback = None if G else 'no mesh-contact graph for this layer'
+        start = eid0
+        if G and eid0 in G['skin_host'] and G['skin_host'][eid0] in self.box:
+            start = G['skin_host'][eid0]   # insulation wrap: follow the duct/pipe it wraps
+        elif G and eid0 in G['excluded']:
+            G, fallback = None, 'the start element is a hanger, support or reference object, which is not part of the mesh graph'
         hops = {eid0: 0}
         parent = {eid0: None}
-        q = deque([eid0])
+        if start != eid0:
+            hops[start], parent[start] = 1, eid0
+
+        def neighbours(cur):
+            if G:
+                return [nb for nb in G['adj'].get(cur, ()) if nb in self.box and self.layer[nb] == layer]
+            return self._box_neighbours(cur, tolerance_m)
+
+        q = deque([start])
         while q and len(hops) < max_elements:
             cur = q.popleft()
-            b = self.box[cur]
-            for nb in self._candidates(b, tolerance_m):
-                if nb in hops or self.layer[nb] != layer:
+            for nb in neighbours(cur):
+                if nb in hops:
                     continue
-                if NOT_RUN.search(self.meta[nb].get('name', '') + ' ' + str(self.meta[nb].get('type', ''))):
-                    continue
-                if ix.box_gap(b, self.box[nb]) <= tolerance_m:
-                    hops[nb] = hops[cur] + 1
-                    parent[nb] = cur
-                    q.append(nb)
-                    if len(hops) >= max_elements:
-                        break
+                hops[nb] = hops[cur] + 1
+                parent[nb] = cur
+                q.append(nb)
+                if len(hops) >= max_elements:
+                    break
         notable = []
         for e, h in hops.items():
             hint = self.service_hint(e)
@@ -483,14 +517,67 @@ class Twin:
                     path.append(p)
                     p = parent[p]
                 s['path_ids'] = list(reversed(path))
+                # unnamed DWG polyface pieces (e.g. a segmented flexible duct or an exploded fitting) count as hops too
+                s['unnamed_mesh_pieces_on_path'] = sum(1 for p in s['path_ids'][1:-1] if self.meta[p].get('name') == 'PolyFace Mesh')
                 notable.append(s)
         notable.sort(key=lambda s: (s['hops'], s['id']))   # id breaks ties: the same answer on every run
         types = Counter(self.meta[e].get('type') for e in hops)
-        return {'start': self.summary(eid0), 'layer': layer, 'elements_reached': len(hops), 'stopped_at_limit': len(hops) >= max_elements,
-                'max_hops': max(hops.values()), 'types_in_run': dict(types.most_common(10)),
-                'notable_on_run': notable[:12],
-                'evidence': 'inferred: bounding boxes touching within tolerance on the same layer (hangers/annotation skipped). '
-                            'Not a verified pipe/duct connection and no flow direction: crossing runs can be joined falsely.'}
+        out = {'start': self.summary(eid0), 'layer': layer, 'elements_reached': len(hops), 'stopped_at_limit': len(hops) >= max_elements,
+               'max_hops': max(hops.values()), 'types_in_run': dict(types.most_common(10)),
+               'notable_on_run': notable[:12]}
+        if not G:
+            out['evidence_basis'] = 'bounding-box'
+            out['evidence'] = ('inferred: bounding boxes touching within tolerance on the same layer (hangers/annotation skipped). '
+                               'Not a verified pipe/duct connection and no flow direction: crossing runs can be joined falsely.')
+            if fallback:
+                out['evidence_note'] = fallback
+            return out
+        crit = G.get('criterion', {})
+        ring_mm = round(1000 * float(crit.get('ring_m', 0.012)))
+        out['evidence_basis'] = 'mesh-contact'
+        out['evidence'] = (f'inferred from mesh contact: parts are linked only where the end face of one lies within {ring_mm} mm of the '
+                           f'other\'s surface (decoded model triangles, graph built {G.get("date")}); runs that merely cross or pass close '
+                           'by are not joined. Not a verified connection (the model has no connector records and was not surveyed) '
+                           'and no flow direction.')
+        if start != eid0:
+            out['start_followed'] = {**self.summary(start), 'reason': 'the picked element is insulation wrapped around this part'}
+        out['mesh_check'] = self._mesh_check(G, eid0, start, hops, notable, tolerance_m, ring_mm)
+        return out
+
+    def _mesh_check(self, G, eid0, start, hops, notable, tolerance_m, ring_mm):
+        """Cheap 'does this make sense' signals from the mesh graph for the model to weigh (no flow direction)."""
+        real = [nb for nb in G['adj'].get(start, ()) if nb in self.box]
+        comp = G['component'].get(start)
+        size = G['component_size'][comp] if comp is not None else 1
+        skip = G['excluded'] | set(G['skin_host'])
+        box_only = [nb for nb in self._box_neighbours(start, tolerance_m) if nb not in G['adj'].get(start, ()) and nb not in skip]
+        box_only.sort(key=lambda e: (ix.box_gap(self.box[start], self.box[e]), e))
+        counts = G.get('counts', {})
+        chk = {'start_touching_parts': len(real), 'start_isolated': not real, 'connected_piece_size': size,
+               'layer_connected_pieces': counts.get('components'), 'layer_isolated_parts': counts.get('isolated_parts'),
+               'box_test_neighbours_not_touching': [{'id': e, 'type': self.meta[e].get('type')} for e in box_only[:8]]}
+        near = G['nearest'].get(start)
+        if near and near[0] in self.box:
+            chk['nearest_unconnected_part'] = {'id': near[0], 'type': self.meta[near[0]].get('type'), 'gap_m': near[1],
+                                               'basis': 'closest part of another connected piece, mesh distance'}
+        notes = []
+        if not real:
+            notes.append(f'The start element meets no other part of this layer in the model (no end face within {ring_mm} mm): '
+                         'the model shows it unconnected, so any source named for it would be a guess.')
+        if box_only:
+            notes.append(f'{len(box_only)} part(s) whose boxes touch the start element do not actually meet it in the mesh '
+                         '(they cross or pass close by); the old box test would have joined them.')
+        if self._is_outlet(eid0):
+            duct = any(self.meta[e].get('name') != 'PolyFace Mesh' and not self._is_outlet(e) for e in hops if e != eid0)
+            chk['outlet_meets_duct'] = duct
+            if not duct:
+                gap = f" ({chk['nearest_unconnected_part']['id']} is {chk['nearest_unconnected_part']['gap_m']} m away)" if 'nearest_unconnected_part' in chk else ''
+                notes.append('This air outlet does not meet any duct part in the model' + gap + '; its connection is not modelled.')
+        if not notable:
+            notes.append(f'No terminal unit, AHU, valve or heater is connected to this element in the mesh graph '
+                         f'(its connected piece has {size} part(s)).')
+        chk['notes'] = notes
+        return chk
 
     def _sensor_position(self, s):
         b = self.box.get(str(s['anchor'].get('id')))
@@ -589,7 +676,7 @@ TOOL_SCHEMAS = [
      'input_schema': {'type': 'object', 'properties': {'element_id': _ID, 'point': _PT, 'radius_m': {'type': 'number'}}, 'additionalProperties': False}},
     {'name': 'building_meters', 'description': 'MEASURED electrical power of the building\'s services from the campus metering feed: kW now, today\'s min/max/average and reading time for each service (480/277 V, 208/120 V, roof). Building level only: use it for "how much power is being used", and say that nothing is metered per device or circuit.',
      'input_schema': {'type': 'object', 'properties': {}, 'additionalProperties': False}},
-    {'name': 'connected_run', 'description': 'Follow geometrically touching elements of the same layer from a start element (breadth-first, hangers skipped) and report valves, terminal units, AHUs, heaters or drain pans found along the run with hop counts. Heuristic adjacency, NOT verified connectivity and no flow direction.',
+    {'name': 'connected_run', 'description': 'Follow connected elements of the same layer from a start element (breadth-first, hangers skipped) and report valves, terminal units, AHUs, heaters or drain pans found along the run with hop counts. Where a mesh-contact graph exists (duct, hydronic, plumbing, fire) parts are linked only where their end faces actually meet in the model geometry; elsewhere touching bounding boxes are used (evidence_basis says which). mesh_check reports whether the start meets anything, parts that only cross it, and whether an air outlet meets a duct: use it to judge whether an answer makes sense. Inferred from geometry, NOT verified connectivity and no flow direction.',
      'input_schema': {'type': 'object', 'properties': {'element_id': _ID, 'max_elements': {'type': 'integer', 'description': 'Default 150, max 400.'}},
                       'required': ['element_id'], 'additionalProperties': False}},
     {'name': 'list_sensors', 'description': 'DEMO sensors (all simulated, none installed) with their anchor element and position; optionally only those within radius_m of an element or point.',
