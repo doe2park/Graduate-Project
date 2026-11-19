@@ -519,6 +519,7 @@ class Twin:
                 s['path_ids'] = list(reversed(path))
                 # unnamed DWG polyface pieces (e.g. a segmented flexible duct or an exploded fitting) count as hops too
                 s['unnamed_mesh_pieces_on_path'] = sum(1 for p in s['path_ids'][1:-1] if self.meta[p].get('name') == 'PolyFace Mesh')
+                s['pieces'] = max(1, s['hops'] - s['unnamed_mesh_pieces_on_path'])   # the number to say: segments of one flexible duct are not counted
                 notable.append(s)
         notable.sort(key=lambda s: (s['hops'], s['id']))   # id breaks ties: the same answer on every run
         types = Counter(self.meta[e].get('type') for e in hops)

@@ -906,7 +906,7 @@ class PlainAnswerTests(unittest.TestCase):
 
     def test_prompt_asks_for_plain_words_and_an_evidence_line(self):
         p = A.SYSTEM_PROMPT
-        for must in ('AT MOST 3 short sentences', 'at most 55 words', 'first sentence answers exactly the question asked', 'in parentheses at most once',
+        for must in ('AT MOST 3 short sentences', 'at most 45 words', 'first sentence answers exactly the question asked', 'in parentheses at most once',
                      'No markdown', 'no element ids', 'CAD layer or system codes', 'no "confidence: low/medium/high"',
                      'Evidence: [[id]]', 'probably', 'not read aloud', 'Write nothing before or between tool calls',
                      'call connected_run from the selected element', 'not pick a source by straight-line proximity',
