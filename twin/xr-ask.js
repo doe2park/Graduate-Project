@@ -5,7 +5,7 @@
      - the answer stream parser (Server-Sent Events from /api/ask),
      - the in-view answer card (headline + a picture built from the tool results + caption, check chip, cited ids, provenance),
      - the spoken text, the run lighting timing for connected_run, the voice/TTS plans,
-     - the waiting state (2026-11-15): step lines from the stream events (stepsAdd), the Claude-style starburst, and the pure
+     - the waiting state (2026-11-15): step lines from the stream events (stepsAdd), the Claude mark (official path), and the pure
        timing of what the page animates on small overlay meshes (markPose, dotWave, revealPose, waitPulse),
      - the decluttered in-view controls (2026-11-15): one compact element label with a hold-to-ask hint and a small "⋯", the
        presets panel behind that "⋯", and their hit tests.
@@ -17,7 +17,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this), function () {
 'use strict';
 
-const API = 6;   // 6: larger answer / waiting-card text (2026-11-17) · 3: access code (code=, X-Ask-Code, refusalText) · 4: the Claude mark path, headerNote, upright settle · 5: pair once (X-Ask-Token, auto-connect)
+const API = 7;   // 7: the official Claude mark path, drawClaudeMark (replaces the stroked-ray helpers) (2026-11-18) · 6: larger answer / waiting-card text (2026-11-17) · 3: access code (code=, X-Ask-Code, refusalText) · 4: the Claude mark path, headerNote, upright settle · 5: pair once (X-Ask-Token, auto-connect)
 const CITE_RX = /\[\[([A-Za-z0-9_.:-]{1,40})\]\]/g;
 const LEVELS = [
   {level: 1, id: 'q1', label: 'What is this?', hint: 'look up', question: 'What is this, and what room am I in?'},
@@ -362,12 +362,6 @@ const doneText = t => String(t || '').replace(/…$/, '');
    picture cover) or a uniform (element pulse), so the big card canvas is redrawn only on step changes and on the answer. */
 const WAIT = {spinMs: 6400, breatheMs: 1800, settleMs: 600, dotMs: 1050, revealMs: 200, pictureDelayMs: 120, pictureMs: 240, pulseMs: 1500};
 const clamp01 = x => Math.max(0, Math.min(1, x)), easeOut = x => 1 - Math.pow(1 - clamp01(x), 3);
-const RAYS = 12;
-/* the mark's rays: n round-capped strokes, evenly spaced, lengths varied in a fixed pattern (drawn in code, not a logo file) */
-function starburstRays(n = RAYS) {
-  const L = [1, .74, .9, .68, .97, .78, .86, .7, .95, .76, .88, .72];
-  return Array.from({length: n}, (_, i) => ({a: -Math.PI / 2 + i * 2 * Math.PI / n + (i % 2 ? .05 : -.03), len: L[i % L.length], w: i % 3 === 0 ? .2 : .17}));
-}
 /* mark pose at time t (ms since waiting began). settleAt: t when the answer arrived (null = still waiting). While waiting: slow
    rotation + gentle breathing (scale, opacity). After the answer it eases back upright (the nearest whole turn, at most half a turn,
    within settleMs) and stops: the Claude mark is not symmetric, so it must come to rest the right way up. */
@@ -540,7 +534,7 @@ const hex = c => '#' + c.toString(16).padStart(6, '0');
      nearby   (elements_near)          -> "what's above" height graph with pictogram markers + counts by system
      trace    (connected_run)          -> mini path diagram: this element -> n pieces along the run -> source
    The full sentence answer stays as a 1-2 line caption; a "check on site" chip and the evidence ids sit at the bottom.
-   Header (2026-11-15): a Claude-style starburst drawn in code (no logo file) + "Claude · LIVE/MOCK"; MOCK answers are scripted,
+   Header (2026-11-18): the official Claude mark (one filled path, CLAUDE_MARK_PATH) + "Claude · LIVE/MOCK"; MOCK answers are scripted,
    which the mode pill and the footer say. */
 const SYS = {duct: '#7dd3fc', fire: '#f87171', hydronic: '#fb923c', plumbing: '#60a5fa', structural: '#cbd5e1', lighting: '#fde68a',
   equipment: '#86efac', conduit: '#c4b5fd', lifesafety: '#fca5a5', fixtures: '#e2e8f0', ceiling: '#94a3b8'};
@@ -659,25 +653,18 @@ function answerVisual({visuals = [], citations = [], primary = null, selected = 
   return out;
 }
 
-/* The Claude mark (2026-11-16, "like before"): the Claude spark, irregular rounded rays in Claude terracotta, drawn in code as one
-   filled path in a 24 x 24 box (no image file is loaded). It is drawn about the box centre (12, 12) and scaled so the farthest ray tip
-   (13.2 units from the centre) stays inside radius r at any rotation (the waiting mark spins). Without Path2D (Node tests) the older
-   stroked starburst stands in. rot in radians. */
+/* The Claude mark (2026-11-18): the official single-path Claude logo (24 x 24 viewBox), embedded verbatim as path data and filled in
+   Claude terracotta with Path2D; the shape is not redrawn or altered. It is drawn about the box centre (12, 12) and scaled so the farthest
+   point (CLAUDE_MARK_REACH = 13.18 units from the centre, measured by rasterising the path) stays inside radius r at any rotation (the
+   waiting mark spins). Without Path2D (Node tests) nothing is drawn and it returns false. rot in radians. */
 const CLAUDE_COLOR = '#D97757';
-const CLAUDE_MARK_PATH = 'M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.704.231-.243 1.908-1.312-.006.006z';
-const CLAUDE_MARK_REACH = 13.2;
-function drawStarburst(ctx, cx, cy, r, color = CLAUDE_COLOR, rot = 0) {
-  if (typeof Path2D === 'function') {
-    const k = r / CLAUDE_MARK_REACH;
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(k, k); ctx.translate(-12, -12); ctx.fillStyle = color; ctx.fill(new Path2D(CLAUDE_MARK_PATH)); ctx.restore();
-    return;
-  }
-  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.strokeStyle = color; ctx.lineCap = 'round';
-  for (const ray of starburstRays()) {
-    ctx.lineWidth = r * ray.w; ctx.beginPath(); ctx.moveTo(Math.cos(ray.a) * r * .12, Math.sin(ray.a) * r * .12);
-    ctx.lineTo(Math.cos(ray.a) * r * (ray.len - ray.w / 2), Math.sin(ray.a) * r * (ray.len - ray.w / 2)); ctx.stroke();
-  }
-  ctx.restore();
+const CLAUDE_MARK_PATH = 'm4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z';
+const CLAUDE_MARK_REACH = 13.18;
+function drawClaudeMark(ctx, cx, cy, r, color = CLAUDE_COLOR, rot = 0) {
+  if (typeof Path2D !== 'function') return false;
+  const k = r / CLAUDE_MARK_REACH;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(k, k); ctx.translate(-12, -12); ctx.fillStyle = color; ctx.fill(new Path2D(CLAUDE_MARK_PATH)); ctx.restore();
+  return true;
 }
 /* small neutral mark (four-point spark) drawn here, no logo file (kept for other panels) */
 function drawMark(ctx, cx, cy, r, color = '#e2e8f0') {
@@ -830,8 +817,8 @@ function drawAnswer(ctx, W, H, view) {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = CARD_BG; rr(ctx, 4, 4, W - 8, HH - 8, 28); ctx.fill();
   ctx.strokeStyle = view.phase === 'error' ? '#e2725b' : 'rgba(226,232,240,.35)'; ctx.lineWidth = 3; ctx.stroke();
-  // header: Claude-style mark + "Claude", mode; right: a speaker icon while it is read aloud, "B/Y closes", and the small "⋯"
-  if (!view.markLayer) drawStarburst(ctx, MARK.x, MARK.y, MARK.r);
+  // header: the Claude mark + "Claude", mode; right: a speaker icon while it is read aloud, "B/Y closes", and the small "⋯"
+  if (!view.markLayer) drawClaudeMark(ctx, MARK.x, MARK.y, MARK.r);
   const mode = view.modeLabel || (m.mode === 'live' ? 'LIVE' : m.mode === 'mock' ? 'MOCK' : ''), brand = headerWord(mode);
   ctx.font = '600 30px Arial'; ctx.fillStyle = '#f1f5f9'; ctx.fillText(brand, pad + 66, 60);
   let hx = pad + 66 + ctx.measureText(brand).width + 10;
@@ -951,7 +938,7 @@ function drawChip(ctx, W, H, model, hover = false) {
 }
 
 return {API, LEVELS, COLORS, BAR, CHIP, ANSWER_MORE, HONESTY, SYS, parseParams, createStream, sections, leadId, plainLine, cardModel, speakable, runPath, runGlow,
-  barRects, barHit, barButtons, chipModel, chipHit, answerHit, micPlan, ttsPlan, wrap, drawMark, drawStarburst, starburstRays, CLAUDE_COLOR, CARD_BG, MARK, drawPicto,
+  barRects, barHit, barButtons, chipModel, chipHit, answerHit, micPlan, ttsPlan, wrap, drawMark, drawClaudeMark, CLAUDE_MARK_REACH, CLAUDE_COLOR, CARD_BG, MARK, drawPicto,
   headerWord, headerNote, CLAUDE_MARK_PATH, waitHeight, STEP_ICON, stepIcon, stepPhrase, stepsAdd, stepsFrom, waitLabel, WAIT, markPose, dotWave, revealPose, waitPulse, drawAnswer, drawBar, drawChip, drawMore,
   pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
   serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, PAIR_KEY, loadPairing, savePairing, forgetPairing, connectPlan, connectLine,

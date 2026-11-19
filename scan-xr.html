@@ -81,7 +81,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
  .b input[type=range]{height:40px}
 }
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=10"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=5"></script><script src="twin/xr-ask.js?v=13"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=10"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=5"></script><script src="twin/xr-ask.js?v=14"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -1385,11 +1385,11 @@ function mrSelectDesktop(o,d){if(mrPanel.mesh.visible){raycaster.set(o,d);raycas
 /* ══ Ask the twin in the headset (opt-in ?ask=1; docs/ASK_TWIN.md "Headset") ══ Needs the local server (scripts/ask_twin_server.py [--mock] --lan),
    which serves this page and answers /api/ask with read-only tools over the twin (Claude, or scripted mock answers). Nothing here exists without ?ask=1.
    Trigger on a service element (or a demo-sensor pin) -> the info card plus an ask bar: the four question levels, hold-to-speak, close.
-   The answer comes back as a world-locked card under the element (Claude-style mark drawn in code, real progress steps while waiting, one headline, a picture built from the tool results, a short caption, check-on-site chip, cited ids), verified citations glow in the model
+   The answer comes back as a world-locked card under the element (the official Claude mark, real progress steps while waiting, one headline, a picture built from the tool results, a short caption, check-on-site chip, cited ids), verified citations glow in the model
    (render-only copies of the element's own batch vertices; a box outline when the element is not drawn), a connected_run lights up piece by piece,
    and the answer is read aloud (browser voice, else the laptop's macOS voice over the LAN, else text only). NOT verified on a headset. */
 var ASK=null;
-const XA=globalThis.XRAsk,XAOK=XA?.API===6,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
+const XA=globalThis.XRAsk,XAOK=XA?.API===7,XAP=XAOK?XA.parseParams(location.search):{enabled:false};
 ASK={on:!!XAP.enabled,base:XAP.server||null,code:XAP.code||'',token:null,prefer:XAP.preferVoice||'laptop',progress:'',sq:[],sqBusy:false,saidAny:false,filler:0,health:null,healthError:null,el:null,anchor:null,busy:false,phase:null,question:'',level:null,steps:[],text:'',final:null,model:null,
  paths:[],vis:[],error:null,epoch:0,abort:null,glow:new THREE.Group(),run:null,speech:null,voice:'off',voiceNote:'',stream:null,rec:null,chunks:[],recT0:0,recTimer:0,audio:null,
  hover:new Set(),dirty:false,lastDraw:0,asked:0,tAnswer:0,more:false,details:false,wsteps:[],heard:false,tWait:0,markSettle:null,tReveal:null,layout:null};
@@ -1402,7 +1402,7 @@ const askCard=makeSurface(1024,800,...ASK_WH.card,61),askBar=makeSurface(1024,30
 const askLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:0xD97757,transparent:true,opacity:.9,depthTest:false,depthWrite:false,toneMapped:false}));
 askLine.renderOrder=61;askLine.visible=false;askLine.frustumCulled=false;scene.add(askLine);
 /* Waiting overlays (2026-11-15), children of the answer card so they follow its placement and visibility. Per frame only these move:
-   the Claude-style mark (its own small texture, drawn ONCE; rotation / scale / opacity), the three-dot wave of the current step (three
+   the Claude mark (official path; its own small texture, drawn ONCE; rotation / scale / opacity), the three-dot wave of the current step (three
    tiny untextured discs) and the cover that lets the picture fill in last (an untextured plane). The big card canvas is redrawn only
    when a step changes or the answer arrives (and still through the 160 ms throttle). */
 const ASK_U=ASK_WH.card[0]/1024,askF=()=>ASK?.cardF||1,askAt=(o,x,y,z=.0005)=>o.position.set((x/1024-.5)*ASK_WH.card[0],(.5-y/(800*askF()))*ASK_WH.card[1],z);
@@ -1410,7 +1410,7 @@ const ASK_U=ASK_WH.card[0]/1024,askF=()=>ASK?.cardF||1,askAt=(o,x,y,z=.0005)=>o.
 function askCrop(){const f=askF();askCard.texture.repeat.set(1,f);askCard.texture.offset.set(0,1-f);}
 const ASK_MARK_PX=96,ASK_MARK_R=44,askMarkSide=ASK_MARK_PX*(XA?.MARK?.r||24)/ASK_MARK_R*ASK_U;
 const askMark=makeSurface(ASK_MARK_PX,ASK_MARK_PX,askMarkSide,askMarkSide,64);askMark.mesh.visible=true;askMark.mesh.name='ask: animated mark';askMark.texture.center.set(.5,.5);   // spins as a UV rotation (the mesh itself is only counter-scaled for the crop, so no shear)
-if(XA?.drawStarburst){askMark.ctx.clearRect(0,0,ASK_MARK_PX,ASK_MARK_PX);XA.drawStarburst(askMark.ctx,ASK_MARK_PX/2,ASK_MARK_PX/2,ASK_MARK_R);askMark.texture.needsUpdate=true;}
+if(XA?.drawClaudeMark){askMark.ctx.clearRect(0,0,ASK_MARK_PX,ASK_MARK_PX);XA.drawClaudeMark(askMark.ctx,ASK_MARK_PX/2,ASK_MARK_PX/2,ASK_MARK_R);askMark.texture.needsUpdate=true;}
 askAt(askMark.mesh,XA?.MARK?.x||58,XA?.MARK?.y||48);askCard.mesh.add(askMark.mesh);
 const askDots=[0,1,2].map(i=>{const d=new THREE.Mesh(new THREE.CircleGeometry(5.5*ASK_U,14),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthTest:false,depthWrite:false,toneMapped:false}));
  d.renderOrder=64;d.visible=false;d.frustumCulled=false;d.name='ask: step dot '+i;askCard.mesh.add(d);return d;});

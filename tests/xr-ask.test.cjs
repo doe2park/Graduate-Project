@@ -28,7 +28,7 @@ test('inert unless ?ask=1', () => {
 });
 
 test('page loads the versioned helper and checks its API before turning on', () => {
-  assert.match(page, /<script src="twin\/xr-ask\.js\?v=13"><\/script>/);
+  assert.match(page, /<script src="twin\/xr-ask\.js\?v=14"><\/script>/);
   assert.match(page, new RegExp(`XA\\?\\.API===${XA.API}`));
   assert.match(page, /XAP=XAOK\?XA\.parseParams\(location\.search\):\{enabled:false\}/);
   assert.match(page, /ASK=\{on:!!XAP\.enabled,base:XAP\.server\|\|null/);
@@ -157,7 +157,7 @@ function fakeCtx() {
     get: (o, k) => k in o ? o[k] : (k === 'roundRect' ? () => {} : typeof k === 'string' && /^[a-z]/.test(k) && !['font', 'fillStyle', 'strokeStyle', 'lineWidth', 'textAlign', 'lineCap', 'lineJoin'].includes(k) ? () => {} : o[k]),
     set: (o, k, v) => { o[k] = v; return true; }});
 }
-test('canvas drawing: answer card (thinking / answer / error) and bar draw without throwing; Claude-style header + cited ids + footer', () => {
+test('canvas drawing: answer card (thinking / answer / error) and bar draw without throwing; Claude mark header + cited ids + footer', () => {
   const m = XA.cardModel({question: 'Which VAV box feeds this?', answer: ANSWER, final: FINAL, level: 3});
   const steps = XA.stepsFrom([{type: 'tool', name: 'connected_run', input: {}}], {layer: 'duct'});
   for (const view of [{phase: 'thinking', model: {question: 'q', level: 3}, wait: {steps}}, {phase: 'answer', model: m, speech: 'speaking', runNote: 'Lit run: 11 pieces'}, {phase: 'error', model: {}, error: 'server 404'}]) {
@@ -289,16 +289,17 @@ test('waiting animation timing: mark spins + breathes, settles on the answer, do
   const ps = Array.from({length: 30}, (_, i) => XA.waitPulse(i * 50));
   assert.ok(Math.min(...ps.map(p => p.opacity)) < .3 && Math.max(...ps.map(p => p.opacity)) > .55, 'element brightness pulses');
   assert.deepEqual(XA.waitPulse(10, {reduced: true}), XA.waitPulse(700, {reduced: true}));
-  // the mark: 12 round rays in Claude terracotta, drawn in code
-  assert.equal(XA.starburstRays().length, 12); assert.equal(XA.CLAUDE_COLOR, '#D97757');
-  // 2026-11-16: the Claude spark as one filled path (24 x 24 box), drawn in code; the laptop panel draws the very same path
-  assert.match(XA.CLAUDE_MARK_PATH, /^M[\d.\s,a-zA-Z-]+z$/); assert.ok(XA.CLAUDE_MARK_PATH.length > 1200);
+  // 2026-11-18: the official single-path Claude logo (24 x 24 viewBox), verbatim, filled in Claude terracotta; the laptop panel draws the very same path
+  assert.equal(XA.CLAUDE_COLOR, '#D97757'); assert.equal(XA.starburstRays, undefined); assert.equal(XA.drawStarburst, undefined);
+  assert.ok(XA.CLAUDE_MARK_PATH.startsWith('m4.7144 15.9555 4.7174-2.6471') && XA.CLAUDE_MARK_PATH.endsWith('1.9064-1.3114Z'));
+  assert.equal(XA.CLAUDE_MARK_PATH.length, 1811); assert.ok(XA.CLAUDE_MARK_REACH >= 13.17 && XA.CLAUDE_MARK_REACH < 13.3, 'reach covers the farthest tip (13.174)');
   const pc = require('fs').readFileSync(require('path').join(__dirname, '..', 'twin', 'ask-twin.js'), 'utf8');
   assert.ok(pc.includes("const CLAUDE_MARK_PATH = '" + XA.CLAUDE_MARK_PATH + "';"), 'twin/ask-twin.js carries the same mark');
   const filled = []; const pctx = new Proxy({fill: p => filled.push(p), save() {}, restore() {}, translate() {}, rotate() {}, scale() {}}, {get: (o, k) => k in o ? o[k] : () => {}, set: (o, k, v) => { o[k] = v; return true; }});
-  global.Path2D = function (d) { this.d = d; }; try { XA.drawStarburst(pctx, 48, 48, 44); } finally { delete global.Path2D; }
+  global.Path2D = function (d) { this.d = d; }; try { assert.equal(XA.drawClaudeMark(pctx, 48, 48, 44), true); } finally { delete global.Path2D; }
   assert.equal(filled.length, 1); assert.equal(filled[0].d, XA.CLAUDE_MARK_PATH); assert.equal(pctx.fillStyle, '#D97757');
-  const ctx = fakeCtx(); XA.drawStarburst(ctx, 48, 48, 44); XA.drawStarburst(ctx, 48, 48, 44, '#fff', 1);
+  const ctx = fakeCtx(); assert.equal(XA.drawClaudeMark(ctx, 48, 48, 44), false, 'no Path2D: nothing drawn, no hand-drawn stand-in');
+  assert.ok(page.includes('XA.drawClaudeMark(askMark.ctx,') && !/drawStarburst|starburstRays/.test(page), 'the page draws the real mark');
 });
 
 test('page: the waiting overlays animate per frame without redrawing the big card canvas', () => {
@@ -306,14 +307,14 @@ test('page: the waiting overlays animate per frame without redrawing the big car
   assert.ok(tick.includes('XA.markPose(') && tick.includes('XA.dotWave(') && tick.includes('XA.revealPose(') && tick.includes('XA.waitPulse('));
   assert.equal((tick.match(/askDraw\(\)/g) || []).length, 1, 'only the throttled redraw');
   assert.ok(tick.includes('if(ASK.dirty&&now-ASK.lastDraw>160)askDraw();'));
-  assert.ok(!/drawStarburst|drawAnswer|needsUpdate/.test(tick), 'no canvas work or texture upload per frame');
+  assert.ok(!/drawClaudeMark|drawAnswer|needsUpdate/.test(tick), 'no canvas work or texture upload per frame');
   assert.ok(page.includes("askMark=makeSurface(ASK_MARK_PX,ASK_MARK_PX,"), 'the mark has its own small surface (panel scale + &panelres)');
   assert.ok(page.includes('markLayer:true') && page.includes('XA.stepsAdd(ASK.wsteps,ev,ASK.el)') && page.includes('askQuestion(null,j.text,{heard:true})'));
   assert.ok(page.includes('askWaitGlowOff();ASK.wsteps=XA.stepsAdd(ASK.wsteps,{type:\'final\'}).steps'));
 });
 
 test('access code (API 3+): code= from the URL, X-Ask-Code on ask/transcribe/speak, friendly 401/429', () => {
-  assert.equal(XA.API, 6);
+  assert.equal(XA.API, 7);
   assert.equal(XA.parseParams('?ask=1&server=https://192.168.1.20:8765&code=ab23cd').code, 'AB23CD');
   assert.equal(XA.parseParams('?ask=1').code, '');
   assert.equal(XA.accessCode('?code=k7-px 3m'), 'K7PX3M');
