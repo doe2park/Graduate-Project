@@ -1480,7 +1480,7 @@ function askDrawChip(){if(!ASK?.on||!ASK.el)return;const e=ASK.el,meta=layerStat
  XA.drawChip(askChip.ctx,askChip.W,askChip.H,m,ASK.hover.has(ASK_MORE_BTN.chip));askChip.texture.needsUpdate=true;invalidate();}
 function askFooter(){const h=ASK.health;return ['Read-only tools over the twin · '+(h?.mode==='mock'?'MOCK':h?.model||''),XA.HONESTY||'demo sensors SIMULATED · not headset-verified'];}
 function askDraw(){ASK.dirty=false;ASK.lastDraw=performance.now();
- const run=ASK.run?'Lit run: '+(ASK.run.ids.length-1)+' steps along touching pieces, cited source to here · inferred from geometry, no flow direction in the model':'';
+ const run=ASK.run?'Lit run: '+(ASK.run.ids.length-1)+' steps along touching pieces, cited source to here · inferred from geometry, no flow direction in the model · moving dots: path only, direction assumed':'';
  const fWas=askF();ASK.layout=XA.drawAnswer(askCard.ctx,askCard.W,askCard.H,{phase:ASK.phase,model:ASK.model||{question:ASK.question,level:ASK.level},steps:ASK.steps,error:ASK.error,speech:ASK.speech,runNote:run,
   progress:ASK.progress,modeLabel:ASK.health?.mode==='live'?'LIVE':ASK.health?.mode==='mock'?'MOCK':'',footer:askFooter(),hoverMore:ASK.hover.has(ASK_MORE_BTN.card),
   wait:{steps:ASK.wsteps,heard:ASK.heard},markLayer:true})||null;
@@ -1489,7 +1489,7 @@ function askDraw(){ASK.dirty=false;ASK.lastDraw=performance.now();
  askCard.texture.needsUpdate=true;invalidate();}
 /* Remove the answer (glow, run, speech) but keep the pick. */
 function askResetAnswer(){ASK.epoch++;try{ASK.abort?.abort();}catch(e){}ASK.abort=null;ASK.busy=false;askStopSpeech();clearTimeout(ASK.filler);ASK.progress='';
- for(const o of [...ASK.glow.children]){ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();o.userData.edge?.geometry.dispose();o.userData.edge?.material.dispose();}ASK.run=null;
+ for(const o of [...ASK.glow.children]){ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();o.userData.edge?.geometry.dispose();o.userData.edge?.material.dispose();}ASK.run=null;askFxClear();
  ASK.phase=null;ASK.model=null;ASK.final=null;ASK.text='';ASK.steps=[];ASK.paths=[];ASK.vis=[];ASK.error=null;askCard.mesh.visible=false;askLine.visible=false;
  ASK.wsteps=[];ASK.heard=false;ASK.markSettle=null;ASK.tReveal=null;ASK.layout=null;ASK.cardF=1;askCrop();askCard.mesh.material.opacity=1;askCover.visible=false;for(const d of askDots)d.visible=false;}
 function askClear(){if(!ASK?.on)return;askResetAnswer();if(ASK.voice==='recording')askRecStop(true);askRing.visible=false;ASK.el=null;ASK.anchor=null;ASK.more=false;ASK.details=false;
@@ -1520,11 +1520,54 @@ function askWaitGlow(){const e=ASK.el;if(!e?.layer)return;const o=askGlowFor(e.i
  if(o.userData.edge){o.userData.kind='wait';o.material.uniforms.opacity.value=0;o.userData.edge.material.opacity=0;}else{ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();}}
 function askWaitGlowOff(){for(const o of [...ASK.glow.children])if(o.userData.kind==='wait'){ASK.glow.remove(o);o.geometry?.dispose();o.material?.dispose();o.userData.edge?.geometry.dispose();o.userData.edge?.material.dispose();}}
 function askHighlight(final){const cites=(final.citations||[]).filter(c=>c.verified),primary=ASK.model?.primary;
- for(const c of cites)askGlowFor(c.id,c.layer,c.bbox_m,c.id===primary?XA.COLORS.primary:XA.COLORS.other,c.id===primary?.62:.4);
+ // the cited elements appear one after another, in the order the answer names them (Evidence order); all at once with reduced motion
+ cites.forEach((c,i)=>{const o=askGlowFor(c.id,c.layer,c.bbox_m,c.id===primary?XA.COLORS.primary:XA.COLORS.other,c.id===primary?.62:.4);if(o&&FX_ON&&!askReduced()){o.userData.t0=performance.now()+i*ASK_SEQ_MS;o.visible=false;}});
  const ids=XA.runPath(ASK.paths,primary,final.citations);if(!ids)return;
  const lit=new Set(cites.map(c=>c.id)),meshes=[];for(const id of ids){if(lit.has(id))continue;const layer=ASK.el?.layer&&layerState[ASK.el.layer]?.meta?.[id]?ASK.el.layer:Object.keys(layerState).find(k=>layerState[k].meta?.[id]);
   const o=layer?askGlowFor(id,layer,null,XA.COLORS.run,0):null;if(o&&o.userData.edge){o.userData.kind='run';o.material.uniforms.opacity.value=0;o.userData.edge.material.opacity=0;o.visible=false;meshes.push({o,i:meshes.length});}}
  if(meshes.length)ASK.run={meshes,t0:performance.now(),ids};}
+/* ── Answer effects (2026-11-19) ── render-only extras on top of the lit elements; &fx=0 turns them off. Nothing here can break an answer:
+   every step is guarded and a failure just removes the effects.
+   1. Dots that travel along the lit run, from the cited source to the asked element. The model has NO flow direction: the direction is
+      the assumed supply direction (source -> outlet) and the card's run note says so.
+   2. A floor guide: arrow marks on the floor from where the viewer stands toward the spot under the answer's main element, plus a thin
+      vertical line up to it, when that element is not the asked one and is more than 2 m away. A straight direction line, not a route.
+   3. (in askHighlight / askTick) the cited elements appear one after another in Evidence order. */
+const FX_ON=q.get('fx')!=='0',ASK_SEQ_MS=450;
+const askFx=new THREE.Group();askFx.name='ask: answer effects (dots, floor guide)';scene.add(askFx);
+let FX=null;const _fxM=new THREE.Matrix4(),_fxQ=new THREE.Quaternion(),_fxS=new THREE.Vector3(),_fxP=new THREE.Vector3();
+function askFxClear(){try{for(const o of [...askFx.children]){askFx.remove(o);o.geometry?.dispose();o.material?.dispose();}FX=null;}catch(e){}}   // may run before this block is initialised (a reset during boot)
+function askFxCenter(o){if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();bimRoot.updateMatrixWorld(true);return o.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(bimRoot.matrixWorld);}
+function askFxBuild(){askFxClear();if(!FX_ON||askReduced())return;
+ try{const byId=new Map(ASK.glow.children.filter(o=>o.geometry).map(o=>[String(o.userData.id),o]));FX={t0:performance.now(),dots:null,guide:null};
+  if(ASK.run){const pts=[];for(const id of ASK.run.ids){const o=byId.get(String(id));if(o)pts.push(askFxCenter(o));}
+   const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+pts[i].distanceTo(pts[i-1]));const total=cum[cum.length-1];
+   if(pts.length>=2&&total>.5&&Number.isFinite(total)){const N=clamp(Math.round(total/.7),3,14);
+    const m=new THREE.InstancedMesh(new THREE.SphereGeometry(.03,10,8),new THREE.MeshBasicMaterial({color:0xe6fbff,transparent:true,opacity:.95,depthTest:false,depthWrite:false,toneMapped:false}),N);
+    m.name='ask: dots along the lit run (direction assumed)';m.renderOrder=56;m.frustumCulled=false;m.visible=false;askFx.add(m);FX.dots={m,pts,cum,total,N,delay:ASK.run.meshes.length*90+500};}}
+  const primary=ASK.model?.primary,po=primary!=null?byId.get(String(primary)):null;
+  if(po&&String(primary)!==String(ASK.el?.id)){const tgt=askFxCenter(po);camera.getWorldPosition(_head);const fy=(MODE_AR?0:viewPos[1]-EYE_H)+.03;
+   const a=new THREE.Vector3(_head.x,fy,_head.z),b=new THREE.Vector3(tgt.x,fy,tgt.z),d=a.distanceTo(b);
+   if(d>2&&d<60&&Number.isFinite(d)){const dir=b.clone().sub(a).normalize(),N=clamp(Math.floor((d-.8)/.5),2,40);
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array([0,0,-.2, -.14,0,.1, 0,0,.02, 0,0,-.2, 0,0,.02, .14,0,.1]),3));   // a flat chevron pointing -Z
+    const m=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial({color:0xFDB515,transparent:true,opacity:.92,side:THREE.DoubleSide,depthTest:false,depthWrite:false,toneMapped:false}),N);
+    m.name='ask: floor guide toward the answer element';m.renderOrder=55;m.frustumCulled=false;askFx.add(m);
+    const lg=new THREE.BufferGeometry().setFromPoints([b,tgt]),ln=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xFDB515,transparent:true,opacity:.7,depthTest:false,depthWrite:false,toneMapped:false}));ln.renderOrder=55;ln.frustumCulled=false;askFx.add(ln);
+    FX.guide={m,a,dir,d,N,yaw:Math.atan2(-dir.x,-dir.z)};}}
+  if(!FX.dots&&!FX.guide)FX=null;
+ }catch(e){console.warn('[ask] effects',e);askFxClear();}}
+function askFxTick(now){if(!FX)return false;
+ try{const t=now-FX.t0;
+  if(FX.dots){const D=FX.dots,on=t>D.delay;D.m.visible=on;
+   if(on){const s0=(t-D.delay)/1000*1.3;for(let i=0;i<D.N;i++){const s=(s0+i*D.total/D.N)%D.total;let k=1;while(k<D.cum.length-1&&D.cum[k]<s)k++;
+     const seg=D.cum[k]-D.cum[k-1]||1,f=clamp((s-D.cum[k-1])/seg,0,1);_fxP.lerpVectors(D.pts[k-1],D.pts[k],f);
+     const edge=Math.min(s,D.total-s),sc=clamp(edge/.25,.2,1);_fxM.compose(_fxP,_fxQ.identity(),_fxS.setScalar(sc));D.m.setMatrixAt(i,_fxM);}
+    D.m.instanceMatrix.needsUpdate=true;}}
+  if(FX.guide){const G=FX.guide,off=(t/1000*.7)%.5;_fxQ.setFromAxisAngle(_fxS.set(0,1,0),G.yaw);
+   for(let i=0;i<G.N;i++){const dist=.8+i*.5+off,vis=dist<G.d-.1;_fxP.copy(G.a).addScaledVector(G.dir,Math.min(dist,G.d));
+    const sc=vis?clamp(Math.min(dist-.7,G.d-dist)/.4,.15,1):0.0001;_fxM.compose(_fxP,_fxQ,new THREE.Vector3(sc,sc,sc));G.m.setMatrixAt(i,_fxM);}
+   G.m.instanceMatrix.needsUpdate=true;}
+  return true;}catch(e){console.warn('[ask] effects',e);askFxClear();return false;}}
 /* Per frame (XR and desktop): glow pulse, run lighting, throttled card redraw. Returns true while something animates (desktop keeps drawing). */
 function askTick(){if(!ASK?.on)return false;const now=performance.now();let anim=false;
  askRing.visible=ASK.voice==='recording'&&!!ASK.el&&!ASK.hideRing;
@@ -1541,11 +1584,13 @@ function askTick(){if(!ASK?.on)return false;const now=performance.now();let anim
  askDepth.visible=ASK.glow.children.length>0;
  if(ASK.glow.children.length){const red=askReduced(),ph=red?0:Math.sin(now/260)*.5+.5;
   const wp=XA.waitPulse(now-ASK.tWait,{reduced:red});
-  for(const o of ASK.glow.children){if(o.userData.kind==='box')o.material.opacity=o.userData.base*(.7+.6*ph);else if(o.userData.kind==='glow')o.material.uniforms.boost.value=.35*ph;
+  for(const o of ASK.glow.children){if(o.userData.t0!=null){const k=clamp((now-o.userData.t0)/260,0,1);o.visible=k>0;if(o.userData.kind==='glow'){o.material.uniforms.opacity.value=ASK_FILL*k;o.userData.edge.material.opacity=ASK_LINE*k;}if(k>=1)o.userData.t0=null;}
+   if(o.userData.kind==='box')o.material.opacity=o.userData.base*(.7+.6*ph);else if(o.userData.kind==='glow')o.material.uniforms.boost.value=.35*ph;
    else if(o.userData.kind==='wait'){o.material.uniforms.opacity.value=wp.opacity;o.material.uniforms.boost.value=wp.boost;o.userData.edge.material.opacity=.25+.5*wp.opacity;}}
   // cited parts breathe in brightness (no fading); each run piece fades in once along the run and stays, the pulse only brightens it
   if(ASK.run){const n=ASK.run.meshes.length,t=now-ASK.run.t0;for(const {o,i} of ASK.run.meshes){const a=XA.runGlow(i,n,t,{reduced:red}),k=Math.min(1,a/.5);o.visible=a>.01;o.material.uniforms.opacity.value=ASK_FILL*k;o.material.uniforms.boost.value=Math.max(0,a-.5)/.3;o.userData.edge.material.opacity=ASK_LINE*k;}}
   anim=anim||!red;}
+ if(askFxTick(now))anim=true;
  return anim||ASK.busy||ASK.speech==='speaking';}
 /* Ask: POST /api/ask (SSE). The selected element and the clicked point go along (bimRoot-local = the server's viewer frame).
    While waiting: a send earcon, the card's progress line from the server events ("Thinking…", "Following the ducts…"), and
@@ -1558,7 +1603,7 @@ async function askQuestion(level,text,{heard=false}={}){if(!ASK.on)return null;i
  ASK.heard=!!heard;ASK.wsteps=[];ASK.tWait=performance.now();ASK.markSettle=null;ASK.tReveal=ASK.tWait;ASK.revealOpts={from:0,picture:false};askWaitGlow();askSync();askDraw();
  askEarcon('send');ASK.filler=setTimeout(()=>{if(epoch===ASK.epoch&&ASK.busy&&!ASK.saidAny)askSay('One moment.',epoch);},XA.FILLER_MS);
  const t0=performance.now();let spoke=false;
- try{const res=await fetch(askApi('ask'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'},ASK.token),signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:[]})});
+ try{const res=await fetch(askApi('ask'),{method:'POST',headers:XA.askHeaders(ASK.code,{'Content-Type':'application/json'},ASK.token),signal:ac?.signal,body:JSON.stringify({question,element_id:ASK.el.id,point:ASK.el.bim,history:(ASK.hist||[]).slice(-3)})});
   if(!res.ok){const rt=await askRefusal(res);if(rt)throw new Error(rt);}
   if(!res.ok||!res.body)throw new Error('ask server '+res.status+(res.status===404||res.status===501?' · open this page from scripts/ask_twin_server.py':''));
   let fail=null;const sp=XA.createStream(ev=>{if(epoch!==ASK.epoch)return;
@@ -1574,7 +1619,8 @@ async function askQuestion(level,text,{heard=false}={}){if(!ASK.on)return null;i
   clearTimeout(ASK.filler);
   const f=ASK.final,answer=f.answer||ASK.text;ASK.text=answer;const se=ASK.el||{},selMeta=layerState[se.layer]?.meta?.[se.id]||{};ASK.model=XA.cardModel({question,answer,final:f,level:ASK.level,visuals:ASK.vis,selected:se.id?{id:se.id,layer:se.layer,type:selMeta.type,name:selMeta.name,sensor:se.sensor}:null});if(ASK.health?.note&&f.mode==='mock')ASK.model.footer[0]=ASK.model.footer[0].replace(/^MOCK · scripted/,'MOCK · '+ASK.health.note);ASK.phase='answer';ASK.tAnswer=Math.round(performance.now()-t0);
   askWaitGlowOff();ASK.wsteps=XA.stepsAdd(ASK.wsteps,{type:'final'}).steps;{const tn=performance.now();ASK.markSettle=tn-ASK.tWait;ASK.tReveal=tn;ASK.revealOpts={from:.55,picture:true};}   // mark settles, card eases in, picture last
-  askHighlight(f);askDraw();ASK.busy=false;askSync();if(!ASK.saidAny)askEarcon('done');
+  askHighlight(f);askFxBuild();askDraw();ASK.busy=false;ASK.hist=[...(ASK.hist||[]),{q:question,a:String(answer||'').slice(0,1500)}].slice(-3);   // follow-up questions: the last three exchanges go along
+  askSync();if(!ASK.saidAny)askEarcon('done');
   if(!spoke)askSay(f.spoken||XA.speakable(answer,f.citations),epoch);   // older server: no 'speak' events
   return {ms:ASK.tAnswer,final:f};
  }catch(e){clearTimeout(ASK.filler);if(epoch!==ASK.epoch||e?.name==='AbortError')return null;ASK.phase='error';ASK.error=String(e?.message||e);askWaitGlowOff();ASK.markSettle=performance.now()-ASK.tWait;console.warn('[ask]',e);askEarcon('miss');askDraw();return {error:ASK.error};}
@@ -1747,6 +1793,7 @@ function askInspection(){if(!ASK?.on)return {on:false,available:XAOK,state:$('as
   el:ASK.el&&{id:ASK.el.id,layer:ASK.el.layer,bim:ASK.el.bim,sensor:ASK.el.sensor},phase:ASK.phase,busy:ASK.busy,question:ASK.question,level:ASK.level,steps:ASK.steps.slice(),error:ASK.error,answerMs:ASK.tAnswer,
   lead:ASK.model?.lead||null,primary:ASK.model?.primary||null,chips:ASK.model?.chips||[],visual:ASK.model?.visual||null,citations:(ASK.final?.citations||[]).map(c=>({id:c.id,verified:c.verified,layer:c.layer})),
   glow:ASK.glow.children.map(o=>({id:o.userData.id,kind:o.userData.kind})),run:ASK.run?{pieces:ASK.run.meshes.length,ids:ASK.run.ids.length}:null,speech:ASK.speech,speechPlan:ASK.speechPlan||null,speechEngine:ASK.speechEngine||null,
+  fx:FX?{dots:FX.dots?.N||0,guide:FX.guide?{d:+FX.guide.d.toFixed(2),n:FX.guide.N,yaw:+FX.guide.yaw.toFixed(3)}:null}:null,history:(ASK.hist||[]).length,
   base:ASK.base,paired:!!ASK.token,codeUsed:!!ASK.code,prefer:ASK.prefer,progress:ASK.progress,note:ASK.health?.note||null,ring:askRing.visible,
   voice:ASK.voice,voicePlan:ASK.voicePlan||null,voiceNote:ASK.voiceNote,bar:askBar.mesh.visible?askButtons().map(b=>b.id):null,moreVisible:askBar.mesh.visible,chipVisible:askChip.mesh.visible,details:ASK.details,cardVisible:askCard.mesh.visible,infoCardVisible:card.mesh.visible,
   wait:{steps:ASK.wsteps.map(s=>({icon:s.icon,text:s.text,state:s.state,n:s.n})),heard:ASK.heard,settled:ASK.markSettle!=null,dots:askDots[0].visible,cover:askCover.visible,cardOpacity:askCard.mesh.material.opacity,markRot:+askMark.texture.rotation.toFixed(3)},
