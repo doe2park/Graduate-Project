@@ -1340,7 +1340,8 @@ class PublicScriptTests(unittest.TestCase):
         args = (d / 'server-args.txt').read_text().split()
         code = args[args.index('--code') + 1]
         self.assertRegex(code, r'^\d{8}$')
-        self.assertIn('--no-tts', args)
+        self.assertNotIn('--no-tts', args)   # 2026-11-19: answer voice on (WAV made with say -o, played in the headset; the Mac stays silent)
+        self.assertIn('--approve-pairing', args)
         self.assertEqual(args[args.index('--public-origin') + 1], 'https://calm-river-two-words.trycloudflare.com')
         blob = json.loads((d / 'blob.txt').read_text())
         self.assertEqual(set(blob), {'server', 'updated'})

@@ -8,7 +8,8 @@
 #   PORT=8765 PYTHON=/path/to/python scripts/ask_twin_public.sh --per-day 100     extra arguments go to ask_twin_server.py
 #
 # Needs: cloudflared (brew install cloudflared), the server's Python environment, ~/.config/ask-twin/env.
-# No laptop speech (--no-tts): the Mac stays silent; a headset speaks with its own browser voice.
+# Answer voice (2026-11-19): the laptop makes each spoken line as a WAV file (macOS say -o, no sound on the Mac) and the headset plays it.
+# The headset's More menu has Answer voice on / off. Add --no-tts to turn it off at the server.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PORT=${PORT:-8765}
@@ -57,4 +58,4 @@ echo "[ask-twin public] Everything through this address (slow: about 95 MB of mo
 echo "[ask-twin public]   $URL/vr/?direct=1&ask=1&code=$CODE   $URL/mr/?direct=1&ask=1&code=$CODE   $URL/scan-compare.html?view=overlay&style=lens&capture=2026-05-06&ask=1&code=$CODE"
 cd "$ROOT"
 # --approve-pairing: a headset pairs with no typing (Connect on the headset, Allow in the dialog on this Mac).
-"$PYTHON" scripts/ask_twin_server.py --no-tts --port "$PORT" --code "$CODE" --public-origin "$URL" --approve-pairing "$@"
+"$PYTHON" scripts/ask_twin_server.py --port "$PORT" --code "$CODE" --public-origin "$URL" --approve-pairing "$@"

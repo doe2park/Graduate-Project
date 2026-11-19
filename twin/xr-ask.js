@@ -107,6 +107,10 @@ function savePairing(storage, token, nowMs = Date.now()) {
   if (!TOKEN_RX.test(token || '')) return false;
   try { storage.setItem(PAIR_KEY, JSON.stringify({token, at: new Date(nowMs).toISOString()})); return loadPairing(storage)?.token === token; } catch (e) { return false; }
 }
+/* Answer voice on / off, kept in this browser (default on). */
+const VOICE_KEY = 'askTwin.voice';
+function voiceOff(storage) { try { return storage?.getItem(VOICE_KEY) === 'off'; } catch (e) { return false; } }
+function setVoice(storage, on) { try { storage.setItem(VOICE_KEY, on ? 'on' : 'off'); return true; } catch (e) { return false; } }
 function forgetPairing(storage) { try { storage?.removeItem(PAIR_KEY); return true; } catch (e) { return false; } }
 /* 'url': the address says what to do (ask=1, server= or code= present; the stored token stands in for a missing code);
    'auto': nothing in the address but this browser is paired -> find the laptop by itself; 'off': neither. */
@@ -627,9 +631,10 @@ function answerVisual({visuals = [], citations = [], primary = null, selected = 
   const byId = new Map(cites.map(c => [c.id, c])), citedOrder = cites.map(c => c.id);
   const selId = selected && selected.id != null ? String(selected.id) : null;
   const selEl = Object.assign({}, selected || {}, byId.get(selId) || {});
-  const run = of('run').find(v => (v.notable || []).some(n => ok.has(n.id))), near   /* a trace card only for a run the answer verifiably cites */ = of('near').find(v => v.above_only && (v.items || []).length) || of('near').find(v => (v.items || []).length);
+  const unsure = /\b(cannot|can't|can not) (tell|say|confirm)\b/i.test(captionText(answer, 1));   // an honest "cannot tell" gets no "Probably fed by" card
+  const run = unsure ? null : of('run').find(v => (v.notable || []).some(n => ok.has(n.id))), near   /* a trace card only for a run the answer verifiably cites */ = of('near').find(v => v.above_only && (v.items || []).length) || of('near').find(v => (v.items || []).length);
   const room = of('room').filter(v => v.room).pop() || null, elv = of('element').map(v => v.element).find(e => e && String(e.id) === selId) || of('element')[0]?.element || null;
-  const out = {kind: 'text', headline: '', check: '', caption: captionText(answer)};
+  const out = {kind: 'text', headline: '', check: '', caption: captionText(answer, 9)};   // the whole answer, never cut (drawAnswer fits it)
   if (run) {
     const src = run.notable.find(n => n.id === primary && ok.has(n.id)) || run.notable.find(n => ok.has(n.id));
     const from = selId && run.start && String(run.start.id) !== selId ? selEl : (run.start && run.start.id ? Object.assign({}, run.start, byId.get(run.start.id) || {}) : selEl);
@@ -870,14 +875,19 @@ function drawAnswer(ctx, W, H, view) {
     // headline
     ctx.fillStyle = '#ffffff'; fit(ctx, v.headline || m.lead || '', pad, y + 50, W - 2 * pad, 56, '700'); y += 78;
     // the picture
-    const bh = 300, by = y;
+    // the whole answer fits: up to 6 caption lines, and the picture gives up height for lines beyond 3 (2026-11-19: answers were cut at 2 lines)
+    const minPic = v.kind === 'trace' || v.kind === 'near' ? 300 : 170;   // the diagrams need their height; the plain lookup tile can shrink
+    let capPx = 33, capLines = [];
+    for (const px of [33, 30, 27, 24, 22, 20]) { capPx = px; ctx.font = px + 'px Arial'; capLines = wrap(ctx, v.caption || '', W - 2 * pad, 12); if (capLines.length * Math.round(px * 1.24) <= (H - 172) - y - minPic - 26) break; }
+    const capLh = Math.round(capPx * 1.24);
+    const bh = v.kind === 'text' ? 300 : Math.max(minPic, Math.min(300, (H - 172) - y - 26 - capLines.length * capLh)), by = y;
     const drawn = v.kind === 'lookup' ? (drawLookup(ctx, v, pad, by, W - 2 * pad, bh), true) : v.kind === 'near' ? (drawNear(ctx, v, pad, by, W - 2 * pad, bh), true)
       : v.kind === 'trace' ? (drawTrace(ctx, v, pad, by, W - 2 * pad, bh), true) : drawItems(ctx, v, pad, by, W - 2 * pad, 250);
     if (drawn) layout.picture = {x: pad - 6, y: by - 6, w: W - 2 * pad + 12, h: (v.kind === 'text' ? 250 : bh) + 12};
     y = drawn ? by + (v.kind === 'text' ? 250 : bh) + 14 : y;
     // caption (the sentence answer, 1-2 lines)
-    ctx.font = '33px Arial'; ctx.fillStyle = '#d5e3ef';
-    for (const t of wrap(ctx, v.caption || '', W - 2 * pad, drawn ? 2 : 6)) { ctx.fillText(t, pad, y + 30); y += 41; }
+    ctx.font = capPx + 'px Arial'; ctx.fillStyle = '#d5e3ef';
+    for (const t of capLines) { ctx.fillText(t, pad, y + capPx - 3); y += capLh; }
     // bottom rows: check on site, then the evidence ids (with the verification count)
     const ry = H - 172;
     pill(ctx, pad, ry, '      ' + v.check, {h: 52, size: 29, fill: 'rgba(251,191,36,.16)', stroke: '#fbbf24', color: '#fde68a', weight: '700', maxW: W - 2 * pad});
@@ -953,5 +963,5 @@ return {API, LEVELS, COLORS, BAR, CHIP, ANSWER_MORE, HONESTY, SYS, parseParams, 
   headerWord, headerNote, CLAUDE_MARK_PATH, waitHeight, STEP_ICON, stepIcon, stepPhrase, stepsAdd, stepsFrom, waitLabel, WAIT, markPose, dotWave, revealPose, waitPulse, drawAnswer, drawBar, drawChip, drawMore,
   pictogram, niceName, sizeText, roomChip, captionText, checkText, answerVisual,
   serverOrigin, privateIPv4, ENDPOINT, endpointFrom, connectCode, PAIR_KEY, loadPairing, savePairing, forgetPairing, connectPlan, connectLine,
-  findLaptop, pairWithCode, pairByApproval, autoConnect, forgetLaptop, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
+  findLaptop, pairWithCode, pairByApproval, voiceOff, setVoice, autoConnect, forgetLaptop, apiUrl, healthProblem, accessCode, askHeaders, refusalText, progressText, EARCONS, HOLD_MS, holdAskAllowed, FILLER_MS};
 });

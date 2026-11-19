@@ -81,7 +81,7 @@ body.mr #capture,body.mr #prev,body.mr #station,body.mr #next,body.mr #hires,bod
  .b input[type=range]{height:40px}
 }
 </style>
-<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=10"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=5"></script><script src="twin/xr-ask.js?v=15"></script>
+<script src="registration-core.js"></script><script src="twin/element-cards.js"></script><script src="twin/xr-core.js?v=11"></script><script src="twin/overlay-visibility.js?v=2"></script><script src="twin/mr-align.js?v=4"></script><script src="twin/sensor-xr.js?v=5"></script><script src="twin/xr-ask.js?v=16"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" crossorigin>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","@mkkellogg/gaussian-splats-3d":"https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"}}</script>
 </head><body>
@@ -148,7 +148,7 @@ $('entryToggle').onclick=()=>{const collapsed=$('entry').classList.toggle('compa
 
 /* Helper scripts are versioned (?v=N above) and must match this page: a stale cached twin/xr-core.js (GitHub Pages max-age=600) once threw
    inside the XR frame loop (X.controllerRoles missing) and left Quest with a black view (2026-10-22). Bump ?v and XR_CORE_API together. */
-const XR_CORE_API=10,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
+const XR_CORE_API=11,MR_ALIGN_API=4,CORE_OK=X?.API===XR_CORE_API&&MR?.API===MR_ALIGN_API&&!!OV;
 const T0=performance.now(),q=new URLSearchParams(location.search);
 const MODE_AR=q.get('mode')==='ar';   // mixed-reality passthrough mode (immersive-ar, manual alignment); default = the 360° photo VR overlay
 const MR_DEFAULT_LAYERS=['fire','duct','plumbing'];   // Quest 2 budget: fire piping, ducts, plumbing on; the rest toggle from the MR panel
@@ -649,7 +649,7 @@ const layerOn=k=>!!layerState[k]&&layerState[k].group.visible&&!layerState[k].er
 const alignShort=()=>capture?.provisional?'PROVISIONAL alignment':'registered, not surveyed';
 function menuModel(){const page=X.MENU_PAGES[state.page]?state.page:'main';
  return {page,buttons:X.menuButtons(page,{captureLabel:capture?capture.label.replace(/, \d{4}$/,''):'May 6',mode:state.mode,scene:gauss.scene,gaussianAvailable:capture?!!gaussianSource():undefined,gaussianLoading:gauss.loading,
- hands:state.hands,opacity:state.opacity.lens,hiRes:state.hiRes,sensorsLabel:SENS.on?(SENS.loading?'loading…':SXN[SENS.scene]):'off',qualityReduced:guard.level>0,qualityLabel:FG.levels[guard.level]?.label,
+ hands:state.hands,opacity:state.opacity.lens,hiRes:state.hiRes,voiceLabel:askVoiceOff()?'off':'on',sensorsLabel:SENS.on?(SENS.loading?'loading…':SXN[SENS.scene]):'off',qualityReduced:guard.level>0,qualityLabel:FG.levels[guard.level]?.label,
  layers:OVERLAY_LAYER_KEYS.map(k=>({key:k,label:LAYERS[k].label,on:layerOn(k),loading:!!layerState[k]?.loading}))}),rects:X.pageLayout(page)};}
 /* The info line(s) under the header. main: where you are + the honesty line (+ one short quality line only when the frame guard
    lowered it); every sub-page: at most one short line. Diagnostics live on Status. */
@@ -710,6 +710,7 @@ async function menuAction(k){const {buttons}=menuModel(),id=(typeof k==='number'
  else if(id==='hires'){if(gauss.scene!=='gaussian')setHiRes(!state.hiRes);}
  else if(id==='exit'){if(xrSession)xrSession.end();else setMenu(false);return id;}
  else if(id==='sensors'){sensorsMenuCycle();}
+ else if(id==='voice'){askVoiceSet(askVoiceOff());}
  else if(id.startsWith('layer:')){const key=id.slice(6);setLayer(key,!layerOn(key));}
  else return null;
  if(state.menu)drawMenu();return id;}
@@ -1583,7 +1584,10 @@ async function askQuestion(level,text,{heard=false}={}){if(!ASK.on)return null;i
 function askUnlockAudio(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!ASK.audio)ASK.audio={ctx:new C(),src:null};if(ASK.audio.ctx.state==='suspended')ASK.audio.ctx.resume().catch(()=>{});}catch(e){}}
 function askStopSpeech(){ASK.sq=[];ASK.sqBusy=false;ASK.sqGen=(ASK.sqGen||0)+1;try{window.speechSynthesis?.cancel();}catch(e){}try{ASK.audio?.src?.stop();}catch(e){}if(ASK.audio)ASK.audio.src=null;if(ASK.speech==='speaking')ASK.speech=null;}
 function askSetSpeech(s,epoch){if(epoch!==ASK.epoch)return;ASK.speech=s;ASK.dirty=true;}
-function askSay(text,epoch=ASK.epoch){if(!text||epoch!==ASK.epoch)return;ASK.saidAny=true;ASK.sq.push(text);askPump(epoch);}
+/* Answer voice on / off (More menu in the headset; kept in this browser). Off: the card only. */
+function askVoiceOff(){return !!(XAOK&&XA.voiceOff&&XA.voiceOff(askStore()));}
+function askVoiceSet(on){if(XAOK&&XA.setVoice)XA.setVoice(askStore(),on);if(!on&&ASK)askStopSpeech();status('Answer voice '+(on?'on':'off'));}
+function askSay(text,epoch=ASK.epoch){if(!text||epoch!==ASK.epoch)return;if(askVoiceOff()){ASK.saidAny=true;return;}ASK.saidAny=true;ASK.sq.push(text);askPump(epoch);}
 async function askPump(epoch){if(ASK.sqBusy)return;ASK.sqBusy=true;const gen=ASK.sqGen;
  try{while(ASK.sq.length&&epoch===ASK.epoch&&gen===ASK.sqGen){const t=ASK.sq.shift();if(!(await askSpeakOne(t,epoch)))break;}}
  finally{if(gen===ASK.sqGen){ASK.sqBusy=false;if(ASK.speech==='speaking')askSetSpeech('read',epoch);}}}

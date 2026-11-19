@@ -153,7 +153,7 @@ async function menuSmoke(page){
  // More (2026-11-17): a hub of sub-pages (Layers, View, Status) + Demo sensors; each page ≤ 6 buttons except Layers (8 + Back); Back goes one level up
  const mp=await page.evaluate(()=>xrDebug.menuButtonNdc('more'));assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),mp)).menu,'more');
  const pageIs=async(p,ids)=>{const m=(await page.evaluate(()=>xrInspection())).menu;assert.equal(m.page,p);if(ids)assert.deepEqual(m.buttons,ids);return m;};
- mi=await pageIs('more',['page:layers','page:view','sensors','page:status','back']);
+ mi=await pageIs('more',['page:layers','page:view','sensors','page:status','voice','back']);
  await page.waitForTimeout(100);await page.screenshot({path:path.join(OUT,'scan-xr-menu-more.png')});
  const lp=await page.evaluate(()=>xrDebug.menuButtonNdc('page:layers'));assert.equal((await page.evaluate(([x,y])=>xrDebug.pickNdc(x,y),lp)).menu,'page:layers');
  const lm=await pageIs('layers');assert.equal(lm.buttons.length,9);assert.equal(lm.buttons.filter(b=>b.startsWith('layer:')).length,8);assert.equal(lm.buttons[8],'back');

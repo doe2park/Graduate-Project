@@ -146,7 +146,7 @@ function cellKey(x, z, size) { return Math.floor(x / size) + ',' + Math.floor(z 
    Nothing was removed: every old function is on a page reached from main in at most two presses (More, then the sub-page).
    Back always sits in the bottom-right slot (where More sits on main). Layout = rows of button counts inside the page's area
    (fractions, y down). Buttons carry stable ids, so the page dispatches by id, never by a grid index. */
-const MENU_PAGES = {main: [2, 2], more: [3, 2], layers: [3, 3, 3], view: [3, 3], status: [1]};
+const MENU_PAGES = {main: [2, 2], more: [3, 3], layers: [3, 3, 3], view: [3, 3], status: [1]};
 const MENU_AREA = {left: .03, right: .97, top: .4, bottom: .965, gap: .022};
 const MENU_AREAS = {main: MENU_AREA, more: {...MENU_AREA, top: .25}, layers: {...MENU_AREA, top: .25}, view: {...MENU_AREA, top: .25},
   status: {...MENU_AREA, left: .69, top: .8}};
@@ -197,6 +197,7 @@ function menuButtons(page, s = {}) {
       {id: 'page:view', label: 'View ▸', value: (s.captureLabel || 'May 6') + ' · ' + (s.scene === 'gaussian' ? 'Gaussian' : 'photo'), tone: 'nav'},
       {id: 'sensors', label: 'Demo sensors', value: s.sensorsLabel || 'off', tone: s.sensorsLabel && s.sensorsLabel !== 'off' ? 'on' : ''},
       {id: 'page:status', label: 'Status ▸', value: reduced ? 'quality ' + (s.qualityLabel || 'reduced') : 'help · frame rate', tone: reduced ? 'warn' : 'nav'},
+      {id: 'voice', label: 'Answer voice', value: s.voiceLabel || 'on', tone: (s.voiceLabel || 'on') === 'on' ? 'on' : ''},
       BACK];
   }
   return [{id: 'style', label: 'Lens / All', value: s.mode === 'all' ? 'All' : 'Lens', tone: s.mode === 'all' ? 'on' : ''},
@@ -612,7 +613,7 @@ function backAction({menuOpen = false, picked = false} = {}) { return menuOpen ?
 
 /* API version of this file. scan-xr.html loads it as twin/xr-core.js?v=<API> and refuses Enter VR on a mismatch (stale cache).
    Bump it (and the page's ?v= / XR_CORE_API) whenever the exports change. */
-const API = 10;   // 7: frame guard, headsetCaptures · 8: panelPixelScale, backAction · 9: 4-button demo menu · 10: More sub-pages (menuPaths, menuArea, pageLayout), lens 15°, cardLines name, toastLines
+const API = 11;   // 11: More page has Answer voice on/off (2026-11-19) · 7: frame guard, headsetCaptures · 8: panelPixelScale, backAction · 9: 4-button demo menu · 10: More sub-pages (menuPaths, menuArea, pageLayout), lens 15°, cardLines name, toastLines
 
 return {API, XR_SCALE_MIN, XR_SCALE_MAX, headsetProfile, xrQuality, PANEL_RES_MIN, PANEL_RES_MAX, panelPixelScale, backAction, FRAME_GUARD, frameGuardInit, frameGuardStep, frameGuardText, headsetCaptures, CAPTURES, DEFAULT_CAPTURE, CAPTURE_ORDER, captureConfig, nextCapture, validRegistration, applyReg, invertReg, bimRootTransform, applyRootTransform,
   quatMul, stationQuaternion, rotateByQuat, coneCos, smoothstep, coneWeight, fragmentAlpha, OPACITY_STEPS, stepOpacity, stepCone,

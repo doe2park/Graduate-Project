@@ -166,7 +166,7 @@ test('XR menu (2026-11-17 sub-pages): main = 4 large buttons; More = named sub-p
   assert.equal(X.menuButtons('view', {...st, scene: 'gaussian'}).find(b => b.id === 'hires').value, 'n/a in 3D');
   assert.equal(X.menuButtons('view', {...st, scene: 'gaussian', gaussianAvailable: true}).find(b => b.id === 'scene').value, 'Gaussian 3D');
   const lay = X.menuButtons('layers', st); assert.equal(lay[7].id, 'layer:fire'); assert.equal(lay[7].value, 'off'); assert.equal(lay[0].tone, 'on');
-  const more = X.menuButtons('more', st); assert.deepEqual(more.map(b => b.id), ['page:layers', 'page:view', 'sensors', 'page:status', 'back']);
+  const more = X.menuButtons('more', st); assert.deepEqual(more.map(b => b.id), ['page:layers', 'page:view', 'sensors', 'page:status', 'voice', 'back']);
   assert.equal(more[0].value, '7 of 8 on'); assert.equal(more[2].value, 'off');
   // diagnostics: the hub's Status button only turns amber when the frame guard lowered the quality
   assert.equal(more[3].tone, 'nav'); const red = X.menuButtons('more', {...st, qualityReduced: true, qualityLabel: 'low'})[3]; assert.equal(red.tone, 'warn'); assert.equal(red.value, 'quality low');
