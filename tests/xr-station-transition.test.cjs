@@ -8,7 +8,7 @@ function fixture(){
  const old={dispose(){}},tex={dispose(){disposed++;}},el={};
  const ctx={stations:[{position:[0,0,0]},{position:[1,0,0]}],active:0,busyStation:false,pendingStation:null,captureEpoch:1,
   clamp:(v,a,b)=>Math.min(b,Math.max(a,v)),gauss:{scene:'photo'},status(){},photoURL:()=>'/photo.jpg',
-  texLoader:{loadAsync:async()=>tex},THREE:{SRGBColorSpace:'srgb'},fade:to=>to===0?new Promise(r=>{resolveFade=r;}):Promise.resolve(),
+  texLoader:{loadAsync:async()=>tex},loadPhoto:async()=>tex,enterReady(){},THREE:{SRGBColorSpace:'srgb'},fade:to=>to===0?new Promise(r=>{resolveFade=r;}):Promise.resolve(),
   hideCard(){},sphereMat:{map:old,color:{setScalar(){}}},sphere:{position:{fromArray(){}},quaternion:{fromArray(){}},visible:true},
   X:{stationQuaternion:()=>[0,0,0,1],applyReg:()=>[0,0,0]},placeRig(){},reg:{},updateRadius(){},$:()=>el,
   timing:{firstPhotoMs:1},xrSession:null,capture:{label:'new',provisional:false},U:{fade:{value:0}},fader:{visible:false},

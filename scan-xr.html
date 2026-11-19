@@ -270,6 +270,17 @@ function applyShaderState(){
 const draco=new DRACOLoader();draco.setWorkerLimit(2);draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');draco.preload();   /* decoder ready before the first layer arrives */
 const gltfLoader=new GLTFLoader();gltfLoader.setDRACOLoader(draco);
 const texLoader=new THREE.TextureLoader();
+/* Station photos (2026-11-19): fetch + createImageBitmap, not an <img>. On the Quest 3 the first headset run entered VR while the photo was
+   still loading and stayed black with the BIM ~40 m away (the rig was never put on a station): image decoding must not depend on the hidden
+   2D page. Falls back to TextureLoader where createImageBitmap is missing or refuses the file. 30 s limit, then the caller reports it. */
+async function loadPhoto(url){
+ if(typeof createImageBitmap==='function'){const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),30000);
+  try{const r=await fetch(url,{signal:ac.signal});if(!r.ok)throw new Error('photo '+r.status);
+   const bmp=await createImageBitmap(await r.blob(),{imageOrientation:'flipY'}),tex=new THREE.Texture(bmp);
+   tex.flipY=false;tex.colorSpace=THREE.SRGBColorSpace;tex.needsUpdate=true;tex.addEventListener('dispose',()=>{try{bmp.close();}catch(e){}});return tex;}
+  catch(e){if(e?.name==='AbortError')throw new Error('photo timed out');console.warn('photo bitmap path failed, using <img>',e);}
+  finally{clearTimeout(tm);}}
+ const tex=await texLoader.loadAsync(url);tex.colorSpace=THREE.SRGBColorSpace;return tex;}
 const fetchJson=u=>fetch(u,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(u+' '+r.status);return r.json();});
 /* ── Render gating ── outside XR draw only after a change; in XR every frame (the compositor requires it). */
 let needsRender=true,renderCount=0,lastInfo={calls:0,triangles:0,lines:0,points:0};const invalidate=()=>{needsRender=true;};
@@ -292,6 +303,7 @@ async function loadCapture(date){
  if(epoch!==captureEpoch)return;
  if(!X.validRegistration(r))throw new Error('Registration unavailable for '+cfg.label);
  capture=cfg;reg=r;manifestURL=new URL(cfg.photo,location.href);stations=m.stations;$('capture').value=cfg.date;
+ enterWait();
  const tf=X.bimRootTransform(reg);bimRoot.rotation.set(0,tf.rotationY,0);bimRoot.position.fromArray(tf.position);bimRoot.updateMatrixWorld(true);
  const sel=$('station');sel.innerHTML='';stations.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent='Capture '+(i+1);sel.appendChild(o);});
  const want=q.get('station'),byId=stations.findIndex(s=>s.id===want),byIndex=want!=null&&want!==''&&Number.isInteger(Number(want))?Number(want):-1;
@@ -309,7 +321,9 @@ async function openStation(index,{instant=false,initialLook=false,force=false}={
   // Gaussian mode outside the published zones (Oct 18 zone B area): photo fallback instead of smeared splats from a neighbouring zone
   const s=stations[i],gMode=gauss.scene==='gaussian',fb=gMode&&!!gauss.zones&&X.gaussianZoneFor(gauss.zones.zones,stations,s.position,{current:gauss.zoneId}).outside,usePhoto=!gMode||fb;let tex=null;
   if(usePhoto){status('Loading photo '+(i+1)+'/'+stations.length+'…',true);
-   tex=await texLoader.loadAsync(photoURL(s));tex.colorSpace=THREE.SRGBColorSpace;
+   // First station: stand on it right away, so a session entered early has the BIM around the head, not tens of metres away.
+   if(active<0){viewPos=s.position.slice();rig.position.fromArray(X.rigForStation(viewPos,rig.rotation.y,xrSession?camera.position.toArray():[0,0,0]));rig.updateMatrixWorld(true);}
+   tex=await loadPhoto(photoURL(s));
    if(epoch!==captureEpoch||(gauss.scene==='gaussian')!==gMode){tex.dispose();return;}}
   if(doFade)await fade(0,140);
   // Capture/scene selection can change during the fade, after texture loading was validated.
@@ -319,7 +333,7 @@ async function openStation(index,{instant=false,initialLook=false,force=false}={
   }
   hideCard();
   if(tex){const old=sphereMat.map;sphereMat.map=tex;sphereMat.needsUpdate=true;if(old)old.dispose();}
-  active=i;viewPos=s.position.slice();sphere.position.fromArray(s.position);sphere.quaternion.fromArray(X.stationQuaternion(s.e57Quaternion,0));sphere.visible=usePhoto&&!!sphereMat.map;
+  active=i;enterReady();viewPos=s.position.slice();sphere.position.fromArray(s.position);sphere.quaternion.fromArray(X.stationQuaternion(s.e57Quaternion,0));sphere.visible=usePhoto&&!!sphereMat.map;
   if(gMode){if(fb){gauss.fallback=true;gauss.outside=true;if(gauss.dropIn)gauss.dropIn.visible=false;applyShaderState();updateAlign();}else if(gauss.fallback)leaveFallback();}
   if(initialLook&&!xrSession){const f=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().fromArray(s.e57Quaternion)).applyQuaternion(axisQ);yaw=Math.atan2(-f.x,-f.z);pitch=0;setDesktopLook();}
   placeRig();stationBim=X.applyReg(reg,viewPos);updateRadius();
@@ -330,10 +344,14 @@ async function openStation(index,{instant=false,initialLook=false,force=false}={
   status((i+1)+'/'+stations.length+' · '+capture.label+(gMode?' · '+(fb?X.gaussianOutsideNote():'Gaussian'+(outside?' · outside the trained zone, appearance missing':'')):'')+(capture.provisional?' · provisional alignment':''));
   if(doFade)await fade(1,200);else{U.fade.value=1;sphereMat.color.setScalar(1);fader.visible=false;}
   if(usePhoto)prefetchNeighbors(i);if(state.menu)drawMenu();
- }catch(e){console.error(e);status('Photo unavailable · choose another capture');}
+ }catch(e){console.error(e);enterReady();status('Photo unavailable · choose another capture');}
  finally{busyStation=false;invalidate();if(pendingStation){const n=pendingStation;pendingStation=null;openStation(n.index,n.opts);}else if(gauss.scene==='gaussian'&&gauss.zones)syncZone();}
 }
 /* Put the tracked head exactly on the capture station (photo centre). Desktop: camera at the rig origin. */
+/* Anywhere · VR stays disabled until the first station (photo + rig) is in place: entering earlier showed a black view on the headset. */
+const ENTER_SUB=document.getElementById('enterVR')?.querySelector('.s')?.textContent||'';
+function enterReady(){const b=$('enterVR');if(!b||!b.disabled)return;b.disabled=false;const s=b.querySelector('.s');if(s)s.textContent=ENTER_SUB;}
+function enterWait(){const b=$('enterVR');if(!b||active>=0||MODE_AR)return;b.disabled=true;const s=b.querySelector('.s');if(s)s.textContent='Loading the first photo…';}
 function placeRig(){if(active<0)return;const head=xrSession?camera.position.toArray():[0,0,0];rig.position.fromArray(X.rigForStation(viewPos,rig.rotation.y,head));rig.updateMatrixWorld(true);gauss.pendingSort=true;invalidate();}
 function walk(dirVec){if(active<0||busyStation)return false;const d=dirVec.clone();d.y=0;if(d.lengthSq()<1e-8)return false;d.normalize();const n=X.chooseNeighbor(stations,active,d.toArray());if(n<0){status('No captured neighbour that way · turn to follow the route');return false;}openStation(n);return true;}
 let fadeAnim=null;
@@ -1907,7 +1925,8 @@ function diagDoc(tag){const v3=o=>{try{return o.toArray().map(n=>+n.toFixed(2));
   layers:Object.fromEntries(Object.entries(layerState).map(([k,s])=>[k,{meshes:s.meshes?.length||0,visible:!!s.group?.visible}])),wanted:P.layers,
   frameErrors:xrFrameErrors,lastFrameError:lastXrFrameError,errs:DIAG.errs,ctxLost:DIAG.ctxLost,glLost:renderer.getContext().isContextLost(),maxTex:renderer.capabilities.maxTextureSize,
   mr:MODE_AR?{demo:mr.demo?{method:mr.demo.method,floorPoint:mr.demo.floorPoint,headingDeg:mr.demo.headingDeg}:null,note:String(mr.note||'').slice(0,120),fit:!!mr.fit}:null,ask:ASK?{on:ASK.on,base:!!ASK.base}:null,...ins};}
-async function diagSend(tag){if(DIAG.busy||DIAG.sent>=40||!XAOK||!(xrSupported||xrARSupported||q.get('diag')==='1'))return;DIAG.busy=true;
+const DIAG_HOST=/(^|\.)github\.io$|\.trycloudflare\.com$/.test(location.hostname);   // the public site or the laptop's tunnel; never a local test origin
+async function diagSend(tag){if(DIAG.busy||DIAG.sent>=40||!XAOK||!DIAG_HOST||!(xrSupported||xrARSupported||q.get('diag')==='1'))return;DIAG.busy=true;
  try{if(!DIAG.server){DIAG.server=ASK?.base||null;if(!DIAG.server&&XA.ENDPOINT){const f=await XA.findLaptop((u,o)=>fetch(u,o),Date.now());if(f.ok)DIAG.server=f.server;}}
   if(DIAG.server){DIAG.sent++;await fetch(XA.apiUrl(DIAG.server,'diag'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(diagDoc(tag)),keepalive:true}).catch(()=>{});}}
  catch(e){}finally{DIAG.busy=false;}}

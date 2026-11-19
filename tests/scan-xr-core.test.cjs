@@ -568,7 +568,7 @@ test('outside the published zones: splats hidden (zone kept, still one viewer), 
   const html = read('scan-xr.html');
   const open = html.slice(html.indexOf('async function openStation('), html.indexOf('/* Put the tracked head exactly on the capture station'));
   assert.ok(open.includes("fb=gMode&&!!gauss.zones&&X.gaussianZoneFor(gauss.zones.zones,stations,s.position,{current:gauss.zoneId}).outside,usePhoto=!gMode||fb"), 'decided from the target station before loading');
-  assert.ok(open.includes('if(usePhoto){') && open.includes('tex=await texLoader.loadAsync(photoURL(s))'), 'the fallback loads that station photo like Photo mode');
+  assert.ok(open.includes('if(usePhoto){') && open.includes('tex=await loadPhoto(photoURL(s))'), 'the fallback loads that station photo like Photo mode');
   assert.ok(open.includes('sphere.visible=usePhoto&&!!sphereMat.map'));
   assert.ok(open.includes('if(fb){gauss.fallback=true;gauss.outside=true;if(gauss.dropIn)gauss.dropIn.visible=false;') && open.includes('else if(gauss.fallback)leaveFallback();'));
   assert.ok(!/disposeGaussian\(\)/.test(open), 'the hidden zone is kept loaded (quick return), not disposed and not duplicated');
