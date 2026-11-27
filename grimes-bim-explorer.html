@@ -1032,8 +1032,9 @@ function status(message, error = false) {
   $("status").className = error ? "error" : "";
 }
 function dispose(object) {
-  const geometries = /* @__PURE__ */ new Set(), materials = /* @__PURE__ */ new Set(), textures = /* @__PURE__ */ new Set();
+  const geometries = /* @__PURE__ */ new Set(), materials = /* @__PURE__ */ new Set(), textures = /* @__PURE__ */ new Set(), instanced = /* @__PURE__ */ new Set();
   object?.traverse((o) => {
+    if (o.isInstancedMesh) instanced.add(o);
     if (o.geometry) geometries.add(o.geometry);
     for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m) {
       materials.add(m);
@@ -1043,6 +1044,7 @@ function dispose(object) {
   for (const t of textures) t.dispose();
   for (const m of materials) m.dispose();
   for (const g of geometries) g.dispose();
+  for (const m of instanced) m.dispose();
   object?.clear();
 }
 function applyVisibility() {
@@ -1314,8 +1316,8 @@ async function decode(buffer, metadata, transform = null) {
     releaseElementSource(gltf);
   }
 }
-async function loadExample() {
-  const choice = $("dataset").value;
+async function loadExample(opts) {
+  const choice = $("dataset").value, freeCurrent = opts?.freeCurrent === true;
   return requestLoad(async (next) => {
     if (choice === "full") {
       buildingSource = true;
@@ -1345,7 +1347,7 @@ async function loadExample() {
     if (parts.reduce((s, p) => s + p.stats.renderTriangles, 0) !== manifest.triangleInstances) throw Error("Triangle count mismatch");
     if (parts.reduce((s, p) => s + p.validation.matched, 0) !== manifest.objectCount) throw Error("Package identity count mismatch");
     return { parts, choice, center: manifest.zone.centerBim, scope: "Level 1 regional package · Eight disciplines · Partial coverage" };
-  });
+  }, { freeCurrent });
 }
 async function fetchSourceFile(path) {
   return checked(deployment.source(path), "buffer");
@@ -1431,7 +1433,31 @@ async function loadFull(next) {
   const scope = omitted.length ? `Grimes BIM · ${requested.length} of ${catalog.layers.length} disciplines on this phone · ${omitted.length > 2 ? "the heavier piping, conduit and fixture models are" : omitted.map((k) => (systems[k]?.label || k).toLowerCase()).join(" and ") + " are"} not loaded` : FULL_SOURCE_SCOPE;
   return { parts, choice: "full", scope, omitted, subset: omitted.length > 0, previewed: true };
 }
-async function requestLoad(build) {
+function releaseCurrentModel() {
+  if (!root) return false;
+  highlight(selected, false);
+  objectView?.dispose();
+  objectView = null;
+  scene.remove(root);
+  dispose(root);
+  root = null;
+  records = {};
+  recordIndex = createRecordIndex({});
+  selected = null;
+  report = null;
+  layers = [];
+  hiddenKeys = /* @__PURE__ */ new Set();
+  flaggedKeys = /* @__PURE__ */ new Set();
+  isolatedKey = null;
+  for (const id of ["metric-objects", "metric-visible", "metric-bytes"]) $(id).textContent = "—";
+  $("layers").replaceChildren();
+  $("report").disabled = true;
+  renderer.clippingPlanes = [];
+  renderer.render(scene, camera);
+  event("Shown model released to make room for the full load");
+  return true;
+}
+async function requestLoad(build, { freeCurrent = false } = {}) {
   return gate.run(async () => {
     const next = new THREE.Group(), started = performance.now();
     cacheReads = [];
@@ -1440,6 +1466,7 @@ async function requestLoad(build) {
     $("loading").hidden = false;
     status("Checking the package…");
     event("Package load started");
+    const released = freeCurrent && releaseCurrentModel();
     try {
       const result = await build(next), newRecords = Object.assign({}, ...result.parts.map((p) => p.records));
       if (Object.keys(newRecords).length !== result.parts.reduce((s, p) => s + p.validation.matched, 0)) throw Error("Duplicate identity across packages");
@@ -1496,8 +1523,8 @@ async function requestLoad(build) {
       endPreview(true, next);
       dispose(next);
       if (subsetShown) forceAll = wantAllLayers();
-      status(e.message, true);
-      event("Load failed; previous model retained");
+      status(released ? `Loading all disciplines failed: ${e.message} The smaller phone model was released to make room. Press Reload example to load it again.` : e.message, true);
+      event(released ? "Load failed; previous model had been released" : "Load failed; previous model retained");
       if (mode && mode !== "upload") $("dataset").value = mode;
     } finally {
       endPreview(false, next);
@@ -1517,12 +1544,13 @@ new MutationObserver(() => {
 $("load-all").onclick = async () => {
   const b = $("load-all");
   if (b.getAttribute("aria-busy") === "true") return;
+  const freeCurrent = subsetShown && !!root;
   forceAll = true;
   b.setAttribute("aria-busy", "true");
   b.disabled = true;
   b.textContent = "Loading…";
   try {
-    await loadExample();
+    await loadExample({ freeCurrent });
   } finally {
     b.removeAttribute("aria-busy");
     b.disabled = false;
