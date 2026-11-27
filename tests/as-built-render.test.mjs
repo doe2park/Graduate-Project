@@ -14,6 +14,11 @@ const ctx = vm.createContext({console, setTimeout}); vm.runInContext(source, ctx
 const meta = {a: {levelKey: 'L1', type: 'light'}, b: {levelKey: 'L1', type: 'light'}};
 const mat = new THREE.MeshStandardMaterial({color: 0xffffff});
 function quad() { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], 3)); g.setIndex([0, 1, 2, 0, 2, 3]); return g; }
+/* The same unit square split into n x n cells (2n^2 triangles). The instanced case needs copies x triangles >= the tier's
+   INSTANCE_MIN_TRIANGLES (2000), so 8 copies of a 2-triangle quad would merge instead; 12 x 12 = 288 triangles per copy. */
+function gridQuad(n) { const p = [], nor = [], idx = []; for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) { p.push(i / n, j / n, 0); nor.push(0, 0, 1); }
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const a = j * (n + 1) + i, b = a + 1, c = a + n + 2, d = a + n + 1; idx.push(a, b, c, a, c, d); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setIndex(idx); return g; }
 function pick(meshes, x, y) {
   const out = new THREE.Group(); out.add(...meshes); out.updateMatrixWorld(true);
   const h = new THREE.Raycaster(new THREE.Vector3(x, y, 3), new THREE.Vector3(0, 0, -1)).intersectObjects(out.children, false)[0];
@@ -21,7 +26,7 @@ function pick(meshes, x, y) {
   return h ? ctx.resolveElementHit(h.object, h.instanceId, h.faceIndex, h.index) : null;
 }
 async function tier(instanced) {
-  const s = new THREE.Group(), g = quad();
+  const s = new THREE.Group(), g = instanced ? gridQuad(12) : quad();
   const n = instanced ? 8 : 2;
   for (let i = 0; i < n; i++) { const o = new THREE.Mesh(instanced ? g : quad(), mat); o.name = i === 0 ? 'a' : 'b'; o.position.x = i * 3; s.add(o); }
   s.updateMatrixWorld(true);

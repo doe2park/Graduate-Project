@@ -1141,6 +1141,10 @@ function bindElementSourceIds(gltf) {
    Repeated geometry remains instanced to avoid expanding thousands of fittings. */
 async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey) {
   const MAX_VERTICES = 180000, INSTANCE_REUSE = 8;
+  // Same rule as viewer-src/bim-explorer/render-tier.mjs (2026-11-13 measurement there: 4,647 draw calls, ~18 frames/s on a
+  // 4x-slowed CPU with per-shape instancing). A reused shape is instanced only when copies x triangles >= this; smaller ones
+  // merge into the shared batches. tests/render-tier-drift.test.mjs fails if these constants drift from the module.
+  const INSTANCE_MIN_TRIANGLES = 2000;
   const fragments = [], repeated = new Map(), mergeBuckets = new Map(), meshes = [];
   const stats = { sourceObjects: 0, unidentifiedObjects: 0, unidentifiedNames: [], sourceTriangles: 0, renderTriangles: 0, sourceSegments: 0, renderSegments: 0, mergedMeshes: 0, instancedMeshes: 0, instances: 0, drawCalls: 0 };
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -1192,7 +1196,8 @@ async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey) {
   };
   const instanceBuckets = new Map();
   for (const part of fragments) {
-    const target = part.canInstance && repeated.get(part.reuseKey) >= INSTANCE_REUSE ? instanceBuckets : mergeBuckets;
+    const copies = part.canInstance ? repeated.get(part.reuseKey) : 0;
+    const target = copies >= INSTANCE_REUSE && copies * Math.floor((part.end-part.start)/3) >= INSTANCE_MIN_TRIANGLES ? instanceBuckets : mergeBuckets;
     const key = target === instanceBuckets ? part.reuseKey : part.key;
     if (!target.has(key)) target.set(key, []);
     target.get(key).push(part);
