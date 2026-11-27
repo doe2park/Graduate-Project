@@ -122,7 +122,7 @@ try{
   if(d?.type==='grimes-linked-pose'&&d.epoch===epoch&&linked&&driver!=='scan'&&!pendingClaim&&validPose(d.pose)){applyPose(d.pose);}
   if(d?.type==='grimes-start-pose'&&state==='ready'&&validPose(d.pose)){held.clear();applyPose(d.pose);if(!pendingClaim)claim();}
  });
- window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);viewer.forceRenderNextFrame();});
+ window.addEventListener('resize',()=>{if(!innerWidth||!innerHeight)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);viewer.forceRenderNextFrame();});
  renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();fail(Error('Graphics context lost · reload or use a smaller export'));});
  async function loadScene(v,url){await v.addSplatScene(url,{showLoadingUI:false,progressiveLoad:false,splatAlphaRemovalThreshold:1});const n=v.splatMesh.getSplatCount();if(!n)throw Error('Gaussian PLY contains no visible splats');return n;}
  const zoneLabel=document.getElementById('zoneLabel'),readyText=()=>`${count.toLocaleString()} trained splats${mobile&&manifest.mobileFile?' · Reduced mobile export':''}`;

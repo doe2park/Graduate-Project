@@ -39,7 +39,8 @@ const draw=createDemandRenderer({renderer,scene,camera,controls,blocked:()=>buil
 const invalidate=()=>draw.invalidate();
 const sectionPlane=new THREE.Plane(new THREE.Vector3(0,-1,0),0);
 function enabledLayers(){return new Set(layers.filter(l=>l.visible).map(l=>l.key));}
-new ResizeObserver(()=>{camera.aspect=vp.clientWidth/vp.clientHeight;camera.updateProjectionMatrix();renderer.setSize(vp.clientWidth,vp.clientHeight);invalidate();}).observe(vp);
+/* A 0-size viewport (hidden or collapsed) would give a NaN/Infinity aspect and then a NaN camera in fit(): skip it. */
+new ResizeObserver(()=>{if(!vp.clientWidth||!vp.clientHeight)return;camera.aspect=vp.clientWidth/vp.clientHeight;camera.updateProjectionMatrix();renderer.setSize(vp.clientWidth,vp.clientHeight);invalidate();}).observe(vp);
 function visibleBox(){
  const box=new THREE.Box3(),visible=enabledLayers();
  for(const [key,e] of recordIndex.entries)if(e.viewBounds&&visible.has(e.layer)&&(!floor||(e.levelKey||'UNKNOWN')===floor)&&!hiddenKeys.has(key)&&(!isolatedKey||key===isolatedKey))

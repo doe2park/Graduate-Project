@@ -933,7 +933,7 @@ $('opacity').oninput=e=>{state.opacity[state.mode]=Number(e.target.value)/100;ap
 $('cone').oninput=e=>{state.coneDeg=Number(e.target.value);applyShaderState();};
 $('hires').onclick=()=>setHiRes(!state.hiRes);$('fire').onclick=()=>setFire(!fireOn());$('scene').onclick=()=>setScene(X.toggleScene(gauss.scene));
 $('statsBtn').onclick=()=>{const s=$('stats');s.hidden=!s.hidden;$('statsBtn').setAttribute('aria-pressed',String(!s.hidden));updateStats();};
-addEventListener('resize',()=>{if(renderer.xr.isPresenting)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);invalidate();});
+addEventListener('resize',()=>{if(renderer.xr.isPresenting||!innerWidth||!innerHeight)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);invalidate();});
 cvs.addEventListener('webglcontextlost',e=>{e.preventDefault();status('Graphics paused · reload this page',true);});
 /* ── WebXR (Quest Browser) ── immersive-vr, 'local' reference space, controllers in the rig, snap turn, no smooth locomotion. */
 let xrSession=null,xrSupported=false,xrARSupported=false,activeController=null,pendingPlace=0;

@@ -76,6 +76,8 @@ const L=makeView($('leftView')),R=makeView($('rightView'));
 const section=new THREE.Plane(new THREE.Vector3(0,-1,0),9.3);for(const v of [L,R])v.renderer.clippingPlanes=[section];
 $('section').oninput=()=>{const h=Number($('section').value),on=h<14;section.constant=h;$('sectionOut').textContent=on?h.toFixed(1)+' m':'off';for(const v of [L,R]){v.renderer.clippingPlanes=on&&!(v===R&&mode==='heading')?[section]:[];v.dirty=true;}};
 /* ---------- load data ---------- */
+/* one shared material per BIM layer (was one per mesh); the GLB's own materials are released */
+const BIM_MAT={arch:new THREE.MeshStandardMaterial({color:0xb9c6d3,roughness:.9,side:THREE.DoubleSide}),lighting:new THREE.MeshStandardMaterial({color:0xffd479,roughness:.9,side:THREE.DoubleSide})};
 const draco=new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'),loader=new GLTFLoader().setDRACOLoader(draco);
 let baseline=null,manifest=null;const scanMeshes=[],bimMeshes=[],scanRoot=new THREE.Group(),bimRoot=new THREE.Group();scanRoot.rotation.x=-Math.PI/2;L.scene.add(scanRoot);
 bimRoot.rotation.y=Math.PI;bimRoot.position.fromArray(EQUIP_OFFSET);R.scene.add(bimRoot);
@@ -84,7 +86,7 @@ async function loadAll(){
  for(const [i,s] of manifest.stations.entries()){const o=document.createElement('option');o.value=i;o.textContent=(i+1)+' · '+s.id;$('station').appendChild(o);}
  for(const [i,p] of cfg.mesh.entries()){status(`Loading scan mesh ${i+1}/${cfg.mesh.length}…`);const g=await loader.loadAsync(p);g.scene.traverse(o=>{if(o.isMesh){const m=o.material;o.material=new THREE.MeshBasicMaterial({map:m.map,side:THREE.DoubleSide});m.dispose();scanMeshes.push(o);}});scanRoot.add(g.scene);}
  scanRoot.updateMatrixWorld(true);const sb=new THREE.Box3().setFromObject(scanRoot),sc=sb.getCenter(new THREE.Vector3());L.controls.target.copy(sc);L.camera.position.copy(sc).add(new THREE.Vector3(0,45,25));L.controls.update();L.dirty=true;
- for(const [i,p] of BIM_LAYERS.entries()){status(`Loading BIM layer ${i+1}/${BIM_LAYERS.length}…`);const g=await loader.loadAsync(p);const light=/lighting/.test(p);g.scene.traverse(o=>{if(o.isMesh){o.material=new THREE.MeshStandardMaterial({color:light?0xffd479:0xb9c6d3,roughness:.9,side:THREE.DoubleSide});o.userData.layer=light?'lighting':'arch';bimMeshes.push(o);}});bimRoot.add(g.scene);}
+ for(const [i,p] of BIM_LAYERS.entries()){status(`Loading BIM layer ${i+1}/${BIM_LAYERS.length}…`);const g=await loader.loadAsync(p);const light=/lighting/.test(p);g.scene.traverse(o=>{if(o.isMesh){for(const m of Array.isArray(o.material)?o.material:[o.material])m?.dispose();o.material=light?BIM_MAT.lighting:BIM_MAT.arch;o.userData.layer=light?'lighting':'arch';bimMeshes.push(o);}});bimRoot.add(g.scene);}
  bimRoot.updateMatrixWorld(true);syncBim();status('Ready · '+capture+' · baseline '+baseline.status);updateCli();
 }
 loadAll().catch(e=>{console.error(e);status('Load failed: '+e.message);});
@@ -96,7 +98,10 @@ const ray=new THREE.Raycaster();
 function pickAt(v,e,meshes){const r=v.renderer.domElement.getBoundingClientRect(),p=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(p,v.camera);const clip=v.renderer.clippingPlanes.length?section.constant:Infinity;return ray.intersectObjects(meshes,false).find(h=>h.point.y<=clip+1e-6&&h.object.visible)||null;}
 function clickHandler(v,fn){let down=null;v.renderer.domElement.addEventListener('pointerdown',e=>down={x:e.clientX,y:e.clientY});v.renderer.domElement.addEventListener('pointerup',e=>{if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<4)fn(e);down=null;});}
 const markerGeo=new THREE.SphereGeometry(.09,12,8);
-function marker(color){return new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({color,depthTest:false}));}
+/* markers share one geometry and one material per colour; residual lines share one material and dispose their geometry on redraw */
+const markerMats=new Map(),lineMat=new THREE.LineBasicMaterial({color:0xff4d6d,depthTest:false});
+function marker(color){if(!markerMats.has(color))markerMats.set(color,new THREE.MeshBasicMaterial({color,depthTest:false}));return new THREE.Mesh(markerGeo,markerMats.get(color));}
+function clearMarkers(group){for(const o of group.children)if(o.isLine)o.geometry.dispose();group.clear();}
 const markersL=new THREE.Group(),markersR=new THREE.Group();L.scene.add(markersL);R.scene.add(markersR);markersL.renderOrder=markersR.renderOrder=10;
 clickHandler(L,e=>{if(mode!=='landmarks')return;const h=pickAt(L,e,scanMeshes);if(!h)return status('No scan surface under the cursor');pending.scan=h.point.toArray();completePair();});
 clickHandler(R,e=>{if(mode==='heading'){headingClick(e);return;}const h=pickAt(R,e,bimMeshes);if(!h)return status('No BIM surface under the cursor');pending.bim=h.point.toArray();completePair();});
@@ -107,9 +112,9 @@ function completePair(){
 const round6=v=>Math.round(v*1e6)/1e6;
 $('undoPick').onclick=()=>{pending={scan:null,bim:null};drawMarkers();status('Pending pick cleared');};
 function drawMarkers(){
- markersL.clear();markersR.clear();const reg=currentReg();
+ clearMarkers(markersL);clearMarkers(markersR);const reg=currentReg();
  for(const p of pairs){const c=p.role==='fit'?0x4fc3f7:0xff9f43;const a=marker(c);a.position.fromArray(p.scan);markersL.add(a);const b=marker(c);b.position.fromArray(p.bim);markersR.add(b);
-  if(reg){const q=RC.apply(reg,p.scan),g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...p.bim),new THREE.Vector3(...q)]);markersR.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff4d6d,depthTest:false})));const m=marker(0xff4d6d);m.scale.setScalar(.6);m.position.fromArray(q);markersR.add(m);}}
+  if(reg){const q=RC.apply(reg,p.scan),g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...p.bim),new THREE.Vector3(...q)]);markersR.add(new THREE.Line(g,lineMat));const m=marker(0xff4d6d);m.scale.setScalar(.6);m.position.fromArray(q);markersR.add(m);}}
  if(pending.scan){const m=marker(0xffffff);m.position.fromArray(pending.scan);markersL.add(m);}if(pending.bim){const m=marker(0xffffff);m.position.fromArray(pending.bim);markersR.add(m);}
  L.dirty=R.dirty=true;
 }

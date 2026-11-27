@@ -993,6 +993,7 @@ function enabledLayers() {
   return new Set(layers.filter((l) => l.visible).map((l) => l.key));
 }
 new ResizeObserver(() => {
+  if (!vp.clientWidth || !vp.clientHeight) return;
   camera.aspect = vp.clientWidth / vp.clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(vp.clientWidth, vp.clientHeight);
