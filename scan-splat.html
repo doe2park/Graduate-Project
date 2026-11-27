@@ -111,7 +111,7 @@ try{
  /* normalised mouse position for scan-compare's overlay LENS */
  renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')send({type:'grimes-pointer',x:e.clientX/innerWidth,y:e.clientY/innerHeight});});
  renderer.domElement.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')send({type:'grimes-pointer',x:null,y:null});});
- renderer.domElement.addEventListener('wheel',e=>{if(state!=='ready')return;e.preventDefault();claim();camera.fov=Math.max(35,Math.min(95,camera.fov+e.deltaY*.025));camera.updateProjectionMatrix();viewer.forceRenderNextFrame();publish();},{passive:false});
+ renderer.domElement.addEventListener('wheel',e=>{if(state!=='ready')return;e.preventDefault();claim();camera.fov=Math.max(35,Math.min(95,camera.fov+e.deltaY*.025));camera.updateProjectionMatrix();viewer?.forceRenderNextFrame();publish();},{passive:false});
  const keys={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',KeyQ:'down',KeyE:'up',ShiftLeft:'fast',ShiftRight:'fast'};
  window.addEventListener('keydown',e=>{if(state!=='ready'||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)||!keys[e.code])return;e.preventDefault();if(!held.size)claim();held.add(keys[e.code]);});
  window.addEventListener('keyup',e=>held.delete(keys[e.code]));window.addEventListener('blur',()=>{held.clear();drag=null;});document.addEventListener('visibilitychange',()=>{if(document.hidden)held.clear();});
@@ -122,7 +122,7 @@ try{
   if(d?.type==='grimes-linked-pose'&&d.epoch===epoch&&linked&&driver!=='scan'&&!pendingClaim&&validPose(d.pose)){applyPose(d.pose);}
   if(d?.type==='grimes-start-pose'&&state==='ready'&&validPose(d.pose)){held.clear();applyPose(d.pose);if(!pendingClaim)claim();}
  });
- window.addEventListener('resize',()=>{if(!innerWidth||!innerHeight)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);viewer.forceRenderNextFrame();});
+ window.addEventListener('resize',()=>{if(!innerWidth||!innerHeight)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);viewer?.forceRenderNextFrame();});
  renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();fail(Error('Graphics context lost · reload or use a smaller export'));});
  async function loadScene(v,url){await v.addSplatScene(url,{showLoadingUI:false,progressiveLoad:false,splatAlphaRemovalThreshold:1});const n=v.splatMesh.getSplatCount();if(!n)throw Error('Gaussian PLY contains no visible splats');return n;}
  const zoneLabel=document.getElementById('zoneLabel'),readyText=()=>`${count.toLocaleString()} trained splats${mobile&&manifest.mobileFile?' · Reduced mobile export':''}`;
@@ -131,13 +131,21 @@ try{
  state='ready';document.body.dataset.state=state;if(mobile){const ex=document.getElementById('experiment');ex.title=ex.textContent;ex.textContent=ex.textContent.replace(/^EXPERIMENT/,'EXP').replace(/ capture$/,'');setTimeout(()=>label.classList.add('quiet'),4000);}document.body.dataset.ready='true';label.textContent=readyText();showZone();document.getElementById('reset').disabled=false;
  /* Swap zones when the camera crosses a core boundary: load the new zone first (no blank frame), then dispose the old viewer. */
  async function switchZone(id){
-  const entry=zoneEntries.find(z=>z.id===id);if(!entry||switching)return;switching=true;const token=++zoneEpoch;showZone(' · loading '+entry.name+'…');let next=null;
+  const entry=zoneEntries.find(z=>z.id===id);if(!entry||switching)return;switching=true;const token=++zoneEpoch;showZone(' · loading '+entry.name+'…');let next=null,released=false;
   try{
-   const info=await readManifest(new URL(entry.manifestURL));next=makeViewer();const n=await loadScene(next,info.assetURL.href);
+   const info=await readManifest(new URL(entry.manifestURL));
+   /* Phones: release the current zone before decoding the next, so two splat scenes are never resident together.
+      The canvas is cleared meanwhile (no stale frame of the released zone); on failure the current zone is reloaded. */
+   if(mobile){const old=viewer;viewer=null;released=true;await old.dispose().catch(()=>{});renderer.clear();}
+   next=makeViewer();const n=await loadScene(next,info.assetURL.href);
    if(token!==zoneEpoch||state!=='ready'){next.dispose().catch(()=>{});next=null;return;}
    const old=viewer;viewer=next;next=null;manifest=info.manifest;selectedFile=info.file;count=n;currentZoneId=id;loadedZones++;viewer.forceRenderNextFrame();label.textContent=readyText();showZone();
-   old.dispose().catch(()=>{});
-  }catch(e){if(next)next.dispose().catch(()=>{});failedZone={id,until:performance.now()+15000};showZone(' · '+id+' unavailable, keeping this zone');}
+   old?.dispose().catch(()=>{});   // already released on a phone
+  }catch(e){if(next)next.dispose().catch(()=>{});failedZone={id,until:performance.now()+15000};
+   if(released&&!viewer&&state==='ready'){const cur=zoneEntries.find(z=>z.id===currentZoneId);showZone(' · '+id+' unavailable, reloading this zone…');
+    try{const info=await readManifest(new URL(cur.manifestURL));const back=makeViewer();count=await loadScene(back,info.assetURL.href);viewer=back;viewer.forceRenderNextFrame();label.textContent=readyText();showZone(' · '+id+' unavailable, kept this zone');}
+    catch(e2){fail(Error('Zone '+id+' unavailable and the current zone could not be reloaded · reload the page'));}}
+   else showZone(' · '+id+' unavailable, keeping this zone');}
   finally{switching=false;}
  }
  // Loading can outlast a parent role handshake: announce only once the asset is usable.
@@ -146,8 +154,8 @@ try{
  renderer.setAnimationLoop(t=>{const dt=Math.min(.05,Math.max(0,(t-previous)/1000));previous=t;if(document.hidden)return;
   if(held.size&&(!linked||driver==='scan')&&!pendingClaim){forward.set(-Math.sin(yaw),0,-Math.cos(yaw));right.crossVectors(forward,up);move.set(0,0,0);if(held.has('forward'))move.add(forward);if(held.has('back'))move.sub(forward);if(held.has('right'))move.add(right);if(held.has('left'))move.sub(right);if(held.has('up'))move.y++;if(held.has('down'))move.y--;if(move.lengthSq()){camera.position.addScaledVector(move.normalize(),dt*(held.has('fast')?4:1.4));publish();}}
   if(zoneEntries&&!switching&&t-lastZoneCheck>250){lastZoneCheck=t;const id=selectZone(zoneEntries,camera.position.x,camera.position.z,currentZoneId);if(id&&id!==currentZoneId&&!(failedZone&&failedZone.id===id&&t<failedZone.until))switchZone(id);}
-  camera.updateMatrixWorld();viewer.selfDrivenUpdate();
+  camera.updateMatrixWorld();viewer?.selfDrivenUpdate();   // null on a phone while the next zone loads
  });
- window.addEventListener('pagehide',()=>{renderer.setAnimationLoop(null);viewer.dispose().catch(()=>{});renderer.dispose();},{once:true});
+ window.addEventListener('pagehide',()=>{renderer.setAnimationLoop(null);viewer?.dispose().catch(()=>{});renderer.dispose();},{once:true});
 }catch(e){fail(e);}
 </script></body></html>
