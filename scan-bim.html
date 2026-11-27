@@ -566,7 +566,7 @@ if(splitPane!=='scan')loader.load('grimes-mep-only.glb', (gltf) => {
     });
     idx++;
   });
-  document.getElementById('loading').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';_kick();
   document.getElementById('legend').innerHTML =
     '<div class="lg-title">BUILDING SYSTEMS · click to inspect</div>' + SYSTEMS.map(s =>
     `<div><span class="sw" style="background:#${s.hex.toString(16).padStart(6,'0')}"></span>${s.label}</div>`).join('');
@@ -1563,7 +1563,7 @@ window.toggleLayer = (key, {bulk=false}={}) => {
     st.group = new THREE.Group(); st.group.name = 'layer:' + key;   // world-space container (matrices already baked)
     for (const im of st.meshes) st.group.add(im);
     st.group.visible=st.desiredVisible!==false;
-    scene.add(st.group);
+    scene.add(st.group);_kick();   // draw the new layer now, not on the next heartbeat
     if(scanOnly){st.scanPriorVisible=true;st.group.visible=false;}
     st.loading = false;
     btn.disabled = false; btn.removeAttribute('aria-busy');
@@ -2540,7 +2540,7 @@ document.getElementById('scanFit').onclick=()=>{claimCamera();fitScan()};
 document.getElementById('scanAlpha').oninput=e=>scanRoot.traverse(o=>{if(o.isMesh)o.material.opacity=Number(e.target.value)});
 document.getElementById('scanOnly').onclick=e=>{scanOnly=!scanOnly;for(const st of Object.values(layerState))if(st.group){if(scanOnly){st.scanPriorVisible=st.group.visible;st.group.visible=false}else st.group.visible=st.scanPriorVisible??st.group.visible}if(mepModel)mepModel.visible=false;e.target.textContent=scanOnly?'Restore BIM':'Scan only'};
 async function loadScanDataset(unused,onLoad,onProgress,onError){try{const combined=new THREE.Group();const prefix=mobileQuality?'scan-assets/mobile/':'scan-assets/';const recent=new URLSearchParams(location.search).get('capture')==='2026-09-17';const paths=recent?['scan-assets/captures/2026-09-17/'+(mobileQuality?'mobile/':'')+'scan.glb']:['level1-scan-2026-05-06.glb','level1-scan-2026-05-06-part2.glb'].map(name=>prefix+name);for(let i=0;i<paths.length;i++){document.getElementById('scanStatus').textContent=`Loading scan part ${i+1}/${paths.length}…`;const g=await loader.loadAsync(paths[i]);combined.add(g.scene);g.parser.cache.removeAll();}onLoad({scene:combined});document.body.dataset.scanParts=String(paths.length);}catch(e){onError(e);}}
-if(splitPane!=='bim')loadScanDataset('scan-assets/level1-scan-2026-05-06.glb',g=>{const axes=new THREE.Group();axes.rotation.x=-Math.PI/2;axes.add(g.scene);scanRoot.add(axes);g.scene.traverse(o=>{if(o.isMesh){const old=o.material;o.material=new THREE.MeshBasicMaterial({map:old.map,toneMapped:false,transparent:splitPane!=='scan',opacity:splitPane==='scan'?1:.65,depthWrite:splitPane==='scan',side:THREE.DoubleSide});old.dispose()}});scanReady=true;if(splitPane==='scan'){Object.assign(scanConfig,{x:0,y:0,z:0,yaw:0});document.getElementById('scanAlpha').value=1;scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}})}updateScanTransform();fitScan();document.getElementById('scanStatus').textContent='Not registered · Do not use overlay for device location';if(splitPane==='scan')document.getElementById('scanStatus').textContent=camerasLinked?'Captured geometry · Views aligned':'Captured geometry · Independent camera';document.body.dataset.scanReady='true';},undefined,e=>{document.getElementById('scanStatus').textContent='Scan load failed: '+e.message});
+if(splitPane!=='bim')loadScanDataset('scan-assets/level1-scan-2026-05-06.glb',g=>{const axes=new THREE.Group();axes.rotation.x=-Math.PI/2;axes.add(g.scene);scanRoot.add(axes);g.scene.traverse(o=>{if(o.isMesh){const old=o.material;o.material=new THREE.MeshBasicMaterial({map:old.map,toneMapped:false,transparent:splitPane!=='scan',opacity:splitPane==='scan'?1:.65,depthWrite:splitPane==='scan',side:THREE.DoubleSide});old.dispose()}});scanReady=true;_kick();if(splitPane==='scan'){Object.assign(scanConfig,{x:0,y:0,z:0,yaw:0});document.getElementById('scanAlpha').value=1;scanRoot.traverse(o=>{if(o.isMesh){o.material.opacity=1;o.material.depthWrite=true}})}updateScanTransform();fitScan();document.getElementById('scanStatus').textContent='Not registered · Do not use overlay for device location';if(splitPane==='scan')document.getElementById('scanStatus').textContent=camerasLinked?'Captured geometry · Views aligned':'Captured geometry · Independent camera';document.body.dataset.scanReady='true';},undefined,e=>{document.getElementById('scanStatus').textContent='Scan load failed: '+e.message});
 
 function solveScanPairs(pairs){
  if(pairs.length<3)throw new Error('Select at least 3 matching landmark pairs.');
@@ -3251,9 +3251,14 @@ if(splitPane==='bim'&&['demo','live'].includes(new URLSearchParams(location.sear
 let _lastT = 0, _lastWalkRender = -Infinity;
 // Draw only when something can have changed: the camera/viewport moved, an input or parent message arrived,
 // or as a slow heartbeat (async layer loads, highlights). An idle page no longer redraws every frame.
-const _viewSig = new Float64Array(34); let _lastDraw = -Infinity, _kickUntil = 0;
-const _kick = () => { _kickUntil = (typeof performance !== 'undefined' ? performance.now() : 0) + 300; };
-if (typeof window !== 'undefined') for (const type of ['pointerdown', 'pointermove', 'pointerup', 'wheel', 'keydown', 'keyup', 'message', 'resize', 'focus']) window.addEventListener(type, _kick, { passive: true });
+// Heartbeat: every 250 ms while the page is active (input, parent messages or loading within the last 5 s), else every 2 s.
+// Pointer motion and wheel kick only over the canvas (UI hover changes nothing in 3D); clicks, form input, keys, messages,
+// resize and focus anywhere still kick, and loads keep the page active, so an async change is drawn as before.
+const _viewSig = new Float64Array(34); let _lastDraw = -Infinity, _kickUntil = 0, _activeUntil = 0;
+const HEARTBEAT_ACTIVE_MS = 250, HEARTBEAT_IDLE_MS = 2000, ACTIVE_WINDOW_MS = 5000;
+const _kick = () => { const now = typeof performance !== 'undefined' ? performance.now() : 0; _kickUntil = now + 300; _activeUntil = now + ACTIVE_WINDOW_MS; };
+if (typeof window !== 'undefined') for (const type of ['pointerdown', 'pointerup', 'click', 'input', 'change', 'keydown', 'keyup', 'message', 'resize', 'focus']) window.addEventListener(type, _kick, { passive: true });
+for (const type of ['pointermove', 'wheel']) renderer.domElement?.addEventListener(type, _kick, { passive: true });
 function _viewChanged() {
   if (!camera.updateMatrixWorld || !camera.projectionMatrix || !renderer.domElement) return true;
   camera.updateMatrixWorld();
@@ -3278,9 +3283,10 @@ renderer.setAnimationLoop((t) => {
   // Show already-loaded rooms while remaining groups decode; bound render cost.
   // Standalone orbit keeps its existing loading policy.
   const layerBusy = interiorState.loading || Object.values(layerState).some(st => st.loading);
+  if (layerBusy || (typeof ovOcc !== 'undefined' && ovOcc.state === 'loading') || (splitPane !== 'bim' && typeof scanReady !== 'undefined' && !scanReady)) _activeUntil = t + ACTIVE_WINDOW_MS;   // loading: stay on the fast heartbeat
   if (!layerBusy || ((walkMode || splitPane==='bim') && t - _lastWalkRender >= (mobileMq.matches ? 400 : 250))) {
     const moved = _viewChanged();
-    if (moved || t < _kickUntil || t - _lastDraw >= 250) {
+    if (moved || t < _kickUntil || t - _lastDraw >= (t < _activeUntil ? HEARTBEAT_ACTIVE_MS : HEARTBEAT_IDLE_MS)) {
       try {
         if (typeof ovBeforeRender === 'function') ovBeforeRender();   // Overlay distance culling + wall-depth pre-pass (no-op outside Overlay)
         renderer.render(scene, camera);
