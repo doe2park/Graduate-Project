@@ -381,7 +381,7 @@ function elementQuality(){return qualityAhead||(qualityAhead=fetchJson(ELEMENT_Q
 function sidecar(key){if(!sidecarAhead.has(key)){const p=fetchJson(LAYERS[key].json);p.catch(()=>sidecarAhead.delete(key));sidecarAhead.set(key,p);}return sidecarAhead.get(key);}
 async function loadLayer(key,{onBytes}={}){
  const L=LAYERS[key],old=layerState[key];if(old&&!old.error)return old.pending;
- if(old){for(const m of old.meshes)m.geometry?.dispose();old.group.removeFromParent();}   // a failed load is retried from scratch
+ if(old){for(const m of old.meshes){m.geometry?.dispose();if(m.isInstancedMesh)m.dispose();}old.group.removeFromParent();}   // a failed load is retried from scratch
  const st=layerState[key]={key,loading:true,loaded:false,meshes:[],meta:null,stats:{},bytes:0,group:new THREE.Group()};
  st.group.name='xr-layer:'+key;st.group.visible=true;bimRoot.add(st.group);
  st.pending=(async()=>{const t0=performance.now();
