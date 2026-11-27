@@ -1215,14 +1215,29 @@ async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey) {
     if (++work % 100 === 0) await tick();
   }
   const normalMatrix = new THREE.Matrix3(), vector = new THREE.Vector3();
+  /* Merged colour storage. The attribute exists for the selection highlight and is white unless a source supplies vertex
+     colours, so it is stored as normalized integers: Uint8 when every value is exactly representable (white fill, or
+     Uint8-normalized source colours), Uint16 for Uint16-normalized sources (Uint8 values map exactly too: 257 x v).
+     Float or other sources keep Float32, so no source colour is ever requantized. Returns null for Float32. */
+  const colourStorage = chunk => {
+    let wide = false;
+    for (const {part} of chunk) {
+      const a = part.geometry.attributes.color;
+      if (!a || !part.material.vertexColors) continue;
+      if (a.normalized && a.array instanceof Uint8Array) continue;
+      if (a.normalized && a.array instanceof Uint16Array) { wide = true; continue; }
+      return null;
+    }
+    return wide ? {Type: Uint16Array, max: 65535} : {Type: Uint8Array, max: 255};
+  };
   for (const parts of mergeBuckets.values()) {
     let chunk = [], vertices = 0;
     const flush = () => {
       if (!chunk.length) return;
       const p = chunk[0].part, sourceAttrs = p.geometry.attributes;
-      const geometry = new THREE.BufferGeometry(), arrays = {}, sizes = {};
-      for (const [name,attribute] of Object.entries(sourceAttrs)) { sizes[name]=attribute.itemSize; arrays[name]=new Float32Array(vertices*attribute.itemSize); }
-      if (!arrays.color) { sizes.color=3;arrays.color=new Float32Array(vertices*3);arrays.color.fill(1); }
+      const geometry = new THREE.BufferGeometry(), arrays = {}, sizes = {}, colour = colourStorage(chunk), white = colour ? colour.max : 1;
+      for (const [name,attribute] of Object.entries(sourceAttrs)) { sizes[name]=attribute.itemSize; arrays[name]=new (name==='color'&&colour?colour.Type:Float32Array)(vertices*attribute.itemSize); }
+      if (!arrays.color) { sizes.color=3;arrays.color=new (colour?colour.Type:Float32Array)(vertices*3);arrays.color.fill(white); }
       const indexCount = chunk.reduce((n,c)=>n+c.indices.length,0), indices = new (vertices>65535?Uint32Array:Uint16Array)(indexCount);
       const ranges = [];let vertexOffset=0,indexOffset=0;
       for (const {part,indices:localIndices,sourceVertices} of chunk) {
@@ -1232,7 +1247,12 @@ async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey) {
         const count=sourceVertices.length, flip=part.matrix.determinant()<0;
         for (const [name,attribute] of Object.entries(part.geometry.attributes)) {
           const size=attribute.itemSize, array=arrays[name], base=vertexOffset*size;
-          if (name==='color'&&!part.material.vertexColors) array.fill(1,base,base+count*size);
+          if (name==='color'&&!part.material.vertexColors) array.fill(white,base,base+count*size);
+          else if (name==='color'&&colour) {
+            // same normalized type: copy the stored integers; Uint8 into Uint16: getComponent() gives v/255, x 65535 = 257 v exactly
+            const raw=attribute.isBufferAttribute&&!attribute.isInterleavedBufferAttribute&&attribute.array instanceof colour.Type, source=attribute.array;
+            for (let i=0;i<count;i++) { const sourceIndex=sourceVertices[i], at=base+i*size; for (let k=0;k<size;k++) array[at+k]=raw?source[sourceIndex*size+k]:Math.round(attribute.getComponent(sourceIndex,k)*colour.max); }
+          }
           else if (attribute.isBufferAttribute&&!attribute.isInterleavedBufferAttribute&&!attribute.normalized&&attribute.array instanceof Float32Array) {
             const source=attribute.array;
             for (let i=0;i<count;i++) { const from=sourceVertices[i]*size, at=base+i*size; for (let k=0;k<size;k++) array[at+k]=source[from+k]; }
@@ -1246,7 +1266,7 @@ async function buildElementRenderTier(THREE, sceneGroup, meta, layerKey) {
         ranges.push({id:part.id,start:indexOffset,count:localIndices.length,vertexStart:vertexOffset,vertexCount:sourceVertices.length});
         indexOffset+=localIndices.length;vertexOffset+=sourceVertices.length;
       }
-      for(const [name,array]of Object.entries(arrays))geometry.setAttribute(name,new THREE.BufferAttribute(array,sizes[name]));
+      for(const [name,array]of Object.entries(arrays))geometry.setAttribute(name,new THREE.BufferAttribute(array,sizes[name],name==='color'&&!!colour));
       geometry.setIndex(new THREE.BufferAttribute(indices,1));geometry.computeBoundingBox();geometry.computeBoundingSphere();
       const material=prepareMaterial(p.material);material.vertexColors=true;
       const mesh=p.isLine?new THREE.LineSegments(geometry,material):new THREE.Mesh(geometry,material);
