@@ -8,9 +8,8 @@ import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 const THREE = await import(process.env.THREE_MODULE ? pathToFileURL(process.env.THREE_MODULE).href : 'three');
 const AsBuilt = createRequire(import.meta.url)('../twin/as-built.js');
-const html = fs.readFileSync(new URL('../scan-bim.html', import.meta.url), 'utf8');
-const source = html.slice(html.indexOf('/* Runtime-only draw-call tier.'), html.indexOf('/* ELEMENT DATA HELPERS */'));
-const ctx = vm.createContext({console, setTimeout}); vm.runInContext(source, ctx);
+// scan-bim.html imports this module (tests/render-tier-drift.test.mjs checks the import), so this is its runtime tier.
+const ctx = await import('../viewer-src/bim-explorer/render-tier.mjs');
 const meta = {a: {levelKey: 'L1', type: 'light'}, b: {levelKey: 'L1', type: 'light'}};
 const mat = new THREE.MeshStandardMaterial({color: 0xffffff});
 function quad() { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], 3)); g.setIndex([0, 1, 2, 0, 2, 3]); return g; }

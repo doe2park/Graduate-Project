@@ -1,4 +1,4 @@
-/* Merged-batch colour storage in viewer-src/bim-explorer/render-tier.mjs and the inline copy in scan-bim.html.
+/* Merged-batch colour storage in viewer-src/bim-explorer/render-tier.mjs (bundled by the explorer, imported by scan-bim.html).
    The colour attribute exists for the selection highlight. It is stored as normalized Uint8 (white or Uint8 source colours)
    or Uint16 (Uint16 sources), and stays Float32 for float sources, so no source colour value changes. Highlight must
    restore the stored integers exactly. Needs Three.js: THREE_MODULE, else tools/node_modules/three, else 'three'. */
@@ -10,11 +10,7 @@ import {pathToFileURL, fileURLToPath} from 'node:url';
 const local = fileURLToPath(new URL('../tools/node_modules/three/build/three.module.js', import.meta.url));
 const THREE = await import(process.env.THREE_MODULE ? pathToFileURL(process.env.THREE_MODULE).href : fs.existsSync(local) ? pathToFileURL(local).href : 'three');
 const mod = await import('../viewer-src/bim-explorer/render-tier.mjs');
-const html = fs.readFileSync(new URL('../scan-bim.html', import.meta.url), 'utf8');
-// typed-array constructors from this realm, so the copy's instanceof checks see the arrays built here (one realm in a browser)
-const ctx = vm.createContext({console, setTimeout, Uint8Array, Uint16Array, Uint32Array, Float32Array});
-vm.runInContext(html.slice(html.indexOf('/* Runtime-only draw-call tier.'), html.indexOf('/* ELEMENT DATA HELPERS */')), ctx);
-const tiers = [['render-tier.mjs', mod], ['scan-bim.html copy', ctx]];
+const tiers = [['render-tier.mjs (also used by scan-bim.html)', mod]];
 const kind = a => Object.prototype.toString.call(a).slice(8, -1);
 const meta = {a: {levelKey: 'L1', type: 't'}, b: {levelKey: 'L1', type: 't'}};
 
